@@ -1,0 +1,34 @@
+# AI Governance Platform - Terraform Variables (Production)
+# Production-grade settings with HA Redis and Cloud SQL
+
+project_id      = "kentron-production"
+region          = "us-central1"
+environment     = "prod"
+platform_domain = "app.kentron.ai"
+image_tag       = "latest"
+log_level       = "INFO"
+
+# Performance tuning
+controlnet_min_instances = 2
+controlnet_max_instances = 20
+web_min_instances        = 1
+web_max_instances        = 10
+
+# Redis configuration - HA for production
+redis_tier      = "STANDARD_HA"
+redis_memory_gb = 4
+
+# ONNX Configuration - Optimized for high concurrency
+onnx_intra_op_num_threads = 1
+onnx_inter_op_num_threads = 1
+onnx_execution_mode       = "SEQUENTIAL"
+
+# Clerk Configuration
+clerk_frontend_api = "clerk.kentron.ai"
+
+# Hugging Face token comes from Secret Manager (hf-token)
+
+# Database configuration
+# Database is provisioned externally (not managed by Terraform)
+# DATABASE_URL is stored in Secret Manager and managed manually
+

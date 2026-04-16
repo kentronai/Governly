@@ -1,0 +1,709 @@
+#!/bin/bash
+# AI Governance Platform - Development CLI
+# Unified interface for all development tasks
+# Usage: ./dev <command> [options]
+
+set -e
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Configuration
+PROJECT_ID="${GCP_PROJECT_ID:-kn-dev-01}"
+REGION="${GCP_REGION:-us-central1}"
+
+# Helper function
+info() { echo -e "${BLUE}ℹ${NC} $1"; }
+success() { echo -e "${GREEN}✅${NC} $1"; }
+warn() { echo -e "${YELLOW}⚠️${NC} $1"; }
+error() { echo -e "${RED}❌${NC} $1"; exit 1; }
+
+# Show usage
+show_usage() {
+    echo -e "╔════════════════════════════════════════════════════════════════╗"
+    echo -e "║                                                                ║"
+    echo -e "║   ${GREEN}🚀 AI Governance Platform - Development CLI${NC}               ║"
+    echo -e "║                                                                ║"
+    echo -e "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo -e "${BLUE}━━━ 🏃 Quick Start ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${GREEN}Local Development:${NC}"
+    echo -e "    ./dev up              Start local services"
+    echo -e "    ./dev logs            Watch logs"
+    echo ""
+    echo -e "  ${GREEN}Deploy to GCP:${NC}"
+    echo -e "    ./dev deploy          Deploy everything (builds + infra + services)"
+    echo -e "    ./dev deploy:service  Deploy single service (faster, uses existing image)"
+    echo ""
+    echo -e "${BLUE}━━━ 🛠️  Development ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  up              🟢 Start all services"
+    echo "  down            🔴 Stop all services"
+    echo "  restart         🔄 Restart services"
+    echo "  logs            📜 View local logs (add service name for specific)"
+    echo "  logs:gcp        ☁️  Stream GCP Cloud Run logs (interactive)"
+    echo "  logs:search     🔍 Search GCP logs by term"
+    echo "  logs:errors     🚨 Stream ERROR logs from GCP"
+    echo "  shell           💻 Open shell in container"
+    echo "  clean           🗑️  Clean volumes and caches"
+    echo ""
+    echo -e "${BLUE}━━━ 🔨 Build & Deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  build           🔨 Build Docker images locally"
+    echo "  deploy          🚀 Deploy to GCP (builds + infra + services)"
+    echo "  deploy:service  📦 Deploy single service (interactive)"
+    echo "  promote         🎯 Promote images between environments"
+    echo "  status          📊 Check deployment status"
+    echo ""
+    echo -e "${BLUE}━━━ ✅ Quality & Testing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  verify          ✅ Pre-commit checks (run before git push)"
+    echo "  test            🧪 Run test suite"
+    echo "  lint            🔍 Check code quality"
+    echo "  format          ✨ Auto-format code"
+    echo ""
+    echo -e "${BLUE}━━━ 🗄️  Data & Infrastructure ━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  redis           🔴 Connect to Redis CLI (local)"
+    echo "  db:migrate      📦 Run database migrations (local)"
+    echo ""
+    echo -e "${BLUE}━━━ 🔧 Utilities ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  env:show        📋 Show environment config"
+    echo "  health          💚 Check all service health"
+    echo "  onnx:debug      🔍 Debug ONNX service (models, health, logs)"
+    echo "  help            ❓ Show this menu"
+    echo ""
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+}
+
+# Commands implementation
+cmd_up() {
+    info "Starting all services..."
+    
+    # ========================================================
+    # Check for GCP Application Default Credentials (ADC)
+    # ========================================================
+    ADC_PATH="$HOME/.config/gcloud/application_default_credentials.json"
+    
+    if [ ! -f "$ADC_PATH" ]; then
+        echo ""
+        warn "GCP credentials not found!"
+        echo ""
+        echo "  Application Default Credentials (ADC) are required for:"
+        echo "  - LanceDB connection to GCS"
+        echo "  - ONNX model loading from GCS"
+        echo "  - Risk detection features"
+        echo ""
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}💡 SETUP (One-Time):${NC}"
+        echo ""
+        echo "  1. Authenticate with GCP:"
+        echo -e "     ${BLUE}gcloud auth application-default login${NC}"
+        echo ""
+        echo "  2. Set your project:"
+        echo -e "     ${BLUE}gcloud config set project YOUR_PROJECT_ID${NC}"
+        echo ""
+        echo "  3. Verify credentials created:"
+        echo -e "     ${BLUE}ls -la ~/.config/gcloud/application_default_credentials.json${NC}"
+        echo ""
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        read -p "Run authentication now? (Y/n) " -n 1 -r
+        echo
+        
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            info "Running gcloud authentication..."
+            gcloud auth application-default login
+            
+            if [ $? -eq 0 ]; then
+                success "Authentication complete!"
+                echo ""
+                info "Configure your GCP project:"
+                echo -e "     ${BLUE}gcloud config set project YOUR_PROJECT_ID${NC}"
+                echo ""
+            else
+                error "Authentication failed. Please try again manually."
+            fi
+        else
+            echo ""
+            warn "Skipping authentication. Services may fail to start."
+            warn "Run 'gcloud auth application-default login' before starting services."
+            echo ""
+            read -p "Continue anyway? (y/N) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                info "Aborted. Run './dev up' again after authentication."
+                exit 0
+            fi
+        fi
+    else
+        success "GCP credentials found at $ADC_PATH"
+    fi
+    
+    echo ""
+    info "Starting Docker services..."
+    docker-compose -f docker-compose.dev.yml up -d
+    
+    echo ""
+    success "Services started! 🚀"
+    echo ""
+    echo -e "  Access:"
+    echo -e "    - All services: ${BLUE}http://localhost${NC}"
+    echo -e "    - ControlNet API: ${BLUE}http://localhost:8000${NC}"
+    echo -e "    - ONNX Service: ${BLUE}http://localhost:8002${NC}"
+    echo -e "    - Web App: ${BLUE}http://localhost:3000${NC}"
+    echo -e "    - ModelGuard: ${BLUE}http://localhost:8001${NC}"
+    echo ""
+    echo -e "  Next steps:"
+    echo -e "    - View logs: ${GREEN}./dev logs${NC}"
+    echo -e "    - Check health: ${GREEN}./dev health${NC}"
+    echo -e "    - Open shell: ${GREEN}./dev shell${NC}"
+    echo ""
+}
+
+cmd_down() {
+    info "Stopping all services..."
+    docker-compose -f docker-compose.dev.yml down
+    success "Services stopped"
+}
+
+cmd_restart() {
+    cmd_down
+    cmd_up
+}
+
+cmd_logs() {
+    local service="$1"
+    if [ -z "$service" ]; then
+        docker-compose -f docker-compose.dev.yml logs -f --tail=100
+    else
+        docker-compose -f docker-compose.dev.yml logs -f --tail=100 "$service"
+    fi
+}
+
+cmd_logs_gcp() {
+    local service="$1"
+    
+    # Interactive prompt if no service specified
+    if [ -z "$service" ]; then
+        echo ""
+        info "Select GCP service to stream logs from:"
+        echo ""
+        echo "  1) ControlNet Gateway"
+        echo "  2) Web App"
+        echo "  3) Model Guard"
+        echo "  4) ONNX Service"
+        echo "  5) All Cloud Run Services"
+        echo "  6) List available services first"
+        echo ""
+        read -p "Enter choice (1-6): " choice
+        
+        case "$choice" in
+            1) service="controlnet-gateway" ;;
+            2) service="web-app" ;;
+            3) service="model-guard" ;;
+            4) service="onnx-inference-service" ;;
+            5) service="all" ;;
+            6) 
+                info "Fetching available Cloud Run services..."
+                echo ""
+                gcloud run services list --project="$PROJECT_ID" --region="$REGION" 2>/dev/null
+                echo ""
+                read -p "Enter service name: " service
+                [ -z "$service" ] && error "Service name required"
+                ;;
+            *) error "Invalid choice" ;;
+        esac
+    fi
+    
+    # Check log severity level
+    echo ""
+    info "Select log level to stream:"
+    echo ""
+    echo "  1) All logs"
+    echo "  2) INFO and above (default)"
+    echo "  3) WARNING and above"
+    echo "  4) ERROR only"
+    echo ""
+    read -p "Enter choice (1-4, default 2): " level_choice
+    level_choice=${level_choice:-2}
+    
+    local severity_filter=""
+    case "$level_choice" in
+        1) severity_filter="" ;;
+        2) severity_filter="severity>=INFO" ;;
+        3) severity_filter="severity>=WARNING" ;;
+        4) severity_filter="severity>=ERROR" ;;
+    esac
+    
+    # Select time window
+    echo ""
+    info "Select time window:"
+    echo ""
+    echo "  1) Last 5 minutes"
+    echo "  2) Last 1 hour (default)"
+    echo "  3) Last 24 hours"
+    echo ""
+    read -p "Enter choice (1-3, default 2): " time_choice
+    time_choice=${time_choice:-2}
+    
+    local freshness=""
+    case "$time_choice" in
+        1) freshness="5m" ;;
+        2) freshness="1h" ;;
+        3) freshness="24h" ;;
+    esac
+    
+    info "Streaming GCP logs for $service..."
+    echo ""
+    
+    if [ "$service" = "all" ]; then
+        # Stream logs from all Cloud Run services
+        local filter="resource.type=\"cloud_run_revision\""
+        [ -n "$severity_filter" ] && filter="$filter AND $severity_filter"
+        
+        info "Streaming combined logs (refreshing every 5s, Ctrl+C to stop)..."
+        info "Filter: $filter"
+        echo ""
+        
+        # First check if there are any logs
+        local test_result=$(gcloud logging read "$filter" \
+            --project="$PROJECT_ID" \
+            --limit=1 \
+            --freshness="$freshness" \
+            2>&1)
+        
+        if [ -z "$test_result" ] || echo "$test_result" | grep -q "ERROR"; then
+            warn "No logs found or error accessing logs. Showing recent Cloud Run activity..."
+            echo ""
+            gcloud logging read "resource.type=\"cloud_run_revision\"" \
+                --project="$PROJECT_ID" \
+                --limit=10 \
+                --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),resource.labels.service_name,severity,textPayload)" \
+                --freshness="24h"
+            exit 0
+        fi
+        
+        # Use continuous polling
+        echo -e "${BLUE}━━━ GCP Logs Stream ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo "Project: $PROJECT_ID | Filter: $filter"
+        echo "Showing last 25 entries | Updates append below | Press Ctrl+C to stop"
+        echo ""
+        
+        while true; do
+            gcloud logging read "$filter" \
+                --project="$PROJECT_ID" \
+                --limit=25 \
+                --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),resource.labels.service_name:label=SERVICE,severity:label=LEVEL,textPayload:label=MESSAGE)" \
+                --freshness="$freshness" \
+                2>/dev/null && echo "" || echo "No new logs..."
+            
+            echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            sleep 5
+        done
+    else
+        # Stream logs from specific service
+        local filter="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$service\""
+        [ -n "$severity_filter" ] && filter="$filter AND $severity_filter"
+        
+        info "Streaming logs from $service (refreshing every 5s, Ctrl+C to stop)..."
+        info "Filter: $filter"
+        echo ""
+        
+        # First check if service exists and has logs
+        local test_result=$(gcloud logging read "$filter" \
+            --project="$PROJECT_ID" \
+            --limit=1 \
+            --freshness="$freshness" \
+            2>&1)
+        
+        if [ -z "$test_result" ] || echo "$test_result" | grep -q "ERROR"; then
+            warn "No logs found for service '$service'"
+            echo ""
+            info "Available Cloud Run services:"
+            gcloud run services list --project="$PROJECT_ID" --region="$REGION" --format="value(metadata.name)" 2>/dev/null
+            exit 0
+        fi
+        
+        echo -e "${BLUE}━━━ GCP Logs: $service ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo "Project: $PROJECT_ID | Updates append below | Press Ctrl+C to stop"
+        echo ""
+        
+        while true; do
+            gcloud logging read "$filter" \
+                --project="$PROJECT_ID" \
+                --limit=25 \
+                --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),severity:label=LEVEL,textPayload:label=MESSAGE)" \
+                --freshness="$freshness" \
+                2>/dev/null && echo "" || echo "No new logs..."
+            
+            echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            sleep 5
+        done
+    fi
+}
+
+cmd_logs_gcp_search() {
+    local search_term="$1"
+    
+    if [ -z "$search_term" ]; then
+        read -p "Enter search term: " search_term
+        [ -z "$search_term" ] && error "Search term is required"
+    fi
+    
+    info "Searching GCP logs for: $search_term"
+    echo ""
+    
+    # Search in last 1 hour by default
+    local filter="resource.type=\"cloud_run_revision\" AND textPayload=~\"$search_term\""
+    
+    gcloud logging read "$filter" \
+        --project="$PROJECT_ID" \
+        --limit=50 \
+        --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),resource.labels.service_name,severity,textPayload)" \
+        --freshness=1h
+}
+
+cmd_logs_gcp_errors() {
+    info "Streaming ERROR logs from all GCP services (refreshing every 5s, Ctrl+C to stop)..."
+    echo ""
+    
+    local filter="resource.type=\"cloud_run_revision\" AND severity>=ERROR"
+    
+    while true; do
+        gcloud logging read "$filter" \
+            --project="$PROJECT_ID" \
+            --limit=15 \
+            --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),resource.labels.service_name,severity,textPayload)" \
+            --freshness=10s \
+            2>/dev/null
+        sleep 5
+        printf "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    done
+}
+
+cmd_onnx_debug() {
+    local service_name="onnx-inference-service-dev"
+    
+    info "ONNX Service Diagnostics"
+    echo ""
+    
+    # Get service URL
+    info "Fetching service URL..."
+    local service_url=$(gcloud run services describe "$service_name" \
+        --region="$REGION" \
+        --project="$PROJECT_ID" \
+        --format='value(status.url)' 2>/dev/null)
+    
+    if [ -z "$service_url" ]; then
+        error "Service not found: $service_name"
+    fi
+    
+    echo "Service URL: $service_url"
+    echo ""
+    
+    # Check health
+    info "Checking health endpoint..."
+    curl -s "$service_url/health" | jq '.' || echo "Failed to fetch health"
+    echo ""
+    
+    # Check model cache
+    info "Checking loaded models..."
+    curl -s "$service_url/models" | jq '.' || echo "Failed to fetch models"
+    echo ""
+    
+    # Check recent logs for PII
+    info "Recent PII-related logs (last 10 minutes)..."
+    gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$service_name\" AND textPayload:\"pii\"" \
+        --project="$PROJECT_ID" \
+        --limit=10 \
+        --format="table(timestamp.date('%Y-%m-%d %H:%M:%S'),severity,textPayload)" \
+        --freshness=10m
+    echo ""
+    
+    # Show current revision
+    info "Current revision details..."
+    gcloud run revisions list \
+        --service="$service_name" \
+        --region="$REGION" \
+        --project="$PROJECT_ID" \
+        --limit=1 \
+        --format="table(metadata.name,status.conditions[0].lastTransitionTime,metadata.labels)"
+}
+
+cmd_shell() {
+    local service="${1:-controlnet}"
+    info "Opening shell in $service..."
+    docker-compose -f docker-compose.dev.yml exec "$service" /bin/bash
+}
+
+cmd_clean() {
+    warn "This will remove all Docker volumes and caches"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        docker-compose -f docker-compose.dev.yml down -v
+        docker system prune -af
+        success "Cleaned"
+    fi
+}
+
+cmd_build() {
+    info "Building all services locally..."
+    export DOCKER_BUILDKIT=1
+    docker-compose -f docker-compose.dev.yml build
+    success "Build complete"
+}
+
+cmd_deploy() {
+    info "Deploying to GCP (builds all images + applies infrastructure)..."
+    echo ""
+    echo "This will:"
+    echo "  1. Build all Docker images in Cloud Build"
+    echo "  2. Apply Terraform infrastructure"
+    echo "  3. Deploy all services to Cloud Run"
+    echo "  4. Run database migrations"
+    echo ""
+    
+    # Use the unified deployment script
+    bash infra/scripts/deploy.sh --project "$PROJECT_ID" --env dev --image-tag latest
+}
+
+cmd_deploy_service() {
+    local service="$1"
+    
+    # Interactive prompt if no service specified
+    if [ -z "$service" ]; then
+        echo ""
+        info "Select service to deploy:"
+        echo ""
+        echo "  1) ControlNet Gateway"
+        echo "  2) Web App"
+        echo "  3) Model Guard"
+        echo "  4) ONNX Service"
+        echo ""
+        read -p "Enter choice (1-4): " choice
+        
+        case "$choice" in
+            1) service="controlnet" ;;
+            2) service="web" ;;
+            3) service="model-guard" ;;
+            4) service="onnx-service" ;;
+            *) error "Invalid choice" ;;
+        esac
+    fi
+    
+    # Map service name to Cloud Run service and image names
+    local cloud_run_service=""
+    local image_name=""
+    
+    case "$service" in
+        controlnet)
+            cloud_run_service="controlnet-gateway-dev"
+            image_name="controlnet"
+            ;;
+        web)
+            cloud_run_service="web-app-dev"
+            image_name="web"
+            ;;
+        model-guard)
+            cloud_run_service="model-guard-dev"
+            image_name="model-guard"
+            ;;
+        onnx-service)
+            cloud_run_service="onnx-inference-service-dev"
+            image_name="onnx-inference-service-dev"
+            ;;
+        *)
+            error "Unknown service: $service"
+            ;;
+    esac
+    
+    info "Deploying $service to Cloud Run..."
+    echo ""
+    echo "Service: $cloud_run_service"
+    echo "Image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/ai-governance/${image_name}:latest"
+    echo ""
+    warn "This uses the EXISTING image from Artifact Registry."
+    warn "To rebuild the image first, use: ./dev deploy"
+    echo ""
+    read -p "Continue? (Y/n) " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        info "Cancelled"
+        exit 0
+    fi
+    
+    info "Updating Cloud Run service..."
+    gcloud run deploy "$cloud_run_service" \
+        --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/ai-governance/${image_name}:latest" \
+        --region="$REGION" \
+        --project="$PROJECT_ID" \
+        --quiet
+    
+    if [ $? -eq 0 ]; then
+        success "Deployment complete!"
+        echo ""
+        info "Service URL:"
+        gcloud run services describe "$cloud_run_service" \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(status.url)"
+    else
+        error "Deployment failed"
+    fi
+}
+
+cmd_promote() {
+    info "Image Promotion - Promote images between environments"
+    echo ""
+    echo "This copies existing images from one project to another"
+    echo "without rebuilding, ensuring identical code in all environments."
+    echo ""
+    
+    bash infra/scripts/promote-images.sh "$@"
+}
+
+cmd_status() {
+    info "Checking GCP deployment status..."
+    echo ""
+    echo "ControlNet:"
+    gcloud run services describe controlnet-gateway-dev \
+        --region=$REGION \
+        --project=$PROJECT_ID \
+        --format="table(status.url,status.traffic[0].revisionName,status.traffic[0].percent)" 2>/dev/null || echo "Not deployed"
+    
+    echo ""
+    echo "Web:"
+    gcloud run services describe web-app-dev \
+        --region=$REGION \
+        --project=$PROJECT_ID \
+        --format="table(status.url,status.traffic[0].revisionName,status.traffic[0].percent)" 2>/dev/null || echo "Not deployed"
+    
+    echo ""
+    echo "ModelGuard:"
+    gcloud run services describe model-guard-dev \
+        --region=$REGION \
+        --project=$PROJECT_ID \
+        --format="table(status.url,status.traffic[0].revisionName,status.traffic[0].percent)" 2>/dev/null || echo "Not deployed"
+}
+
+
+cmd_test() {
+    info "Running tests..."
+    cd apps/controlnet && python -m pytest tests/ -v
+    cd ../..
+}
+
+cmd_verify() {
+    bash infra/scripts/verify-before-checkin.sh
+}
+
+cmd_lint() {
+    info "Running linters..."
+    cd apps/controlnet && ruff check . && cd ../..
+}
+
+cmd_format() {
+    info "Formatting code..."
+    cd apps/controlnet && black . && ruff check --fix . && cd ../..
+}
+
+cmd_db_migrate() {
+    info "Running database migrations..."
+    docker-compose -f docker-compose.dev.yml exec controlnet alembic upgrade head
+}
+
+cmd_redis() {
+    info "Connecting to Redis..."
+    docker-compose -f docker-compose.dev.yml exec redis redis-cli
+}
+
+
+cmd_env_sync() {
+    python3 infra/scripts/sync-env.py --check
+}
+
+cmd_env_show() {
+    info "Current environment configuration:"
+    echo ""
+    echo "Project ID: $PROJECT_ID"
+    echo "Region: $REGION"
+    echo ""
+    if [ -f .env ]; then
+        cat .env | grep -v "^#" | grep -v "^$"
+    else
+        warn ".env file not found"
+    fi
+}
+
+cmd_health() {
+    info "Checking service health..."
+    echo ""
+    
+    # Local services
+    echo "Local Services:"
+    curl -s http://localhost:8000/healthz > /dev/null 2>&1 && echo "  ✅ ControlNet (port 8000)" || echo "  ❌ ControlNet"
+    curl -s http://localhost:8002/health > /dev/null 2>&1 && echo "  ✅ ONNX Service (port 8002)" || echo "  ❌ ONNX Service"
+    curl -s http://localhost:3000 > /dev/null 2>&1 && echo "  ✅ Web (port 3000)" || echo "  ❌ Web"
+    curl -s http://localhost:8001/health > /dev/null 2>&1 && echo "  ✅ ModelGuard (port 8001)" || echo "  ❌ ModelGuard"
+    
+    echo ""
+    echo "GCP Services:"
+    # Add GCP health checks
+}
+
+# Main command router
+case "${1:-help}" in
+    # Local Development
+    up) cmd_up ;;
+    down) cmd_down ;;
+    restart) cmd_restart ;;
+    logs) cmd_logs "$2" ;;
+    logs:gcp) cmd_logs_gcp "$2" ;;
+    logs:search) cmd_logs_gcp_search "$2" ;;
+    logs:errors) cmd_logs_gcp_errors ;;
+    shell) cmd_shell "$2" ;;
+    clean) cmd_clean ;;
+    
+    # Building
+    build) cmd_build ;;
+    
+    # Deployment
+    deploy) cmd_deploy ;;
+    deploy:service) cmd_deploy_service "$2" ;;
+    promote) shift; cmd_promote "$@" ;;
+    status) cmd_status ;;
+    
+    # Testing
+    test) cmd_test ;;
+    verify) cmd_verify ;;
+    lint) cmd_lint ;;
+    format) cmd_format ;;
+    
+    # Database (local only)
+    db:migrate) cmd_db_migrate ;;
+    redis) cmd_redis ;;
+    
+    # Utilities
+    env:sync) cmd_env_sync ;;
+    env:show) cmd_env_show ;;
+    health) cmd_health ;;
+    onnx:debug) cmd_onnx_debug ;;
+    
+    # Help
+    help|--help|-h) show_usage ;;
+    
+    *)
+        error "Unknown command: $1\nRun './dev help' for usage"
+        ;;
+esac
+

@@ -1,0 +1,38 @@
+# Copy this file to terraform.tfvars and fill in your values
+# Project-level isolation: Each environment uses a separate GCP project
+# 
+# Environment-specific examples available:
+# - terraform.tfvars.production  (STANDARD_HA Redis, higher scale)
+# - terraform.tfvars.staging     (BASIC Redis, production-like)
+# - terraform.tfvars (current)   (BASIC Redis, demo/dev)
+
+project_id      = "your-gcp-project-id"  # REQUIRED: Your GCP Project ID
+region          = "us-central1"
+environment     = "prod"                 # dev, staging, or prod (aligned with deploy script)
+platform_domain = "your-domain.com"      # REQUIRED: Your custom domain
+image_tag       = "latest"
+log_level       = "INFO"
+
+# Performance tuning
+controlnet_min_instances = 1  # Keep warm for < 100ms p95 latency
+controlnet_max_instances = 10
+web_min_instances        = 0  # Can scale to zero
+web_max_instances        = 5
+
+# Redis configuration
+# Production: STANDARD_HA with 4GB+ for high availability
+# Dev/Staging: BASIC with 1-2GB for cost optimization
+redis_tier      = "STANDARD_HA"  # STANDARD_HA for production, BASIC for dev/staging
+redis_memory_gb = 4              # 1GB for dev, 4GB+ for production
+
+# HuggingFace token is provided via Secret Manager (secret: hf-token)
+
+# ==============================================================================
+# DATABASE CONFIGURATION
+# ==============================================================================
+# Database is provisioned externally (not managed by Terraform)
+# DATABASE_URL is stored in Secret Manager and managed manually
+# 
+# To set DATABASE_URL manually:
+#   echo "postgresql://user:pass@host:port/db" | gcloud secrets versions add database-url --data-file=- --project=YOUR-PROJECT-ID
+

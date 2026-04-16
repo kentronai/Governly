@@ -1,0 +1,56 @@
+# Base image for AI Governance Platform
+# Build once, reuse across all services
+# Saves 3-5 minutes per build
+
+FROM python:3.11-slim AS base
+
+# Install system dependencies (unchanging layer)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    libpq5 \
+    libgomp1 \
+    libprotobuf32 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV (5x faster than pip)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Common Python dependencies (unchanging layer)
+# These are used across multiple services
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system \
+    fastapi==0.109.0 \
+    uvicorn[standard]==0.27.0 \
+    pydantic==2.5.3 \
+    pydantic-settings==2.1.0 \
+    redis==5.0.1 \
+    sqlalchemy==2.0.25 \
+    alembic==1.13.1 \
+    psycopg2-binary==2.9.9 \
+    httpx==0.26.0 \
+    pyjwt==2.8.0 \
+    python-jose[cryptography]==3.3.0 \
+    python-multipart==0.0.6 \
+    # ML dependencies
+    onnxruntime==1.16.3 \
+    sentence-transformers==2.2.2 \
+    transformers==4.36.2 \
+    lancedb==0.3.3 \
+    numpy==1.26.3 \
+    torch==2.1.2 \
+    # Utilities
+    tenacity==8.2.3 \
+    typing-extensions==4.9.0
+
+WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD echo "base image healthy"
+
+# Default command
+CMD ["/bin/bash"]
+

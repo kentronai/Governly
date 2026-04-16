@@ -1,0 +1,31 @@
+# AI Governance Platform - Terraform Variables (Staging)
+# Staging environment mirrors production scale with lower quotas
+
+project_id      = "your-staging-project-id"
+region          = "us-central1"
+environment     = "staging"
+platform_domain = "staging.example.com"
+image_tag       = "latest"
+log_level       = "INFO"
+
+# Performance tuning (closer to prod)
+controlnet_min_instances = 1
+controlnet_max_instances = 12
+web_min_instances        = 1
+web_max_instances        = 6
+
+# Redis configuration - BASIC tier with more memory
+redis_tier      = "BASIC"
+redis_memory_gb = 1
+
+# ONNX Configuration
+onnx_intra_op_num_threads = 1
+onnx_inter_op_num_threads = 1
+onnx_execution_mode       = "SEQUENTIAL"
+
+# Hugging Face token comes from Secret Manager (hf-token)
+
+# Database configuration
+# Database is provisioned externally (not managed by Terraform)
+
+

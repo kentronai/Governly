@@ -1,0 +1,563 @@
+"""
+Default Guardrails Implementation
+
+Core production-ready guardrails for AI safety and content moderation.
+All guards follow CGA architecture with functional programming principles.
+
+Guards:
+1. profanity_detect: T0 regex-based profanity detection
+2. jailbreak_detect: T1 pattern-based jailbreak/prompt injection detection
+3. toxicity_detect: T1 pattern-based toxicity detection
+4. pii_detect: T0 regex-based PII detection with anonymization
+"""
+
+import re
+from typing import List, Literal, Optional, Dict, Any
+
+from cga_core import guard, Violation, Ctx, Either, Right_, Left_, Guard
+
+
+# ============================================================================
+# PROFANITY DETECTION (T0)
+# ============================================================================
+
+# Profanity patterns by severity level
+PROFANITY_PATTERNS = {
+    "mild": [
+        r"\b(?:damn|hell|crap|darn|heck)\b",
+    ],
+    "moderate": [
+        r"\b(?:shit|bitch|ass|bastard|piss|dick|cock)\b",
+        r"\b(?:asshole|bullshit|dumbass|jackass)\b",
+    ],
+    "severe": [
+        r"\b(?:fuck|fucking|fucked|fucker|motherfucker)\b",
+        r"\b(?:cunt|pussy|whore|slut)\b",
+    ],
+}
+
+
+@guard("profanity.detect", tier="T0", description="Detects profane and offensive language", performance_budget_ms=3.0)
+def profanity_detect(
+    threshold: float = 1.0,
+    severity: Literal["low", "med", "high", "critical"] = "high",
+    categories: Optional[List[str]] = None
+) -> Guard:
+    """
+    Detects profane and offensive language using regex patterns.
+    
+    This guard categorizes profanity into mild, moderate, and severe levels
+    and triggers violations based on configurable thresholds.
+    
+    Args:
+        threshold: Minimum number of profane words to trigger violation (default: 1.0)
+        severity: Severity level for violations (low/med/high/critical)
+        categories: List of profanity categories to check (mild/moderate/severe).
+                   If None, checks all categories.
+    
+    Returns:
+        Guard that detects profanity and returns violations if found
+        
+    Example:
+        >>> guard = profanity_detect(threshold=1.0, severity="high")
+        >>> # Will detect any profane word and return a violation
+    """
+    # Validate threshold
+    if threshold < 1.0:
+        raise ValueError(f"Invalid threshold={threshold}. Must be >= 1.0")
+    
+    # Handle string input (convert to list)
+    if isinstance(categories, str):
+        categories = [categories]
+    
+    # Default to checking all categories
+    if categories is None:
+        categories = ["mild", "moderate", "severe"]
+    
+    # Compile patterns for requested categories
+    compiled_patterns = {}
+    for category in categories:
+        if category in PROFANITY_PATTERNS:
+            compiled_patterns[category] = [
+                re.compile(pattern, re.IGNORECASE) 
+                for pattern in PROFANITY_PATTERNS[category]
+            ]
+    
+    async def run(ctx: Ctx) -> Either:
+        """Run profanity detection on context."""
+        # Extract text from context (works for both input and output phases)
+        text = ctx.get("output", "")
+        
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+        
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+        
+        # Detect profanity by category
+        violations = []
+        detected_by_category = {}
+        total_matches = 0
+        
+        for category, patterns in compiled_patterns.items():
+            matches = []
+            for pattern in patterns:
+                found = pattern.findall(text)
+                if found:
+                    matches.extend(found)
+            
+            if matches:
+                detected_by_category[category] = {
+                    "count": len(matches),
+                    "words": list(set(matches))  # Unique words only
+                }
+                total_matches += len(matches)
+        
+        # Check if threshold is met
+        if total_matches >= threshold:
+            # Calculate score based on severity and count
+            category_weights = {"mild": 0.3, "moderate": 0.6, "severe": 1.0}
+            max_weight = max(
+                category_weights.get(cat, 0.5) 
+                for cat in detected_by_category.keys()
+            )
+            score = min(max_weight * (total_matches / threshold), 1.0)
+            
+            violations.append(Violation(
+                rule_id="profanity.detect",
+                severity=severity,
+                message=f"Profanity detected: {total_matches} instances across {len(detected_by_category)} categories",
+                score=score,
+                evidence={
+                    "total_matches": total_matches,
+                    "detected_by_category": detected_by_category,
+                    "threshold": threshold,
+                    "text_length": len(text)
+                }
+            ))
+        
+        return Left_(violations) if violations else Right_(ctx)
+    
+    return run
+
+
+# ============================================================================
+# JAILBREAK DETECTION (T1)
+# ============================================================================
+
+# Jailbreak/prompt injection patterns
+JAILBREAK_PATTERNS = [
+    # Instruction override attempts
+    r"(?i)ignore\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|rules?|prompts?|commands?)",
+    r"(?i)disregard\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions?|rules?|prompts?)",
+    r"(?i)forget\s+(?:all\s+)?(?:previous|prior|earlier)\s+(?:instructions?|rules?|everything)",
+    r"(?i)ignore\s+(?:the\s+)?(?:above|previous)\s+(?:and|then)",
+    
+    # Role-playing attacks
+    r"(?i)you\s+are\s+(?:now\s+)?(?:in\s+)?(?:a\s+)?(?:developer|admin|god|root|sudo|unrestricted|DAN)\s+mode",
+    r"(?i)act\s+as\s+(?:if\s+you\s+are\s+)?(?:a\s+)?(?:DAN|evil|jailbreak|unrestricted|unfiltered)",
+    r"(?i)pretend\s+(?:you\s+are|to\s+be)\s+(?:a\s+)?(?:DAN|evil|unfiltered|unrestricted|without\s+(?:rules|limits))",
+    r"(?i)roleplay\s+as\s+(?:a\s+)?(?:evil|harmful|unrestricted|without.*(?:rules|limits|restrictions))",
+    
+    # System override attempts
+    r"(?i)new\s+instructions?\s+(?:override|replace|supersede|take\s+priority)",
+    r"(?i)system\s+(?:override|bypass|disable)\s+(?:safety|rules?|restrictions?|filters?)",
+    r"(?i)enable\s+(?:developer|admin|god|debug)\s+mode",
+    r"(?i)activate\s+(?:developer|admin|god|debug)\s+mode",
+    
+    # Context manipulation
+    r"(?i)from\s+now\s+on,?\s+you\s+(?:will|must|should)\s+(?:not\s+)?(?:follow|obey|ignore)",
+    r"(?i)you\s+must\s+(?:not\s+)?(?:follow|obey|comply\s+with)\s+(?:any\s+)?(?:previous|earlier)",
+]
+
+
+@guard("jailbreak.detect", tier="T1", description="Detects prompt injection and jailbreak attempts", performance_budget_ms=20.0)
+def jailbreak_detect(
+    threshold: float = 0.6,
+    severity: Literal["low", "med", "high", "critical"] = "critical"
+) -> Guard:
+    """
+    Detects jailbreak and prompt injection attempts.
+    
+    This guard identifies attempts to circumvent AI safety measures through
+    prompt manipulation, role-playing attacks, and instruction override attempts.
+    
+    Args:
+        threshold: Detection threshold (0.0-1.0). Lower values are more sensitive.
+        severity: Severity level for violations (typically critical)
+    
+    Returns:
+        Guard that detects jailbreak attempts
+        
+    Example:
+        >>> guard = jailbreak_detect(threshold=0.6, severity="critical")
+        >>> # Will detect "ignore all previous instructions" type prompts
+    """
+    # Validate threshold
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(f"Invalid threshold={threshold}. Must be between 0.0 and 1.0")
+    
+    # Compile all patterns
+    compiled_patterns = [re.compile(pattern) for pattern in JAILBREAK_PATTERNS]
+    
+    async def run(ctx: Ctx) -> Either:
+        """Run jailbreak detection on context."""
+        # Extract text
+        text = ctx.get("output", "")
+        
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+        
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+        
+        # Count pattern matches
+        pattern_matches = sum(1 for pattern in compiled_patterns if pattern.search(text))
+        
+        # Calculate score based on number of matches
+        # More matches = higher confidence of jailbreak attempt
+        score = min(pattern_matches * 0.25, 1.0)
+        
+        if score >= threshold:
+            violations = [Violation(
+                rule_id="jailbreak.detect",
+                severity=severity,
+                message=f"Jailbreak/prompt injection attempt detected (confidence: {score:.2f})",
+                score=score,
+                evidence={
+                    "pattern_matches": pattern_matches,
+                    "threshold": threshold,
+                    "text_preview": text[:200] + "..." if len(text) > 200 else text
+                }
+            )]
+            return Left_(violations)
+        
+        return Right_(ctx)
+    
+    return run
+
+
+# ============================================================================
+# TOXICITY DETECTION (T1)
+# ============================================================================
+
+# Toxicity patterns by category
+TOXICITY_PATTERNS = {
+    "harassment": [
+        r"(?i)\b(?:kill\s+yourself|kys|hang\s+yourself|jump\s+off|end\s+yourself)\b",
+        r"(?i)\b(?:you\s+should\s+die|you\s+deserve\s+to\s+die|hope\s+you\s+die)\b",
+        r"(?i)\b(?:stupid|idiot|moron|retard|dumbass|imbecile|pathetic)\b",
+        r"(?i)\b(?:worthless|useless|waste\s+of\s+space|piece\s+of\s+(?:shit|crap))\b",
+    ],
+    "hate_speech": [
+        r"(?i)\b(?:nigger|nigga|chink|gook|wetback|spic|kike|heeb|raghead)\b",
+        r"(?i)\b(?:faggot|dyke|tranny|shemale|homo|fag)\b",
+    ],
+    "threats": [
+        r"(?i)\b(?:i\s+will\s+kill|i'll\s+kill|i\s+will\s+murder|i'll\s+murder)\b",
+        r"(?i)\b(?:i\s+will\s+hurt|i'll\s+hurt|i\s+will\s+beat|i'll\s+beat)\b",
+        r"(?i)\b(?:i'm\s+going\s+to\s+(?:kill|hurt|destroy|harm))\b",
+        r"(?i)\b(?:watch\s+out|you're\s+dead|you're\s+gonna\s+(?:die|regret))\b",
+    ],
+    "abuse": [
+        r"(?i)\b(?:rape|rapist|molest)\b",
+        r"(?i)\b(?:whore|slut|prostitute|hooker)\b",
+        r"(?i)\b(?:sexual\s+(?:predator|abuse|harassment|assault))\b",
+    ],
+}
+
+
+@guard("toxicity.detect", tier="T1", description="Detects toxic, harmful, and abusive content", performance_budget_ms=10.0)
+def toxicity_detect(
+    threshold: float = 0.5,
+    severity: Literal["low", "med", "high", "critical"] = "high",
+    categories: Optional[List[str]] = None
+) -> Guard:
+    """
+    Detects toxic, harmful, and abusive content.
+    
+    This guard identifies various forms of toxic content including harassment,
+    hate speech, threats, and abuse. Each category can be weighted differently.
+    
+    Args:
+        threshold: Score threshold for violations (0.0-1.0)
+        severity: Severity level for violations
+        categories: List of toxicity categories to check (harassment/hate_speech/threats/abuse).
+                   If None, checks all categories.
+    
+    Returns:
+        Guard that detects toxic content
+        
+    Example:
+        >>> guard = toxicity_detect(threshold=0.5, categories=["harassment", "threats"])
+        >>> # Will detect harassment and threats only
+    """
+    # Validate threshold
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(f"Invalid threshold={threshold}. Must be between 0.0 and 1.0")
+    
+    # Handle string input (convert to list)
+    if isinstance(categories, str):
+        categories = [categories]
+    
+    # Default to all categories
+    if categories is None:
+        categories = ["harassment", "hate_speech", "threats", "abuse"]
+    
+    # Compile patterns for requested categories
+    compiled_patterns = {}
+    for category in categories:
+        if category in TOXICITY_PATTERNS:
+            compiled_patterns[category] = [
+                re.compile(pattern) for pattern in TOXICITY_PATTERNS[category]
+            ]
+    
+    # Category weights (severity of toxicity type)
+    category_weights = {
+        "harassment": 0.6,
+        "hate_speech": 0.9,
+        "threats": 0.95,
+        "abuse": 0.85,
+    }
+    
+    async def run(ctx: Ctx) -> Either:
+        """Run toxicity detection on context."""
+        # Extract text
+        text = ctx.get("output", "")
+        
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+        
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+        
+        # Detect toxicity by category
+        detected_categories = []
+        total_score = 0.0
+        
+        for category, patterns in compiled_patterns.items():
+            matches = 0
+            for pattern in patterns:
+                matches += len(pattern.findall(text))
+            
+            if matches > 0:
+                # Calculate category score
+                weight = category_weights.get(category, 0.5)
+                category_score = min(matches * weight, 1.0)
+                total_score += category_score
+                
+                detected_categories.append({
+                    "category": category,
+                    "matches": matches,
+                    "score": category_score,
+                    "weight": weight
+                })
+        
+        # Normalize total score
+        total_score = min(total_score, 1.0)
+        
+        if total_score >= threshold:
+            violations = [Violation(
+                rule_id="toxicity.detect",
+                severity=severity,
+                message=f"Toxic content detected (score: {total_score:.2f})",
+                score=total_score,
+                evidence={
+                    "total_score": total_score,
+                    "threshold": threshold,
+                    "detected_categories": detected_categories,
+                    "num_categories": len(detected_categories)
+                }
+            )]
+            return Left_(violations)
+        
+        return Right_(ctx)
+    
+    return run
+
+
+# ============================================================================
+# PII DETECTION (T0)
+# ============================================================================
+
+# PII regex patterns (following OpenAI guardrails-js reference)
+PII_PATTERNS = {
+    # Contact Information
+    "EMAIL": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", re.IGNORECASE),
+    "PHONE": re.compile(r"(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})"),
+    
+    # Financial Information
+    "CREDIT_CARD": re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
+    "BANK_ACCOUNT": re.compile(r"\b\d{8,17}\b"),
+    
+    # Government IDs
+    "SSN": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    "PASSPORT": re.compile(r"\b[A-Z]{1,2}\d{6,9}\b"),
+    "DRIVERS_LICENSE": re.compile(r"\b[A-Z]\d{7,8}\b"),
+    
+    # Technical Identifiers
+    "IP_ADDRESS": re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"),
+    "API_KEY": re.compile(r"\b[Aa][Pp][Ii][-_]?[Kk][Ee][Yy][-_:=\s]*[A-Za-z0-9+/]{20,}\b"),
+    "JWT": re.compile(r"\beyJ[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]*\b"),
+}
+
+# Entity metadata for UI
+PII_ENTITY_INFO = {
+    "EMAIL": {"name": "Email Address", "category": "Contact", "risk": "Medium"},
+    "PHONE": {"name": "Phone Number", "category": "Contact", "risk": "Medium"},
+    "CREDIT_CARD": {"name": "Credit Card", "category": "Financial", "risk": "High"},
+    "BANK_ACCOUNT": {"name": "Bank Account", "category": "Financial", "risk": "High"},
+    "SSN": {"name": "Social Security Number", "category": "Government ID", "risk": "High"},
+    "PASSPORT": {"name": "Passport Number", "category": "Government ID", "risk": "High"},
+    "DRIVERS_LICENSE": {"name": "Driver's License", "category": "Government ID", "risk": "High"},
+    "IP_ADDRESS": {"name": "IP Address", "category": "Technical", "risk": "Low"},
+    "API_KEY": {"name": "API Key", "category": "Credentials", "risk": "High"},
+    "JWT": {"name": "JWT Token", "category": "Credentials", "risk": "High"},
+}
+
+
+@guard("pii.detect", tier="T0", description="Detects and anonymizes Personal Identifiable Information", performance_budget_ms=5.0)
+def pii_detect(
+    types: Optional[List[str]] = None,
+    threshold: float = 1.0,
+    anonymize_mode: Literal["mask", "remove"] = "mask",
+    severity: Literal["low", "med", "high", "critical"] = "high"
+) -> Guard:
+    """
+    Detects Personal Identifiable Information (PII) and provides anonymized version.
+    
+    This guard detects various types of PII using regex patterns and returns
+    violations with anonymized text that can be used programmatically.
+    
+    Supported PII types:
+    - Contact: EMAIL, PHONE
+    - Financial: CREDIT_CARD, BANK_ACCOUNT
+    - Government: SSN, PASSPORT, DRIVERS_LICENSE
+    - Technical: IP_ADDRESS, API_KEY, JWT
+    
+    Args:
+        types: List of PII types to detect. If None, detects all types.
+        threshold: Minimum number of PII instances to trigger violation (default: 1.0)
+        anonymize_mode: How to anonymize PII - "mask" replaces with [TYPE], "remove" removes entirely
+        severity: Severity level for violations
+    
+    Returns:
+        Guard that detects PII and returns violations with anonymized text
+        
+    Example:
+        >>> guard = pii_detect(types=["EMAIL", "PHONE"], anonymize_mode="mask")
+        >>> # Will detect emails and phones, replacing them with [EMAIL] and [PHONE]
+    """
+    # Validate threshold
+    if threshold < 1.0:
+        raise ValueError(f"Invalid threshold={threshold}. Must be >= 1.0")
+    
+    # Handle string input (convert to list)
+    if isinstance(types, str):
+        types = [types]
+    
+    # Default to all PII types
+    if types is None:
+        types = list(PII_PATTERNS.keys())
+    
+    # Validate requested types
+    invalid_types = [t for t in types if t not in PII_PATTERNS]
+    if invalid_types:
+        raise ValueError(f"Invalid PII types: {invalid_types}. Valid types: {list(PII_PATTERNS.keys())}")
+    
+    async def run(ctx: Ctx) -> Either:
+        """Run PII detection on context."""
+        # Extract text
+        text = ctx.get("output", "")
+        
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+        
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+        
+        # Detect PII
+        detected_types = []
+        total_matches = 0
+        anonymized_text = text
+        all_spans = []
+        
+        for pii_type in types:
+            if pii_type not in PII_PATTERNS:
+                continue
+            
+            pattern = PII_PATTERNS[pii_type]
+            matches = list(pattern.finditer(text))
+            
+            if len(matches) > 0:
+                detected_types.append(pii_type)
+                total_matches += len(matches)
+                
+                # Store spans for evidence
+                for match in matches:
+                    all_spans.append({
+                        "start": match.start(),
+                        "end": match.end(),
+                        "text": match.group(),
+                        "type": pii_type
+                    })
+        
+        # Anonymize if PII detected and threshold met
+        if total_matches >= threshold:
+            # Apply anonymization (process from end to start to preserve positions)
+            for span in sorted(all_spans, key=lambda s: s["start"], reverse=True):
+                if anonymize_mode == "mask":
+                    replacement = f"[{span['type']}]"
+                else:  # remove
+                    replacement = ""
+                
+                anonymized_text = (
+                    anonymized_text[:span["start"]] + 
+                    replacement + 
+                    anonymized_text[span["end"]:]
+                )
+            
+            # Get entity info for detected types
+            entity_info = {
+                pii_type: PII_ENTITY_INFO.get(pii_type, {})
+                for pii_type in detected_types
+            }
+            
+            # Calculate score
+            score = min(total_matches / 10.0, 1.0)
+            
+            violations = [Violation(
+                rule_id="pii.detect",
+                severity=severity,
+                message=f"PII detected: {', '.join(detected_types)} ({total_matches} total instances)",
+                score=score,
+                span={"matches": all_spans},
+                evidence={
+                    "detected_types": detected_types,
+                    "total_matches": total_matches,
+                    "anonymized_text": anonymized_text,
+                    "anonymize_mode": anonymize_mode,
+                    "entity_info": entity_info,
+                    "original_text_length": len(text),
+                    "anonymized_text_length": len(anonymized_text),
+                    "threshold": threshold
+                }
+            )]
+            return Left_(violations)
+        
+        return Right_(ctx)
+    
+    return run
+

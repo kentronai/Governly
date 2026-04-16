@@ -1,0 +1,239 @@
+# ===================================
+# Python
+# ===================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+TEST*.xml
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ===================================
+# Node.js / Next.js
+# ===================================
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output
+
+# Next.js
+.next/
+out/
+build
+
+# Production
+/build
+*.tsbuildinfo
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+
+# Vercel
+.vercel
+
+# Turbo
+.turbo
+
+# ===================================
+# Environment variables
+# ===================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+.env.prod
+# ===================================
+# IDEs and editors
+# ===================================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+\#*\#
+.\#*
+
+# ===================================
+# OS generated files
+# ===================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ===================================
+# Machine Learning / AI Models
+# ===================================
+# ONNX models (large binary files)
+*.onnx
+
+# Other ML model formats
+*.pkl
+*.h5
+*.pb
+*.pt
+*.pth
+*.safetensors
+
+# Model directories (uncomment if you don't want to track models)
+# models/
+# checkpoints/
+# weights/
+
+# Model cache directories (runtime downloads)
+model_cache/
+apps/*/model_cache/
+**/model_cache/
+
+# ===================================
+# Docker
+# ===================================
+*.log
+
+# ===================================
+# Database
+# ===================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ===================================
+# Clerk (authentication)
+# ===================================
+.clerk/
+
+# ===================================
+# Terraform
+# ===================================
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+
+# ===================================
+# Temporary files
+# ===================================
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+tmp/
+temp/
+.env
+.env.backup
+
+# ===================================
+# DevContainer (development only)
+# ===================================
+# DevContainer volumes are managed by Docker
+# The .devcontainer/ directory is tracked in git
+ken-dev-config.json
+gcs-credentials.json
+
+
+bun.lock
+prompts.csv
+guard_benchmark_results.csv
+docs-backup/
+apps/controlnet/models/
+apps/controlnet/credentials/
+.env.production
+infra/terraform/tfplan

@@ -1,0 +1,33 @@
+# .gcloudignore - What NOT to upload to Cloud Build
+# This prevents uploading 5.5 GB of local models to GCS!
+
+# CRITICAL: Local model files (4.8 GB!)
+# Use full paths with wildcards
+apps/controlnet/models
+apps/controlnet/model_cache
+apps/controlnet/**/*.onnx
+apps/controlnet/**/*.safetensors
+apps/model-guard/models
+
+# Next.js build artifacts (995 MB!)
+apps/web/.next
+apps/web/node_modules
+.next
+
+# Python virtual environments and cache
+apps/controlnet/.venv
+apps/model-guard/.venv
+**/__pycache__
+**/*.pyc
+
+# Terraform
+infra/terraform/.terraform
+**/.terraform
+
+# Node modules (root)
+node_modules
+
+# Git
+.git
+.gitignore
+

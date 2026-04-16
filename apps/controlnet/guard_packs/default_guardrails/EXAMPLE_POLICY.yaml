@@ -1,0 +1,76 @@
+# Example Policy using Default Guardrails
+# This policy demonstrates the correct naming convention for default guardrails
+
+policy: default-safety-policy
+description: Comprehensive safety policy using all default guardrails
+version: v1
+
+# Input guards - check user messages before sending to LLM
+guards:
+  # T0 Guards (Ultra-fast, < 5ms)
+  - id: pii.detect
+    target: messages[-1].content  # Check only the last user message
+    with:
+      types: ["EMAIL", "PHONE", "SSN", "CREDIT_CARD"]
+      threshold: 1.0
+      anonymize_mode: mask
+      severity: high
+  
+  - id: profanity.detect
+    target: messages[-1].content
+    with:
+      threshold: 1.0
+      categories: ["mild", "moderate", "severe"]
+      severity: high
+  
+  # T1 Guards (Fast, < 20ms)
+  - id: jailbreak.detect
+    target: messages[-1].content
+    with:
+      threshold: 0.6
+      severity: critical
+  
+  - id: toxicity.detect
+    target: messages[-1].content
+    with:
+      threshold: 0.5
+      categories: ["harassment", "hate_speech", "threats", "abuse"]
+      severity: high
+
+# Compose guards - define execution order and logic
+compose:
+  # All input guards must pass (allOf = logical AND)
+  input: allOf(pii_detect, profanity_detect, jailbreak_detect, toxicity_detect)
+  
+  # Output guards (if you want to check LLM responses)
+  output: allOf(pii_detect, toxicity_detect)
+  
+  # Root composition
+  root: input
+
+# Alternative composition examples:
+# ------------------------------
+
+# Example 1: Any violation blocks (default behavior with allOf)
+# compose:
+#   input: allOf(pii_detect, profanity_detect, jailbreak_detect, toxicity_detect)
+#   root: input
+
+# Example 2: Block only on critical issues (jailbreak) but warn on others
+# compose:
+#   critical: jailbreak_detect
+#   warnings: anyOf(pii_detect, profanity_detect, toxicity_detect)
+#   input: allOf(critical, warnings)
+#   root: input
+
+# Example 3: Sequential execution with early exit
+# compose:
+#   input: seq(jailbreak_detect, toxicity_detect, profanity_detect, pii_detect)
+#   root: input
+
+# Example 4: Parallel execution for performance
+# compose:
+#   t0_guards: par(pii_detect, profanity_detect)
+#   t1_guards: par(jailbreak_detect, toxicity_detect)
+#   input: seq(t0_guards, t1_guards)
+#   root: input

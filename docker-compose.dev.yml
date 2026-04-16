@@ -1,0 +1,164 @@
+# Docker Compose for ControlNet Platform - DEVELOPMENT MODE
+# Hot reload enabled, dev servers running
+
+services:
+  # Nginx Reverse Proxy - Single URL Entry Point
+  nginx:
+    image: nginx:alpine
+    container_name: controlnet-nginx
+    restart: unless-stopped
+    depends_on:
+      - controlnet
+      - model-guard
+      - web
+      - onnx-service
+    ports:
+      - "80:80"  # ACCESS EVERYTHING HERE
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: controlnet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_governance
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+    expose:
+      - "5432"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_governance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: controlnet-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ControlNet Gateway (Development Mode)
+  controlnet:
+    build:
+      context: ./apps/controlnet
+      dockerfile: Dockerfile
+    container_name: controlnet-gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Mount source for hot reload
+      - ./apps/controlnet:/app
+      # Mount ADC credentials from host (~/.config/gcloud created by gcloud CLI)
+      - ~/.config/gcloud:/home/controlnet/.config/gcloud:ro
+    command: uvicorn gateway.main:app --reload --host 0.0.0.0 --port 8000
+
+  # ONNX Inference Service (Development Mode)
+  onnx-service:
+    build:
+      context: ./apps/onnx-service
+      dockerfile: Dockerfile
+    container_name: controlnet-onnx-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8002"
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      # Mount source for hot reload
+      - ./apps/onnx-service:/app
+      # Mount ADC credentials from host (~/.config/gcloud created by gcloud CLI)
+      - ~/.config/gcloud:/home/onnx/.config/gcloud:ro
+      # Persistent ONNX model storage (shared with controlnet)
+      - onnx_model_cache:/app/model_cache
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8002
+
+  # ModelGuard (Development Mode)
+  model-guard:
+    build:
+      context: ./apps/model-guard
+      dockerfile: Dockerfile
+    container_name: controlnet-modelguard
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8001"
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    volumes:
+      # Mount source for hot reload
+      - ./apps/model-guard:/app
+      - model_cache:/tmp/model-guard-scans  # Persistent cache for downloaded models
+      # Mount ADC credentials from host
+      - ~/.config/gcloud:/home/modelguard/.config/gcloud:ro
+    command: uvicorn gateway.main:app --reload --host 0.0.0.0 --port 8001
+
+  # Next.js Web App (Development Mode)
+  web:
+    image: node:18-alpine
+    container_name: controlnet-web
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      - controlnet
+    expose:
+      - "3000"
+    env_file:
+      - .env
+    volumes:
+      # Mount source for hot reload
+      - ./apps/web:/app
+      - /app/node_modules  # Don't mount node_modules
+      - /app/.next  # Don't mount .next
+    command: sh -c "npm install && npm run dev"
+
+volumes:
+  postgres_data:  # Persistent PostgreSQL data
+  redis_data:
+  model_cache:  # Persistent storage for ModelGuard scans
+  onnx_model_cache:  # Persistent storage for ONNX models (survives container restarts)
+
+networks:
+  default:
+    name: controlnet-network

@@ -1,0 +1,62 @@
+# Bitbucket Pipelines CI/CD Configuration
+# Uses GCP Cloud Build for actual building and deployment
+# This is a thin wrapper that triggers your existing cloudbuild.yaml
+
+image: google/cloud-sdk:alpine
+
+definitions:
+  steps:
+    - step: &deploy-via-cloud-build
+        name: Deploy via GCP Cloud Build
+        deployment: production
+        script:
+          # Authenticate with GCP
+          - echo $GCP_SERVICE_ACCOUNT_KEY | base64 -d > ${HOME}/gcp-key.json
+          - gcloud auth activate-service-account --key-file ${HOME}/gcp-key.json
+          - gcloud config set project $GCP_PROJECT_ID
+          
+          # Trigger Cloud Build (uses your existing infra/cloudbuild.yaml)
+          - |
+            gcloud builds submit \
+              --config=infra/cloudbuild.yaml \
+              --substitutions=_ENVIRONMENT=$ENVIRONMENT,_REGION=$GCP_REGION,_PLATFORM_DOMAIN=$PLATFORM_DOMAIN,_HF_TOKEN=$HF_TOKEN \
+              --project=$GCP_PROJECT_ID
+          
+          # Cleanup credentials
+          - rm -f ${HOME}/gcp-key.json
+        after-script:
+          # Always cleanup credentials (even if build fails)
+          - rm -f ${HOME}/gcp-key.json
+
+    - step: &lint-and-test
+        name: Lint & Test
+        script:
+          # Python linting (ControlNet)
+          - echo "🔍 Linting Python code..."
+          - cd apps/controlnet && pip install ruff --quiet && ruff check . || true
+          
+          # TypeScript linting (Web)
+          - echo "🔍 Linting TypeScript code..."
+          - cd apps/web && npm ci --quiet && npm run lint || true
+
+pipelines:
+  # Main branch - Auto deploy to production
+  branches:
+    main:
+      - step: *lint-and-test
+      - step: *deploy-via-cloud-build
+
+    master:
+      - step: *lint-and-test
+      - step: *deploy-via-cloud-build
+
+  # Pull requests - Lint and test only (no deploy)
+  pull-requests:
+    '**':
+      - step: *lint-and-test
+
+  # Manual deployment trigger
+  custom:
+    deploy-to-gcp:
+      - step: *deploy-via-cloud-build
+

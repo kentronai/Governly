@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "cga-sdk"
+version = "2.0.0"
+description = "CGA (Comprehensive Guardrails Architecture) SDK - HTTP client for CGA Gateway"
+authors = ["AI Governance Team"]
+packages = [{include = "cga_sdk"}]
+readme = "README.md"
+homepage = "https://github.com/ai-governance/cga-sdk"
+repository = "https://github.com/ai-governance/cga-sdk"
+keywords = ["ai", "guardrails", "safety", "llm", "validation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.28.1"
+
+[tool.poetry.scripts]
+cga-sdk = "cga_sdk.cli:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.25.0"
+mypy = "^1.13.0"
+ruff = "^0.8.0"
+black = "^24.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.black]
+line-length = 100
+target-version = ['py311']

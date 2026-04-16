@@ -1,0 +1,55 @@
+# Docker build context exclusions
+# CRITICAL: Keep image size small by excluding all models and caches
+
+Dockerfile
+.dockerignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env*
+!env.example
+.venv
+venv/
+ENV/
+env/
+.git
+.gitignore
+README.md
+tests/
+demo/
+examples/
+docs/
+.pytest_cache
+.coverage
+htmlcov/
+.mypy_cache
+.ruff_cache
+*.egg-info/
+dist/
+build/
+.DS_Store
+uv.lock
+*.sh
+scripts/
+
+# CRITICAL: Exclude ALL model files and directories (4.8 GB!)
+# Models are downloaded from GCS at runtime - NEVER bundle in image
+models/
+model_cache/
+**/*.onnx
+**/*.pt
+**/*.pth
+**/*.bin
+**/*.safetensors
+**/*.h5
+**/*.pkl
+**/*.pickle
+
+# Large markdown documentation
+*.md
+COMPLETE_ROUTER_IMPLEMENTATION.md
+FINAL_IMPLEMENTATION_SUMMARY.md
+POLICY_FILTERED_ROUTING.md
+PRODUCTION_AUDIT.md

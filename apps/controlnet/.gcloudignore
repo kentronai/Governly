@@ -1,0 +1,45 @@
+# .gcloudignore for apps/controlnet directory
+# Prevents uploading large model files to Cloud Build
+
+# CRITICAL: Local models (4.8 GB!) - NOT needed for build
+models
+model_cache
+*.onnx
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.h5
+
+# Python cache and virtual envs
+__pycache__
+*.pyc
+.venv
+venv
+.pytest_cache
+
+# Build artifacts
+dist
+build
+*.egg-info
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs
+
+# Tests and examples
+tests
+examples
+scripts
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
