@@ -2,6 +2,8 @@ import posthog from 'posthog-js'
 
 if (typeof window !== 'undefined') {
   const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  const sessionRecordingEnabled =
+    process.env.NEXT_PUBLIC_POSTHOG_SESSION_RECORDING === 'true';
   
   if (posthogKey) {    
     posthog.init(posthogKey, {
@@ -12,10 +14,13 @@ if (typeof window !== 'undefined') {
       autocapture: false,
       capture_performance: false,
       capture_heatmaps: false,
-      session_recording: {
-        recordCrossOriginIframes: true,
-      },
-      debug: true, // Enable debug mode temporarily
+      disable_session_recording: !sessionRecordingEnabled,
+      session_recording: sessionRecordingEnabled
+        ? {
+            recordCrossOriginIframes: true,
+          }
+        : undefined,
+      debug: process.env.NEXT_PUBLIC_POSTHOG_DEBUG === 'true',
     
       before_send: (event: any) => {
         // Allow all our custom events
@@ -30,6 +35,10 @@ if (typeof window !== 'undefined') {
           'server_api_error',
           '$pageview'
         ]
+        if (sessionRecordingEnabled && event.event === '$snapshot') {
+          return event
+        }
+
         return allowedEvents.includes(event.event) ? event : null
       },
     })

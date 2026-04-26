@@ -10,6 +10,7 @@ import { createAuditEvent } from "@/lib/server/audit";
 import { eq, and, sql, isNull, or, ilike } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { ensureClerkMirror } from "@/lib/auth/sync-clerk-mirror";
 import {
   getApplicationsWithSummary,
   getArchivedApplications,
@@ -35,10 +36,14 @@ interface UpdateApplicationInput {
 
 // Create application
 export const createApplication = async (input: CreateApplicationInput) => {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
+  }
+
+  if (orgId !== input.tenantId) {
+    throw new Error("Tenant access denied");
   }
 
   if (!input.goviqEnabled && !input.controlnetEnabled) {
@@ -46,6 +51,9 @@ export const createApplication = async (input: CreateApplicationInput) => {
       "At least one module (GovIQ or ControlNet) must be enabled"
     );
   }
+
+  await ensureClerkMirror();
+
   const { application } = await db.transaction(async (tx) => {
     const user = await tx.query.users.findFirst({
       where: eq(users.id, userId),

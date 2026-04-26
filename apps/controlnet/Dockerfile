@@ -18,6 +18,8 @@ RUN groupadd -r controlnet && useradd -r -g controlnet controlnet
 
 # Copy and install dependencies FIRST (better layer caching)
 COPY pyproject.toml ./
+# Preinstall CPU-only Torch so pip does not resolve the large CUDA package set.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch==2.11.0+cpu"
 RUN pip install --no-cache-dir -e .[onnx]
 
 # Copy application code (changes more frequently)

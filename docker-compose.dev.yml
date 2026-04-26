@@ -74,6 +74,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      GCS_MODEL_BUCKET: ""
+      ENABLE_EMBEDDING_ROUTER: "false"
     volumes:
       # Mount source for hot reload
       - ./apps/controlnet:/app
@@ -146,6 +149,8 @@ services:
       - "3000"
     env_file:
       - .env
+      - path: .env.local
+        required: false
     volumes:
       # Mount source for hot reload
       - ./apps/web:/app

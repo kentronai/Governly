@@ -7,6 +7,7 @@ All environment variables are defined here with proper types and defaults.
 
 from typing import Dict, List, Optional
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, field_validator, model_validator, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -225,10 +226,26 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
-        """Ensure database URL uses asyncpg driver"""
+        """Ensure database URL uses asyncpg-compatible driver and options."""
         if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        return v
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        parts = urlsplit(v)
+        query = []
+        for key, value in parse_qsl(parts.query, keep_blank_values=True):
+            if key == "sslmode":
+                query.append(("ssl", value))
+                continue
+
+            # asyncpg does not accept libpq's channel_binding option.
+            if key == "channel_binding":
+                continue
+
+            query.append((key, value))
+
+        return urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+        )
     
     @field_validator("log_level")
     @classmethod
