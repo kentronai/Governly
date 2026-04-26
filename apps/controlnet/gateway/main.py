@@ -2,6 +2,7 @@
 
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Optional
 from gateway.routes import guardrails, policies, cache_admin
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI):
     logger.info("✅ Background tasks list initialized")
     logger.info("gcs_bucket", bucket=settings.gcs_bucket or "NOT SET")
     logger.info("gcs_model_bucket", bucket=settings.gcs_model_bucket or "NOT SET")
+    logger.info("s3_model_bucket", bucket=settings.s3_model_bucket or "NOT SET")
+    logger.info("aws_region", region=settings.aws_region)
     
     # =====================================================
     # Step 2: Policy Cache
@@ -68,33 +71,49 @@ async def lifespan(app: FastAPI):
     logger.info("📦 Initializing LanceDB risk detector...")
     try:
         from cga_core.risk_detector import create_risk_detector
-        
-        if settings.gcs_model_bucket:
-            # Initialize risk detector NOW (not in background task)
-            # This prevents race conditions with incoming requests
-            risk_detector = create_risk_detector(
-                gcs_bucket=settings.gcs_model_bucket
+
+        # Prefer S3 (AWS) if configured, fall back to GCS for backwards compat.
+        bucket_uri: Optional[str] = None
+        if settings.s3_model_bucket:
+            bucket_uri = f"s3://{settings.s3_model_bucket}"
+        elif settings.gcs_model_bucket:
+            bucket_uri = f"gs://{settings.gcs_model_bucket}"
+
+        if not settings.enable_embedding_router:
+            logger.info(
+                "↪️  ENABLE_EMBEDDING_ROUTER=false - skipping LanceDB risk detector init"
             )
-            app.state.risk_detector = risk_detector
-            logger.info("✅ Risk detector ready (LanceDB auto-embedding)")
-        else:
-            logger.warning("⚠️  GCS_MODEL_BUCKET not set - risk detection disabled")
             app.state.risk_detector = None
-        
+        elif bucket_uri:
+            # Wrap in a timeout: if the object store isn't reachable (egress
+            # blocked, missing creds, etc.), don't block startup forever.
+            try:
+                risk_detector = await asyncio.wait_for(
+                    asyncio.to_thread(create_risk_detector, bucket_uri),
+                    timeout=15.0,
+                )
+                app.state.risk_detector = risk_detector
+                logger.info("✅ Risk detector ready (LanceDB auto-embedding)", uri=bucket_uri)
+            except asyncio.TimeoutError:
+                logger.error(
+                    "⏱  Risk detector init timed out after 15s - continuing without it"
+                )
+                app.state.risk_detector = None
+        else:
+            logger.warning(
+                "⚠️  Neither S3_MODEL_BUCKET nor GCS_MODEL_BUCKET set - risk detection disabled"
+            )
+            app.state.risk_detector = None
+
     except FileNotFoundError as e:
-        logger.error(f"❌ GCP credentials not found: {e}")
-        logger.error("")
-        logger.error("💡 SETUP INSTRUCTIONS:")
-        logger.error("   1. Run: gcloud auth application-default login")
-        logger.error("   2. Restart the application")
-        logger.error("")
-        # Set to None instead of failing - allow app to start
+        logger.error(f"❌ Object-storage credentials not found: {e}")
+        logger.error("   For AWS: ensure AWS_ACCESS_KEY_ID/SECRET are set or attach an instance profile")
+        logger.error("   For GCP: run `gcloud auth application-default login`")
         app.state.risk_detector = None
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to initialize risk detector: {e}")
         logger.error("   Risk detection will be disabled")
-        # Set to None instead of failing - graceful degradation
         app.state.risk_detector = None
     
     logger.info("🎉 ControlNet Gateway initialized")

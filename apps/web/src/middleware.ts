@@ -111,7 +111,12 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Anchor the asset extension list with `$` so middleware ALSO runs for
+    // paths like `/foo.js.map` or `/foo.css.br` — without the anchor, the
+    // unanchored lookahead treats them as `.js`/`.css` and skips middleware,
+    // which causes the 404 handler's <ClerkProvider> → auth() to throw with
+    // "Clerk can't detect usage of clerkMiddleware()".
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)$).*)',
     '/(api|trpc)(.*)',
   ],
 };

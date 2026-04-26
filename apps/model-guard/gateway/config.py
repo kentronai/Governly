@@ -65,9 +65,17 @@ class Settings(BaseSettings):
     # AWS Configuration (for S3)
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
-    aws_region: str = "us-east-1"
-    
-    # Google Cloud Storage Configuration
+    aws_region: str = Field(
+        default="us-east-1",
+        validation_alias=AliasChoices("AWS_REGION", "aws_region"),
+    )
+    s3_bucket_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("S3_MODEL_BUCKET", "s3_bucket_name"),
+        description="S3 bucket for model artifacts (preferred over GCS when set)",
+    )
+
+    # Google Cloud Storage Configuration (legacy, kept for back-compat)
     gs_project_id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("GCP_PROJECT_ID", "gs_project_id")

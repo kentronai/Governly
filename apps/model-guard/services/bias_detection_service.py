@@ -208,13 +208,23 @@ class BiasDetectionService:
             print(f"Sensitive columns: {sensitive_columns}")
             print(f"Model GCS URL: {model_gcs_url}")
             
-            # Get GCS configuration
+            # Pick S3 if configured, fall back to GCS for back-compat.
             settings = get_settings()
-            gcs_manager = GCSManager(
-                bucket_name=settings.gs_bucket_name,
-                project_id=settings.gs_project_id,
-                credentials_path=settings.gs_credentials_path
-            )
+            using_s3 = bool(settings.s3_bucket_name)
+            s3_manager = None
+            gcs_manager = None
+            if using_s3:
+                from adapters.s3 import S3Manager
+                s3_manager = S3Manager(
+                    bucket_name=settings.s3_bucket_name,
+                    region=settings.aws_region,
+                )
+            else:
+                gcs_manager = GCSManager(
+                    bucket_name=settings.gs_bucket_name,
+                    project_id=settings.gs_project_id,
+                    credentials_path=settings.gs_credentials_path,
+                )
             
             # Process files in temporary directory
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -241,40 +251,51 @@ class BiasDetectionService:
                 model_sha256 = None
                 
                 if analysis_option == "model-prediction":
-                    print(f"📥 Processing model from GCS: {model_gcs_url}")
+                    print(f"📥 Processing model from object storage: {model_gcs_url}")
                     try:
-                        # Step 1: Download model from user's GCS URL to temporary location
-                        print(f"🔄 Step 1: Downloading model from user's GCS URL...")
-                        
-                        # Parse the user's GCS URL to extract bucket and path
-                        if not model_gcs_url.startswith('gs://'):
-                            raise ValueError(f"Invalid GCS URL format: {model_gcs_url}")
-                        
-                        # Extract bucket and path from gs://bucket/path format
-                        url_parts = model_gcs_url[5:].split('/', 1)  # Remove 'gs://' and split
-                        if len(url_parts) != 2:
-                            raise ValueError(f"Invalid GCS URL format: {model_gcs_url}")
-                        
-                        user_bucket = url_parts[0]
-                        user_gcs_path = url_parts[1]
-                        
-                        # Download from user's bucket to temporary location
-                        temp_model_path = os.path.join(temp_dir, 'user_model.pkl')
-                        
-                        # Use a separate GCS client to download from user's bucket
-                        from google.cloud import storage
-                        user_gcs_client = storage.Client.from_service_account_json(
-                            settings.gs_credentials_path,
-                            project=settings.gs_project_id
-                        )
-                        user_bucket_obj = user_gcs_client.bucket(user_bucket)
-                        user_blob = user_bucket_obj.blob(user_gcs_path)
-                        
-                        if not user_blob.exists():
-                            raise ValueError(f"Model not found at user's GCS URL: {model_gcs_url}")
-                        
-                        user_blob.download_to_filename(temp_model_path)
-                        print(f"✅ Model downloaded from user's GCS to: {temp_model_path}")
+                        # Step 1: Download user-supplied model. Accepts s3:// or gs:// URLs.
+                        print(f"🔄 Step 1: Downloading model from user's object-storage URL...")
+
+                        if model_gcs_url.startswith("s3://"):
+                            url_parts = model_gcs_url[5:].split("/", 1)
+                            if len(url_parts) != 2:
+                                raise ValueError(f"Invalid S3 URL format: {model_gcs_url}")
+                            user_bucket, user_object_path = url_parts
+                            temp_model_path = os.path.join(temp_dir, "user_model.pkl")
+                            import boto3
+                            from botocore.exceptions import ClientError
+                            user_s3 = boto3.client("s3", region_name=settings.aws_region)
+                            try:
+                                user_s3.head_object(Bucket=user_bucket, Key=user_object_path)
+                            except ClientError as exc:
+                                code = exc.response.get("Error", {}).get("Code", "")
+                                if code in {"404", "NoSuchKey", "NotFound"}:
+                                    raise ValueError(f"Model not found at user's S3 URL: {model_gcs_url}")
+                                raise
+                            user_s3.download_file(user_bucket, user_object_path, temp_model_path)
+                            print(f"✅ Model downloaded from user's S3 to: {temp_model_path}")
+                        elif model_gcs_url.startswith("gs://"):
+                            url_parts = model_gcs_url[5:].split("/", 1)
+                            if len(url_parts) != 2:
+                                raise ValueError(f"Invalid GCS URL format: {model_gcs_url}")
+                            user_bucket, user_object_path = url_parts
+                            temp_model_path = os.path.join(temp_dir, "user_model.pkl")
+
+                            from google.cloud import storage
+                            user_gcs_client = storage.Client.from_service_account_json(
+                                settings.gs_credentials_path,
+                                project=settings.gs_project_id,
+                            )
+                            user_bucket_obj = user_gcs_client.bucket(user_bucket)
+                            user_blob = user_bucket_obj.blob(user_object_path)
+                            if not user_blob.exists():
+                                raise ValueError(f"Model not found at user's GCS URL: {model_gcs_url}")
+                            user_blob.download_to_filename(temp_model_path)
+                            print(f"✅ Model downloaded from user's GCS to: {temp_model_path}")
+                        else:
+                            raise ValueError(
+                                f"Invalid object-storage URL format (expected s3:// or gs://): {model_gcs_url}"
+                            )
                         
                         # Step 2: Calculate SHA-256 hash of the downloaded model
                         print(f"🔄 Step 2: Calculating SHA-256 hash...")
