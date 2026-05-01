@@ -99,18 +99,34 @@ class Settings(BaseSettings):
     # =====================================================
     
     gcp_project_id: str = Field(
+        default="",
         validation_alias=AliasChoices("GCP_PROJECT_ID", "gcp_project_id"),
-        description="GCP project ID (required, from GCP_PROJECT_ID env var)"
+        description="GCP project ID (optional when using AWS S3)"
     )
     
     gcs_bucket: str = Field(
+        default="",
         validation_alias=AliasChoices("GS_BUCKET_NAME", "gcs_bucket"),
-        description="GCS bucket for general storage (policies, documents)"
+        description="GCS bucket for general storage (optional when using AWS S3)"
     )
     
     gcs_model_bucket: str = Field(
+        default="",
         validation_alias=AliasChoices("GCS_MODEL_BUCKET", "gcs_model_bucket"),
-        description="GCS bucket for ML models (ONNX, embeddings)"
+        description="GCS bucket for ML models (optional when using AWS S3)"
+    )
+
+    # AWS S3 model bucket (optional alternative to GCS)
+    s3_model_bucket: str = Field(
+        default="",
+        validation_alias=AliasChoices("S3_MODEL_BUCKET", "s3_model_bucket"),
+        description="S3 bucket for ML models (ONNX, embeddings)"
+    )
+
+    aws_region: str = Field(
+        default="us-east-1",
+        validation_alias=AliasChoices("AWS_REGION", "aws_region"),
+        description="AWS region for S3 model bucket"
     )
     
     gcs_credentials_path: str = Field(

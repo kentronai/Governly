@@ -6,12 +6,25 @@ const nextConfig = {
   output: 'standalone',
   images: {
     remotePatterns: [
-      // GCP Storage (ONNX models)
+      // AWS S3 (static assets, integration logos, ONNX model thumbs)
+      {
+        protocol: 'https',
+        hostname: '*.s3.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.s3.us-east-1.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
+      },
+      // Legacy GCP Storage (kept for back-compat with already-published URLs)
       {
         protocol: 'https',
         hostname: 'storage.googleapis.com',
       },
-      // Clerk user avatars (if you use Clerk)
+      // Clerk user avatars
       {
         protocol: 'https',
         hostname: 'img.clerk.com',

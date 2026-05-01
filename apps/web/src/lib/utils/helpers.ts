@@ -355,12 +355,15 @@ export const getStatusIconStyle = (status: StatusType): string =>
 export const getStaticFileUrl = (fileName: string) => {
   // Require environment variable - fail if not set
   const bucketName = process.env.NEXT_PUBLIC_STATIC_FILES_BUCKET;
-  
+
   if (!bucketName) {
     throw new Error('NEXT_PUBLIC_STATIC_FILES_BUCKET environment variable is required');
   }
-  
-  return `https://storage.googleapis.com/${bucketName}/static/${fileName}`;
+
+  // Default to AWS S3 (us-east-1). Override the region via
+  // NEXT_PUBLIC_STATIC_FILES_REGION if the bucket lives elsewhere.
+  const region = process.env.NEXT_PUBLIC_STATIC_FILES_REGION || 'us-east-1';
+  return `https://${bucketName}.s3.${region}.amazonaws.com/static/${fileName}`;
 };
 
 export const deepCompare = (a: any, b: any): boolean => {

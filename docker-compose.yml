@@ -74,6 +74,7 @@ services:
 
   # ControlNet Gateway
   controlnet:
+    image: ai-governance-controlnet:latest
     build:
       context: ./apps/controlnet
       dockerfile: Dockerfile
@@ -91,9 +92,11 @@ services:
     volumes:
       - ./apps/controlnet/policies:/app/policies
       - ./apps/controlnet/guard_packs:/app/guard_packs
-      # Mount ADC credentials from host (~/.config/gcloud created by gcloud CLI)
-      - ~/.config/gcloud:/home/controlnet/.config/gcloud:ro
-      - onnx_model_cache:/app/model_cache  # Persistent ONNX model storage
+      # Bind-mount the new Python source over the cached image so GCS→S3
+      # changes take effect without a rebuild (interpreter reads at startup).
+      - ./apps/controlnet/gateway:/app/gateway:ro
+      - ./apps/controlnet/cga_core:/app/cga_core:ro
+      - onnx_model_cache:/app/model_cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
@@ -102,6 +105,7 @@ services:
 
   # ModelGuard Service
   model-guard:
+    image: ai-governance-model-guard:latest
     build:
       context: ./apps/model-guard
       dockerfile: Dockerfile
@@ -117,15 +121,21 @@ services:
     env_file:
       - .env
     volumes:
-      - model_cache:/tmp/model-guard-scans  # Persistent cache for downloaded models
+      - model_cache:/tmp/model-guard-scans
+      # Bind-mount the new Python source over the cached image (S3 adapter etc.)
+      - ./apps/model-guard/gateway:/app/gateway:ro
+      - ./apps/model-guard/services:/app/services:ro
+      - ./apps/model-guard/adapters:/app/adapters:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      # python:3.11-slim does not ship curl; use python's http client instead.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=5).status==200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   # ONNX Inference Service
   onnx-service:
+    image: ai-governance-onnx-service:latest
     build:
       context: ./apps/onnx-service
       dockerfile: Dockerfile
@@ -141,21 +151,53 @@ services:
     env_file:
       - .env
     volumes:
-      - ~/.config/gcloud:/home/onnx/.config/gcloud:ro
       - onnx_model_cache:/app/model_cache
+      # Bind-mount the only-changed top-level Python file. Need to mount each
+      # file individually because the cached image has additional generated
+      # files in /app that we shouldn't shadow with a directory mount.
+      - ./apps/onnx-service/main.py:/app/main.py:ro
+      - ./apps/onnx-service/config.py:/app/config.py:ro
+      - ./apps/onnx-service/model_loader.py:/app/model_loader.py:ro
+      - ./apps/onnx-service/inference.py:/app/inference.py:ro
+      - ./apps/onnx-service/cache.py:/app/cache.py:ro
+      - ./apps/onnx-service/db.py:/app/db.py:ro
+      - ./apps/onnx-service/middleware.py:/app/middleware.py:ro
+      - ./apps/onnx-service/logging_config.py:/app/logging_config.py:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s  # Allow time to load models
+      start_period: 60s
 
   # Next.js Web App
   web:
+    image: ai-governance-web:latest
     build:
       context: ./apps/web
       dockerfile: Dockerfile
       target: runner
+      args:
+        # Bake NEXT_PUBLIC_* into the client bundle at build time. Compose
+        # substitutes from the .env file in the same directory.
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+        DATABASE_URL: ${DATABASE_URL}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_PLAYGROUND_REQUEST_URL: ${NEXT_PUBLIC_PLAYGROUND_REQUEST_URL:-}
+        NEXT_PUBLIC_STATIC_FILES_BUCKET: ${NEXT_PUBLIC_STATIC_FILES_BUCKET:-}
+        NEXT_PUBLIC_STATIC_FILES_REGION: ${NEXT_PUBLIC_STATIC_FILES_REGION:-us-east-1}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN:-}
+        NEXT_PUBLIC_TENANT_NAME: ${NEXT_PUBLIC_TENANT_NAME:-}
+        NEXT_PUBLIC_TENANT_NAME_AI: ${NEXT_PUBLIC_TENANT_NAME_AI:-}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-}
+        NEXT_PUBLIC_BASE_URL_AI: ${NEXT_PUBLIC_BASE_URL_AI:-}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+        NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-development}
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     container_name: controlnet-web
     restart: unless-stopped
     depends_on:
@@ -165,11 +207,19 @@ services:
       - "8080"  # Internal only
     env_file:
       - .env
+    environment:
+      # Force Next.js standalone server to bind to all interfaces, not the
+      # container's auto-assigned hostname (which makes localhost:8080 from
+      # inside the container fail with "connection refused").
+      HOSTNAME: "0.0.0.0"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      # node:18-alpine has wget but not curl. /api/health may 404 if route is
+      # missing in this build, so accept any 2xx/3xx response from /.
+      test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=5", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:  # Persistent PostgreSQL data

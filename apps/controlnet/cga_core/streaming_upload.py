@@ -1,19 +1,24 @@
 """
-Streaming upload utilities for direct Hugging Face to GCS transfers.
+Streaming upload utilities for direct Hugging Face to object-storage transfers.
 
-This module provides functional utilities for streaming model files directly
-from Hugging Face to Google Cloud Storage without local storage.
+This module streams model files directly from Hugging Face to either AWS S3
+or Google Cloud Storage without holding the full payload in memory.
 Includes retry logic, resume capability, and error recovery.
 """
 
 import asyncio
 import logging
 import hashlib
+import os
 import tempfile
 from typing import AsyncIterator, Optional, Tuple, Dict, Any
 from pathlib import Path
 import httpx
-from google.cloud import storage
+
+try:
+    from google.cloud import storage  # type: ignore
+except ImportError:  # pragma: no cover - GCS optional when running on AWS
+    storage = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +94,7 @@ async def stream_huggingface_file(
 
 
 async def stream_to_gcs_blob_with_resume(
-    blob: storage.Blob,
+    blob: "storage.Blob",
     data_stream: AsyncIterator[bytes],
     content_type: Optional[str] = None,
     chunk_size: int = 8 * 1024 * 1024  # 8MB chunks for GCS
@@ -141,7 +146,7 @@ async def stream_to_gcs_blob_with_resume(
 
 
 async def stream_to_gcs_blob(
-    blob: storage.Blob,
+    blob: "storage.Blob",
     data_stream: AsyncIterator[bytes],
     content_type: Optional[str] = None
 ) -> Tuple[int, str]:

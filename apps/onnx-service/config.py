@@ -60,13 +60,27 @@ class Settings(BaseSettings):
     # =====================================================
     
     gcp_project_id: str = Field(
+        default="",
         validation_alias=AliasChoices("GCP_PROJECT_ID", "gcp_project_id"),
-        description="GCP project ID (required, from GCP_PROJECT_ID env var)"
+        description="GCP project ID (optional when using AWS S3)"
     )
     
     gcs_model_bucket: str = Field(
+        default="",
         validation_alias=AliasChoices("GCS_MODEL_BUCKET", "gcs_model_bucket"),
-        description="GCS bucket for ONNX models (required, format: {project-id}-onnx-models)"
+        description="GCS bucket for ONNX models (optional alternative to S3)"
+    )
+
+    s3_model_bucket: str = Field(
+        default="",
+        validation_alias=AliasChoices("S3_MODEL_BUCKET", "s3_model_bucket"),
+        description="S3 bucket for ONNX models (optional alternative to GCS)"
+    )
+
+    aws_region: str = Field(
+        default="us-east-1",
+        validation_alias=AliasChoices("AWS_REGION", "aws_region"),
+        description="AWS region for S3 model bucket"
     )
     
     onnx_model_cache_path: str = Field(

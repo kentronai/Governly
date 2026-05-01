@@ -28,6 +28,7 @@ from modelguard_core.report.json_report import generate_json_report
 from modelguard_core.report.sarif_report import generate_sarif_report
 from adapters.storage import download_model
 from adapters.gcs import GCSManager
+from adapters.s3 import S3Manager
 from models import ModelArtifact, ModelScan, ScanFinding
 from gateway.db import get_async_session
 from gateway.cache import get_cache_service
@@ -38,17 +39,26 @@ from services.registry_sync_service import get_registry_sync_service
 class ScanService:
     """Main service for model security scanning."""
     
-    def __init__(self, db_session: Optional[AsyncSession] = None, gcs_manager: Optional[GCSManager] = None):
+    def __init__(
+        self,
+        db_session: Optional[AsyncSession] = None,
+        gcs_manager: Optional[GCSManager] = None,
+        s3_manager: Optional[S3Manager] = None,
+    ):
         """
         Initialize scan service.
-        
-        Args:
-            db_session: Optional database session for testing
-            gcs_manager: Optional GCS manager for hybrid storage approach
+
+        Either ``s3_manager`` or ``gcs_manager`` may be supplied for the
+        hybrid (object-store cache + local temp scan) approach. S3 wins when
+        both are provided.
         """
         self.extractors = {}
         self.db_session = db_session
-        self.gcs_manager = gcs_manager
+        self.s3_manager = s3_manager
+        # Keep the legacy attribute name so existing callers using
+        # ``self.gcs_manager`` still work; it's set to whichever manager is
+        # actually active so the hybrid logic is single-path.
+        self.gcs_manager = s3_manager or gcs_manager
         self._register_extractors()
     
     def _register_extractors(self) -> None:
@@ -950,13 +960,19 @@ async def get_scan_service() -> ScanService:
     """
     global _scan_service
     if _scan_service is None:
-        # Initialize GCS manager if configured
+        s3_manager = None
         gcs_manager = None
         try:
             from gateway.config import get_settings
             settings = get_settings()
-            
-            if settings.gs_project_id and settings.gs_bucket_name:
+
+            if settings.s3_bucket_name:
+                s3_manager = S3Manager(
+                    bucket_name=settings.s3_bucket_name,
+                    region=settings.aws_region,
+                )
+                print(f"✅ S3 integration enabled: {settings.s3_bucket_name}")
+            elif settings.gs_project_id and settings.gs_bucket_name:
                 gcs_manager = GCSManager(
                     bucket_name=settings.gs_bucket_name,
                     project_id=settings.gs_project_id,
@@ -964,12 +980,15 @@ async def get_scan_service() -> ScanService:
                 )
                 print(f"✅ GCS integration enabled: {settings.gs_bucket_name}")
             else:
-                print("⚠️  GCS not configured, using local storage only")
-                
+                print("⚠️  Neither S3 nor GCS configured, using local storage only")
+
         except Exception as e:
-            print(f"⚠️  Failed to initialize GCS: {e}")
-        
-        # Get database session
+            print(f"⚠️  Failed to initialize object storage: {e}")
+
         db_session = await get_async_session()
-        _scan_service = ScanService(db_session=db_session, gcs_manager=gcs_manager)
+        _scan_service = ScanService(
+            db_session=db_session,
+            gcs_manager=gcs_manager,
+            s3_manager=s3_manager,
+        )
     return _scan_service

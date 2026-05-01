@@ -1,8 +1,10 @@
 """
-Shared Embedding Store using LanceDB + GCS with Auto-Embedding
+Shared Embedding Store using LanceDB with Auto-Embedding
 
 Uses LanceDB's built-in embedding registry - no manual embedding service needed!
 LanceDB automatically handles embeddings on insert and search.
+
+Supports both AWS S3 (s3://) and GCS (gs://) backends via a bucket URI.
 """
 
 import os
@@ -26,57 +28,69 @@ class DetectedRisk:
 class EmbeddingStore:
     """
     LanceDB-backed risk prompt store with auto-embedding
-    
+
     Features:
     - Auto-embeds text using LanceDB's registry (no manual service!)
     - Stores risk prompts with categories
     - Computes centroids per risk category
     - Fast vector similarity search with ANN
-    - GCS persistence
+    - S3 or GCS persistence (selected via bucket_uri scheme)
     """
-    
+
     def __init__(
         self,
-        gcs_bucket: str,
+        bucket_uri: str,
         table_name: str = "risk_prompts",
         model_name: str = "all-MiniLM-L6-v2"
     ):
-        self.gcs_bucket = gcs_bucket
+        """
+        Args:
+            bucket_uri: Object-storage URI for LanceDB. Either ``s3://<bucket>``
+                or ``gs://<bucket>``. The ``/lancedb`` suffix is added
+                automatically.
+            table_name: LanceDB table name.
+            model_name: Sentence-transformers embedding model.
+        """
+        if not bucket_uri:
+            raise ValueError("bucket_uri is required (e.g. 's3://my-bucket' or 'gs://my-bucket')")
+        # Strip trailing slash and any pre-existing /lancedb suffix
+        normalized = bucket_uri.rstrip("/")
+        if normalized.endswith("/lancedb"):
+            normalized = normalized[: -len("/lancedb")]
+        self.bucket_uri = normalized
         self.table_name = table_name
         self.model_name = model_name
         self.centroids: Dict[str, np.ndarray] = {}
-        
+
         # Initialize LanceDB with auto-embedding
         try:
             import lancedb
             from lancedb.embeddings import get_registry
             from lancedb.pydantic import LanceModel, Vector
-            
+
             # Register embedding model (LanceDB handles all encoding!)
             self.embedding_model = get_registry().get("sentence-transformers").create(
                 name=model_name,
                 device="cpu",
                 normalize=True  # Normalized embeddings for cosine similarity
             )
-            
+
             logger.info(f"✅ Registered embedding model: {model_name}")
-            
-            # Connect to GCS-backed LanceDB
-            uri = f"gs://{gcs_bucket}/lancedb"
-            
-            # ========================================================
-            # SIMPLE: Always use ADC (like production!)
-            # ========================================================
-            logger.info("🔑 Using Application Default Credentials (ADC)")
-            logger.info("   ADC automatically finds credentials from:")
-            logger.info("   1. Cloud Run service account (production)")
-            logger.info("   2. ~/.config/gcloud/application_default_credentials.json (local/Docker)")
-            logger.info("   3. GCE/GKE metadata service (if applicable)")
-            logger.info("")
-            logger.info("   💡 If credentials not found, run: gcloud auth application-default login")
-            
-            # Empty dict = use ADC (no files, no env vars!)
-            self.db = lancedb.connect(uri, storage_options={})
+
+            uri = f"{self.bucket_uri}/lancedb"
+
+            # Pick storage_options based on scheme. boto3/AWS picks creds up
+            # from env vars (AWS_ACCESS_KEY_ID/SECRET) or instance profile.
+            storage_options: Dict[str, str] = {}
+            if uri.startswith("s3://"):
+                logger.info("🔑 Using AWS env credentials / instance profile for S3-backed LanceDB")
+                aws_region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+                if aws_region:
+                    storage_options["region"] = aws_region
+            else:
+                logger.info("🔑 Using Application Default Credentials (ADC) for GCS-backed LanceDB")
+
+            self.db = lancedb.connect(uri, storage_options=storage_options)
             
             # Define schema with auto-embedding
             class RiskPrompt(LanceModel):
@@ -105,14 +119,18 @@ class EmbeddingStore:
             )
         except Exception as e:
             logger.error(f"Failed to initialize LanceDB: {e}")
-            logger.error(f"GCS Bucket: {gcs_bucket}")
-            logger.error(f"LanceDB URI: gs://{gcs_bucket}/lancedb")
+            logger.error(f"LanceDB URI: {self.bucket_uri}/lancedb")
             logger.error("")
             logger.error("💡 TROUBLESHOOTING:")
-            logger.error("   1. Run: gcloud auth application-default login")
-            logger.error(f"   2. Verify GCS bucket exists: gsutil ls gs://{gcs_bucket}")
-            logger.error("   3. Check IAM permissions on bucket")
-            logger.error("   4. Verify gcloud credentials mounted: ls -la ~/.config/gcloud/")
+            if self.bucket_uri.startswith("s3://"):
+                logger.error("   1. Verify AWS_ACCESS_KEY_ID/SECRET are set or instance profile is attached")
+                logger.error(f"   2. Verify S3 bucket exists: aws s3 ls {self.bucket_uri}")
+                logger.error("   3. Check IAM permissions on bucket")
+            else:
+                logger.error("   1. Run: gcloud auth application-default login")
+                logger.error(f"   2. Verify GCS bucket exists: gsutil ls {self.bucket_uri}")
+                logger.error("   3. Check IAM permissions on bucket")
+                logger.error("   4. Verify gcloud credentials mounted: ls -la ~/.config/gcloud/")
             raise
     
     def add_prompts_batch(self, prompts: List[Dict]):
@@ -308,7 +326,7 @@ class EmbeddingStore:
             "risk_categories": unique_categories,
             "centroids": len(self.centroids),
             "model": self.model_name,
-            "storage": f"gs://{self.gcs_bucket}/lancedb/{self.table_name}"
+            "storage": f"{self.bucket_uri}/lancedb/{self.table_name}"
         }
         
         # Category counts (no pandas!)

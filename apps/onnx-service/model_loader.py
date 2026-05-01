@@ -221,51 +221,57 @@ async def fetch_active_models(db_session: AsyncSession) -> list[ModelSpec]:
         raise
 
 
-def load_model_from_gcs(spec: ModelSpec, cache_dir: Path) -> LoadedModel:
+def load_model_from_storage(spec: ModelSpec, cache_dir: Path) -> LoadedModel:
     """
-    Load ONNX model from GCS
+    Load ONNX model from object storage (GCS or S3)
     
     Pure function: ModelSpec → LoadedModel
     Raises on failure (fail-fast)
     """
-    from google.cloud import storage
     import onnxruntime as ort
-    import os
+    from urllib.parse import urlparse
     
     # GCS credentials: Uses Application Default Credentials (ADC) automatically
     # - Cloud Run: Uses service account attached to Cloud Run service
     # - Local dev: Uses gcloud auth credentials
     # - Cloud Build: Uses Cloud Build service account
     
-    # Parse GCS URL
-    if not spec.storage_url.startswith("gs://"):
-        raise ValueError(f"Invalid GCS URL: {spec.storage_url}")
-    
-    parts = spec.storage_url.replace("gs://", "").split("/", 1)
-    if len(parts) != 2:
-        raise ValueError(f"Invalid GCS URL format: {spec.storage_url}")
-    
-    bucket_name, blob_path = parts
+    parsed = urlparse(spec.storage_url)
+    if parsed.scheme not in {"gs", "s3"}:
+        raise ValueError(f"Unsupported model storage URL scheme: {spec.storage_url}")
+
+    bucket_name = parsed.netloc
+    blob_path = parsed.path.lstrip("/")
+    if not bucket_name or not blob_path:
+        raise ValueError(f"Invalid storage URL format: {spec.storage_url}")
     
     # Setup cache path
     cache_file = cache_dir / f"{spec.model_id}.onnx"
     
     # Always ensure model is on disk (ONNX Runtime works better with file paths)
     if not cache_file.exists():
-        # Download from GCS
-        logger.info(f"💾 Downloading from GCS: {spec.storage_url}")
-        
-        # GCS client uses ADC automatically
         from config import get_settings
+
         settings = get_settings()
-        client = storage.Client(project=settings.gcp_project_id)
-        logger.info(f"🔑 Using ADC for GCS access in project: {settings.gcp_project_id}")
-        
-        bucket = client.bucket(bucket_name)
-        blob = bucket.blob(blob_path)
-        
-        model_bytes = blob.download_as_bytes()
-        
+
+        if parsed.scheme == "gs":
+            from google.cloud import storage
+
+            logger.info(f"💾 Downloading from GCS: {spec.storage_url}")
+            client = storage.Client(project=settings.gcp_project_id)
+            logger.info(f"🔑 Using ADC for GCS access in project: {settings.gcp_project_id}")
+
+            bucket = client.bucket(bucket_name)
+            blob = bucket.blob(blob_path)
+            model_bytes = blob.download_as_bytes()
+        else:
+            import boto3
+
+            logger.info(f"💾 Downloading from S3: {spec.storage_url}")
+            s3_client = boto3.client("s3", region_name=settings.aws_region)
+            response = s3_client.get_object(Bucket=bucket_name, Key=blob_path)
+            model_bytes = response["Body"].read()
+
         # Save to disk cache
         cache_file.parent.mkdir(parents=True, exist_ok=True)
         cache_file.write_bytes(model_bytes)
@@ -393,7 +399,7 @@ async def preload_all_models(db_session: AsyncSession, cache_dir: Path) -> dict[
     for spec in model_specs:
         try:
             logger.info(f"🔄 Loading model: {spec.model_id} ({spec.name})")
-            loaded_model = load_model_from_gcs(spec, cache_dir)
+            loaded_model = load_model_from_storage(spec, cache_dir)
             cache_model(loaded_model)
             loaded_count += 1
         except Exception as e:

@@ -14,6 +14,7 @@ from pathlib import Path
 import asyncio
 import json
 import datetime
+import re
 
 from gateway.auth import require_tenant_auth, TenantContext
 from gateway.config import get_settings
@@ -31,6 +32,15 @@ def _get_onnx_registry():
         return None
 
 router = APIRouter(prefix="/v1/models", tags=["models"])
+
+
+def _get_model_storage_backend(settings) -> str:
+    """Pick model storage backend based on configured buckets."""
+    if settings.s3_model_bucket:
+        return "s3"
+    if settings.gcs_model_bucket:
+        return "gcs"
+    return "none"
 
 
 class DownloadRequest(BaseModel):
@@ -71,20 +81,40 @@ async def download_model(
             detail=f"Model {request.model_id} not found in registry"
         )
     
-    # Check if model already exists in GCS
-    if settings.gcs_model_bucket:
+    storage_backend = _get_model_storage_backend(settings)
+
+    # Check if model already exists in remote object storage
+    if storage_backend == "gcs":
         from google.cloud import storage
+
         client = storage.Client()
         bucket = client.bucket(settings.gcs_model_bucket)
         blob = bucket.blob(model_info.model_path)
-        
+
         if blob.exists():
             storage_url = f"gs://{settings.gcs_model_bucket}/{model_info.model_path}"
             return {
                 "status": "already_downloaded",
                 "model_id": request.model_id,
-                "path": storage_url
+                "path": storage_url,
             }
+    elif storage_backend == "s3":
+        import boto3
+        from botocore.exceptions import ClientError
+
+        s3_client = boto3.client("s3", region_name=settings.aws_region)
+        try:
+            s3_client.head_object(Bucket=settings.s3_model_bucket, Key=str(model_info.model_path))
+            storage_url = f"s3://{settings.s3_model_bucket}/{model_info.model_path}"
+            return {
+                "status": "already_downloaded",
+                "model_id": request.model_id,
+                "path": storage_url,
+            }
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code", "")
+            if error_code not in {"404", "NotFound", "NoSuchKey"}:
+                raise
     
     # Check if huggingface_hub is available
     try:
@@ -119,30 +149,52 @@ async def download_model(
                 "url": model_info.source_url
             }
         
-        # Stream directly to GCS (fail-fast if bucket not configured)
-        if not settings.gcs_model_bucket:
+        if storage_backend == "none":
             raise HTTPException(
                 status_code=500,
-                detail="GCS_MODEL_BUCKET not configured. Set GCS_MODEL_BUCKET environment variable."
+                detail="No model bucket configured. Set GCS_MODEL_BUCKET or S3_MODEL_BUCKET."
             )
-        
-        # Stream directly from HuggingFace to GCS using streaming_upload utilities
-        from cga_core.streaming_upload import stream_hf_to_gcs_with_durability
-        
+
         blob_name = str(model_info.model_path)
-        
-        logger.info(f"📥 Streaming model from HuggingFace to GCS: gs://{gcs_bucket}/{blob_name}")
-        
-        # Stream directly to GCS (no local storage)
-        bytes_written, etag, metadata = await stream_hf_to_gcs_with_durability(
-            model_name=repo_id,
-            filename=onnx_files[0],
-            bucket_name=gcs_bucket,
-            gcs_path=blob_name
-        )
-        
-        storage_url = f"gs://{gcs_bucket}/{blob_name}"
-        logger.info(f"✅ Streamed model to GCS: {storage_url} ({bytes_written} bytes)")
+
+        if storage_backend == "gcs":
+            # Stream directly from HuggingFace to GCS using streaming_upload utilities
+            from cga_core.streaming_upload import stream_hf_to_gcs_with_durability
+
+            logger.info(f"📥 Streaming model from HuggingFace to GCS: gs://{settings.gcs_model_bucket}/{blob_name}")
+            bytes_written, etag, metadata = await stream_hf_to_gcs_with_durability(
+                model_name=repo_id,
+                filename=onnx_files[0],
+                bucket_name=settings.gcs_model_bucket,
+                gcs_path=blob_name,
+            )
+            storage_url = f"gs://{settings.gcs_model_bucket}/{blob_name}"
+            logger.info(f"✅ Streamed model to GCS: {storage_url} ({bytes_written} bytes)")
+        else:
+            import shutil
+            import tempfile
+            import boto3
+
+            from huggingface_hub import hf_hub_download
+
+            logger.info(f"📥 Downloading model from HuggingFace for S3 upload: s3://{settings.s3_model_bucket}/{blob_name}")
+            local_model_path = hf_hub_download(repo_id=repo_id, filename=onnx_files[0])
+
+            s3_client = boto3.client("s3", region_name=settings.aws_region)
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_path = temp_file.name
+
+            # Copy into managed temp path so file size and cleanup are deterministic
+            shutil.copyfile(local_model_path, temp_path)
+            s3_client.upload_file(temp_path, settings.s3_model_bucket, blob_name)
+
+            bytes_written = Path(temp_path).stat().st_size
+            etag = ""
+            metadata = {"backend": "s3", "source": "huggingface_hub"}
+            Path(temp_path).unlink(missing_ok=True)
+
+            storage_url = f"s3://{settings.s3_model_bucket}/{blob_name}"
+            logger.info(f"✅ Uploaded model to S3: {storage_url} ({bytes_written} bytes)")
         
         return {
             "status": "downloaded",
@@ -243,7 +295,13 @@ async def download_model_from_url(
                 
                 # Save file with timestamp to ensure uniqueness
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                safe_filename = request.filename.replace('.onnx', '')
+                # Sanitize user-provided filename to avoid accidental nested paths
+                # from values like "foo/bar/model.onnx" or URL-like names.
+                raw_name = Path(request.filename).name
+                base_name = raw_name.replace(".onnx", "")
+                safe_filename = re.sub(r"[^A-Za-z0-9._-]+", "_", base_name).strip("._-")
+                if not safe_filename:
+                    safe_filename = "model"
                 output_filename = f"{safe_filename}_{timestamp}.onnx"
                 output_path = category_dir / output_filename
                 
@@ -280,10 +338,12 @@ async def download_model_from_url(
             logger.warning(f"Model validation failed: {validation_error}")
             # Continue with original model - let ONNX Runtime handle the error
         
-        # Upload to GCS if bucket is configured
+        # Upload to configured object storage if bucket is configured
         storage_url = str(output_path)  # Default to local path
-        
-        if settings.gcs_model_bucket:
+
+        storage_backend = _get_model_storage_backend(settings)
+
+        if storage_backend == "gcs":
             try:
                 from google.cloud import storage
                 client = storage.Client()
@@ -302,6 +362,20 @@ async def download_model_from_url(
                 
             except Exception as e:
                 logger.error(f"Failed to upload to GCS: {e}, using local path")
+        elif storage_backend == "s3":
+            try:
+                import boto3
+
+                blob_name = str(output_path)
+                s3_client = boto3.client("s3", region_name=settings.aws_region)
+
+                logger.info(f"Uploading to S3: s3://{settings.s3_model_bucket}/{blob_name}")
+                s3_client.upload_file(str(output_path), settings.s3_model_bucket, blob_name)
+
+                storage_url = f"s3://{settings.s3_model_bucket}/{blob_name}"
+                logger.info(f"✅ Uploaded to S3: {storage_url}")
+            except Exception as e:
+                logger.error(f"Failed to upload to S3: {e}, using local path")
         
         # Save to database with tenant context in metadata
         try:
@@ -430,10 +504,10 @@ async def download_model_from_url(
         
         return {
             "status": "success",
-            "path": str(output_path),
+            "path": storage_url,
             "size_mb": size_mb,
             "url": request.url,
-            "filename": request.filename,
+            "filename": output_filename,
             "tenant_id": effective_tenant_id,
             "visibility": "tenant" if effective_tenant_id else "shared"
         }
