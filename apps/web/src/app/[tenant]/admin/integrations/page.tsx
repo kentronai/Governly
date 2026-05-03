@@ -32,7 +32,6 @@ import {
 } from "@/lib/api/integrations";
 import { Search, Filter, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { GrIntegration } from "react-icons/gr";
 
 // Default integrations that can be added to the database
 const defaultIntegrations = [
@@ -767,8 +766,7 @@ const _Integrations = () => {
     <div className="flex  flex-col justify-between w-full h-full overflow-hidden">
       <div className="flex w-full h-full relative z-0 overflow-hidden">
         <div className="flex flex-col z-30 p-5 w-full h-[100vh] pl-[15px] relative">
-          {/* Blurred Content */}
-          <div className="blur-[2px] pointer-events-none select-none h-full overflow-hidden">
+          <div className="h-full overflow-hidden">
             <div className="w-full h-full overflow-hidden">
               <div className="border-b border-[#FFFFFF]">
                 <div className="flex overflow-x-hidden">
@@ -1168,17 +1166,6 @@ const _Integrations = () => {
               )}
             </div>
           </div>
-          {/* Coming Soon Overlay - Clear and on top */}
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-[1px] pointer-events-none">
-            <div className="bg-white/95 backdrop-blur-sm px-8 py-4 rounded-lg shadow-lg border border-gray-200">
-              <h2 className="text-2xl font-semibold text-gray-900">
-                Coming Soon
-              </h2>
-              <p className="text-sm text-gray-600 mt-1 text-center">
-                This feature will be available shortly
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1194,9 +1181,9 @@ const _Integrations = () => {
         <DialogContent className="sm:max-w-[425px] bg-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-semibold text-[#18181B]">
-              {selectedIntegration && (
+              {selectedIntegration?.logoUrl && (
                 <Image
-                  src={getStaticFileUrl(selectedIntegration.logoUrl || "")}
+                  src={getStaticFileUrl(selectedIntegration.logoUrl)}
                   width={20}
                   height={20}
                   alt={selectedIntegration.name}
@@ -1236,36 +1223,4 @@ const _Integrations = () => {
   );
 };
 
-const Integrations = () => {
-  return (
-    <div className="flex items-center justify-center min-h-[60vh] p-6">
-      <div className="max-w-2xl text-center space-y-6">
-        {/* Icon */}
-        <div className="flex justify-center mb-4">
-          <div className="p-4 rounded-xl shadow-sm">
-            <GrIntegration className="w-12 h-12 " strokeWidth={1.5} />
-          </div>
-        </div>
-
-        {/* Header */}
-        <h1 className="text-4xl font-bold  tracking-tight">
-          Integration Coming Soon
-        </h1>
-
-        {/* Description */}
-        <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">
-          Integration of key compliance frameworks such as the EU AI Act and ISO
-          42001 is on the way. We’re building unified tools to help you automate
-          assessments, ensure continuous compliance, and stay ahead of evolving
-          AI governance requirements.
-        </p>
-        {/* Subtle divider */}
-        <div className="pt-4">
-          <div className="h-px w-24 bg-muted mx-auto"></div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Integrations;
+export default _Integrations;

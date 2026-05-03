@@ -5,10 +5,10 @@
 
 "use server";
 
-import { db, applications, stakeholders, users, tenants } from "@db";
+import { db, applications, memberships, stakeholders, users, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { eq, and, sql, isNull, or, ilike } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   getApplicationsWithSummary,
@@ -35,7 +35,7 @@ interface UpdateApplicationInput {
 
 // Create application
 export const createApplication = async (input: CreateApplicationInput) => {
-  const { userId } = await auth();
+  const { userId, orgRole } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
@@ -46,8 +46,17 @@ export const createApplication = async (input: CreateApplicationInput) => {
       "At least one module (GovIQ or ControlNet) must be enabled"
     );
   }
+  const clerkUser = await currentUser();
+  const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+  const firstName = clerkUser?.firstName || "";
+  const lastName = clerkUser?.lastName || "";
+  const name =
+    `${firstName} ${lastName}`.trim() ||
+    primaryEmail ||
+    "Unknown user";
+
   const { application } = await db.transaction(async (tx) => {
-    const user = await tx.query.users.findFirst({
+    let user = await tx.query.users.findFirst({
       where: eq(users.id, userId),
       columns: {
         name: true,
@@ -56,8 +65,55 @@ export const createApplication = async (input: CreateApplicationInput) => {
     });
 
     if (!user) {
-      throw new Error(`User with ID ${userId} not found.`);
+      const [syncedUser] = await tx
+        .insert(users)
+        .values({
+          id: userId,
+          email: primaryEmail || `${userId}@unknown.local`,
+          name,
+          firstName,
+          lastName,
+          imageUrl: clerkUser?.imageUrl || null,
+        })
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            email: primaryEmail || `${userId}@unknown.local`,
+            name,
+            firstName,
+            lastName,
+            imageUrl: clerkUser?.imageUrl || null,
+            updatedAt: new Date().toISOString(),
+          },
+        })
+        .returning({
+          name: users.name,
+          email: users.email,
+        });
+
+      user = syncedUser;
     }
+
+    if (!user) {
+      throw new Error(`Unable to sync user with ID ${userId}.`);
+    }
+
+    await tx
+      .insert(memberships)
+      .values({
+        tenantId: input.tenantId,
+        userId,
+        role: orgRole || "member",
+        permissions: [],
+      })
+      .onConflictDoUpdate({
+        target: [memberships.tenantId, memberships.userId],
+        set: {
+          role: orgRole || "member",
+          updatedAt: new Date().toISOString(),
+        },
+      });
+
     const [application] = await tx
       .insert(applications)
       .values({

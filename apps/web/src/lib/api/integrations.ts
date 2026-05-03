@@ -50,11 +50,39 @@ export interface UpdateIntegrationRequest {
 export async function fetchIntegrations(tenantSlugOrId: string): Promise<Integration[]> {
   try {
     const result = await integrationActions.getIntegrations(tenantSlugOrId);
-    return result.integrations_admin as Integration[] || [];
+    return (result.integrations || []).map(toIntegration);
   } catch (error) {
     console.error('Error fetching integrations:', error);
     throw error;
   }
+}
+
+function toIntegration(integration: any): Integration {
+  if (!integration.category || !['data_platforms', 'ml_platforms', 'llm_providers', 'ai_security', 'vector_databases', 'cloud_providers'].includes(integration.category)) {
+    throw new Error('Invalid integration category');
+  }
+
+  return {
+    id: integration.id,
+    tenantId: integration.tenantId,
+    name: integration.name,
+    category: integration.category as Integration['category'],
+    description: integration.description || undefined,
+    isEnabled: integration.isEnabled,
+    isCredentialsAdded: integration.isCredentialsAdded,
+    configuration: (integration.configuration as Record<string, any>) || {},
+    apiKey: integration.credentialsEncrypted || undefined,
+    logoUrl: integration.logoUrl || integration.metadata?.logoUrl || undefined,
+    webhookUrl: integration.webhookUrl || undefined,
+    lastSyncAt: integration.lastSyncAt || undefined,
+    syncStatus: integration.syncStatus || undefined,
+    errorMessage: integration.errorMessage || undefined,
+    metadata: integration.metadata,
+    createdBy: integration.createdBy,
+    updatedBy: integration.updatedBy || undefined,
+    createdAt: integration.createdAt,
+    updatedAt: integration.updatedAt,
+  };
 }
 
 // Create a new integration
@@ -65,31 +93,7 @@ export async function createIntegration(tenantSlugOrId: string, data: CreateInte
       ...data,
     });
     const integration = result.integration;
-    // Transform database record to Integration interface, ensuring category is properly typed
-    if (!integration.category || !['data_platforms', 'ml_platforms', 'llm_providers', 'ai_security', 'vector_databases', 'cloud_providers'].includes(integration.category)) {
-      throw new Error('Invalid integration category');
-    }
-    return {
-      id: integration.id,
-      tenantId: integration.tenantId,
-      name: integration.name,
-      category: integration.category as Integration['category'],
-      description: integration.description || undefined,
-      isEnabled: integration.isEnabled,
-      isCredentialsAdded: integration.isCredentialsAdded,
-      configuration: (integration.configuration as Record<string, any>) || {},
-      apiKey: integration.apiKey || undefined,
-      logoUrl: integration.logoUrl || undefined,
-      webhookUrl: undefined,
-      lastSyncAt: undefined,
-      syncStatus: undefined,
-      errorMessage: undefined,
-      metadata: undefined,
-      createdBy: integration.createdBy,
-      updatedBy: integration.updatedBy || undefined,
-      createdAt: integration.createdAt,
-      updatedAt: integration.updatedAt,
-    };
+    return toIntegration(integration);
   } catch (error) {
     console.error('Error creating integration:', error);
     throw error;
@@ -105,31 +109,7 @@ export async function updateIntegration(tenantSlugOrId: string, id: string, data
       ...data,
     });
     const integration = result.integration;
-    // Transform database record to Integration interface, ensuring category is properly typed
-    if (!integration.category || !['data_platforms', 'ml_platforms', 'llm_providers', 'ai_security', 'vector_databases', 'cloud_providers'].includes(integration.category)) {
-      throw new Error('Invalid integration category');
-    }
-    return {
-      id: integration.id,
-      tenantId: integration.tenantId,
-      name: integration.name,
-      category: integration.category as Integration['category'],
-      description: integration.description || undefined,
-      isEnabled: integration.isEnabled,
-      isCredentialsAdded: integration.isCredentialsAdded,
-      configuration: (integration.configuration as Record<string, any>) || {},
-      apiKey: integration.apiKey || undefined,
-      logoUrl: integration.logoUrl || undefined,
-      webhookUrl: undefined,
-      lastSyncAt: undefined,
-      syncStatus: undefined,
-      errorMessage: undefined,
-      metadata: undefined,
-      createdBy: integration.createdBy,
-      updatedBy: integration.updatedBy || undefined,
-      createdAt: integration.createdAt,
-      updatedAt: integration.updatedAt,
-    };
+    return toIntegration(integration);
   } catch (error) {
     console.error('Error updating integration:', error);
     throw error;

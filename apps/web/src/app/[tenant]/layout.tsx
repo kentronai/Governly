@@ -1,7 +1,7 @@
 // src/app/[tenant]/layout.tsx
 import { headers } from "next/headers";
 import { ReactNode } from "react";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import { db, tenants } from "@db";
 import { eq } from "drizzle-orm";
@@ -9,6 +9,70 @@ import { TenantProvider } from "@/contexts/TenantContext";
 import LayoutWithConditionalSidebar from "@/components/app/LayoutWithConditionalSidebar";
 import { TenantHeader } from "@/components/app/TenantHeader";
 import { UserGuideModal } from "@/components/common/UserGuided";
+
+const tenantRouteAliases = new Set([
+  "admin",
+  "ai-catalog",
+  "ai-console",
+  "ai-risk-center",
+  "api-keys",
+  "applications",
+  "control-net",
+  "guardrails",
+  "model-guard",
+  "model-registry",
+  "observability",
+  "playground",
+  "policies",
+  "red-teaming",
+  "reports",
+]);
+
+const slugify = (name: string): string =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || `org-${Date.now()}`;
+
+async function ensureTenantForOrg(orgId: string) {
+  let tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, orgId),
+  });
+
+  if (tenant) {
+    return tenant;
+  }
+
+  const clerk = await clerkClient();
+  const org = await clerk.organizations.getOrganization({
+    organizationId: orgId,
+  });
+  const metadata = (org.publicMetadata ?? {}) as Record<string, unknown>;
+
+  await db
+    .insert(tenants)
+    .values({
+      id: org.id,
+      name: org.name,
+      slug: org.slug || slugify(org.name),
+      plan: (metadata.plan as string) || "free",
+      createdByKentron: Boolean(metadata.createdByKentron),
+      metadata,
+    })
+    .onConflictDoUpdate({
+      target: tenants.id,
+      set: {
+        name: org.name,
+        slug: org.slug || slugify(org.name),
+      },
+    });
+
+  return db.query.tenants.findFirst({
+    where: eq(tenants.id, orgId),
+  });
+}
+
 interface TenantLayoutProps {
   children: ReactNode;
   params: Promise<{ tenant: string }>;
@@ -47,6 +111,12 @@ export default async function TenantLayout({
 
   // Redirect if tenant not found
   if (!tenant) {
+    const activeTenant = orgId ? await ensureTenantForOrg(orgId) : null;
+
+    if (activeTenant && tenantRouteAliases.has(tenantSlug)) {
+      redirect(`/${activeTenant.slug}/${tenantSlug}`);
+    }
+
     redirect("/");
   }
 

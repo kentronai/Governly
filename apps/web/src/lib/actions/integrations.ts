@@ -4,7 +4,7 @@
 
 'use server';
 
-import { db, integrationsAdmin, tenants } from '@db';
+import { db, integrations, tenants } from '@db';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { createAuditEvent } from '@/lib/server/audit';
@@ -44,11 +44,11 @@ export const getIntegrations = async (tenantSlugOrId: string) => {
 
   const integrationsList = await db
     .select()
-    .from(integrationsAdmin)
-    .where(eq(integrationsAdmin.tenantId, tenantId))
-    .orderBy(integrationsAdmin.name);
+    .from(integrations)
+    .where(eq(integrations.tenantId, tenantId))
+    .orderBy(integrations.name);
 
-  return { integrations_admin: integrationsList };
+  return { integrations: integrationsList };
 };
 
 export const createIntegration = async (input: CreateIntegrationInput) => {
@@ -68,14 +68,14 @@ export const createIntegration = async (input: CreateIntegrationInput) => {
   }
 
   const newIntegration = await db
-    .insert(integrationsAdmin)
+    .insert(integrations)
     .values({
       tenantId,
       name: input.name,
       category: input.category,
       description: input.description,
-      logoUrl: input.logoUrl,
       configuration: input.configuration || {},
+      metadata: input.logoUrl ? { logoUrl: input.logoUrl } : {},
       isEnabled: false,
       createdBy: userId,
       updatedBy: userId,
@@ -118,17 +118,17 @@ export const updateIntegration = async (input: UpdateIntegrationInput) => {
   if (input.isEnabled !== undefined) updateData.isEnabled = input.isEnabled;
   if (input.isCredentialsAdded !== undefined) updateData.isCredentialsAdded = input.isCredentialsAdded;
   if (input.configuration !== undefined) updateData.configuration = input.configuration;
-  if (input.apiKey !== undefined) updateData.apiKey = input.apiKey;
+  if (input.apiKey !== undefined) updateData.credentialsEncrypted = input.apiKey;
   if (input.name !== undefined) updateData.name = input.name;
   if (input.description !== undefined) updateData.description = input.description;
-  if (input.logoUrl !== undefined) updateData.logoUrl = input.logoUrl;
+  if (input.logoUrl !== undefined) updateData.metadata = { logoUrl: input.logoUrl };
 
   const updatedIntegration = await db
-    .update(integrationsAdmin)
+    .update(integrations)
     .set(updateData)
     .where(and(
-      eq(integrationsAdmin.id, input.id),
-      eq(integrationsAdmin.tenantId, tenantId)
+      eq(integrations.id, input.id),
+      eq(integrations.tenantId, tenantId)
     ))
     .returning();
 
@@ -165,10 +165,10 @@ export const deleteIntegration = async (tenantSlugOrId: string, id: string) => {
   const tenantId = tenantRow[0].id;
 
   const deletedIntegration = await db
-    .delete(integrationsAdmin)
+    .delete(integrations)
     .where(and(
-      eq(integrationsAdmin.id, id),
-      eq(integrationsAdmin.tenantId, tenantId)
+      eq(integrations.id, id),
+      eq(integrations.tenantId, tenantId)
     ))
     .returning();
 

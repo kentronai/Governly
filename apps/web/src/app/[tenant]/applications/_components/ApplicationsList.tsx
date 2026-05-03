@@ -211,7 +211,12 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
         router.push(overviewPath);
         setIsCreateModalOpen(false);
       } catch (error) {
-        errorToast("Failed to create application");
+        console.error("Failed to create application:", error);
+        errorToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to create application"
+        );
       }
     });
   };
