@@ -1,0 +1,19 @@
+{
+  "name": "Norix",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    }
+  },
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@9.0.0 --activate",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python"
+      ]
+    }
+  }
+}
