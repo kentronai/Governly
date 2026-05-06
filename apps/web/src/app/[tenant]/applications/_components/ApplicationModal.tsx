@@ -96,7 +96,7 @@ export function ApplicationModal({
     defaultValues: {
       name: "",
       description: "",
-      goviqEnabled: false,
+      goviqEnabled: true,
       controlnetEnabled: true,
       status: "Not Started",
     },
@@ -119,7 +119,7 @@ export function ApplicationModal({
       form.reset({
         name: "",
         description: "",
-        goviqEnabled: false,
+        goviqEnabled: true,
         controlnetEnabled: true,
         status: "Not Started",
       });

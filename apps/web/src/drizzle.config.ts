@@ -3,7 +3,12 @@ import { config } from "dotenv";
 import { resolve } from "path";
 
 // Load environment variables from root .env file
-config({ path: resolve(process.cwd(), "../../.env") });
+config({
+  path: [
+    resolve(process.cwd(), "../../.env.local"),
+    resolve(process.cwd(), "../../.env"),
+  ],
+});
 
 export default {
   schema: "./drizzle/schema.ts",
@@ -12,6 +17,6 @@ export default {
 
   dbCredentials: {
     url: process.env.DATABASE_URL!,
-    ssl: true,
+    ssl: !/localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL ?? ""),
   },
 } satisfies Config;

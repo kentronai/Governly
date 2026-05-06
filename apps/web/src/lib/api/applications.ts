@@ -43,7 +43,7 @@ export async function createApplication(tenantId: string, data: any): Promise<Ap
     tenantId,
     name: data.sProjectName,
     description: data.description,
-    goviqEnabled: data.bGovIQ,
+    goviqEnabled: true,
     controlnetEnabled: data.bControlNet,
   });
 

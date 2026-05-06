@@ -1,7 +1,8 @@
-import posthog from './posthog'
+import { capturePostHogEvent, isPostHogEnabled } from './posthog'
 
 export function setupErrorTracking() {
   if (typeof window === 'undefined') return;
+  if (!isPostHogEnabled()) return;
 
   console.log('Setting up error tracking...');
 
@@ -10,7 +11,7 @@ export function setupErrorTracking() {
     console.error('Unhandled promise rejection:', event.reason);
     
     // Use both $exception and $autocapture for better detection
-    posthog.capture('$exception', {
+    capturePostHogEvent('$exception', {
       $exception_type: 'unhandledrejection',
       $exception_message: event.reason?.message || String(event.reason) || 'Unhandled promise rejection',
       $exception_stack_trace_raw: event.reason?.stack,
@@ -19,7 +20,7 @@ export function setupErrorTracking() {
     });
     
     // Also send as a regular event for better visibility
-    posthog.capture('unhandled_promise_rejection', {
+    capturePostHogEvent('unhandled_promise_rejection', {
       error_message: event.reason?.message || String(event.reason),
       error_stack: event.reason?.stack,
       timestamp: new Date().toISOString(),
@@ -30,7 +31,7 @@ export function setupErrorTracking() {
   window.addEventListener('error', (event) => {
     console.error('JavaScript error:', event.error);
     
-    posthog.capture('$exception', {
+    capturePostHogEvent('$exception', {
       $exception_type: 'javascript_error',
       $exception_message: event.message,
       $exception_stack_trace_raw: event.error?.stack,
@@ -42,7 +43,7 @@ export function setupErrorTracking() {
     });
     
     // Also send as a regular event
-    posthog.capture('javascript_error', {
+    capturePostHogEvent('javascript_error', {
       error_message: event.message,
       error_stack: event.error?.stack,
       filename: event.filename,

@@ -1,6 +1,6 @@
 'use client';
 
-import posthog from '@/lib/posthog';
+import { capturePostHogEvent } from '@/lib/posthog';
 import React from 'react';
 
 class ErrorBoundary extends React.Component<{ fallback: React.ReactNode, children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component<{ fallback: React.ReactNode, childre
     console.error("Error caught by ErrorBoundary:", error, errorInfo);
 
     // Send as $exception for PostHog's error detection
-    posthog.capture('$exception', {
+    capturePostHogEvent('$exception', {
       $exception_type: 'react_error_boundary',
       $exception_message: error.message,
       $exception_stack_trace_raw: error.stack,
@@ -27,7 +27,7 @@ class ErrorBoundary extends React.Component<{ fallback: React.ReactNode, childre
     });
 
     // Also send as a custom event for easier filtering
-    posthog.capture('react_error_boundary', {
+    capturePostHogEvent('react_error_boundary', {
       error_message: error.message,
       error_stack: error.stack,
       component_stack: errorInfo.componentStack,

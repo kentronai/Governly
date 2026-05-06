@@ -6,11 +6,22 @@
 
 import * as integrationActions from '@/lib/actions/integrations';
 
+const INTEGRATION_CATEGORIES = [
+  'data_platforms',
+  'ml_platforms',
+  'llm_providers',
+  'ai_security',
+  'vector_databases',
+  'cloud_providers',
+] as const;
+
+type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];
+
 export interface Integration {
   id: string;
   tenantId: string;
   name: string;
-  category: 'data_platforms' | 'ml_platforms' | 'llm_providers' | 'ai_security' | 'vector_databases' | 'cloud_providers';
+  category: IntegrationCategory;
   description?: string;
   isEnabled: boolean;
   isCredentialsAdded: boolean;
@@ -30,7 +41,7 @@ export interface Integration {
 
 export interface CreateIntegrationRequest {
   name: string;
-  category: 'data_platforms' | 'ml_platforms' | 'llm_providers' | 'ai_security' | 'vector_databases' | 'cloud_providers';
+  category: IntegrationCategory;
   description?: string;
   logoUrl?: string;
   configuration?: Record<string, any>;
@@ -58,15 +69,15 @@ export async function fetchIntegrations(tenantSlugOrId: string): Promise<Integra
 }
 
 function toIntegration(integration: any): Integration {
-  if (!integration.category || !['data_platforms', 'ml_platforms', 'llm_providers', 'ai_security', 'vector_databases', 'cloud_providers'].includes(integration.category)) {
-    throw new Error('Invalid integration category');
-  }
+  const category = INTEGRATION_CATEGORIES.includes(integration.category)
+    ? integration.category
+    : 'data_platforms';
 
   return {
     id: integration.id,
     tenantId: integration.tenantId,
     name: integration.name,
-    category: integration.category as Integration['category'],
+    category,
     description: integration.description || undefined,
     isEnabled: integration.isEnabled,
     isCredentialsAdded: integration.isCredentialsAdded,
