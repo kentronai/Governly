@@ -41,8 +41,8 @@ jobs:
       - name: Build and push devcontainer
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/${{ github.repository }}/devcontainer
-          cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
+          imageName: ghcr.io/kentronai/norix/devcontainer
+          cacheFrom: ghcr.io/kentronai/norix/devcontainer
           push: always
           runCmd: |
             # Install Python dependencies
@@ -61,6 +61,6 @@ jobs:
       - name: Summary
         run: |
           echo "✅ Devcontainer prebuild complete!"
-          echo "   Image: ghcr.io/${{ github.repository }}/devcontainer"
+          echo "   Image: ghcr.io/kentronai/norix/devcontainer"
           echo "   Next Codespace startup: ~10 seconds"
 
