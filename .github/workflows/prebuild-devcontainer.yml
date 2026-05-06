@@ -55,12 +55,12 @@ jobs:
             
             # Install Node dependencies
             cd ../web
-            pnpm install
+            corepack pnpm install
             
             # Verify installations
             python --version
             node --version
-            pnpm --version
+            corepack pnpm --version
 
       - name: Summary
         run: |
