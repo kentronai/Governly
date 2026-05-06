@@ -495,12 +495,13 @@ export const getArchivedApplicationsAction = async (
 
   if (searchTerm) {
     const term = `%${searchTerm}%`;
-    countConditions.push(
-      or(
-        ilike(applications.name, term),
-        ilike(applications.description, term)
-      )
+    const searchCondition = or(
+      ilike(applications.name, term),
+      ilike(applications.description, term)
     );
+    if (searchCondition) {
+      countConditions.push(searchCondition);
+    }
   }
 
   const [{ count }] = await db
