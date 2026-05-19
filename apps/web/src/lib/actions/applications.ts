@@ -19,7 +19,7 @@ interface CreateApplicationInput {
   tenantId: string;
   name: string;
   description?: string;
-  goviqEnabled: boolean;
+  goviqEnabled?: boolean;
   controlnetEnabled: boolean;
 }
 
@@ -41,11 +41,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
     throw new Error("Authentication required");
   }
 
-  if (!input.goviqEnabled && !input.controlnetEnabled) {
-    throw new Error(
-      "At least one module (GovIQ or ControlNet) must be enabled"
-    );
-  }
+  const goviqEnabled = true;
   const clerkUser = await currentUser();
   const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress;
   const firstName = clerkUser?.firstName || "";
@@ -120,7 +116,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
         tenantId: input.tenantId,
         name: input.name,
         description: input.description,
-        goviqEnabled: input.goviqEnabled,
+        goviqEnabled,
         controlnetEnabled: input.controlnetEnabled,
         createdBy: userId,
         updatedBy: userId,
