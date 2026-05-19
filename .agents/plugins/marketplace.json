@@ -1,0 +1,34 @@
+{
+  "name": "kentron-codex-plugins",
+  "interface": {
+    "displayName": "Kentron Codex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "superpowers",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/obra/superpowers.git",
+        "ref": "v5.1.0"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    },
+    {
+      "name": "claude-mem",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/thedotmack/claude-mem.git",
+        "ref": "v13.2.0"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

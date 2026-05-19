@@ -17,9 +17,11 @@ services:
       onnx-service:
         condition: service_healthy
     ports:
-      - "80:80"  # Single port for everything
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
       interval: 10s
@@ -215,7 +217,7 @@ services:
     healthcheck:
       # node:18-alpine has wget but not curl. /api/health may 404 if route is
       # missing in this build, so accept any 2xx/3xx response from /.
-      test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=5", "http://localhost:8080/"]
+      test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=5", "http://127.0.0.1:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
