@@ -5,7 +5,7 @@
  * including response times, status codes, error rates, and endpoint usage.
  */
 
-import posthog from '@/lib/posthog'
+import { capturePostHogEvent, isPostHogEnabled } from '@/lib/posthog'
 
 export interface APITrackingData {
   method: string
@@ -192,7 +192,7 @@ export function trackAPIComplete(
   error?: any,
   options: APITrackingOptions = {}
 ): void {
-  if (!trackingId || typeof window === 'undefined') return
+  if (!trackingId || typeof window === 'undefined' || !isPostHogEnabled()) return
   
   const storedData = sessionStorage.getItem(`api_tracking_${trackingId}`)
   if (!storedData) return
@@ -237,7 +237,7 @@ export function trackAPIComplete(
     }
     
     // Send to PostHog
-    posthog.capture('api_call', completeData)
+    capturePostHogEvent('api_call', completeData)
     
     // Clean up
     sessionStorage.removeItem(`api_tracking_${trackingId}`)
@@ -324,6 +324,8 @@ export function trackAPIError(
   error: any,
   options: APITrackingOptions = {}
 ): void {
+  if (!isPostHogEnabled()) return
+
   const endpoint = extractEndpoint(url)
   
   if (!shouldTrackEndpoint(endpoint, options)) {
@@ -353,7 +355,7 @@ export function trackAPIError(
     if (tenantId) errorData.tenantId = tenantId
   }
   
-  posthog.capture('api_error', errorData)
+  capturePostHogEvent('api_error', errorData)
 }
 
 /**

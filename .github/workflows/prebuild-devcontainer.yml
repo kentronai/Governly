@@ -38,11 +38,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Resolve devcontainer image name
+        id: devcontainer-image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/devcontainer" >> "$GITHUB_OUTPUT"
+
       - name: Build and push devcontainer
         uses: devcontainers/ci@v0.3
         with:
-          imageName: ghcr.io/${{ github.repository }}/devcontainer
-          cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
+          imageName: ${{ steps.devcontainer-image.outputs.name }}
+          cacheFrom: ${{ steps.devcontainer-image.outputs.name }}
           push: always
           runCmd: |
             # Install Python dependencies
@@ -51,16 +55,16 @@ jobs:
             
             # Install Node dependencies
             cd ../web
-            pnpm install
+            corepack pnpm install
             
             # Verify installations
             python --version
             node --version
-            pnpm --version
+            corepack pnpm --version
 
       - name: Summary
         run: |
           echo "✅ Devcontainer prebuild complete!"
-          echo "   Image: ghcr.io/${{ github.repository }}/devcontainer"
+          echo "   Image: ${{ steps.devcontainer-image.outputs.name }}"
           echo "   Next Codespace startup: ~10 seconds"
 

@@ -850,7 +850,7 @@ export const tenants = pgTable(
     logoUrl: text("logo_url"),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" }),
     controlnetEnabled: boolean().default(true),
-    govIqEnabled: boolean().default(false),
+    govIqEnabled: boolean().default(true),
   },
   (table) => [
     index("idx_tenants_created_by_kentron").using(
@@ -1801,7 +1801,7 @@ export const applications = pgTable(
     slug: text(),
     description: text(),
     status: applicationStatus().default("Not Started").notNull(),
-    goviqEnabled: boolean("goviq_enabled").default(false).notNull(),
+    goviqEnabled: boolean("goviq_enabled").default(true).notNull(),
     controlnetEnabled: boolean("controlnet_enabled").default(false).notNull(),
     metadata: jsonb().default({}).notNull(),
     createdBy: text("created_by").notNull(),

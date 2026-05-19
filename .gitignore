@@ -197,6 +197,7 @@ apps/*/model_cache/
 # Clerk (authentication)
 # ===================================
 .clerk/
+.browser*/
 
 # ===================================
 # Terraform

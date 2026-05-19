@@ -35,17 +35,17 @@ interface UpdateApplicationInput {
 
 // Create application
 export const createApplication = async (input: CreateApplicationInput) => {
-  const { userId, orgRole } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
   }
 
-  if (!input.goviqEnabled && !input.controlnetEnabled) {
-    throw new Error(
-      "At least one module (GovIQ or ControlNet) must be enabled"
-    );
+  if (orgId && input.tenantId !== orgId) {
+    throw new Error("Tenant mismatch");
   }
+
+  const goviqEnabled = true;
   const clerkUser = await currentUser();
   const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress;
   const firstName = clerkUser?.firstName || "";
@@ -103,13 +103,14 @@ export const createApplication = async (input: CreateApplicationInput) => {
       .values({
         tenantId: input.tenantId,
         userId,
-        role: orgRole || "member",
-        permissions: [],
+        role: orgRole || "org:member",
+        permissions: orgRole === "org:admin" ? ["*"] : [""],
       })
       .onConflictDoUpdate({
         target: [memberships.tenantId, memberships.userId],
         set: {
-          role: orgRole || "member",
+          role: orgRole || "org:member",
+          permissions: orgRole === "org:admin" ? ["*"] : [""],
           updatedAt: new Date().toISOString(),
         },
       });
@@ -120,7 +121,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
         tenantId: input.tenantId,
         name: input.name,
         description: input.description,
-        goviqEnabled: input.goviqEnabled,
+        goviqEnabled,
         controlnetEnabled: input.controlnetEnabled,
         createdBy: userId,
         updatedBy: userId,
@@ -133,7 +134,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
       .values({
         tenantId: application.tenantId,
         applicationId: application.id,
-        userName: user.name as string,
+        userName: user.name || user.email,
         role: "member",
         email: user.email,
         createdBy: userId,
@@ -494,12 +495,13 @@ export const getArchivedApplicationsAction = async (
 
   if (searchTerm) {
     const term = `%${searchTerm}%`;
-    countConditions.push(
-      or(
-        ilike(applications.name, term),
-        ilike(applications.description, term)
-      )
+    const searchCondition = or(
+      ilike(applications.name, term),
+      ilike(applications.description, term)
     );
+    if (searchCondition) {
+      countConditions.push(searchCondition);
+    }
   }
 
   const [{ count }] = await db

@@ -1,19 +1,19 @@
 'use client'
 import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import posthog from '@/lib/posthog'
+import { capturePostHogEvent, isPostHogEnabled } from '@/lib/posthog'
 
 function PostHogTracking() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (pathname) {
+    if (pathname && isPostHogEnabled()) {
       let url = window.origin + pathname
       if (searchParams.toString()) {
         url = url + `?${searchParams.toString()}`
       }
-      posthog.capture('$pageview', {
+      capturePostHogEvent('$pageview', {
         $current_url: url,
       })
     }
