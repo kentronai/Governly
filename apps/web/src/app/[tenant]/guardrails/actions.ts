@@ -60,23 +60,22 @@ export async function createGuardrail(input: CreateGuardrailInput) {
   return newGuardrail;
 }
 
+export type InstallResult =
+  | { ok: true; data: { id: string; key: string; name: string | null } }
+  | { ok: false; error: string };
+
 export async function installMarketplaceGuardrail(input: {
   tenantSlug: string;
   userId: string;
   sourceGuardrailId: string;
-}) {
+}): Promise<InstallResult> {
   const { tenantSlug, userId, sourceGuardrailId } = input;
-  console.log(input);
-  // Get tenant
+
   const tenant = await db.query.tenants.findFirst({
     where: (tenants, { eq }) => eq(tenants.slug, tenantSlug),
   });
+  if (!tenant) return { ok: false, error: "Tenant not found" };
 
-  if (!tenant) {
-    throw new Error("Tenant not found");
-  }
-
-  // Get source guardrail (must be global and not deleted)
   const sourceGuardrail = await db.query.guardrails.findFirst({
     where: (g, { eq, and, isNull }) =>
       and(
@@ -85,12 +84,9 @@ export async function installMarketplaceGuardrail(input: {
         isNull(g.deletedAt)
       ),
   });
+  if (!sourceGuardrail)
+    return { ok: false, error: "Source guardrail not found or not global" };
 
-  if (!sourceGuardrail) {
-    throw new Error("Source guardrail not found or not global");
-  }
-
-  // Check if already installed (exclude soft-deleted)
   const existing = await db.query.guardrails.findFirst({
     where: (g, { eq, and, isNull }) =>
       and(
@@ -99,38 +95,48 @@ export async function installMarketplaceGuardrail(input: {
         isNull(g.deletedAt)
       ),
   });
+  if (existing)
+    return { ok: false, error: "Guardrail already installed for this tenant" };
 
-  if (existing) {
-    throw new Error("Guardrail already installed");
+  try {
+    const [installed] = await db
+      .insert(guardrails)
+      .values({
+        tenantId: tenant.id,
+        createdBy: userId,
+        key: sourceGuardrail.key,
+        name: sourceGuardrail.name,
+        packName: sourceGuardrail.packName,
+        functionName: sourceGuardrail.functionName,
+        description: sourceGuardrail.description,
+        tier: sourceGuardrail.tier,
+        performanceBudgetMs: sourceGuardrail.performanceBudgetMs,
+        infrastructure: sourceGuardrail.infrastructure,
+        inputSchema: sourceGuardrail.inputSchema,
+        outputSchema: sourceGuardrail.outputSchema,
+        category: sourceGuardrail.category,
+        family: sourceGuardrail.family,
+        defaultParams: sourceGuardrail.defaultParams,
+        metadata: sourceGuardrail.metadata,
+        isEnabled: true,
+        isGlobal: false,
+        isCertified: false,
+        enableInstall: false,
+        fallbackGuardrailId: sourceGuardrailId,
+      })
+      .returning({
+        id: guardrails.id,
+        key: guardrails.key,
+        name: guardrails.name,
+      });
+
+    revalidatePath(`/${tenantSlug}/guardrails`);
+    return { ok: true, data: installed };
+  } catch (e: any) {
+    console.error("[installMarketplaceGuardrail] insert failed:", e);
+    return {
+      ok: false,
+      error: e?.message ?? "Database insert failed",
+    };
   }
-
-  // Clone the guardrail for this tenant
-  const [installed] = await db
-    .insert(guardrails)
-    .values({
-      tenantId: tenant.id,
-      createdBy: userId,
-      key: sourceGuardrail.key,
-      name: sourceGuardrail.name,
-      packName: sourceGuardrail.packName,
-      functionName: sourceGuardrail.functionName,
-      description: sourceGuardrail.description,
-      tier: sourceGuardrail.tier,
-      performanceBudgetMs: sourceGuardrail.performanceBudgetMs,
-      infrastructure: sourceGuardrail.infrastructure,
-      inputSchema: sourceGuardrail.inputSchema,
-      outputSchema: sourceGuardrail.outputSchema,
-      category: sourceGuardrail.category,
-      defaultParams: sourceGuardrail.defaultParams,
-      isEnabled: true,
-      isGlobal: false,
-      isCertified: false,
-      // Link to the original global guardrail
-      fallbackGuardrailId: sourceGuardrailId,
-    })
-    .returning();
-
-  revalidatePath(`/${tenantSlug}/guardrails`);
-
-  return installed;
 }

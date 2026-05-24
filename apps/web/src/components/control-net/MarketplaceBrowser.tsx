@@ -118,7 +118,6 @@ export function MarketplaceBrowser({
       await onInstall(guardrailId);
     } catch (error) {
       console.error("Failed to install guardrail:", error);
-      alert("Failed to install guardrail");
     } finally {
       setInstallingId(null);
     }

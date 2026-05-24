@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import {
   Card,
   CardContent,
@@ -58,14 +60,24 @@ export function GuardrailsPageClient({
   tenantGuardrails,
   marketplaceGuardrails,
 }: GuardrailsPageClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
   const handleInstallGuardrail = async (guardrailId: string) => {
-    await installMarketplaceGuardrail({
+    const result = await installMarketplaceGuardrail({
       tenantSlug,
       userId,
       sourceGuardrailId: guardrailId,
     });
+    if (result.ok) {
+      toast.success(`Installed ${result.data.name ?? result.data.key}`);
+      startTransition(() => router.refresh());
+    } else {
+      toast.error(result.error);
+      throw new Error(result.error);
+    }
   };
-  console.log(tenantGuardrails);
+
   const installedKeys = new Set(tenantGuardrails.map((g) => g.key));
   const installedMarketplaceIds = marketplaceGuardrails
     .filter((mg) => installedKeys.has(mg.key))

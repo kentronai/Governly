@@ -152,6 +152,43 @@ http {
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
         }
+
+        # ControlNet Gateway direct routes (frontend calls these via /v1/*)
+        # Bypasses Next.js rewrites so requests reach FastAPI directly.
+        location /v1/ {
+            proxy_pass http://controlnet_upstream;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_read_timeout 120s;
+            client_max_body_size 100M;
+        }
+
+        location /modelguard/ {
+            proxy_pass http://modelguard_upstream;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_read_timeout 120s;
+        }
+
+        location = /docs {
+            proxy_pass http://controlnet_upstream;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+
+        location = /redoc {
+            proxy_pass http://controlnet_upstream;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+        }
     }
 }
 NGINXCONF

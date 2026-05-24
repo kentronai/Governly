@@ -25,10 +25,15 @@ def get_clerk_config() -> Dict[str, str]:
     if not settings.clerk_enabled:
         logger.warning("clerk_not_configured", message="Clerk authentication not configured")
     
+    # Accept clerk_frontend_api with or without a scheme prefix
+    # (env var sometimes set as "https://clerk.kentron.ai", sometimes as "clerk.kentron.ai")
+    domain = (settings.clerk_frontend_api or "").strip()
+    host = domain.removeprefix("https://").removeprefix("http://").rstrip("/")
+
     return {
-        "domain": settings.clerk_frontend_api,
+        "domain": host,
         "secret_key": settings.clerk_secret_key,
-        "jwks_url": f"https://{settings.clerk_frontend_api}/.well-known/jwks.json" if settings.clerk_frontend_api else None
+        "jwks_url": f"https://{host}/.well-known/jwks.json" if host else None
     }
 
 
