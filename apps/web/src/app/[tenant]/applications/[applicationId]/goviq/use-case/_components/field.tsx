@@ -18,7 +18,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface UseCase {
   id: string;
@@ -47,6 +47,11 @@ interface UseCase {
   };
 }
 
+const uniqueValues = (values: string[] = []) =>
+  Array.isArray(values)
+    ? values.filter((value, index, array) => array.indexOf(value) === index)
+    : [];
+
 export const MultiSelectField = ({
   field,
   options,
@@ -66,12 +71,20 @@ export const MultiSelectField = ({
   error?: string;
   formData: any;
 }) => {
-  const handleMultiSelectToggle = (field: keyof UseCase, value: string) => {
-    const newValues = data.includes(value)
-      ? data.filter((v) => v !== value)
-      : [...data, value];
+  const selectedValues = uniqueValues(data);
+  const optionValues = uniqueValues(options);
 
-    onUpdate({ ...formData, [field]: newValues });
+  const handleMultiSelectToggle = (field: keyof UseCase, value: string) => {
+    onUpdate((current: any) => {
+      const currentValues = uniqueValues(
+        current?.[field] ?? formData?.[field] ?? selectedValues
+      );
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter((v) => v !== value)
+        : [...currentValues, value];
+
+      return { ...current, [field]: newValues };
+    });
   };
 
   const [isOpen, setOpen] = useState(false);
@@ -79,8 +92,10 @@ export const MultiSelectField = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleAddCustomValue = () => {
-    if (customInput.trim() && !data.includes(customInput.trim())) {
-      handleMultiSelectToggle(field, customInput.trim());
+    const value = customInput.trim();
+
+    if (value && !selectedValues.includes(value)) {
+      handleMultiSelectToggle(field, value);
       setCustomInput("");
       setTimeout(() => {
         if (inputRef.current) {
@@ -111,8 +126,8 @@ export const MultiSelectField = ({
             className="w-full justify-between h-auto min-h-10 p-3 bg-transparent"
           >
             <div className="flex flex-wrap gap-2">
-              {data.length > 0 ? (
-                data?.map((value) => (
+              {selectedValues.length > 0 ? (
+                selectedValues.map((value) => (
                   <Badge key={value} variant="secondary" className="text-xs  ">
                     {value}
                     <X
@@ -163,7 +178,7 @@ export const MultiSelectField = ({
                 </p>
               </CommandEmpty>
               <CommandGroup>
-                {options?.map((option) => (
+                {optionValues.map((option) => (
                   <CommandItem
                     key={option}
                     value={option}
@@ -172,7 +187,9 @@ export const MultiSelectField = ({
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        data.includes(option) ? "opacity-100" : "opacity-0"
+                        selectedValues.includes(option)
+                          ? "opacity-100"
+                          : "opacity-0"
                       )}
                     />
                     {option}
@@ -215,7 +232,10 @@ export const SingleSelectField = ({
 
   const handleAddCustomValue = () => {
     if (customInput.trim()) {
-      onUpdate({ ...formData, [field]: customInput.trim() });
+      onUpdate((current: any) => ({
+        ...current,
+        [field]: customInput.trim(),
+      }));
       setCustomInput("");
       setIsOpen(false);
     }
@@ -227,17 +247,6 @@ export const SingleSelectField = ({
       handleAddCustomValue();
     }
   };
-
-  useEffect(() => {
-    if (formData.kpis && formData.kpis.length > 1) {
-      onUpdate({
-        ...formData,
-        kpis: formData.kpis
-          ? [formData.kpis[formData.formData.length - 1]]
-          : [],
-      });
-    }
-  }, [formData.kpis]);
 
   return (
     <div className="space-y-2">
@@ -289,7 +298,7 @@ export const SingleSelectField = ({
                 </p>
               </CommandEmpty>
               <CommandGroup>
-                {options?.map((option) => (
+                {uniqueValues(options).map((option) => (
                   <CommandItem
                     key={option}
                     value={option}
