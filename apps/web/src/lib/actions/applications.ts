@@ -7,6 +7,7 @@
 
 import { db, applications, memberships, stakeholders, users, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
+import { createDefaultLaunchPolicy } from "@/lib/actions/default-launch-policy";
 import { eq, and, sql, isNull, or, ilike } from "drizzle-orm";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
@@ -35,7 +36,7 @@ interface UpdateApplicationInput {
 
 // Create application
 export const createApplication = async (input: CreateApplicationInput) => {
-  const { userId, orgId, orgRole } = await auth();
+  const { userId, orgId, orgRole, getToken } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
@@ -158,6 +159,41 @@ export const createApplication = async (input: CreateApplicationInput) => {
     });
   } catch (e) {
     console.error("Failed to write audit event (application.created):", e);
+  }
+
+  // Auto-create the default "Launch" policy for the new application.
+  // Additive + error-isolated: a policy failure must NOT fail application creation.
+  try {
+    const token = await getToken();
+    const result = await createDefaultLaunchPolicy({
+      orgId: input.tenantId,
+      applicationId: application.id,
+      userId,
+      token,
+    });
+    if (
+      !result.created &&
+      result.reason &&
+      !result.reason.startsWith("already_exists")
+    ) {
+      console.warn(
+        `Default Launch policy not created for application ${application.id}: ${result.reason}`
+      );
+    }
+  } catch (e) {
+    console.error("Failed to create default Launch policy:", e);
+    try {
+      await createAuditEvent({
+        tenantId: input.tenantId,
+        actorUserId: userId,
+        action: "application.default_policy_failed",
+        targetType: "application",
+        targetId: application.id,
+        metadata: { error: e instanceof Error ? e.message : String(e) },
+      });
+    } catch {
+      // best-effort audit; ignore
+    }
   }
 
   return {

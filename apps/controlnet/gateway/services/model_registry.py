@@ -126,6 +126,15 @@ async def resolve_model(
     
     # Require explicit model_url configuration (no defaults)
     if not model_url:
+        logger.error(
+            "model_resolution_failed",
+            extra={
+                "model_id": model_id,
+                "tenant_id": tenant_id,
+                "provider": provider,
+                "reason": "missing_model_url",
+            },
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Model '{model_id}' has no model_url configured in registry. "

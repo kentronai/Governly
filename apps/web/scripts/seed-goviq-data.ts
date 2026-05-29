@@ -1629,6 +1629,7 @@ async function main() {
       outputCostPer1K: '0.03',
       currency: 'USD',
       availabilityStatus: 'available',
+      modelUrl: 'https://api.openai.com/v1',
       createdBy: DEMO_USER_ID,
       updatedBy: DEMO_USER_ID,
     });
@@ -1648,6 +1649,7 @@ async function main() {
       outputCostPer1K: '0.075',
       currency: 'USD',
       availabilityStatus: 'available',
+      modelUrl: 'https://api.anthropic.com',
       createdBy: DEMO_USER_ID,
       updatedBy: DEMO_USER_ID,
     });
@@ -1667,6 +1669,7 @@ async function main() {
       outputCostPer1K: '0.01',
       currency: 'USD',
       availabilityStatus: 'available',
+      modelUrl: 'https://api.openai.com/v1',
       createdBy: DEMO_USER_ID,
       updatedBy: DEMO_USER_ID,
     });
@@ -1686,6 +1689,7 @@ async function main() {
       outputCostPer1K: '0.0015',
       currency: 'USD',
       availabilityStatus: 'available',
+      modelUrl: 'https://generativelanguage.googleapis.com/v1beta',
       createdBy: DEMO_USER_ID,
       updatedBy: DEMO_USER_ID,
     });
@@ -1703,6 +1707,7 @@ async function main() {
       outputCostPer1K: '0.08',
       currency: 'USD',
       availabilityStatus: 'available',
+      modelUrl: 'https://api.openai.com/v1',
       createdBy: DEMO_USER_ID,
       updatedBy: DEMO_USER_ID,
     });

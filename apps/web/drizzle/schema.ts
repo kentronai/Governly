@@ -15,6 +15,7 @@ import {
   uniqueIndex,
   varchar,
   pgEnum,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -1568,6 +1569,10 @@ export const providerModels = pgTable(
       table.tenantId
     ),
     unique("uq_provider_models_artifact").on(table.modelArtifactId),
+    check(
+      "chk_provider_models_url_when_available",
+      sql`availability_status <> 'available' OR model_url IS NOT NULL`
+    ),
   ]
 );
 

@@ -46,8 +46,6 @@ import { successToast, errorToast } from "@/lib/utils/toast";
 import ApplicationLoader from "./ApplicationLoader";
 import Pagination from "@/components/common/pagination";
 import ApplicationView from "./ApplicationView";
-import { useAuthAxios } from "@/lib/api/auth-axios";
-import { DemoPolicies, ProdPolicies } from "@/constants/defaultPolicy";
 export interface Application {
   id: string;
   name: string;
@@ -164,7 +162,6 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
 
   // No client-side filtering needed - server handles it
   const filteredApplications = applications;
-  const authAxios = useAuthAxios();
   const handleCreate = async (data: {
     name: string;
     description?: string;
@@ -184,25 +181,9 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
           errorToast(newApp.message);
           return;
         }
-        // creating default policy
-
         // @ts-ignore
         setApplications((prev) => [newApp.application, ...prev]);
-        try {
-          if (window.location.hostname === "app.kentron.ai") {
-            await authAxios("/v1/policies", {
-              data: { ...ProdPolicies, application_id: newApp.application.id },
-              method: "post",
-            });
-          } else {
-            await authAxios("/v1/policies", {
-              data: { ...DemoPolicies, application_id: newApp.application.id },
-              method: "post",
-            });
-          }
-        } catch (err) {
-          console.warn("[CREATE APPLICAITON] Failed to create default policy");
-        }
+        // The default "Launch" policy is created server-side in createApplication.
         const overviewPath = getApplicationOverviewPath(
           newApp.application,
           tenant,

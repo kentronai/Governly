@@ -71,6 +71,13 @@
       "when": 1778080644608,
       "tag": "0009_mute_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779030540000,
+      "tag": "0010_provider_models_url_invariant",
+      "breakpoints": true
     }
   ]
 }
