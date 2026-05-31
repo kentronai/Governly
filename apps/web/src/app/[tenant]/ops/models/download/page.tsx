@@ -121,14 +121,19 @@ export default function DownloadModelsPage() {
   }, []);
 
   const loadRiskCategories = async () => {
-    const categories = await getRiskCategories();
-    setRiskCategories(
-      categories.map((category) => ({
-        slug: category.slug,
-        name: category.name,
-        color: category.color || undefined,
-      }))
-    );
+    try {
+      const categories = await getRiskCategories();
+      setRiskCategories(
+        categories.map((category) => ({
+          slug: category.slug,
+          name: category.name,
+          color: category.color || undefined,
+        }))
+      );
+    } catch (error) {
+      console.error("Error loading risk categories:", error);
+      setRiskCategories([]);
+    }
   };
 
   const loadModels = async () => {
@@ -282,7 +287,19 @@ export default function DownloadModelsPage() {
       const result = await response.json();
 
       if (result.status === "success") {
-        successToast({}, "Model", "downloaded", `Size: ${result.size_mb}MB`);
+        const storageLabel =
+          result.storage_backend === "s3"
+            ? `AWS S3${result.bucket ? ` (${result.bucket})` : ""}`
+            : result.storage_backend === "gcs"
+              ? `GCS${result.bucket ? ` (${result.bucket})` : ""}`
+              : "object storage";
+
+        successToast(
+          {},
+          "Model",
+          "downloaded",
+          `Stored in ${storageLabel}. Size: ${result.size_mb}MB`
+        );
         setDownloadUrl("");
         setFilename("");
         setFamily("");

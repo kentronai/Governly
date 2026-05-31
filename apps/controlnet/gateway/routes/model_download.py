@@ -316,8 +316,15 @@ async def download_model_from_url(
         logger.info(f"Downloaded model: {output_path} ({size_mb} MB)")
         
         # Check model size against configured limit
-        from gateway.config import Settings
-        settings = Settings()
+        settings = get_settings()
+        storage_backend = _get_model_storage_backend(settings)
+        if storage_backend == "none":
+            output_path.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=500,
+                detail="No model bucket configured. Set S3_MODEL_BUCKET for AWS S3 or GCS_MODEL_BUCKET for GCS."
+            )
+
         if size_mb > settings.max_onnx_model_size_mb:
             logger.warning(f"Model {output_path.name} is too large ({size_mb}MB > {settings.max_onnx_model_size_mb}MB)")
             output_path.unlink()  # Remove the oversized file
@@ -338,10 +345,10 @@ async def download_model_from_url(
             logger.warning(f"Model validation failed: {validation_error}")
             # Continue with original model - let ONNX Runtime handle the error
         
-        # Upload to configured object storage if bucket is configured
-        storage_url = str(output_path)  # Default to local path
-
-        storage_backend = _get_model_storage_backend(settings)
+        # Upload to configured object storage. Never persist local container
+        # paths here, because ONNX service instances load models from object
+        # storage via storage_url.
+        storage_url = ""
 
         if storage_backend == "gcs":
             try:
@@ -361,7 +368,12 @@ async def download_model_from_url(
                 logger.info(f"✅ Uploaded to GCS: {storage_url}")
                 
             except Exception as e:
-                logger.error(f"Failed to upload to GCS: {e}, using local path")
+                logger.error(f"Failed to upload to GCS: {e}")
+                output_path.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to upload model to GCS: {str(e)}"
+                )
         elif storage_backend == "s3":
             try:
                 import boto3
@@ -375,7 +387,12 @@ async def download_model_from_url(
                 storage_url = f"s3://{settings.s3_model_bucket}/{blob_name}"
                 logger.info(f"✅ Uploaded to S3: {storage_url}")
             except Exception as e:
-                logger.error(f"Failed to upload to S3: {e}, using local path")
+                logger.error(f"Failed to upload to S3: {e}")
+                output_path.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to upload model to S3: {str(e)}"
+                )
         
         # Save to database with tenant context in metadata
         try:
@@ -509,9 +526,13 @@ async def download_model_from_url(
             "url": request.url,
             "filename": output_filename,
             "tenant_id": effective_tenant_id,
-            "visibility": "tenant" if effective_tenant_id else "shared"
+            "visibility": "tenant" if effective_tenant_id else "shared",
+            "storage_backend": storage_backend,
+            "bucket": settings.s3_model_bucket if storage_backend == "s3" else settings.gcs_model_bucket,
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to download model from URL: {e}")
         raise HTTPException(
