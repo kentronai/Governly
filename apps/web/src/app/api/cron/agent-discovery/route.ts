@@ -112,12 +112,12 @@ async function run(request: NextRequest) {
           )),
         });
       } else if (
-        integration.name === "Databricks" &&
+        integration.name === "Databricks Unity Catalog" &&
         integration.credentialsEncrypted
       ) {
         results.push({
           integrationId: integration.id,
-          provider: "Databricks",
+          provider: "Databricks Unity Catalog",
           ...(await runDatabricksDiscoveryScan(
             integration.tenantId,
             integration.id,

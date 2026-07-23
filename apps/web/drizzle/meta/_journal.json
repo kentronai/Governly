@@ -155,6 +155,13 @@
       "when": 1784811000000,
       "tag": "0021_integration_resource_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784812000000,
+      "tag": "0022_rename_databricks_unity_catalog",
+      "breakpoints": true
     }
   ]
 }

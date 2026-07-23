@@ -94,11 +94,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
+const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const DISCOVERY_INTEGRATIONS = new Set([
   "AWS",
   "Azure",
   "Google Cloud",
-  "Databricks",
+  DATABRICKS_UNITY_CATALOG,
 ]);
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
@@ -314,7 +315,7 @@ export default function IntegrationsPage() {
     if (["OpenAI", "Anthropic", "Cohere"].includes(selected.name)) {
       return Boolean(credentials.apiKey.trim());
     }
-    if (selected.name === "Databricks") {
+    if (selected.name === DATABRICKS_UNITY_CATALOG) {
       return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
     }
     if (selected.name === "Snowflake") {
@@ -418,7 +419,7 @@ export default function IntegrationsPage() {
           "",
           `Google Cloud connected — ${scan.agentsDiscovered} agents discovered`,
         );
-      } else if (selected.name === "Databricks") {
+      } else if (selected.name === DATABRICKS_UNITY_CATALOG) {
         const connection = await createDatabricksConnection({
           tenantSlugOrId: tenant.id,
           workspaceUrl: credentials.hostUrl,
@@ -438,7 +439,7 @@ export default function IntegrationsPage() {
           "",
           "",
           "",
-          `Databricks connected — ${scan.agentsDiscovered} agents and ${Object.values(
+          `Databricks Unity Catalog connected — ${scan.agentsDiscovered} agents and ${Object.values(
             scan.resourcesScanned,
           ).reduce(
             (sum, count) => sum + Number(count),
@@ -493,7 +494,7 @@ export default function IntegrationsPage() {
         await removeIntegrationCredentials(tenant.id, integration.id);
       } else if (integration.name === "Google Cloud") {
         await deleteGoogleCloudConnection(tenant.id, integration.id);
-      } else if (integration.name === "Databricks") {
+      } else if (integration.name === DATABRICKS_UNITY_CATALOG) {
         await deleteDatabricksConnection(tenant.id, integration.id);
       } else {
         await removeIntegrationCredentials(tenant.id, integration.id);
@@ -528,7 +529,7 @@ export default function IntegrationsPage() {
         result = await triggerAzureDiscovery(tenant.id, id);
       } else if (integration.name === "Google Cloud") {
         result = await triggerGoogleCloudDiscovery(tenant.id, integration.id);
-      } else if (integration.name === "Databricks") {
+      } else if (integration.name === DATABRICKS_UNITY_CATALOG) {
         result = await triggerDatabricksDiscovery(tenant.id, integration.id);
       }
       if (!result) return;
@@ -770,7 +771,7 @@ export default function IntegrationsPage() {
                         </span>
                       </div>
                     ) : null}
-                    {integration.name === "Databricks" &&
+                    {integration.name === DATABRICKS_UNITY_CATALOG &&
                     integration.configuration.lastDiscoveryCounts ? (
                       <>
                         <div className="flex items-center justify-between">
@@ -1122,7 +1123,7 @@ export default function IntegrationsPage() {
                   autoComplete="new-password"
                 />
               </FormField>
-            ) : selected?.name === "Databricks" ? (
+            ) : selected?.name === DATABRICKS_UNITY_CATALOG ? (
               <>
                 <Alert>
                   <Info />

@@ -12,6 +12,9 @@ import {
   testDatabricksConnection,
 } from "@/lib/server/databricks/discovery-orchestrator";
 
+const INTEGRATION_NAME = "Databricks Unity Catalog";
+const LEGACY_INTEGRATION_NAME = "Databricks";
+
 async function context(slugOrId: string) {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
@@ -37,18 +40,27 @@ export async function ensureDatabricksIntegrationCatalogEntry(
   tenantSlugOrId: string,
 ) {
   const { tenantId, userId } = await context(tenantSlugOrId);
-  const existing = await db.query.integrations.findFirst({
+  let existing = await db.query.integrations.findFirst({
     where: and(
       eq(integrations.tenantId, tenantId),
-      eq(integrations.name, "Databricks"),
+      eq(integrations.name, INTEGRATION_NAME),
     ),
   });
+  if (!existing) {
+    existing = await db.query.integrations.findFirst({
+      where: and(
+        eq(integrations.tenantId, tenantId),
+        eq(integrations.name, LEGACY_INTEGRATION_NAME),
+      ),
+    });
+  }
   const description =
     "Discovers Unity Catalog catalogs, schemas, tables, registered models, and Model Serving endpoints with real governance evidence.";
   if (existing) {
     const [updated] = await db
       .update(integrations)
       .set({
+        name: INTEGRATION_NAME,
         category: "data_platforms",
         description,
         updatedAt: new Date().toISOString(),
@@ -61,7 +73,7 @@ export async function ensureDatabricksIntegrationCatalogEntry(
     .insert(integrations)
     .values({
       tenantId,
-      name: "Databricks",
+      name: INTEGRATION_NAME,
       category: "data_platforms",
       description,
       configuration: {},
@@ -79,8 +91,8 @@ async function connection(tenantId: string, id: string) {
   const row = await db.query.integrations.findFirst({
     where: and(eq(integrations.id, id), eq(integrations.tenantId, tenantId)),
   });
-  if (!row || row.name !== "Databricks") {
-    throw new Error("Databricks connection not found");
+  if (!row || ![INTEGRATION_NAME, LEGACY_INTEGRATION_NAME].includes(row.name)) {
+    throw new Error("Databricks Unity Catalog connection not found");
   }
   return row;
 }
