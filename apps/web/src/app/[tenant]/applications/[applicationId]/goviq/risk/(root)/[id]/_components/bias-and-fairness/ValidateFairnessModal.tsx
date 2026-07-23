@@ -121,8 +121,8 @@ const ValidateFairnessModal: React.FC<ValidateFairnessModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogTitle className="sr-only">Validate Fairness</DialogTitle>
       <DialogContent className="sm:max-w-[500px]  p-0 gap-0 z-50">
+        <DialogTitle className="sr-only">Validate Fairness</DialogTitle>
         <div className="p-6 pb-4 space-y-1 border-b relative">
           <h3 className="text-lg font-semibold leading-none tracking-tight">
             Validate fairness

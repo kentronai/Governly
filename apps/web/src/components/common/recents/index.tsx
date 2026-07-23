@@ -117,6 +117,7 @@ export default function RecentEndpointsTable({
                     <TableHead>Application</TableHead>
                   </>
                 )}
+                <TableHead>Agent</TableHead>
                 <TableHead>Latency</TableHead>
                 <TableHead>Metadata</TableHead>
               </TableRow>
@@ -157,6 +158,7 @@ export default function RecentEndpointsTable({
                   <TableHead>Application</TableHead>
                 </>
               )}
+              <TableHead>Agent</TableHead>
               <TableHead>Latency</TableHead>
               <TableHead>Metadata</TableHead>
             </TableRow>
@@ -223,6 +225,9 @@ export default function RecentEndpointsTable({
                             {ele.applicationName}
                           </TableCell>
                         )}
+                        <TableCell className="text-sm">
+                          {ele.agentName ?? "Application traffic"}
+                        </TableCell>
                         <TableCell>
                           <span className="text-sm">
                             {ele.latencyMs ? `${ele.latencyMs}ms` : "N/A"}
@@ -291,6 +296,10 @@ export default function RecentEndpointsTable({
                                       ? `${(ele.guardrailResults as GuardrailResults).total_execution_time_ms!.toFixed(0)}ms`
                                       : "N/A"}
                                   </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground block">Agent</span>
+                                  <span>{ele.agentName ?? "Not attributed"}</span>
                                 </div>
                               </div>
 

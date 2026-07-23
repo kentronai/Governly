@@ -1,417 +1,203 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
 
-// Removed Navbar import - using static layout instead
-import { successToast, errorToast } from "@/lib/utils/toast";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle, Building2, CalendarDays, CheckCircle2, ExternalLink,
+  Download, FileSearch, Globe2, Landmark, Loader2, MapPin, Search, ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FileText, X } from "lucide-react";
-
+import { successToast, errorToast } from "@/lib/utils/toast";
 import { useTenant } from "@/contexts/TenantContext";
-import { PolicyPack, Connector } from "./type";
-import {
-  fetchPolicyCenterPolicies,
-  updatePolicyCenterPolicyStatus,
-} from "@/lib/api/policy-center";
+import { fetchPolicyCenterPolicies, updatePolicyCenterPolicyStatus } from "@/lib/api/policy-center";
+import type { PolicyPack } from "./type";
+import { ComplianceEvidenceManager } from "@/components/compliance/ComplianceEvidenceManager";
+import { getControlDefinition } from "@/lib/server/compliance/control-catalog";
 
-// Helper function to map API response to PolicyPack
-const mapToPolicyPack = (data: any[]): PolicyPack[] => {
-  return data.map((item) => ({
-    id: item.id,
-    name: item.name,
-    description: item.description ?? null,
-    category: item.category ?? null,
-    country: item.country ?? null,
-    state: item.state ?? null,
-    projectsCompliant: item.projectsCompliant ?? 0,
-    totalProjects: item.totalProjects ?? 0,
-    isActive: item.isActive ?? false,
-    tags: item.tags ?? null,
-    icon: item.icon ?? null,
-    color: item.color ?? "",
-    type: item.type,
-    docsRequired: item.docsRequired,
-    disable: item.disable,
-  }));
+const ALL = "__all__";
+
+function toPolicy(data: any): PolicyPack {
+  return {
+    id: data.id, name: data.name, description: data.description ?? "", category: data.category ?? "Guideline",
+    country: data.country ?? "International", state: data.state ?? undefined,
+    projectsCompliant: data.projectsCompliant ?? 0, totalProjects: data.totalProjects ?? 0,
+    isActive: Boolean(data.isActive), tags: Array.isArray(data.tags) ? data.tags : [], icon: data.icon ?? "POL",
+    color: data.color ?? "bg-slate-700", type: data.type ?? "", disable: Boolean(data.disable),
+    fullDescription: data.fullDescription, purpose: data.purpose, scope: data.scope,
+    requirements: Array.isArray(data.requirements) ? data.requirements : [],
+    riskCategories: Array.isArray(data.riskCategories) ? data.riskCategories : [],
+    industriesAffected: Array.isArray(data.industriesAffected) ? data.industriesAffected : [],
+    governingAuthority: data.governingAuthority, effectiveDate: data.effectiveDate, version: data.version,
+    legalStatus: data.legalStatus, officialUrl: data.officialUrl,
+    references: Array.isArray(data.references) ? data.references : [],
+    controlMappings: Array.isArray(data.controlMappings) ? data.controlMappings : [],
+    applicabilityRules: Array.isArray(data.applicabilityRules) ? data.applicabilityRules : [],
+    metadata: data.metadata && typeof data.metadata === "object" ? data.metadata : null,
+  };
+}
+
+const categoryTone: Record<string, string> = {
+  "AI Regulation": "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-300",
+  Standard: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-300",
+  Framework: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  Guideline: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300",
 };
 
-const PolicyCenter = () => {
-  const [selectedTab, setSelectedTab] = useState<string>("policy-packs");
+export default function CompliancePolicyCenterPage() {
+  const [policies, setPolicies] = useState<PolicyPack[]>([]);
+  const [catalog, setCatalog] = useState<PolicyPack[]>([]);
+  const [selected, setSelected] = useState<PolicyPack | null>(null);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
-  const [newPolicyName, setNewPolicyName] = useState("");
-  const [newPolicyDescription, setNewPolicyDescription] = useState("");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<string>("all");
-  const [selectedState, setSelectedState] = useState<string>("all");
-  const [loading, setLoading] = useState<boolean>(true);
+  const debouncedSearch = useDebounce(search, 350);
+  const [country, setCountry] = useState(ALL);
+  const [category, setCategory] = useState(ALL);
+  const [status, setStatus] = useState(ALL);
+  const [requirementType, setRequirementType] = useState(ALL);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const { tenant, refreshPolicyStatus } = useTenant();
 
-  // State for policy packs from database
-  const [mockPolicyPacks, setMockPolicyPacks] = useState<PolicyPack[]>([]);
-
-  // State for all policies (for dropdown options)
-  const [allPolicies, setAllPolicies] = useState<PolicyPack[]>([]);
-
-  // Fetch all policies for dropdown options (unfiltered)
-  const fetchAllPolicies = useCallback(async () => {
-    try {
-      const data = await fetchPolicyCenterPolicies();
-      setAllPolicies(mapToPolicyPack(data));
-    } catch (error) {
-      console.error("Error fetching all policies:", error);
-    }
+  const loadCatalog = useCallback(async () => {
+    const data = await fetchPolicyCenterPolicies();
+    setCatalog(data.map(toPolicy));
   }, []);
 
-  // Fetch policies from API with filters
-  const fetchPolicies = useCallback(async () => {
+  const loadPolicies = useCallback(async () => {
     setLoading(true);
     try {
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (selectedCountry && selectedCountry !== "all") {
-        params.append("country", selectedCountry);
-      }
-      if (selectedState && selectedState !== "all") {
-        params.append("state", selectedState);
-      }
-      if (debouncedSearch) {
-        params.append("search", debouncedSearch);
-      }
-
-      const options = {
-        country: selectedCountry !== "all" ? selectedCountry : undefined,
-        state: selectedState !== "all" ? selectedState : undefined,
+      const data = await fetchPolicyCenterPolicies({
         search: debouncedSearch || undefined,
-      };
-
-      const data = await fetchPolicyCenterPolicies(options);
-      setMockPolicyPacks(mapToPolicyPack(data));
-    } catch (error) {
-      errorToast("Error loading policies");
+        country: country === ALL ? undefined : country,
+        category: category === ALL ? undefined : category,
+        active: status === ALL ? undefined : status,
+        type: requirementType === ALL ? undefined : requirementType,
+      });
+      setPolicies(data.map(toPolicy));
+    } catch {
+      errorToast("Unable to load compliance policies");
     } finally {
       setLoading(false);
     }
-  }, [selectedCountry, selectedState, debouncedSearch]);
+  }, [category, country, debouncedSearch, requirementType, status]);
 
-  // Fetch all policies once on mount for dropdown options
-  useEffect(() => {
-    fetchAllPolicies();
-  }, [fetchAllPolicies]);
+  useEffect(() => { loadCatalog().catch(() => errorToast("Unable to load policy filters")); }, [loadCatalog]);
+  useEffect(() => { loadPolicies(); }, [loadPolicies]);
 
-  // Fetch filtered policies when filters change
-  useEffect(() => {
-    fetchPolicies();
-  }, [fetchPolicies]);
+  const countries = useMemo(() => [...new Set(catalog.map((p) => p.country).filter(Boolean))].sort(), [catalog]);
+  const categories = useMemo(() => [...new Set(catalog.map((p) => p.category).filter(Boolean))].sort(), [catalog]);
 
-  // Mock data for connectors
-  const mockConnectors: Connector[] = [];
-
-  // Get unique countries for the dropdown from all policies
-  const availableCountries = Array.from(
-    new Set(
-      allPolicies
-        .map((pack) => pack.country)
-        .filter((c): c is string => c !== null)
-    )
-  ).sort();
-
-  // Get unique states for the selected country from all policies
-  const availableStates =
-    selectedCountry && selectedCountry !== "all"
-      ? Array.from(
-          new Set(
-            allPolicies
-              .filter((pack) => pack.country === selectedCountry && pack.state)
-              .map((pack) => pack.state!)
-          )
-        ).sort()
-      : [];
-
-  // No need for client-side filtering anymore - API handles it
-  const filteredPolicyPacks = mockPolicyPacks;
-
-  // Reset state filter when country changes
-  React.useEffect(() => {
-    setSelectedState("all");
-  }, [selectedCountry]);
-
-  const handleAddPolicy = () => {
-    if (!newPolicyName.trim()) {
-      errorToast("Policy name is required");
-      return;
-    }
-
-    // In a real app, this would make an API call
-    successToast("Policy pack added successfully", "", "");
-    setNewPolicyName("");
-    setNewPolicyDescription("");
-    setShowAddDialog(false);
-  };
-  const { refreshPolicyStatus, policyStatus } = useTenant();
-
-  const handleTogglePolicyStatus = async (policyId: string) => {
-    const policy = mockPolicyPacks.find((p) => p.id === policyId);
-    if (!policy) return;
-
-    const currentValue = policy["isActive"];
-    const newValue = !currentValue;
-
-    // Optimistically update UI
-    setMockPolicyPacks((prevPolicies) =>
-      prevPolicies.map((p) =>
-        p.id === policyId ? { ...p, isActive: newValue } : p
-      )
-    );
-
+  const togglePolicy = async (policy: PolicyPack, enabled: boolean) => {
+    setToggling(policy.id);
+    setPolicies((current) => current.map((item) => item.id === policy.id ? { ...item, isActive: enabled } : item));
+    setCatalog((current) => current.map((item) => item.id === policy.id ? { ...item, isActive: enabled } : item));
+    if (selected?.id === policy.id) setSelected({ ...selected, isActive: enabled });
     try {
-      // Update in database
-      await updatePolicyCenterPolicyStatus(policyId, newValue);
-
-      // Refresh policy status from database to update sidebar
+      await updatePolicyCenterPolicyStatus(policy.id, enabled);
       await refreshPolicyStatus();
-
-      successToast(
-        `Policy ${newValue ? "enabled" : "disabled"} successfully`,
-        "Policy",
-        "updated"
-      );
-    } catch (error) {
-      // Revert on error
-      setMockPolicyPacks((prevPolicies) =>
-        prevPolicies.map((p) =>
-          p.id === policyId ? { ...p, isActive: currentValue } : p
-        )
-      );
-      errorToast(`Error updating policy isActive`);
+      successToast(`Policy ${enabled ? "enabled" : "disabled"}`, policy.name, "updated");
+    } catch {
+      setPolicies((current) => current.map((item) => item.id === policy.id ? { ...item, isActive: !enabled } : item));
+      setCatalog((current) => current.map((item) => item.id === policy.id ? { ...item, isActive: !enabled } : item));
+      if (selected?.id === policy.id) setSelected({ ...selected, isActive: !enabled });
+      errorToast("Unable to update policy status");
+    } finally {
+      setToggling(null);
     }
   };
 
-  const renderPolicyPackCard = (policy: PolicyPack) => {
-    return (
-      <>
-        <div
-          key={policy.id}
-          className=" rounded-lg p-6 hover:shadow-md transition-shadow h-full bg-muted"
-        >
-          <div className="flex items-start justify-between mb-3 h-full">
-            <div className="flex items-start gap-3 flex-1 h-full ">
-              <div
-                className={`w-8 h-8 rounded-full ${policy.color} flex items-center justify-center text-white text-sm font-semibold shrink-0`}
-              >
-                {policy.icon || ""}
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col h-full ">
-                <h3 className="font-semibold  text-sm leading-tight mb-1 line-clamp-2">
-                  {policy.name}
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed line-clamp-3 mb-2">
-                  {policy.description || ""}
-                </p>
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  {policy.category && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs px-2 py-0.5  text-muted-foreground"
-                    >
-                      {policy.category}
-                    </Badge>
-                  )}
-                  {policy.country && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs px-2 py-0.5  text-muted-foreground"
-                    >
-                      {policy.country}
-                      {policy.state ? `, ${policy.state}` : ""}
-                    </Badge>
-                  )}
-                  {/* Mandatory/Voluntary Badge */}
-                  {policy.type && (
-                    <Badge
-                      className={cn(
-                        "text-xs px-2 py-0.5 font-medium border",
-                        policy.type === "Mandatory"
-                          ? "bg-red-500/10 text-red-500"
-                          : "bg-blue-500/10 text-blue-500"
-                      )}
-                    >
-                      {policy.type}
-                    </Badge>
-                  )}
-                </div>
+  const resetFilters = () => { setSearch(""); setCountry(ALL); setCategory(ALL); setStatus(ALL); setRequirementType(ALL); };
+  const hasFilters = Boolean(search) || [country, category, status, requirementType].some((value) => value !== ALL);
 
-                <div className="space-y-2 pt-2 border-t  mt-auto">
-                  {/* Active Status Toggle */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Status
-                    </span>
-                    <Switch
-                      defaultChecked={policy.isActive}
-                      onCheckedChange={() =>
-                        handleTogglePolicyStatus(policy.id)
-                      }
-                      disabled={policy.disable}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+  return <div className="min-h-full w-full bg-background p-5 lg:p-7">
+    <div className="mx-auto max-w-[1500px] space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div><div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><ShieldCheck className="h-4 w-4" />Compliance library</div>
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Compliance Policies</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore, understand and enable authoritative AI regulations, standards, frameworks and guidelines for application governance.</p>
         </div>
-      </>
-    );
+        <div className="rounded-lg border bg-card px-4 py-2 text-right"><p className="text-2xl font-semibold tabular-nums">{catalog.length}</p><p className="text-xs text-muted-foreground">Policies in library</p></div>
+      </header>
+
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_repeat(4,minmax(150px,1fr))_auto]">
+          <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, description, country or authority…" className="pl-9" /></div>
+          <PolicySelect value={country} onChange={setCountry} label="Country" options={countries} />
+          <PolicySelect value={category} onChange={setCategory} label="Regulation type" options={categories} />
+          <PolicySelect value={status} onChange={setStatus} label="Status" options={["enabled", "disabled"]} format={(v) => v[0].toUpperCase() + v.slice(1)} />
+          <PolicySelect value={requirementType} onChange={setRequirementType} label="Mandatory / Voluntary" options={["Mandatory", "Voluntary"]} />
+          <Button variant="ghost" disabled={!hasFilters} onClick={resetFilters}>Reset</Button>
+        </div>
+      </section>
+
+      <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">{loading ? "Loading policy library…" : `${policies.length} ${policies.length === 1 ? "policy" : "policies"}`}</p><p className="text-xs text-muted-foreground">Disabled policies stay in existing mappings but cannot be assigned</p></div>
+
+      {loading ? <div className="flex min-h-64 items-center justify-center rounded-xl border"><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span className="text-sm text-muted-foreground">Loading policies</span></div>
+      : policies.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border bg-card text-center"><FileSearch className="mb-3 h-9 w-9 text-muted-foreground" /><h2 className="font-semibold">No policies found</h2><p className="mt-1 text-sm text-muted-foreground">Adjust the filters or search terms.</p><Button variant="outline" className="mt-4" onClick={resetFilters}>Clear filters</Button></div>
+      : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{policies.map((policy) =>
+        <article key={policy.id} role="button" tabIndex={0} onClick={() => setSelected(policy)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelected(policy); }}
+          className="group flex min-h-[270px] cursor-pointer flex-col rounded-xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary">
+          <div className="flex items-start gap-4"><div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xs font-bold tracking-tight text-white shadow-sm", policy.color)}>{policy.icon}</div>
+            <div className="min-w-0 flex-1"><h2 className="line-clamp-2 text-base font-semibold leading-snug group-hover:text-primary">{policy.name}</h2><p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Landmark className="h-3 w-3" />{policy.governingAuthority || "Authority unavailable"}</p></div>
+          </div>
+          <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{policy.description}</p>
+          <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline" className={categoryTone[policy.category] ?? categoryTone.Guideline}>{policy.category}</Badge><Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{policy.country}{policy.state ? ` · ${policy.state}` : ""}</Badge><Badge className={policy.type === "Mandatory" ? "bg-red-500/10 text-red-600 hover:bg-red-500/10 dark:text-red-300" : "bg-blue-500/10 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300"}>{policy.type || "Voluntary"}</Badge></div>
+          <div className="mt-auto flex items-center justify-between border-t pt-4" onClick={(event) => event.stopPropagation()}><div><p className="text-sm font-medium">{policy.isActive ? "Enabled" : "Disabled"}</p><p className="text-xs text-muted-foreground">{policy.isActive ? "Available for assignment" : "Hidden from assignment"}</p></div><div className="flex items-center gap-2">{toggling === policy.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}<Switch checked={policy.isActive} disabled={policy.disable || toggling === policy.id} onCheckedChange={(enabled) => togglePolicy(policy, enabled)} aria-label={`${policy.isActive ? "Disable" : "Enable"} ${policy.name}`} /></div></div>
+        </article>)}</div>}
+    </div>
+
+    <PolicyDetails tenant={tenant?.slug || tenant?.id || ""} policy={selected} onClose={() => setSelected(null)} onToggle={togglePolicy} toggling={toggling} />
+  </div>;
+}
+
+function PolicySelect({ value, onChange, label, options, format = (value) => value }: { value: string; onChange: (value: string) => void; label: string; options: string[]; format?: (value: string) => string }) {
+  return <Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue placeholder={label} /></SelectTrigger><SelectContent><SelectItem value={ALL}>All {label === "Mandatory / Voluntary" ? "obligations" : label.toLowerCase()}</SelectItem>{options.map((option) => <SelectItem key={option} value={option}>{format(option)}</SelectItem>)}</SelectContent></Select>;
+}
+
+function PolicyDetails({ tenant, policy, onClose, onToggle, toggling }: { tenant: string; policy: PolicyPack | null; onClose: () => void; onToggle: (policy: PolicyPack, enabled: boolean) => Promise<void>; toggling: string | null }) {
+  const requirements = policy?.requirements ?? []; const risks = policy?.riskCategories ?? []; const industries = policy?.industriesAffected ?? []; const references = policy?.references ?? []; const controls = policy?.controlMappings ?? [];
+  const downloadChecklist = () => {
+    if (!policy) return;
+    const header = ["Control", "Requirement", "Required", "Mapped Norix field", "Required evidence", "Implementation guidance"];
+    const rows = controls.map((control) => { const definition = getControlDefinition(control.key); return [control.key, control.title, control.required === false ? "No" : "Yes", definition.mappedField, definition.requiredEvidence.join("; "), definition.implementationGuidance]; });
+    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${policy.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-evidence-checklist.csv`; anchor.click(); URL.revokeObjectURL(url);
   };
-
-  const renderConnectorCard = (connector: Connector) => {
-    const isAddCredentials = connector.status === "Add Credentials";
-
-    return (
-      <div
-        key={connector.id}
-        className="bg-white border border-[#E4E4E7] rounded-lg p-4"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
-              <FileText size={14} className="text-white" />
-            </div>
-            <span className="font-medium  text-sm">{connector.name}</span>
-          </div>
-          <button
-            className={cn(
-              "text-xs font-medium border-b",
-              isAddCredentials
-                ? "text-[#1C9852] border-[#1C9852] hover:text-[#15803D]"
-                : "text-[#D84040] border-[#D84040] hover:text-[#B91C1C]"
-            )}
-          >
-            {connector.status}
-          </button>
-        </div>
+  return <Dialog open={Boolean(policy)} onOpenChange={(open) => !open && onClose()}><DialogContent
+    className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-4xl"
+    onEscapeKeyDown={(event) => event.preventDefault()}
+    onInteractOutside={(event) => event.preventDefault()}
+    onPointerDownOutside={(event) => event.preventDefault()}
+  >
+    {policy && <div className="flex max-h-[90vh] flex-col"><DialogHeader className="shrink-0 border-b p-5 pr-12"><div className="flex items-start gap-4"><div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white", policy.color)}>{policy.icon}</div><div className="min-w-0"><DialogTitle className="text-xl leading-tight">{policy.name}</DialogTitle><DialogDescription className="mt-1">{policy.governingAuthority}</DialogDescription><div className="mt-3 flex flex-wrap gap-2"><Badge variant="outline" className={categoryTone[policy.category] ?? categoryTone.Guideline}>{policy.category}</Badge><Badge variant="outline">{policy.country}{policy.state ? ` · ${policy.state}` : ""}</Badge><Badge variant="outline">{policy.type}</Badge></div></div></div></DialogHeader>
+      <div className="flex-1 space-y-6 overflow-y-auto p-5">
+        {(policy.metadata as any)?.citationWarning && <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm"><AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" /><p>This citation is commonly confused with an AI bill. Review the official source and the clarification below before mapping controls.</p></div>}
+        <DetailSection title="Overview"><p className="text-sm leading-6 text-muted-foreground">{policy.fullDescription || policy.description}</p></DetailSection>
+        <div className="grid gap-4 sm:grid-cols-2"><DetailSection title="Purpose"><p className="text-sm leading-6 text-muted-foreground">{policy.purpose || "Not specified"}</p></DetailSection><DetailSection title="Scope"><p className="text-sm leading-6 text-muted-foreground">{policy.scope || "Not specified"}</p></DetailSection></div>
+        <DetailSection title="Core requirements"><BulletList items={requirements} /></DetailSection>
+        <DetailSection title="Automated Norix evidence checks">
+          {controls.length ? <div className="space-y-3"><Button type="button" variant="outline" size="sm" onClick={downloadChecklist}><Download className="mr-1.5 h-4 w-4" />Download evidence checklist</Button><ul className="space-y-3">{controls.map((control) => { const definition = getControlDefinition(control.key); return <li key={control.key} className="rounded-lg border p-3 text-sm"><div className="flex gap-2 font-medium"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>{control.title}{control.required === false ? " (optional)" : ""}</span></div><p className="mt-2 text-xs text-muted-foreground"><strong>Mapped field:</strong> {definition.mappedField}</p><p className="mt-1 text-xs text-muted-foreground"><strong>Evidence:</strong> {definition.requiredEvidence.join("; ")}</p><p className="mt-1 text-xs text-muted-foreground"><strong>Guidance:</strong> {definition.implementationGuidance}</p></li>; })}</ul></div> : <p className="text-sm text-muted-foreground">No automated controls apply to this entry. Review the applicability notice above.</p>}
+        </DetailSection>
+        {tenant && controls.length > 0 && <DetailSection title="Inherited evidence"><ComplianceEvidenceManager tenant={tenant} policyId={policy.id} controls={controls} organizationScope /></DetailSection>}
+        <div className="grid gap-4 sm:grid-cols-2"><DetailSection title="Risk categories"><TagList items={risks} /></DetailSection><DetailSection title="Industries affected"><TagList items={industries} /></DetailSection></div>
+        <DetailSection title="Policy information"><div className="grid gap-x-6 sm:grid-cols-2"><InfoRow icon={Globe2} label="Country / region" value={`${policy.country}${policy.state ? ` · ${policy.state}` : ""}`} /><InfoRow icon={Landmark} label="Governing authority" value={policy.governingAuthority || "Not specified"} /><InfoRow icon={CalendarDays} label="Effective / publication date" value={policy.effectiveDate ? new Date(`${policy.effectiveDate}T00:00:00`).toLocaleDateString() : "Not enacted / not specified"} /><InfoRow icon={ShieldCheck} label="Version" value={policy.version || "Not specified"} /><InfoRow icon={CheckCircle2} label="Legal status" value={policy.legalStatus || "Not specified"} /><InfoRow icon={Building2} label="Obligation" value={policy.type || "Not specified"} /></div></DetailSection>
+        {policy.officialUrl && <DetailSection title="Official documentation"><a href={policy.officialUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm font-medium text-primary hover:bg-muted"><span className="truncate">{policy.officialUrl}</span><ExternalLink className="h-4 w-4 shrink-0" /></a></DetailSection>}
+        {references.length > 0 && <DetailSection title="References"><div className="space-y-2">{references.map((reference) => <a key={reference.url} href={reference.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm hover:bg-muted"><span>{reference.title}</span><ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" /></a>)}</div></DetailSection>}
       </div>
-    );
-  };
+      <div className="shrink-0 border-t p-5"><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Policy assignment</p><p className="text-xs text-muted-foreground">{policy.isActive ? "Available to applications" : "Hidden from new application assignments"}</p></div><div className="flex items-center gap-2">{toggling === policy.id && <Loader2 className="h-4 w-4 animate-spin" />}<Switch checked={policy.isActive} disabled={toggling === policy.id} onCheckedChange={(enabled) => onToggle(policy, enabled)} /></div></div></div>
+    </div>}
+  </DialogContent></Dialog>;
+}
 
-  return (
-    <>
-      <div className="flex flex-col p-5 w-full overflow-y-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold  mb-2">Compliance Policies</h1>
-          <p className="text-muted-foreground text-sm">
-            Manage and monitor your policy compliance across all projects
-          </p>
-        </div>
-
-        {/* Filters */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 max-w-md">
-            <Input
-              placeholder="Search policies..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="text-sm  "
-            />
-          </div>
-          <div className="w-full sm:w-64">
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger className="text-sm  ">
-                <SelectValue placeholder="Filter by country" />
-              </SelectTrigger>
-              <SelectContent className=" border ">
-                <SelectItem value="all" className=" ">
-                  All Countries
-                </SelectItem>
-                {availableCountries.map((country) => (
-                  <SelectItem key={country} value={country} className=" ">
-                    {country}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* State/Province Filter - Only show when states are available */}
-          {availableStates.length > 0 && (
-            <div className="w-full sm:w-64">
-              <Select value={selectedState} onValueChange={setSelectedState}>
-                <SelectTrigger className="text-sm border-[#E4E4E7] ">
-                  <SelectValue placeholder="Filter by state" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-[#E4E4E7]">
-                  <SelectItem value="all" className=" hover:bg-[#F4F4F5]">
-                    cd d: All States
-                  </SelectItem>
-                  <SelectItem value="federal" className=" hover:bg-[#F4F4F5]">
-                    Federal Only
-                  </SelectItem>
-                  {availableStates.map((state) => (
-                    <SelectItem
-                      key={state}
-                      value={state}
-                      className=" hover:bg-[#F4F4F5]"
-                    >
-                      {state}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        {selectedTab === "policy-packs" && (
-          <>
-            {loading ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-sm">
-                  Loading policies...
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredPolicyPacks
-                  .sort((a, b) => {
-                    if (a.disable === b.disable) return 0;
-                    return a.disable ? 1 : -1;
-                  })
-                  .map((policy, idx) => (
-                    <div key={"policy" + idx}>
-                      {renderPolicyPackCard(policy)}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {selectedTab === "connectors" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockConnectors.map(renderConnectorCard)}
-          </div>
-        )}
-
-        {filteredPolicyPacks.length === 0 &&
-          selectedTab === "policy-packs" &&
-          search && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground text-sm">No policy found</p>
-            </div>
-          )}
-      </div>
-    </>
-  );
-};
-
-export default PolicyCenter;
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) { return <section><h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>{children}</section>; }
+function BulletList({ items }: { items: string[] }) { return items.length ? <ul className="space-y-2">{items.map((item) => <li key={item} className="flex gap-2 text-sm"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>{item}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">No requirements recorded.</p>; }
+function TagList({ items }: { items: string[] }) { return items.length ? <div className="flex flex-wrap gap-2">{items.map((item) => <Badge key={item} variant="secondary">{item}</Badge>)}</div> : <p className="text-sm text-muted-foreground">Not specified.</p>; }
+function InfoRow({ icon: Icon, label, value }: { icon: typeof Globe2; label: string; value: string }) { return <div className="flex gap-3 border-b py-3"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-0.5 text-sm font-medium">{value}</p></div></div>; }

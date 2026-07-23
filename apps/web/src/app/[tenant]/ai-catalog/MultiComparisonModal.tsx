@@ -239,7 +239,7 @@ const MultiComparisonModal: React.FC<{
         <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t ">
           <Calendar className="w-4 h-4 shrink-0" />
           <span>
-            Audited: {new Date(tool.collection_date).toLocaleDateString()}
+            Audited: {new Date(tool.collection_date).toLocaleDateString("en-US")}
           </span>
         </div>
       </div>

@@ -427,7 +427,7 @@ export const RiskManagement: React.FC<RiskManagementProps> = ({
           <div>
             <Label className="text-sm text-gray-500">Review Date</Label>
             <p className="font-medium">
-              {risk.dTargetDate ? new Date(risk.dTargetDate).toLocaleDateString() : 'Not set'}
+              {risk.dTargetDate ? new Date(risk.dTargetDate).toLocaleDateString("en-US") : 'Not set'}
             </p>
           </div>
 

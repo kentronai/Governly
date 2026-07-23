@@ -115,10 +115,10 @@ const BiasAndFairnessModals: React.FC<BiasAndFairnessModalsProps> = ({
         open={openModal === "edit bias"}
         onOpenChange={(open) => !open && onEditClose()}
       >
-        <DialogTitle className="sr-only">
-          Edit Bias and Fairness Check
-        </DialogTitle>
         <DialogContent className="sm:max-w-[600px] p-0 gap-0 z-50">
+          <DialogTitle className="sr-only">
+            Edit Bias and Fairness Check
+          </DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Edit Bias and Fairness Check
@@ -254,10 +254,10 @@ const BiasAndFairnessModals: React.FC<BiasAndFairnessModalsProps> = ({
         open={openModal === "create bias"}
         onOpenChange={(open) => !open && onCreateClose()}
       >
-        <DialogTitle className="sr-only">
-          Create Bias and Fairness Check
-        </DialogTitle>
         <DialogContent className="sm:max-w-[600px] text-black p-0 gap-0">
+          <DialogTitle className="sr-only">
+            Create Bias and Fairness Check
+          </DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Create Bias and Fairness Check

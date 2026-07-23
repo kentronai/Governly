@@ -24,7 +24,7 @@ export default function EndpointsContent({ initialEndpoints }: EndpointsContentP
       name: `gpt-4o-config-${endpoints.length + 1}`,
       modelName: 'gpt-4o',
       type: 'foundationModels',
-      lastModified: new Date().toLocaleDateString() + ' & ' + new Date().toLocaleTimeString(),
+      lastModified: new Date().toLocaleDateString("en-US") + ' & ' + new Date().toLocaleTimeString("en-US"),
     };
 
     if (endpointData) {

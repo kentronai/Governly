@@ -78,6 +78,22 @@ export function TenantHeader() {
     [pathname]
   );
 
+  // Clerk, next-themes, and navigation hooks can resolve to browser-specific
+  // values during hydration. Render an identical shell on the server and on
+  // the client's first pass, then reveal the interactive header after mount.
+  if (!isMounted) {
+    return (
+      <div className="sticky top-0 h-14 border-b z-20 flex items-center justify-between px-4">
+        <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 animate-pulse rounded-md bg-muted" />
+          <div className="h-10 w-28 animate-pulse rounded-md bg-muted" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sticky top-0  h-14 border-b z-20 flex items-center justify-between px-4">
       <div className="flex items-center gap-4">
@@ -112,7 +128,7 @@ export function TenantHeader() {
         <Theme />
 
         <OrganizationSwitcher />
-        {!isAdminPage && orgRole === "org:admin" && (
+        {isMounted && !isAdminPage && orgRole === "org:admin" && (
           <Link
             target="_blank"
             href={`/${tenant}/admin/home`}
@@ -126,14 +142,21 @@ export function TenantHeader() {
             </Button>
           </Link>
         )}
-        <UserButton
-          afterSignOutUrl="/sign-in"
-          appearance={{
-            elements: {
-              avatarBox: "w-8 h-8",
-            },
-          }}
-        />
+        {isMounted ? (
+          <UserButton
+            afterSignOutUrl="/sign-in"
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8",
+              },
+            }}
+          />
+        ) : (
+          <div
+            className="h-8 w-8 animate-pulse rounded-full bg-muted"
+            aria-hidden="true"
+          />
+        )}
       </div>
     </div>
   );

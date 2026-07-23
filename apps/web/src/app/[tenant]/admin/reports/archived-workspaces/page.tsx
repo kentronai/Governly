@@ -270,7 +270,7 @@
 //                       {workspace.size}
 //                     </TableCell>
 //                     <TableCell className="text-sm pl-4 text-[#18181B] font-normal">
-//                       {new Date(workspace?.archivedAt).toLocaleDateString()}
+//                       {new Date(workspace?.archivedAt).toLocaleDateString("en-US")}
 //                     </TableCell>
 //                     <TableCell className="text-sm pl-4 text-[#18181B] font-normal">
 //                       {workspace.archivedBy}
@@ -278,7 +278,7 @@
 //                     <TableCell className="text-sm pl-4 text-[#18181B] font-normal">
 //                       {new Date(
 //                         getTimestampAfter15Days(workspace.archivedAt)
-//                       ).toLocaleDateString()}
+//                       ).toLocaleDateString("en-US")}
 //                     </TableCell>
 //                     <TableCell className="text-sm pl-4 text-[#18181B] font-normal">
 //                       {renderWorkspaceActions(workspace)}

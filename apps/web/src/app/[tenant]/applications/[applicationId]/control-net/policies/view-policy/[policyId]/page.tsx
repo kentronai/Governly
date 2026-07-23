@@ -33,7 +33,7 @@ export default async function PolicyDetails({ params }: PageProps) {
             </span>
             <p className="text-sm text-gray-900">
               {policy.user_createdBy?.name || policy.createdBy} at{" "}
-              {new Date(policy.createdAt).toLocaleDateString()}
+              {new Date(policy.createdAt).toLocaleDateString("en-US")}
             </p>
           </div>
           <div>
@@ -42,7 +42,7 @@ export default async function PolicyDetails({ params }: PageProps) {
             </span>
             <p className="text-sm text-gray-900">
               {policy.user_updatedBy?.name || policy.updatedBy} at{" "}
-              {new Date(policy.updatedAt).toLocaleDateString()}
+              {new Date(policy.updatedAt).toLocaleDateString("en-US")}
             </p>
           </div>
         </div>

@@ -249,8 +249,8 @@ const StakeholderRoleModals: React.FC<StakeholderRoleModalsProps> = ({
         open={openModal === 'edit qa test'}
         onOpenChange={(open) => !open && onEditClose()}
       >
-        <DialogTitle className="sr-only">Edit Stakeholder & Role</DialogTitle>
         <DialogContent className="sm:max-w-[700px] text-black p-0 gap-0 z-50 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Edit Stakeholder & Role</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Edit Stakeholder & Role
@@ -372,8 +372,8 @@ const StakeholderRoleModals: React.FC<StakeholderRoleModalsProps> = ({
         open={openModal === 'create qa test'}
         onOpenChange={(open) => !open && onCreateClose()}
       >
-        <DialogTitle className="sr-only">Create Stakeholder & Role</DialogTitle>
         <DialogContent className="sm:max-w-[700px] text-black p-0 gap-0 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Create Stakeholder & Role</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Create Stakeholder & Role

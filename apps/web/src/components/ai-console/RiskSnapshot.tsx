@@ -29,11 +29,11 @@ export function RiskSnapshot() {
           <span className="text-sm text-muted-foreground">AI Sessions</span>
         </div>
         <div className="text-2xl font-bold text-foreground mb-2">
-          {summaryStats.sessions24h.toLocaleString()}
+          {summaryStats.sessions24h.toLocaleString("en-US")}
         </div>
         <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>7d: {summaryStats.sessions7d.toLocaleString()}</span>
-          <span>30d: {summaryStats.sessions30d.toLocaleString()}</span>
+          <span>7d: {summaryStats.sessions7d.toLocaleString("en-US")}</span>
+          <span>30d: {summaryStats.sessions30d.toLocaleString("en-US")}</span>
         </div>
       </div>
 

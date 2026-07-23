@@ -12,6 +12,21 @@ export interface PolicyPack {
   icon: string;
   color: string;
   type?: "Mandatory" | "Voluntary" | ""; // Added policy type
+  fullDescription?: string | null;
+  purpose?: string | null;
+  scope?: string | null;
+  requirements?: string[];
+  riskCategories?: string[];
+  industriesAffected?: string[];
+  governingAuthority?: string | null;
+  effectiveDate?: string | null;
+  version?: string | null;
+  legalStatus?: string | null;
+  officialUrl?: string | null;
+  references?: { title: string; url: string }[];
+  controlMappings?: { key: string; title: string; required?: boolean }[];
+  applicabilityRules?: Array<Record<string, unknown>>;
+  metadata?: Record<string, unknown> | null;
   docsRequired?: boolean;
   disable?: boolean;
 }

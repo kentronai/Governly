@@ -34,10 +34,10 @@ const FullReportModal: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTitle className="sr-only">
-        Full Report for {tool.tool_name}
-      </DialogTitle>
       <DialogContent className="max-w-6xl!  max-h-[90vh] overflow-y-auto ">
+        <DialogTitle className="sr-only">
+          Full Report for {tool.tool_name}
+        </DialogTitle>
         <DialogHeader>
           <div className="flex items-center gap-4">
             <div className="flex-1 px-6">
@@ -128,7 +128,7 @@ const FullReportModal: React.FC<{
               <div className="flex items-center justify-between">
                 <div className="flex items-center justify-start gap-1 text-sm font-medium ">
                   <Calendar className="w-5 h-5 " />
-                  Audit: {new Date(tool.collection_date).toLocaleDateString()}
+                  Audit: {new Date(tool.collection_date).toLocaleDateString("en-US")}
                 </div>
                 <div className="text-sm ">
                   Verified:{" "}

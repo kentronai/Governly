@@ -191,7 +191,7 @@ export default function ScanResults({ result }: ScanResultsProps) {
               <span className="text-sm font-medium text-gray-700">Scanned</span>
             </div>
             <p className="text-sm text-gray-900">
-              {new Date(result.created_at).toLocaleString()}
+              {new Date(result.created_at).toLocaleString("en-US")}
             </p>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function ScanResults({ result }: ScanResultsProps) {
                   
                   <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
                     <span>Scanner: {finding.scanner}</span>
-                    <span>{new Date(finding.created_at).toLocaleString()}</span>
+                    <span>{new Date(finding.created_at).toLocaleString("en-US")}</span>
                   </div>
                 </div>
               ))}

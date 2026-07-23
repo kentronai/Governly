@@ -1,14 +1,44 @@
 const path = require('path');
-require('dotenv').config({
+const dotenv = require('dotenv');
+
+dotenv.config({
   path: [
     path.resolve(__dirname, '../../.env.local'),
     path.resolve(__dirname, '../../.env'),
   ],
 });
 
+// Always use the web app's Clerk test instance during `next dev`, even when
+// the shell or root environment already contains production Clerk keys.
+// Production builds continue to use their injected live environment.
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({
+    path: path.resolve(__dirname, '.env.local'),
+    override: true,
+  });
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  experimental: {
+    // Avoid compiling entire barrel-export packages when a page uses only a
+    // handful of components/icons. This keeps dev-route compilation small.
+    optimizePackageImports: [
+      '@nextui-org/react',
+      'lucide-react',
+      'react-icons',
+    ],
+  },
+  // Development uses Turbopack; the Webpack settings below remain available
+  // for production builds.
+  // `root` is pinned explicitly because Turbopack otherwise walks up looking
+  // for a lockfile and can latch onto an unrelated one outside this repo
+  // (e.g. a stray ~/package-lock.json), which misidentifies the workspace
+  // root and breaks module resolution entirely.
+  turbopack: {
+    root: path.resolve(__dirname, '../..'),
+  },
   images: {
     remotePatterns: [
       // AWS S3 (static assets, integration logos, ONNX model thumbs)

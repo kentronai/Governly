@@ -78,7 +78,7 @@ export const Dashboard = () => {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </div>
           <p className="text-3xl font-bold text-foreground">
-            {stats.totalTests.toLocaleString()}
+            {stats.totalTests.toLocaleString("en-US")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">All time</p>
         </Card>
@@ -89,7 +89,7 @@ export const Dashboard = () => {
             <CheckCircle2 className="h-4 w-4 text-success" />
           </div>
           <p className="text-3xl font-bold text-success">
-            {stats.passed.toLocaleString()}
+            {stats.passed.toLocaleString("en-US")}
           </p>
           <div className="flex items-center gap-1 mt-1">
             <TrendingUp className="h-3 w-3 text-success" />
@@ -103,7 +103,7 @@ export const Dashboard = () => {
             <XCircle className="h-4 w-4 text-destructive" />
           </div>
           <p className="text-3xl font-bold text-destructive">
-            {stats.failed.toLocaleString()}
+            {stats.failed.toLocaleString("en-US")}
           </p>
           <div className="flex items-center gap-1 mt-1">
             <TrendingDown className="h-3 w-3 text-destructive" />

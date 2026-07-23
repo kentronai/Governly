@@ -77,6 +77,16 @@ export interface TransformedPolicy {
   createdBy: string;
   updatedBy: string | null;
   updatedAt: string;
+  isApplicationActive: boolean;
+  isDefault: boolean;
+}
+
+export async function makeApplicationPolicyDefault(
+  tenantSlugOrId: string,
+  applicationId: string,
+  policyId: string
+) {
+  return policyActions.setApplicationDefaultPolicy(tenantSlugOrId, applicationId, policyId);
 }
 
 // Since there's no GET endpoint for policies, we'll use localStorage for now

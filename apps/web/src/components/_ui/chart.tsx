@@ -239,7 +239,7 @@ const ChartTooltipContent = React.forwardRef<
                       </div>
                       {item.value && (
                         <span className="font-mono font-medium tabular-nums text-slate-950 dark:text-slate-50">
-                          {item.value.toLocaleString()}
+                          {item.value.toLocaleString("en-US")}
                         </span>
                       )}
                     </div>

@@ -262,7 +262,7 @@ export const createFieldConfig = {
                       </span>
                       <span className="text-gray-600">
                         {risk.dTargetDate
-                          ? new Date(risk.dTargetDate).toLocaleDateString()
+                          ? new Date(risk.dTargetDate).toLocaleDateString("en-US")
                           : "N/A"}
                       </span>
                     </div>
@@ -276,7 +276,7 @@ export const createFieldConfig = {
                       <span className="text-gray-600">
                         {new Date(
                           risk.dLastRiskReviewDate
-                        ).toLocaleDateString()}
+                        ).toLocaleDateString("en-US")}
                       </span>
                     </div>
                   )}
@@ -734,7 +734,7 @@ const DynamicDetailsViewModal = <T extends Record<string, any>>({
       case "date":
         return (
           <DetailRow key={fieldKey} label={field.label}>
-            {value ? new Date(value).toLocaleDateString() : "N/A"}
+            {value ? new Date(value).toLocaleDateString("en-US") : "N/A"}
           </DetailRow>
         );
 
@@ -824,11 +824,11 @@ const DynamicDetailsViewModal = <T extends Record<string, any>>({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogTitle className="sr-only">{title}</DialogTitle>
       <DialogContent
         className={className}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogHeader>
           <h2 className=" font-semibold text-lg">{title}</h2>
         </DialogHeader>

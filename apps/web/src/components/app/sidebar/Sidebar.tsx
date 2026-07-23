@@ -1,5 +1,5 @@
 "use client";
-import React, { ReactNode } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import {
   Key,
   Activity,
@@ -9,6 +9,12 @@ import {
   Search,
   FileText,
   AlertTriangle,
+  LayoutGrid,
+  BarChart3,
+  Bot,
+  Gauge,
+  Route,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
@@ -46,12 +52,26 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
   const pathname = usePathname();
   const { tenant } = useParams();
   const { isSignedIn, isLoaded } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
+  const isAgentDiscoveryRoute =
+    pathname.startsWith(`/${tenant}/ai-agent-discovery`) ||
+    pathname.startsWith(`/${tenant}/ai-agent-inventory`);
+  const [isAgentDiscoveryOpen, setIsAgentDiscoveryOpen] = useState(isAgentDiscoveryRoute);
+
+  useEffect(() => {
+    if (isAgentDiscoveryRoute) setIsAgentDiscoveryOpen(true);
+  }, [isAgentDiscoveryRoute]);
+
+  // Clerk can already be loaded on the browser's first render while it is
+  // still unresolved during SSR. Render the same skeleton on both sides,
+  // then reveal authenticated navigation after hydration completes.
+  useEffect(() => setIsMounted(true), []);
 
   const { tenant: tenantInfo } = useTenant();
   // Show loading state to prevent layout shift
-  if (!isLoaded) {
+  if (!isMounted || !isLoaded) {
     return (
-      <div className="flex w-64 flex-col  border-r  shadow-sm">
+      <div className="flex w-64 flex-col border-r shadow-sm">
         <div className="flex-1 space-y-1 p-4">
           <div className="animate-pulse">
             <Skeleton className="h-4  rounded w-3/4 mb-2"></Skeleton>
@@ -75,7 +95,7 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
   };
 
   return (
-    <div className="flex w-64 flex-col  border-r shadow-sm">
+    <div className="flex w-64 flex-col border-r shadow-sm">
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4">
         {/* New Feature Pages - At the Top */}
@@ -87,6 +107,71 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
           >
             Applications
           </NavItem>
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsAgentDiscoveryOpen((open) => !open)}
+              aria-expanded={isAgentDiscoveryOpen}
+              aria-controls="ai-agent-discovery-navigation"
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                isAgentDiscoveryRoute
+                  ? "bg-muted"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-inherit"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4 shrink-0" />
+              <span className="flex-1">Agent Registry</span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
+                  isAgentDiscoveryOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            <div
+              id="ai-agent-discovery-navigation"
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                isAgentDiscoveryOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="ml-5 mt-1 space-y-1 border-l pl-2">
+                  <NavItem
+                    href={`/${tenant}/ai-agent-discovery/dashboard`}
+                    icon={<BarChart3 className="h-3.5 w-3.5" />}
+                    isActive={pathname === `/${tenant}/ai-agent-discovery/dashboard`}
+                    className="py-1.5 text-xs"
+                  >
+                    Executive Risk Dashboard
+                  </NavItem>
+                  <NavItem
+                    href={`/${tenant}/ai-agent-inventory`}
+                    icon={<Bot className="h-3.5 w-3.5" />}
+                    isActive={pathname.startsWith(`/${tenant}/ai-agent-inventory`)}
+                    className="py-1.5 text-xs"
+                  >
+                    Agent Inventory
+                  </NavItem>
+                  <NavItem
+                    href={`/${tenant}/ai-agent-discovery/autonomy`}
+                    icon={<Gauge className="h-3.5 w-3.5" />}
+                    isActive={pathname === `/${tenant}/ai-agent-discovery/autonomy`}
+                    className="py-1.5 text-xs"
+                  >
+                    Agent Autonomy Levels
+                  </NavItem>
+                  <NavItem
+                    href={`/${tenant}/ai-agent-discovery/journey`}
+                    icon={<Route className="h-3.5 w-3.5" />}
+                    isActive={pathname === `/${tenant}/ai-agent-discovery/journey`}
+                    className="py-1.5 text-xs"
+                  >
+                    Registry Journey
+                  </NavItem>
+                </div>
+              </div>
+            </div>
+          </div>
           <NavItem
             href={`/${tenant}/model-registry`}
             icon={<Database className="h-4 w-4" />}

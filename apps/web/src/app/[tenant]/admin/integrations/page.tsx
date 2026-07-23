@@ -1,9 +1,36 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
-import React, { ChangeEvent, useState, useEffect } from "react";
-// Removed Navbar import - using static layout instead
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  Blocks,
+  CheckCircle2,
+  Cloud,
+  Filter,
+  Info,
+  Loader2,
+  PlayCircle,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { useTenant } from "@/contexts/TenantContext";
 import { successToast, errorToast } from "@/lib/utils/toast";
-// Removed API imports - using static data instead
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -11,230 +38,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-// Removed useSearchStore import - using static behavior instead
-import { getStaticFileUrl } from "@/lib/utils/helpers";
-import Image from "next/image";
-// Removed permission check - using static behavior instead
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { AlertCircle, Blocks } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useDebounce } from "@/hooks/useDebounce";
-import { useTenant } from "@/contexts/TenantContext";
 import {
-  fetchIntegrations,
-  toggleIntegrationStatus,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  addEncryptedIntegrationCredentials,
   addIntegrationCredentials,
+  fetchIntegrations,
   removeIntegrationCredentials,
+  toggleIntegrationStatus,
   type Integration,
 } from "@/lib/api/integrations";
-import { Search, Filter, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import {
+  createAwsConnection,
+  deleteAwsConnection,
+  ensureAwsIntegrationCatalogEntry,
+  testAwsIntegrationConnection,
+} from "@/lib/actions/aws-integration";
+import { triggerManualScan } from "@/lib/actions/aws-discovery";
+import {
+  createAzureConnection,
+  deleteAzureConnection,
+  ensureAzureIntegrationCatalogEntry,
+  testAzureIntegrationConnection,
+  triggerAzureDiscovery,
+} from "@/lib/actions/azure-integration";
+import {
+  createGoogleCloudConnection,
+  deleteGoogleCloudConnection,
+  ensureGoogleCloudIntegrationCatalogEntry,
+  testGoogleCloudIntegrationConnection,
+  triggerGoogleCloudDiscovery,
+} from "@/lib/actions/gcp-integration";
+import { ensureUniversalAgentIntegrationCatalogEntry } from "@/lib/actions/universal-agent-integration";
 
-// Default integrations that can be added to the database
-const defaultIntegrations = [
-  // Data Platforms
-  {
-    name: "Databricks",
-    category: "data_platforms" as const,
-    logoUrl: "/logos/data-bricks.png",
-    description: "Unified analytics platform",
-  },
-  {
-    name: "Snowflake",
-    category: "data_platforms" as const,
-    logoUrl: "/logos/snowflake.svg",
-    description: "Cloud data platform",
-  },
-  {
-    name: "Dataiku",
-    category: "data_platforms" as const,
-    logoUrl: "/logos/dataiku.svg",
-    description: "Data science platform",
-  },
-
-  // ML Platforms
-  {
-    name: "Azure AI Foundry",
-    category: "ml_platforms" as const,
-    logoUrl: "",
-    description: "Microsoft AI platform",
-  },
-  {
-    name: "MLFlow",
-    category: "ml_platforms" as const,
-    logoUrl: "/logos/mlflow.svg",
-    description: "ML lifecycle management",
-  },
-  {
-    name: "PromptLayer",
-    category: "ml_platforms" as const,
-    logoUrl: "",
-    description: "Prompt engineering platform",
-  },
-  {
-    name: "HoneyHive",
-    category: "ml_platforms" as const,
-    logoUrl: "",
-    description: "LLM evaluation platform",
-  },
-  {
-    name: "Humanloop",
-    category: "ml_platforms" as const,
-    logoUrl: "",
-    description: "AI app development",
-  },
-
-  // LLM Providers
-  {
-    name: "OpenAI",
-    category: "llm_providers" as const,
-    logoUrl: "/logos/openAI.png",
-    description: "AI research company",
-  },
-  {
-    name: "Anthropic",
-    category: "llm_providers" as const,
-    logoUrl: "/logos/anthropic.svg",
-    description: "AI safety company",
-  },
-  {
-    name: "OctoAI",
-    category: "llm_providers" as const,
-    logoUrl: "",
-    description: "AI compute platform",
-  },
-  {
-    name: "Cohere",
-    category: "llm_providers" as const,
-    logoUrl: "/logos/cohere.svg",
-    description: "NLP platform",
-  },
-  {
-    name: "Hugging Face",
-    category: "llm_providers" as const,
-    logoUrl: "/logos/hugging-face.svg",
-    description: "AI model hub",
-  },
-  {
-    name: "Together AI",
-    category: "llm_providers" as const,
-    logoUrl: "",
-    description: "Decentralized AI platform",
-  },
-  {
-    name: "Scale",
-    category: "llm_providers" as const,
-    logoUrl: "",
-    description: "AI data platform",
-  },
-  {
-    name: "Abacus AI",
-    category: "llm_providers" as const,
-    logoUrl: "",
-    description: "AI platform",
-  },
-  {
-    name: "Mostly AI",
-    category: "llm_providers" as const,
-    logoUrl: "",
-    description: "Synthetic data platform",
-  },
-
-  // AI Security
-  {
-    name: "Lakera",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI security platform",
-  },
-  {
-    name: "Credal",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI governance platform",
-  },
-  {
-    name: "Protect AI",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI security solutions",
-  },
-  {
-    name: "Patronus AI",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI evaluation platform",
-  },
-  {
-    name: "Athina",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI monitoring platform",
-  },
-  {
-    name: "WhyLabs",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "ML monitoring platform",
-  },
-  {
-    name: "Fiddler",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "Model performance management",
-  },
-  {
-    name: "Collibra",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "Data governance platform",
-  },
-  {
-    name: "Apache Atlas",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "Data governance framework",
-  },
-  {
-    name: "MMUTA",
-    category: "ai_security" as const,
-    logoUrl: "",
-    description: "AI compliance platform",
-  },
-
-  // Vector Databases
-  {
-    name: "Pinecone",
-    category: "vector_databases" as const,
-    logoUrl: "/logos/pinecone.svg",
-    description: "Vector database",
-  },
-  {
-    name: "Chroma",
-    category: "vector_databases" as const,
-    logoUrl: "/logos/chroma.svg",
-    description: "Open-source vector database",
-  },
-  {
-    name: "Weaviate",
-    category: "vector_databases" as const,
-    logoUrl: "/logos/weaviate.svg",
-    description: "Vector search engine",
-  },
-
-  // Cloud Providers
-  {
-    name: "AWS",
-    category: "cloud_providers" as const,
-    logoUrl: "/logos/AWS.svg",
-    description: "Amazon Web Services",
-  },
-];
-
-const categoryLabels = {
+const CATEGORY_LABELS: Record<string, string> = {
   data_platforms: "Data Platforms",
   ml_platforms: "ML Platforms",
   llm_providers: "LLM Providers",
@@ -243,984 +86,1020 @@ const categoryLabels = {
   cloud_providers: "Cloud Providers",
 };
 
-const _Integrations = () => {
+const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
+
+type AwsMethod = "iam_role" | "access_key" | "cross_account";
+
+type CredentialState = {
+  apiKey: string;
+  apiSecret: string;
+  hostUrl: string;
+  json: string;
+  awsMethod: AwsMethod;
+  awsRegion: string;
+  awsRoleArn: string;
+  awsExternalId: string;
+  awsCrossAccountRoleArn: string;
+  awsAccessKeyId: string;
+  awsSecretAccessKey: string;
+  azureTenantId: string;
+  azureSubscriptionId: string;
+  azureClientId: string;
+  azureClientSecret: string;
+  gcpProjectId: string;
+  gcpServiceAccountJson: string;
+};
+
+const EMPTY_CREDENTIALS: CredentialState = {
+  apiKey: "",
+  apiSecret: "",
+  hostUrl: "",
+  json: "",
+  awsMethod: "iam_role",
+  awsRegion: "us-east-1",
+  awsRoleArn: "",
+  awsExternalId: "",
+  awsCrossAccountRoleArn: "",
+  awsAccessKeyId: "",
+  awsSecretAccessKey: "",
+  azureTenantId: "",
+  azureSubscriptionId: "",
+  azureClientId: "",
+  azureClientSecret: "",
+  gcpProjectId: "",
+  gcpServiceAccountJson: "",
+};
+
+function formatUtc(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+function IntegrationLogo({ integration }: { integration: Integration }) {
+  if (integration.logoUrl) {
+    return (
+      <Image
+        src={integration.logoUrl}
+        width={28}
+        height={28}
+        alt=""
+        className="h-7 w-7 object-contain"
+      />
+    );
+  }
+  return CLOUD_PROVIDERS.has(integration.name) ? (
+    <Cloud className="h-6 w-6" />
+  ) : (
+    <Blocks className="h-6 w-6" />
+  );
+}
+
+function FormField({
+  label,
+  required,
+  help,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label}
+        {required ? "*" : ""}
+      </Label>
+      {children}
+      {help ? <p className="text-xs text-muted-foreground">{help}</p> : null}
+    </div>
+  );
+}
+
+export default function IntegrationsPage() {
   const { tenant } = useTenant();
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedIntegration, setSelectedIntegration] =
-    useState<Integration | null>(null);
-  const [apiKey, setApiKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
-  const [hostUrl, setHostUrl] = useState("");
-  const [credValue, setCredValue] = useState("");
-  const [showError, setShowError] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [isFormValid, setIsFormValid] = useState(false);
-  const [search, setSearch] = useState("");
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "enabled" | "disabled"
-  >("all");
-  const [credentialsFilter, setCredentialsFilter] = useState<
-    "all" | "with_credentials" | "without_credentials"
-  >("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Integration | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [status, setStatus] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
-  const debouncedSearch = useDebounce(search, 300);
+  const [credentials, setCredentials] =
+    useState<CredentialState>(EMPTY_CREDENTIALS);
 
-  // Load integrations from database
+  const setCredential = <K extends keyof CredentialState>(
+    key: K,
+    value: CredentialState[K],
+  ) => setCredentials((current) => ({ ...current, [key]: value }));
+
+  const load = async () => {
+    if (!tenant?.id) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      await Promise.all([
+        ensureAwsIntegrationCatalogEntry(tenant.id),
+        ensureAzureIntegrationCatalogEntry(tenant.id),
+        ensureGoogleCloudIntegrationCatalogEntry(tenant.id),
+        ensureUniversalAgentIntegrationCatalogEntry(tenant.id),
+      ]);
+      setIntegrations(await fetchIntegrations(tenant.id));
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : "Failed to load integrations",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadIntegrations = async () => {
-      if (!tenant?.id) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchIntegrations(tenant.id);
-        console.log("data", data);
-        setIntegrations(data);
-      } catch (err) {
-        console.error("Error loading integrations:", err);
-        setError("Failed to load integrations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadIntegrations();
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.id]);
 
-  // Add credentials to integration
-  const addCredentials = async (credentials: Record<string, any>) => {
-    if (!tenant?.id || !selectedIntegration) return;
+  const categories = useMemo(
+    () =>
+      Object.keys(CATEGORY_LABELS).filter((value) =>
+        integrations.some((integration) => integration.category === value),
+      ),
+    [integrations],
+  );
 
-    try {
-      const updatedIntegration = await addIntegrationCredentials(
-        tenant.id,
-        selectedIntegration.id,
-        credentials
-      );
-
-      // Update local state
-      setIntegrations((prev) =>
-        prev.map((integration) =>
-          integration.id === selectedIntegration.id
-            ? updatedIntegration
-            : integration
-        )
-      );
-
-      successToast("", "Integration", "credentials added");
-      resetState();
-    } catch (err) {
-      errorToast("Failed to add credentials");
-    }
-  };
-
-  // Remove credentials from integration
-  const deleteCredentials = async (integration: Integration) => {
-    if (!tenant?.id) return;
-
-    try {
-      const updatedIntegration = await removeIntegrationCredentials(
-        tenant.id,
-        integration.id
-      );
-
-      // Update local state
-      setIntegrations((prev) =>
-        prev.map((item) =>
-          item.id === integration.id ? updatedIntegration : item
-        )
-      );
-
-      successToast(null, "Integration", "credentials removed");
-    } catch (err) {
-      console.error("Error removing credentials:", err);
-      errorToast("Failed to remove credentials");
-    }
-  };
-
-  const handleUpdateIntegrationStatus = async (integration: Integration) => {
-    if (!tenant?.id) return;
-
-    const newStatus = !integration.isEnabled;
-
-    // Update local state immediately for better UX
-    setIntegrations((prev) =>
-      prev.map((item) =>
-        item.id === integration.id ? { ...item, isEnabled: newStatus } : item
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return integrations
+      .filter(
+        (integration) =>
+          category === "all" || integration.category === category,
       )
-    );
+      .filter(
+        (integration) =>
+          status === "all" ||
+          (status === "enabled"
+            ? integration.isEnabled
+            : !integration.isEnabled),
+      )
+      .filter(
+        (integration) =>
+          !query ||
+          integration.name.toLowerCase().includes(query) ||
+          integration.description?.toLowerCase().includes(query),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [integrations, category, status, search]);
 
+  const openCredentials = (integration: Integration) => {
+    setSelected(integration);
+    setCredentials(EMPTY_CREDENTIALS);
+    setDialogOpen(true);
+  };
+
+  const closeCredentials = () => {
+    if (saving) return;
+    setDialogOpen(false);
+    setSelected(null);
+    setCredentials(EMPTY_CREDENTIALS);
+  };
+
+  const valid = useMemo(() => {
+    if (!selected) return false;
+    if (selected.name === "AWS") {
+      if (!credentials.awsRegion.trim()) return false;
+      if (credentials.awsMethod === "iam_role")
+        return Boolean(credentials.awsRoleArn.trim());
+      if (credentials.awsMethod === "cross_account")
+        return Boolean(credentials.awsCrossAccountRoleArn.trim());
+      return Boolean(
+        credentials.awsAccessKeyId.trim() &&
+          credentials.awsSecretAccessKey.trim(),
+      );
+    }
+    if (selected.name === "Azure") {
+      return Boolean(
+        credentials.azureTenantId.trim() &&
+          credentials.azureSubscriptionId.trim() &&
+          credentials.azureClientId.trim() &&
+          credentials.azureClientSecret.trim(),
+      );
+    }
+    if (selected.name === "Google Cloud") {
+      return Boolean(
+        credentials.gcpProjectId.trim() &&
+          credentials.gcpServiceAccountJson.trim(),
+      );
+    }
+    if (["OpenAI", "Anthropic", "Cohere"].includes(selected.name)) {
+      return Boolean(credentials.apiKey.trim());
+    }
+    if (["Databricks", "Snowflake"].includes(selected.name)) {
+      return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
+    }
     try {
-      const updatedIntegration = await toggleIntegrationStatus(
+      return Boolean(
+        credentials.json.trim() && JSON.parse(credentials.json.trim()),
+      );
+    } catch {
+      return false;
+    }
+  }, [selected, credentials]);
+
+  const save = async () => {
+    if (!tenant?.id || !selected || !valid) return;
+    setSaving(true);
+    try {
+      if (selected.name === "AWS") {
+        const connection = await createAwsConnection({
+          tenantSlug: tenant.id,
+          name: "AWS",
+          authMethod: credentials.awsMethod,
+          region: credentials.awsRegion.trim(),
+          roleArn: credentials.awsRoleArn.trim() || undefined,
+          externalId: credentials.awsExternalId.trim() || undefined,
+          crossAccountRoleArn:
+            credentials.awsCrossAccountRoleArn.trim() || undefined,
+          accessKeyId: credentials.awsAccessKeyId.trim() || undefined,
+          secretAccessKey: credentials.awsSecretAccessKey.trim() || undefined,
+        });
+        const tested = await testAwsIntegrationConnection(
+          tenant.id,
+          connection.id,
+        );
+        if (!tested.ok) throw new Error(tested.error);
+        await addIntegrationCredentials(tenant.id, selected.id, {
+          authMethod: credentials.awsMethod,
+          region: credentials.awsRegion.trim(),
+          awsConnectionId: connection.id,
+        });
+        setRunning(selected.id);
+        const scan = await triggerManualScan(tenant.id, connection.id);
+        if (scan.status === "failed")
+          throw new Error(scan.errorMessage || "AWS discovery failed");
+        successToast(
+          "",
+          "",
+          "",
+          `AWS connected — ${scan.agentsDiscovered} agents discovered`,
+        );
+      } else if (selected.name === "Azure") {
+        const connection = await createAzureConnection({
+          tenantSlugOrId: tenant.id,
+          azureTenantId: credentials.azureTenantId.trim(),
+          subscriptionId: credentials.azureSubscriptionId.trim(),
+          clientId: credentials.azureClientId.trim(),
+          clientSecret: credentials.azureClientSecret,
+        });
+        const tested = await testAzureIntegrationConnection(
+          tenant.id,
+          connection.id,
+        );
+        if (!tested.ok) throw new Error(tested.error);
+        await addIntegrationCredentials(tenant.id, selected.id, {
+          azureConnectionId: connection.id,
+          subscriptionId: connection.subscriptionId,
+          authentication: "service_principal",
+        });
+        setRunning(selected.id);
+        const scan = await triggerAzureDiscovery(tenant.id, connection.id);
+        if (scan.status === "failed")
+          throw new Error(scan.errorMessage || "Azure discovery failed");
+        successToast(
+          "",
+          "",
+          "",
+          `Azure connected — ${scan.agentsDiscovered} agents discovered`,
+        );
+      } else if (selected.name === "Google Cloud") {
+        const connection = await createGoogleCloudConnection({
+          tenantSlugOrId: tenant.id,
+          projectId: credentials.gcpProjectId.trim(),
+          serviceAccountJson: credentials.gcpServiceAccountJson,
+        });
+        const tested = await testGoogleCloudIntegrationConnection(
+          tenant.id,
+          connection.id,
+        );
+        if (!tested.ok) throw new Error(tested.error);
+        setRunning(selected.id);
+        const scan = await triggerGoogleCloudDiscovery(
+          tenant.id,
+          connection.id,
+        );
+        if (scan.status === "failed")
+          throw new Error(scan.errorMessage || "Google Cloud discovery failed");
+        successToast(
+          "",
+          "",
+          "",
+          `Google Cloud connected — ${scan.agentsDiscovered} agents discovered`,
+        );
+      } else {
+        let secret: Record<string, unknown>;
+        if (["OpenAI", "Anthropic", "Cohere"].includes(selected.name)) {
+          secret = { apiKey: credentials.apiKey };
+        } else if (["Databricks", "Snowflake"].includes(selected.name)) {
+          secret = {
+            hostUrl: credentials.hostUrl,
+            apiKey: credentials.apiKey,
+          };
+        } else {
+          secret = JSON.parse(credentials.json);
+        }
+        await addEncryptedIntegrationCredentials(
+          tenant.id,
+          selected.id,
+          secret,
+        );
+        successToast("", "Integration", "connected");
+      }
+      setDialogOpen(false);
+      setSelected(null);
+      setCredentials(EMPTY_CREDENTIALS);
+      await load();
+    } catch (error) {
+      errorToast(
+        error instanceof Error
+          ? error.message
+          : "Failed to connect integration",
+      );
+    } finally {
+      setSaving(false);
+      setRunning(null);
+    }
+  };
+
+  const revoke = async (integration: Integration) => {
+    if (!tenant?.id) return;
+    try {
+      if (integration.name === "AWS") {
+        const connectionId = integration.configuration.awsConnectionId;
+        if (connectionId) await deleteAwsConnection(tenant.id, connectionId);
+        await removeIntegrationCredentials(tenant.id, integration.id);
+      } else if (integration.name === "Azure") {
+        const connectionId = integration.configuration.azureConnectionId;
+        if (connectionId) await deleteAzureConnection(tenant.id, connectionId);
+        await removeIntegrationCredentials(tenant.id, integration.id);
+      } else if (integration.name === "Google Cloud") {
+        await deleteGoogleCloudConnection(tenant.id, integration.id);
+      } else {
+        await removeIntegrationCredentials(tenant.id, integration.id);
+      }
+      successToast("", "Integration", "connection revoked");
+      await load();
+    } catch (error) {
+      errorToast(
+        error instanceof Error ? error.message : "Failed to revoke connection",
+      );
+    }
+  };
+
+  const runDiscovery = async (integration: Integration) => {
+    if (!tenant?.id) return;
+    setRunning(integration.id);
+    try {
+      let result:
+        | {
+            status: "completed" | "failed";
+            agentsDiscovered: number;
+            errorMessage?: string;
+          }
+        | undefined;
+      if (integration.name === "AWS") {
+        const id = integration.configuration.awsConnectionId;
+        if (!id) throw new Error("AWS connection is missing");
+        result = await triggerManualScan(tenant.id, id);
+      } else if (integration.name === "Azure") {
+        const id = integration.configuration.azureConnectionId;
+        if (!id) throw new Error("Azure connection is missing");
+        result = await triggerAzureDiscovery(tenant.id, id);
+      } else if (integration.name === "Google Cloud") {
+        result = await triggerGoogleCloudDiscovery(tenant.id, integration.id);
+      }
+      if (!result) return;
+      if (result.status === "failed")
+        throw new Error(result.errorMessage || "Discovery failed");
+      successToast(
+        "",
+        "",
+        "",
+        `Discovery complete — ${result.agentsDiscovered} agents found`,
+      );
+      await load();
+    } catch (error) {
+      errorToast(error instanceof Error ? error.message : "Discovery failed");
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const toggle = async (integration: Integration) => {
+    if (!tenant?.id) return;
+    try {
+      const updated = await toggleIntegrationStatus(
         tenant.id,
         integration.id,
-        newStatus
+        !integration.isEnabled,
       );
-
-      // Update with server response
-      setIntegrations((prev) =>
-        prev.map((item) =>
-          item.id === integration.id ? updatedIntegration : item
-        )
+      setIntegrations((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
       );
-
-      successToast(null, "Integration", "status updated");
-    } catch (err) {
-      console.error("Error updating integration status:", err);
-      // Revert local state on error
-      setIntegrations((prev) =>
-        prev.map((item) =>
-          item.id === integration.id
-            ? { ...item, isEnabled: integration.isEnabled }
-            : item
-        )
+    } catch (error) {
+      errorToast(
+        error instanceof Error ? error.message : "Failed to update integration",
       );
-      errorToast("Failed to update integration status");
     }
   };
-
-  const validateForm = () => {
-    if (!selectedIntegration) {
-      setIsFormValid(false);
-      return;
-    }
-
-    let isValid = false;
-
-    // Different validation logic based on integration type
-    switch (selectedIntegration.name) {
-      case "OpenAI":
-      case "Anthropic":
-      case "Cohere":
-        isValid = apiKey !== "";
-        break;
-      case "Databricks":
-      case "Snowflake":
-        isValid = hostUrl !== "" && apiKey !== "";
-        break;
-      case "Azure AI Foundry":
-        isValid = apiKey !== "" && apiSecret !== "";
-        break;
-      default:
-        try {
-          if (credValue.trim()) {
-            JSON.parse(credValue);
-            isValid = true;
-          }
-        } catch {
-          isValid = false;
-        }
-        break;
-    }
-
-    setIsFormValid(isValid);
-  };
-
-  useEffect(() => {
-    validateForm();
-  }, [selectedIntegration, apiKey, apiSecret, hostUrl, credValue]);
-
-  const handleSave = async () => {
-    if (!selectedIntegration || !isFormValid) {
-      setShowError(true);
-      return;
-    }
-
-    let secretConfig = {};
-
-    switch (selectedIntegration.name) {
-      case "OpenAI":
-      case "Anthropic":
-      case "Cohere":
-        secretConfig = { api_key: apiKey };
-        break;
-      case "Databricks":
-      case "Snowflake":
-        secretConfig = { host_url: hostUrl, api_key: apiKey };
-        break;
-      case "Azure AI Foundry":
-        secretConfig = { api_key: apiKey, api_secret: apiSecret };
-        break;
-      default:
-        try {
-          secretConfig = JSON.parse(credValue);
-        } catch (error) {
-          errorToast("Invalid JSON format");
-          return;
-        }
-        break;
-    }
-
-    setShowError(false);
-    setOpen(false);
-    await addCredentials(secretConfig);
-  };
-
-  const handleDelete = async (integration: Integration) => {
-    await deleteCredentials(integration);
-  };
-
-  const renderCredentialComponent = (integrationName: string) => {
-    switch (integrationName) {
-      case "OpenAI":
-      case "Anthropic":
-      case "Cohere":
-        return (
-          <div className="space-y-2">
-            <label
-              htmlFor="apiKey"
-              className="text-sm font-medium text-[#18181B]"
-            >
-              API Key*
-            </label>
-            <Input
-              id="apiKey"
-              placeholder="Enter your API key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type="password"
-              className={cn(
-                "text-sm border-[#E4E4E7] text-[#18181B]",
-                showError && apiKey === "" && "border-red-500"
-              )}
-            />
-            {showError && apiKey === "" && (
-              <p className="text-xs text-red-500">API key is required</p>
-            )}
-          </div>
-        );
-
-      case "Databricks":
-      case "Snowflake":
-        return (
-          <>
-            <div className="space-y-2">
-              <label
-                htmlFor="hostUrl"
-                className="text-sm font-medium text-[#18181B]"
-              >
-                Host URL*
-              </label>
-              <Input
-                id="hostUrl"
-                placeholder="Enter your host URL"
-                value={hostUrl}
-                onChange={(e) => setHostUrl(e.target.value)}
-                className={cn(
-                  "text-sm border-[#E4E4E7] text-[#18181B]",
-                  showError && hostUrl === "" && "border-red-500"
-                )}
-              />
-              {showError && hostUrl === "" && (
-                <p className="text-xs text-red-500">Host URL is required</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="apiKey"
-                className="text-sm font-medium text-[#18181B]"
-              >
-                API Key*
-              </label>
-              <Input
-                id="apiKey"
-                placeholder="Enter your API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                type="password"
-                className={cn(
-                  "text-sm border-[#E4E4E7] text-[#18181B]",
-                  showError && apiKey === "" && "border-red-500"
-                )}
-              />
-              {showError && apiKey === "" && (
-                <p className="text-xs text-red-500">API key is required</p>
-              )}
-            </div>
-          </>
-        );
-
-      case "Azure AI Foundry":
-        return (
-          <>
-            <div className="space-y-2">
-              <label
-                htmlFor="apiKey"
-                className="text-sm font-medium text-[#18181B]"
-              >
-                API Key*
-              </label>
-              <Input
-                id="apiKey"
-                placeholder="Enter your API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                type="password"
-                className={cn(
-                  "text-sm border-[#E4E4E7] text-[#18181B]",
-                  showError && apiKey === "" && "border-red-500"
-                )}
-              />
-              {showError && apiKey === "" && (
-                <p className="text-xs text-red-500">API key is required</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="apiSecret"
-                className="text-sm font-medium text-[#18181B]"
-              >
-                API Secret*
-              </label>
-              <Input
-                id="apiSecret"
-                placeholder="Enter your API secret"
-                value={apiSecret}
-                onChange={(e) => setApiSecret(e.target.value)}
-                type="password"
-                className={cn(
-                  "text-sm border-[#E4E4E7] text-[#18181B]",
-                  showError && apiSecret === "" && "border-red-500"
-                )}
-              />
-              {showError && apiSecret === "" && (
-                <p className="text-xs text-red-500">API secret is required</p>
-              )}
-            </div>
-          </>
-        );
-
-      default:
-        return (
-          <div className="space-y-2">
-            <label
-              htmlFor="credentials"
-              className="text-sm font-medium text-[#18181B]"
-            >
-              Configuration JSON*
-            </label>
-            <Textarea
-              id="credentials"
-              placeholder="Enter your configuration JSON here"
-              value={credValue}
-              onChange={(e) => setCredValue(e.target.value)}
-              className={cn(
-                "text-sm border-[#E4E4E7] text-[#18181B] min-h-[100px]",
-                showError && credValue === "" && "border-red-500"
-              )}
-            />
-            {showError && credValue === "" && (
-              <p className="text-xs text-red-500">
-                Configuration JSON is required
-              </p>
-            )}
-          </div>
-        );
-    }
-  };
-
-  const resetState = () => {
-    setSelectedIntegration(null);
-    setApiKey("");
-    setApiSecret("");
-    setHostUrl("");
-    setCredValue("");
-    setShowError(false);
-    setIsFormValid(false);
-  };
-
-  // Enhanced filtering logic
-  const filteredIntegrations = integrations.filter((integration) => {
-    // Search filter
-    const matchesSearch =
-      debouncedSearch === "" ||
-      integration.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      (integration.description &&
-        integration.description
-          .toLowerCase()
-          .includes(debouncedSearch.toLowerCase())) ||
-      integration.category
-        .toLowerCase()
-        .includes(debouncedSearch.toLowerCase());
-
-    // Category filter
-    const matchesCategory =
-      selectedCategory === "all" || integration.category === selectedCategory;
-
-    // Status filter
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "enabled" && integration.isEnabled) ||
-      (statusFilter === "disabled" && !integration.isEnabled);
-
-    // Credentials filter (checking if configuration has credentials)
-    const hasCredentials =
-      integration.configuration &&
-      Object.keys(integration.configuration).length > 0;
-    const matchesCredentials =
-      credentialsFilter === "all" ||
-      (credentialsFilter === "with_credentials" && hasCredentials) ||
-      (credentialsFilter === "without_credentials" && !hasCredentials);
-
-    return (
-      matchesSearch && matchesCategory && matchesStatus && matchesCredentials
-    );
-  });
-
-  // Get filter counts for display
-  const getFilterCounts = () => {
-    const total = integrations.length;
-    const enabled = integrations.filter((i) => i.isEnabled).length;
-    const disabled = total - enabled;
-    const withCredentials = integrations.filter(
-      (i) => i.configuration && Object.keys(i.configuration).length > 0
-    ).length;
-    const withoutCredentials = total - withCredentials;
-
-    return { total, enabled, disabled, withCredentials, withoutCredentials };
-  };
-
-  const filterCounts = getFilterCounts();
-
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSearch("");
-    setSelectedCategory("all");
-    setStatusFilter("all");
-    setCredentialsFilter("all");
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters =
-    search !== "" ||
-    selectedCategory !== "all" ||
-    statusFilter !== "all" ||
-    credentialsFilter !== "all";
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl/Cmd + K to focus search
-      if ((event.ctrlKey || event.metaKey) && event.key === "k") {
-        event.preventDefault();
-        const searchInput = document.querySelector(
-          'input[placeholder*="Search integrations"]'
-        ) as HTMLInputElement;
-        if (searchInput) {
-          searchInput.focus();
-        }
-      }
-      // Escape to clear search
-      if (event.key === "Escape" && search) {
-        setSearch("");
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [search]);
-
-  // Get search suggestions based on available integrations
-  const getSearchSuggestions = () => {
-    if (!debouncedSearch || debouncedSearch.length < 2) return [];
-
-    const suggestions = new Set<string>();
-    integrations.forEach((integration) => {
-      if (
-        integration.name.toLowerCase().includes(debouncedSearch.toLowerCase())
-      ) {
-        suggestions.add(integration.name);
-      }
-      if (
-        integration.description &&
-        integration.description
-          .toLowerCase()
-          .includes(debouncedSearch.toLowerCase())
-      ) {
-        suggestions.add(integration.description);
-      }
-      if (
-        integration.category
-          .toLowerCase()
-          .includes(debouncedSearch.toLowerCase())
-      ) {
-        suggestions.add(
-          categoryLabels[integration.category as keyof typeof categoryLabels]
-        );
-      }
-    });
-
-    return Array.from(suggestions).slice(0, 5);
-  };
-
-  const searchSuggestions = getSearchSuggestions();
-
-  const categories = Object.keys(categoryLabels) as Array<
-    keyof typeof categoryLabels
-  >;
 
   return (
-    <div className="flex  flex-col justify-between w-full h-full overflow-hidden">
-      <div className="flex w-full h-full relative z-0 overflow-hidden">
-        <div className="flex flex-col z-30 p-5 w-full h-[100vh] pl-[15px] relative">
-          <div className="h-full overflow-hidden">
-            <div className="w-full h-full overflow-hidden">
-              <div className="border-b border-[#FFFFFF]">
-                <div className="flex overflow-x-hidden">
-                  <button
-                    onClick={() => setSelectedCategory("all")}
-                    className={`px-4 py-2 font-sans leading-4 text-sm font-semibold whitespace-nowrap flex items-center gap-2 ${
-                      selectedCategory === "all"
-                        ? "border-b border-black text-[#18181B]"
-                        : "text-[#71717A] hover:text-[#18181B]"
-                    }`}
-                  >
-                    All Integrations
-                    <Badge variant="secondary" className="text-xs">
-                      {integrations.length}
-                    </Badge>
-                  </button>
-                  {categories.map((category) => {
-                    const categoryCount = integrations.filter(
-                      (i) => i.category === category
-                    ).length;
-                    return (
-                      <button
-                        key={category}
-                        onClick={() => setSelectedCategory(category)}
-                        className={`px-4 py-2 font-sans leading-4 text-sm font-semibold whitespace-nowrap flex items-center gap-2 ${
-                          selectedCategory === category
-                            ? "border-b border-black text-[#18181B]"
-                            : "text-[#71717A] hover:text-[#18181B]"
-                        }`}
-                      >
-                        {categoryLabels[category]}
-                        <Badge variant="secondary" className="text-xs">
-                          {categoryCount}
-                        </Badge>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Integrations
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Connect providers, discover deployed agents, and bring them under
+            NORIX policy and compliance evaluation.
+          </p>
+        </div>
 
-              {/* <div className="mt-4">
-              <div className="flex items-center gap-2 p-3 bg-[#F9F9F9F9] border border-[#E4E4E7] rounded-lg">
-                <AlertCircle size={16} className="text-[#18181B]" />
-                <span className="text-sm font-medium font-sans leading-[100%] text-[#18181B]">
-                  You need to add credentials to the integration before you can enable it.
-                </span>
-              </div>
-            </div> */}
+        <div className="flex flex-wrap items-center gap-2 border-b">
+          <Button
+            variant="ghost"
+            className={
+              category === "all"
+                ? "rounded-none border-b-2 border-foreground"
+                : "rounded-none text-muted-foreground"
+            }
+            onClick={() => setCategory("all")}
+          >
+            All
+            <Badge variant="secondary">{integrations.length}</Badge>
+          </Button>
+          {categories.map((value) => (
+            <Button
+              key={value}
+              variant="ghost"
+              className={
+                category === value
+                  ? "rounded-none border-b-2 border-foreground"
+                  : "rounded-none text-muted-foreground"
+              }
+              onClick={() => setCategory(value)}
+            >
+              {CATEGORY_LABELS[value]}
+              <Badge variant="secondary">
+                {
+                  integrations.filter(
+                    (integration) => integration.category === value,
+                  ).length
+                }
+              </Badge>
+            </Button>
+          ))}
+        </div>
 
-              {/* Search and Filter Section */}
-              <div className="mt-4 mb-4 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search integrations by name, description, or category..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-10 pr-20 text-sm border-[#E4E4E7] text-[#18181B]"
-                    />
-                    {search && (
-                      <button
-                        onClick={() => setSearch("")}
-                        className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 hidden sm:block">
-                      ⌘K
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative max-w-xl flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search integrations"
+              className="pl-9 pr-9"
+            />
+            {search ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters((value) => !value)}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filters
+          </Button>
+        </div>
+
+        {showFilters ? (
+          <Card className="gap-4 py-4 shadow-none">
+            <CardContent className="flex flex-wrap items-end gap-3 px-4">
+              <div className="w-52 space-y-2">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All integrations</SelectItem>
+                    <SelectItem value="enabled">Enabled</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setStatus("all");
+                  setSearch("");
+                  setCategory("all");
+                }}
+              >
+                Clear filters
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Alert>
+          <ShieldCheck />
+          <AlertTitle>Real agent coverage</AlertTitle>
+          <AlertDescription>
+            Native managed agents are discovered directly. VM and container
+            workloads must include an agent-identifying name or tag such as
+            <code className="rounded bg-muted px-1 py-0.5">
+              norix:agent=true
+            </code>
+            . Workloads on any other platform can register through the
+            authenticated agent discovery ingestion API.
+          </AlertDescription>
+        </Alert>
+
+        {loading ? (
+          <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading integrations
+          </div>
+        ) : loadError ? (
+          <Alert variant="destructive">
+            <Info />
+            <AlertTitle>Integrations could not be loaded</AlertTitle>
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        ) : filtered.length === 0 ? (
+          <Card className="items-center py-12 text-center shadow-none">
+            <CardHeader>
+              <CardTitle>No integrations found</CardTitle>
+              <CardDescription>
+                Adjust the current search or filter.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((integration) => (
+              <Card
+                key={integration.id}
+                className="min-h-64 gap-0 py-0 shadow-sm"
+              >
+                <CardHeader className="border-b p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border bg-muted/40">
+                      <IntegrationLogo integration={integration} />
                     </div>
-
-                    {/* Search Suggestions */}
-                    {searchSuggestions.length > 0 && debouncedSearch && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                        <div className="py-1">
-                          <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b">
-                            Suggestions
-                          </div>
-                          {searchSuggestions.map((suggestion, index) => (
-                            <button
-                              key={index}
-                              onClick={() => setSearch(suggestion)}
-                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Filters
-                    {hasActiveFilters && (
-                      <Badge
-                        variant="secondary"
-                        className="flex items-center justify-center h-5 w-5 rounded-full p-0 text-xs"
-                      >
-                        {
-                          [
-                            search,
-                            selectedCategory !== "all",
-                            statusFilter !== "all",
-                            credentialsFilter !== "all",
-                          ].filter(Boolean).length
-                        }
-                      </Badge>
-                    )}
-                  </Button>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearAllFilters}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      Clear all
-                    </Button>
-                  )}
-                </div>
-
-                {/* Advanced Filters */}
-                {showFilters && (
-                  <div className="bg-gray-50 p-4 rounded-lg border space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Status Filter */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">
-                          Status
-                        </label>
-                        <div className="flex gap-2">
-                          {[
-                            {
-                              value: "all",
-                              label: "All",
-                              count: filterCounts.total,
-                            },
-                            {
-                              value: "enabled",
-                              label: "Enabled",
-                              count: filterCounts.enabled,
-                            },
-                            {
-                              value: "disabled",
-                              label: "Disabled",
-                              count: filterCounts.disabled,
-                            },
-                          ].map(({ value, label, count }) => (
-                            <button
-                              key={value}
-                              onClick={() => setStatusFilter(value as any)}
-                              className={cn(
-                                "px-3 py-1 text-sm rounded-full border transition-colors",
-                                statusFilter === value
-                                  ? "bg-black text-white border-black"
-                                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-                              )}
-                            >
-                              {label} ({count})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Credentials Filter */}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">
-                          Credentials
-                        </label>
-                        <div className="flex gap-2">
-                          {[
-                            {
-                              value: "all",
-                              label: "All",
-                              count: filterCounts.total,
-                            },
-                            {
-                              value: "with_credentials",
-                              label: "With Credentials",
-                              count: filterCounts.withCredentials,
-                            },
-                            {
-                              value: "without_credentials",
-                              label: "Without Credentials",
-                              count: filterCounts.withoutCredentials,
-                            },
-                          ].map(({ value, label, count }) => (
-                            <button
-                              key={value}
-                              onClick={() => setCredentialsFilter(value as any)}
-                              className={cn(
-                                "px-3 py-1 text-sm rounded-full border transition-colors",
-                                credentialsFilter === value
-                                  ? "bg-black text-white border-black"
-                                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-                              )}
-                            >
-                              {label} ({count})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Results Summary */}
-                {hasActiveFilters && (
-                  <div className="text-sm text-gray-600">
-                    Showing {filteredIntegrations.length} of{" "}
-                    {integrations.length} integrations
-                  </div>
-                )}
-              </div>
-
-              {loading && (
-                <div className="flex justify-center items-center py-8">
-                  <div className="text-sm text-gray-500">
-                    Loading integrations...
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex justify-center items-center py-8">
-                  <div className="text-sm text-red-500">{error}</div>
-                </div>
-              )}
-
-              {!loading && !error && filteredIntegrations.length === 0 && (
-                <div className="flex flex-col justify-center items-center py-12 space-y-4">
-                  {integrations.length === 0 ? (
-                    <>
-                      <div className="text-center">
-                        <div className="text-lg font-medium text-gray-900 mb-2">
-                          No integrations available
-                        </div>
-                        <div className="text-sm text-gray-500 mb-4">
-                          Get started by adding some default integrations
-                        </div>
-                      </div>
-                      <Button
-                        onClick={async () => {
-                          if (!tenant?.id) return;
-                          try {
-                            setLoading(true);
-                            const response = await fetch(
-                              `/api/tenants/${tenant.id}/integrations/seed`,
-                              {
-                                method: "POST",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                              }
-                            );
-
-                            if (response.ok) {
-                              const result = await response.json();
-                              successToast(
-                                null,
-                                "Integrations",
-                                `seeded ${result.count} integrations successfully`
-                              );
-                              // Reload integrations
-                              const data = await fetchIntegrations(tenant.id);
-                              setIntegrations(data);
-                            } else {
-                              errorToast("Failed to seed integrations");
-                            }
-                          } catch (err) {
-                            console.error("Error seeding integrations:", err);
-                            errorToast("Failed to seed integrations");
-                          } finally {
-                            setLoading(false);
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="truncate text-base">
+                          {integration.name}
+                        </CardTitle>
+                        <Badge
+                          variant={
+                            integration.isCredentialsAdded
+                              ? "default"
+                              : "secondary"
                           }
-                        }}
-                        className="bg-black text-white hover:bg-black/90"
-                      >
-                        Seed Default Integrations
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-center">
-                        <div className="text-lg font-medium text-gray-900 mb-2">
-                          No integrations match your filters
-                        </div>
-                        <div className="text-sm text-gray-500 mb-4">
-                          Try adjusting your search terms or filters to find
-                          what you're looking for
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={clearAllFilters}
-                          className="flex items-center gap-2"
                         >
-                          <X className="h-4 w-4" />
-                          Clear all filters
-                        </Button>
-                        {search && (
+                          {integration.isCredentialsAdded
+                            ? "Connected"
+                            : "Not connected"}
+                        </Badge>
+                      </div>
+                      <CardDescription className="line-clamp-2 min-h-10">
+                        {integration.description ||
+                          "Connect this provider to NORIX."}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between gap-4 p-5">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Category</span>
+                      <span className="font-medium">
+                        {CATEGORY_LABELS[integration.category] ||
+                          integration.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className="inline-flex items-center gap-1.5 font-medium">
+                        {integration.isEnabled ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : null}
+                        {integration.isEnabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                    {integration.lastSyncAt ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Last sync</span>
+                        <span className="font-medium">
+                          {formatUtc(integration.lastSyncAt)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {integration.name === "Universal Agent Collector" ? (
+                      <div className="space-y-1 border-t pt-3">
+                        <span className="text-xs text-muted-foreground">
+                          Collector integration ID
+                        </span>
+                        <code className="block break-all rounded bg-muted px-2 py-1.5 text-xs">
+                          {integration.id}
+                        </code>
+                      </div>
+                    ) : null}
+                  </div>
+                </CardContent>
+                <CardFooter className="justify-between gap-3 border-t p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {!integration.isCredentialsAdded ? (
+                      <Button
+                        size="sm"
+                        onClick={() => openCredentials(integration)}
+                      >
+                        Add credentials
+                      </Button>
+                    ) : (
+                      <>
+                        {CLOUD_PROVIDERS.has(integration.name) ? (
                           <Button
+                            size="sm"
                             variant="outline"
-                            onClick={() => setSearch("")}
-                            className="flex items-center gap-2"
+                            disabled={running === integration.id}
+                            onClick={() => void runDiscovery(integration)}
                           >
-                            <Search className="h-4 w-4" />
-                            Clear search
+                            {running === integration.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <PlayCircle className="mr-2 h-4 w-4" />
+                            )}
+                            Discover
+                          </Button>
+                        ) : null}
+                        {integration.name === "Universal Agent Collector" ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link
+                              href={`/${tenant?.slug || tenant?.id}/api-keys`}
+                            >
+                              Manage API keys
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => void revoke(integration)}
+                          >
+                            Revoke
                           </Button>
                         )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {!loading && !error && (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredIntegrations
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((integration) => (
-                      <div
-                        key={integration.id}
-                        className="flex flex-col border-[#E4E4E7] border rounded-md p-4"
-                      >
-                        <div className="flex flex-row items-center">
-                          <div className="flex items-start gap-2 w-full">
-                            <div className="flex items-center justify-center w-[24px] h-[24px]">
-                              {integration.logoUrl ? (
-                                <Image
-                                  src={integration.logoUrl}
-                                  width={24}
-                                  height={24}
-                                  alt={integration.name}
-                                  className="object-contain"
-                                />
-                              ) : (
-                                <Blocks />
-                              )}
-                            </div>
-                            <div className="flex flex-col w-full">
-                              <span className="text-[#09090B] font-semibold text-[13px] leading-none font-sans">
-                                {integration.name}
-                              </span>
-                              <span className="text-[10px] text-[#71717A] font-normal mb-2">
-                                {integration.description}
-                              </span>
-                              <div className="pb-2 pt-0">
-                                {!integration.isCredentialsAdded ? (
-                                  <span
-                                    onClick={() => {
-                                      setSelectedIntegration(integration);
-                                      setOpen(true);
-                                    }}
-                                    className="text-[12px] font-normal font-sans leading-5 border-b border-[#1C9852] text-[#1C9852] cursor-pointer"
-                                  >
-                                    Add Credentials
-                                  </span>
-                                ) : (
-                                  <span
-                                    onClick={() => {
-                                      handleDelete(integration);
-                                    }}
-                                    className="text-[12px] font-normal font-sans leading-5 border-b border-[#D84040] text-[#D84040] cursor-pointer"
-                                  >
-                                    Revoke Connection
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex flex-row items-center justify-between">
-                                <span className="mt-0 font-normal text-[12px] leading-5 text-[#777777]">
-                                  Manage Integration
-                                </span>
-                                <Switch
-                                  checked={integration.isEnabled}
-                                  onCheckedChange={() =>
-                                    handleUpdateIntegrationStatus(integration)
-                                  }
-                                  disabled={!integration.isCredentialsAdded}
-                                  className=" data-[state=checked]:bg-black data-[state=checked]:border-black"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor={`integration-${integration.id}`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Manage
+                    </Label>
+                    <Switch
+                      id={`integration-${integration.id}`}
+                      checked={integration.isEnabled}
+                      disabled={!integration.isCredentialsAdded}
+                      onCheckedChange={() => void toggle(integration)}
+                    />
+                  </div>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
       <Dialog
-        open={open}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            resetState();
-          }
-          setOpen(isOpen);
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeCredentials();
         }}
       >
-        <DialogContent className="sm:max-w-[425px] bg-white">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-[#18181B]">
-              {selectedIntegration?.logoUrl && (
-                <Image
-                  src={getStaticFileUrl(selectedIntegration.logoUrl)}
-                  width={20}
-                  height={20}
-                  alt={selectedIntegration.name}
-                  className="w-[20px] h-[20px] object-contain"
-                />
-              )}
-              Add Credentials
-            </DialogTitle>
+        <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-0 sm:max-w-[600px]">
+          <DialogTitle className="sr-only">
+            Connect {selected?.name}
+          </DialogTitle>
+          <DialogHeader className="border-b p-6 pb-4">
+            <div className="flex items-center gap-3">
+              {selected ? (
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-muted/40">
+                  <IntegrationLogo integration={selected} />
+                </div>
+              ) : null}
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Connect {selected?.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Add credentials and verify access before the integration is
+                  enabled.
+                </p>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            {renderCredentialComponent(selectedIntegration?.name || "")}
+          <div className="space-y-6 p-6">
+            {selected?.name === "AWS" ? (
+              <>
+                <Alert>
+                  <Info />
+                  <AlertTitle>AWS discovery access</AlertTitle>
+                  <AlertDescription>
+                    IAM role is recommended. NORIX reads Bedrock, AgentCore,
+                    Lambda, EC2, IAM, and related resource metadata; secrets are
+                    encrypted at rest.
+                  </AlertDescription>
+                </Alert>
+                <FormField label="Authentication Method" required>
+                  <Select
+                    value={credentials.awsMethod}
+                    onValueChange={(value) =>
+                      setCredential("awsMethod", value as AwsMethod)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="iam_role">
+                        IAM role (recommended)
+                      </SelectItem>
+                      <SelectItem value="cross_account">
+                        Cross-account role
+                      </SelectItem>
+                      <SelectItem value="access_key">
+                        Access key and secret
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="AWS Region" required>
+                  <Input
+                    value={credentials.awsRegion}
+                    onChange={(event) =>
+                      setCredential("awsRegion", event.target.value)
+                    }
+                    placeholder="us-east-1"
+                  />
+                </FormField>
+                {credentials.awsMethod === "iam_role" ? (
+                  <FormField label="Role ARN" required>
+                    <Input
+                      value={credentials.awsRoleArn}
+                      onChange={(event) =>
+                        setCredential("awsRoleArn", event.target.value)
+                      }
+                      placeholder="arn:aws:iam::123456789012:role/NorixDiscovery"
+                    />
+                  </FormField>
+                ) : null}
+                {credentials.awsMethod === "cross_account" ? (
+                  <>
+                    <FormField label="Cross-account Role ARN" required>
+                      <Input
+                        value={credentials.awsCrossAccountRoleArn}
+                        onChange={(event) =>
+                          setCredential(
+                            "awsCrossAccountRoleArn",
+                            event.target.value,
+                          )
+                        }
+                        placeholder="arn:aws:iam::123456789012:role/NorixDiscovery"
+                      />
+                    </FormField>
+                    <FormField label="External ID">
+                      <Input
+                        type="password"
+                        value={credentials.awsExternalId}
+                        onChange={(event) =>
+                          setCredential("awsExternalId", event.target.value)
+                        }
+                      />
+                    </FormField>
+                  </>
+                ) : null}
+                {credentials.awsMethod === "access_key" ? (
+                  <>
+                    <FormField label="Access Key ID" required>
+                      <Input
+                        value={credentials.awsAccessKeyId}
+                        onChange={(event) =>
+                          setCredential("awsAccessKeyId", event.target.value)
+                        }
+                        autoComplete="off"
+                      />
+                    </FormField>
+                    <FormField label="Secret Access Key" required>
+                      <Input
+                        type="password"
+                        value={credentials.awsSecretAccessKey}
+                        onChange={(event) =>
+                          setCredential(
+                            "awsSecretAccessKey",
+                            event.target.value,
+                          )
+                        }
+                        autoComplete="new-password"
+                      />
+                    </FormField>
+                  </>
+                ) : null}
+              </>
+            ) : selected?.name === "Azure" ? (
+              <>
+                <Alert>
+                  <Info />
+                  <AlertTitle>Azure service principal</AlertTitle>
+                  <AlertDescription>
+                    Grant Resource Graph read access. NORIX discovers Azure AI,
+                    Functions, Logic Apps, VMs, Container Apps, and AKS agent
+                    workloads.
+                  </AlertDescription>
+                </Alert>
+                <FormField label="Tenant ID" required>
+                  <Input
+                    value={credentials.azureTenantId}
+                    onChange={(event) =>
+                      setCredential("azureTenantId", event.target.value)
+                    }
+                  />
+                </FormField>
+                <FormField label="Subscription ID" required>
+                  <Input
+                    value={credentials.azureSubscriptionId}
+                    onChange={(event) =>
+                      setCredential("azureSubscriptionId", event.target.value)
+                    }
+                  />
+                </FormField>
+                <FormField label="Client ID" required>
+                  <Input
+                    value={credentials.azureClientId}
+                    onChange={(event) =>
+                      setCredential("azureClientId", event.target.value)
+                    }
+                  />
+                </FormField>
+                <FormField label="Client Secret" required>
+                  <Input
+                    type="password"
+                    value={credentials.azureClientSecret}
+                    onChange={(event) =>
+                      setCredential("azureClientSecret", event.target.value)
+                    }
+                    autoComplete="new-password"
+                  />
+                </FormField>
+              </>
+            ) : selected?.name === "Google Cloud" ? (
+              <>
+                <Alert>
+                  <Info />
+                  <AlertTitle>Google Cloud service account</AlertTitle>
+                  <AlertDescription>
+                    Grant Cloud Asset Viewer and Project Viewer. NORIX discovers
+                    Vertex AI Agent Engine plus identified agent workloads on
+                    Cloud Run, Compute Engine, GKE, and Cloud Functions.
+                  </AlertDescription>
+                </Alert>
+                <FormField label="Project ID" required>
+                  <Input
+                    value={credentials.gcpProjectId}
+                    onChange={(event) =>
+                      setCredential("gcpProjectId", event.target.value)
+                    }
+                    placeholder="my-production-project"
+                  />
+                </FormField>
+                <FormField
+                  label="Service Account JSON"
+                  required
+                  help="The complete downloaded JSON key. It is encrypted before storage."
+                >
+                  <Textarea
+                    rows={9}
+                    value={credentials.gcpServiceAccountJson}
+                    onChange={(event) =>
+                      setCredential("gcpServiceAccountJson", event.target.value)
+                    }
+                    placeholder='{"type":"service_account","project_id":"..."}'
+                    className="font-mono text-xs"
+                  />
+                </FormField>
+              </>
+            ) : selected &&
+              ["OpenAI", "Anthropic", "Cohere"].includes(selected.name) ? (
+              <FormField
+                label="API Key"
+                required
+                help="Stored encrypted; the key is never returned to the browser."
+              >
+                <Input
+                  type="password"
+                  value={credentials.apiKey}
+                  onChange={(event) =>
+                    setCredential("apiKey", event.target.value)
+                  }
+                  autoComplete="new-password"
+                />
+              </FormField>
+            ) : selected &&
+              ["Databricks", "Snowflake"].includes(selected.name) ? (
+              <>
+                <FormField label="Host URL" required>
+                  <Input
+                    value={credentials.hostUrl}
+                    onChange={(event) =>
+                      setCredential("hostUrl", event.target.value)
+                    }
+                    placeholder="https://..."
+                  />
+                </FormField>
+                <FormField label="API Key" required>
+                  <Input
+                    type="password"
+                    value={credentials.apiKey}
+                    onChange={(event) =>
+                      setCredential("apiKey", event.target.value)
+                    }
+                    autoComplete="new-password"
+                  />
+                </FormField>
+              </>
+            ) : (
+              <FormField
+                label="Credentials JSON"
+                required
+                help="Enter the provider credential object. NORIX encrypts the complete object at rest."
+              >
+                <Textarea
+                  rows={8}
+                  value={credentials.json}
+                  onChange={(event) =>
+                    setCredential("json", event.target.value)
+                  }
+                  placeholder='{"apiKey":"..."}'
+                  className="font-mono text-xs"
+                />
+              </FormField>
+            )}
           </div>
 
-          <DialogFooter className="pt-4">
+          <DialogFooter className="border-t p-6 pt-4">
             <Button
+              type="button"
               variant="outline"
-              onClick={() => {
-                setOpen(false);
-                resetState();
-              }}
-              className="border-[#E4E4E7] text-[#18181B] hover:bg-[#F4F4F5] hover:text-[#18181B]"
+              onClick={closeCredentials}
+              disabled={saving}
             >
-              Close
+              Cancel
             </Button>
             <Button
-              onClick={handleSave}
-              disabled={!isFormValid}
-              className="bg-black text-white hover:bg-black/90"
+              type="button"
+              onClick={() => void save()}
+              disabled={!valid || saving}
             >
-              Save
+              {saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Connect and discover
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-};
-
-export default _Integrations;
+}

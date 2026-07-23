@@ -4,7 +4,7 @@ export default function Page() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="w-full max-w-md p-6">
-        <SignIn forceRedirectUrl="/" signUpUrl="/sign-up" />
+        <SignIn fallbackRedirectUrl="/" signUpUrl="/sign-up" />
       </div>
     </div>
   );

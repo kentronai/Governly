@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Next.js app
 # Stage 1: Dependencies
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 WORKDIR /app
 
 # Copy package files
@@ -17,7 +17,7 @@ RUN \
   fi
 
 # Stage 2: Builder
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -78,7 +78,7 @@ RUN \
   fi
 
 # Stage 3: Runner
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
@@ -108,4 +108,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 # Start server
 CMD ["node", "server.js"]
-

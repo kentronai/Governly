@@ -38,7 +38,7 @@ export const CategoryCard = ({
               {name}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {promptCount.toLocaleString()} prompts
+              {promptCount.toLocaleString("en-US")} prompts
             </p>
           </div>
         </div>

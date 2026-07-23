@@ -4,11 +4,13 @@
 
 'use server';
 
-import { db, policies, tenants, applicationPolicies } from '@db';
+import { db, policies, tenants, applicationPolicies, agents } from '@db';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { revalidatePath } from 'next/cache';
 import { createAuditEvent } from '@/lib/server/audit';
 import { getPolicyWithDetails } from '@/lib/queries/policies';
+import { syncAgentPolicyEvaluations } from '@/lib/server/policy-enforcement/agent-policy-sync';
 
 export interface UpdatePolicyInput {
   id: string;
@@ -281,6 +283,7 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
 
   const transformedPolicies = policiesList.map((policy) => {
     const rulesCount = policy.yaml?.match(/- id:/g)?.length || 0;
+    const assignment = appPolicies.find((item) => item.policyId === policy.id);
     return {
       id: policy.id,
       name: policy.name,
@@ -295,6 +298,8 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
       createdBy: policy.createdBy,
       updatedBy: policy.updatedBy,
       updatedAt: policy.updatedAt,
+      isApplicationActive: assignment?.isActive ?? false,
+      isDefault: assignment?.isDefault ?? false,
     };
   });
 
@@ -304,4 +309,57 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
     tenantId,
     applicationId,
   };
+};
+
+/** Select the one runtime policy automatically enforced for an application. */
+export const setApplicationDefaultPolicy = async (
+  tenantSlugOrId: string,
+  applicationId: string,
+  policyId: string
+) => {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) throw new Error('Authentication required');
+
+  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  if (!tenantRow.length) {
+    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+  }
+  if (!tenantRow.length || tenantRow[0].id !== orgId) throw new Error('Access denied');
+
+  const assignment = await db.query.applicationPolicies.findFirst({
+    where: and(
+      eq(applicationPolicies.tenantId, orgId),
+      eq(applicationPolicies.applicationId, applicationId),
+      eq(applicationPolicies.policyId, policyId)
+    ),
+  });
+  if (!assignment) throw new Error('Policy is not linked to this application');
+
+  await db.transaction(async (tx) => {
+    await tx.update(applicationPolicies).set({ isDefault: false }).where(and(
+      eq(applicationPolicies.tenantId, orgId),
+      eq(applicationPolicies.applicationId, applicationId)
+    ));
+    await tx.update(applicationPolicies).set({ isDefault: true, isActive: true }).where(
+      eq(applicationPolicies.id, assignment.id)
+    );
+  });
+
+  await createAuditEvent({
+    tenantId: orgId,
+    actorUserId: userId,
+    action: 'runtime_policy.default_selected',
+    targetType: 'policy',
+    targetId: policyId,
+    metadata: { applicationId },
+  });
+  const linkedAgents = await db.select({ id: agents.id }).from(agents).where(and(
+    eq(agents.tenantId, orgId),
+    eq(agents.applicationId, applicationId)
+  ));
+  for (const agent of linkedAgents) {
+    await syncAgentPolicyEvaluations(orgId, agent.id);
+  }
+  revalidatePath(`/${tenantRow[0].slug}/applications/${applicationId}/control-net/policies`);
+  return { success: true, agentsEvaluated: linkedAgents.length };
 };

@@ -121,7 +121,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
 
   const formatDate = (date?: string | null) => {
     if (!date) return "-";
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString("en-US");
   };
 
   const isExpired = (expiresAt?: string | null) => {

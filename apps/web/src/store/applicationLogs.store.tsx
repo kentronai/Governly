@@ -59,8 +59,8 @@ export function ApplicationLogsStore({ children }: { children: ReactNode }) {
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
-    refetchInterval: 1000 * 60 * 5,
+    refetchOnMount: "always",
+    refetchInterval: 15_000,
     refetchIntervalInBackground: true,
   });
 
@@ -116,8 +116,8 @@ export function ApplicationStatsStore({ children }: { children: ReactNode }) {
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
-    refetchInterval: 1000 * 60 * 5,
+    refetchOnMount: "always",
+    refetchInterval: 15_000,
     refetchIntervalInBackground: true,
   });
 
@@ -171,8 +171,8 @@ export function ApplicationGraphStore({ children }: { children: ReactNode }) {
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
-    refetchInterval: 1000 * 60 * 5,
+    refetchOnMount: "always",
+    refetchInterval: 15_000,
     refetchIntervalInBackground: true,
   });
 

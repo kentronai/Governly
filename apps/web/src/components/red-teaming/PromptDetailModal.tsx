@@ -102,7 +102,7 @@ export const PromptDetailModal = ({
                   Usage Count
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  {prompt.metadata.usageCount.toLocaleString()} tests
+                  {prompt.metadata.usageCount.toLocaleString("en-US")} tests
                 </p>
               </div>
               <div>

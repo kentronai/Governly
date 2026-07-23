@@ -5,12 +5,14 @@ import { successToast } from "@/lib/utils/toast";
 
 import { FaPython, FaNodeJs } from "react-icons/fa";
 import { SiCurl } from "react-icons/si";
+import { useParams } from "next/navigation";
 export default function PolicyIntegration({
   selectedPolicy,
 }: {
   selectedPolicy: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const { applicationId } = useParams();
   const [requestURL] = useState(
     process.env.NEXT_PUBLIC_PLAYGROUND_REQUEST_URL || "https://demo.kentron.ai"
   );
@@ -24,6 +26,8 @@ export default function PolicyIntegration({
   -H "X-API-KEY: sk_test_YOUR_CONTROLNET_KEY" \\
   -H "Authorization: Bearer sk-proj-YOUR_OPENAI_KEY" \\
   -H "X-Policy-ID: ${selectedPolicy || "policy-uuid-here"}" \\
+  -H "X-Application-ID: ${String(applicationId || "application-uuid-here")}" \\
+  -H "X-Agent-ID: OPTIONAL_DISCOVERED_AGENT_UUID" \\
   -d '{
     "model": "your-model-id",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -38,6 +42,8 @@ client = OpenAI(
     default_headers={
         "X-API-KEY": "sk_test_YOUR_CONTROLNET_KEY",
         "X-Policy-ID": '${selectedPolicy || "policy-uuid-here"}',
+        "X-Application-ID": "${String(applicationId || "application-uuid-here")}",
+        "X-Agent-ID": "OPTIONAL_DISCOVERED_AGENT_UUID",
     }
 )
 
@@ -56,6 +62,8 @@ const client = new OpenAI({
   defaultHeaders: {
     'X-API-KEY': process.env.CONTROLNET_API_KEY,
     'X-Policy-ID': '${selectedPolicy || "policy-uuid-here"}',
+    'X-Application-ID': '${String(applicationId || "application-uuid-here")}',
+    'X-Agent-ID': 'OPTIONAL_DISCOVERED_AGENT_UUID',
   }
 });
 
@@ -114,6 +122,14 @@ const response = await client.chat.completions.create({
             <div>
               <span className="text-muted-foreground">X-Policy-ID:</span>{" "}
               <span className="">{selectedPolicy || "policy-uuid-here"}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">X-Application-ID:</span>{" "}
+              <span className="">{String(applicationId || "application-uuid-here")}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">X-Agent-ID:</span>{" "}
+              <span className="">Optional discovered agent UUID</span>
             </div>
           </div>
         </div>

@@ -8,14 +8,20 @@ services:
     container_name: controlnet-nginx
     restart: unless-stopped
     depends_on:
-      - controlnet
-      - model-guard
-      - web
-      - onnx-service
+      controlnet:
+        condition: service_started
+      model-guard:
+        condition: service_started
+      web:
+        condition: service_healthy
+      onnx-service:
+        condition: service_started
     ports:
       - "80:80"  # ACCESS EVERYTHING HERE
+      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ./apps/web/certificates:/etc/nginx/certificates:ro
 
   # PostgreSQL Database
   postgres:
@@ -35,10 +41,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ai_governance"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
 
   # Redis cache
   redis:
@@ -51,10 +58,29 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+  # Apply every committed Drizzle migration before the web app starts. Without
+  # this gate, a newly-added Policy Center column makes the route fail at
+  # runtime even though the UI code itself compiled successfully.
+  migrate:
+    image: node:20-alpine
+    container_name: controlnet-migrate
+    working_dir: /app
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+    command: sh -c "test -x node_modules/.bin/drizzle-kit || npm install; npx drizzle-kit migrate --config=src/drizzle.config.ts"
 
   # ControlNet Gateway (Development Mode)
   controlnet:
@@ -80,6 +106,13 @@ services:
       # Mount ADC credentials from host (~/.config/gcloud created by gcloud CLI)
       - ~/.config/gcloud:/home/controlnet/.config/gcloud:ro
     command: uvicorn gateway.main:app --reload --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz >/dev/null"]
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
 
   # ONNX Inference Service (Development Mode)
   onnx-service:
@@ -107,6 +140,13 @@ services:
       # Persistent ONNX model storage (shared with controlnet)
       - onnx_model_cache:/app/model_cache
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8002
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8002/health >/dev/null"]
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
 
   # ModelGuard (Development Mode)
   model-guard:
@@ -136,28 +176,51 @@ services:
 
   # Next.js Web App (Development Mode)
   web:
-    image: node:18-alpine
+    image: node:20-alpine
     container_name: controlnet-web
     restart: unless-stopped
     working_dir: /app
     depends_on:
-      - controlnet
+      controlnet:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     expose:
-      - "3000"
+      - "8080"
     env_file:
       - .env
+    environment:
+      # Server Actions are internally forwarded back to the request host.
+      # Alpine resolves localhost to ::1 first, while Next dev is bound to
+      # the IPv4 0.0.0.0 listener, causing ECONNREFUSED ::1:8080.
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
     volumes:
       # Mount source for hot reload
       - ./apps/web:/app
-      - /app/node_modules  # Don't mount node_modules
-      - /app/.next  # Don't mount .next
-    command: sh -c "test -x node_modules/.bin/next || npm install; npm run dev"
+      # Named volumes survive `docker compose down` and prevent a full npm
+      # reinstall / cold Turbopack cache every time the stack is started.
+      - web_node_modules:/app/node_modules
+      - web_next_cache:/app/.next
+    # Turbopack reduces the memory and cold-compilation pressure of this large
+    # Next.js app. Its cache persists in web_next_cache across container restarts.
+    command: sh -c "test -x node_modules/.bin/next || npm install; npx next dev --turbopack --hostname 0.0.0.0 --port 8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/sign-in"]
+      interval: 30s
+      start_interval: 2s
+      timeout: 60s
+      retries: 12
+      start_period: 2s
 
 volumes:
   postgres_data:  # Persistent PostgreSQL data
   redis_data:
   model_cache:  # Persistent storage for ModelGuard scans
   onnx_model_cache:  # Persistent storage for ONNX models (survives container restarts)
+  web_node_modules:  # Persistent web dependencies (avoids npm install on every start)
+    name: norix-web-node-modules
+  web_next_cache:  # Persistent Turbopack compilation cache
+    name: norix-web-next-cache
 
 networks:
   default:

@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import { usePathname } from "next/navigation";
-import { FaDiscord } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import {
   FolderX,
@@ -14,6 +13,7 @@ import {
   Shield,
   Clock,
   XCircle,
+  MessageCircle,
 } from "lucide-react";
 import {
   Card,
@@ -164,7 +164,7 @@ const CustomErrorPage: React.FC<CustomErrorPageProps> = ({
               (window.location.href = "https://discord.gg/3RB9NCe6mz")
             }
           >
-            <FaDiscord></FaDiscord>
+            <MessageCircle aria-hidden="true" />
             <span>Report this on Discord</span>
           </Button>
         </CardContent>

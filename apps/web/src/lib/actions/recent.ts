@@ -28,7 +28,7 @@ export interface RecentEndpointsPaginatedResponse {
   prev: number | null;
   next: number | null;
 
-  data: (typeof observabilityLogs.$inferSelect & { applicationName: string })[];
+  data: (typeof observabilityLogs.$inferSelect & { applicationName: string; agentName: string | null })[];
 }
 
 export const getApplicationRecentEndpoints = async ({
@@ -80,6 +80,7 @@ export const getApplicationRecentEndpoints = async ({
     orderBy: desc(observabilityLogs.createdAt),
     with: {
       application: true,
+      agent: true,
     },
     limit,
     offset,
@@ -95,7 +96,7 @@ export const getApplicationRecentEndpoints = async ({
 
   return {
     data: logs.map((ele) => {
-      return { ...ele, applicationName: ele.application?.name ?? "Unknown" };
+      return { ...ele, applicationName: ele.application?.name ?? "Unknown", agentName: ele.agent?.name ?? null };
     }),
     page,
     limit,
@@ -153,6 +154,7 @@ export const getTenantRecentEndpoints = async ({
     offset,
     with: {
       application: true,
+      agent: true,
     },
   });
 
@@ -166,7 +168,7 @@ export const getTenantRecentEndpoints = async ({
 
   return {
     data: logs.map((ele) => {
-      return { ...ele, applicationName: ele.application?.name ?? "Unknown" };
+      return { ...ele, applicationName: ele.application?.name ?? "Unknown", agentName: ele.agent?.name ?? null };
     }),
     page,
     limit,
@@ -210,53 +212,72 @@ export const getApplicationGraphStats = async ({
     gte(observabilityLogs.createdAt, startDateStr), // ✅ Use string instead of Date
   ];
 
-  // ----- TOTAL ACCEPTED -----
-  const acceptedResult = await db
-    .select({
-      accepted: sql<number>`count(*)`,
-    })
-    .from(observabilityLogs)
-    .where(
-      and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
-    );
+  // These four queries are independent of one another — run them concurrently
+  // instead of paying for four sequential round trips.
+  const [acceptedResult, blockedResult, blockedLogs, rows] = await Promise.all([
+    // ----- TOTAL ACCEPTED -----
+    db
+      .select({ accepted: sql<number>`count(*)` })
+      .from(observabilityLogs)
+      .where(
+        and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
+      ),
+    // ----- TOTAL BLOCKED -----
+    db
+      .select({ blocked: sql<number>`count(*)` })
+      .from(observabilityLogs)
+      .where(
+        and(
+          ...baseFilters,
+          notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
+        )
+      ),
+    // Category breakdown for blocked requests
+    db.query.observabilityLogs.findMany({
+      columns: {
+        guardrailResults: true,
+      },
+      where: and(
+        ...baseFilters,
+        notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
+        isNotNull(observabilityLogs.guardrailResults)
+      ),
+    }),
+    // Daily passed/blocked breakdown
+    db
+      .select({
+        day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
+        passed: sql<number>`
+          count(
+            CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
+              ALLOWED_CODES.join(",")
+            )}]::int[]) THEN 1 END
+          )
+        `,
+        blocked: sql<number>`
+          count(
+            CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
+              ALLOWED_CODES.join(",")
+            )}]::int[]) THEN 1 END
+          )
+        `,
+      })
+      .from(observabilityLogs)
+      .where(and(...baseFilters))
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
+  ]);
 
   const accepted = acceptedResult[0]?.accepted ?? 0;
-
-  // ----- TOTAL BLOCKED -----
-  const blockedResult = await db
-    .select({
-      blocked: sql<number>`count(*)`,
-    })
-    .from(observabilityLogs)
-    .where(
-      and(
-        ...baseFilters,
-        notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
-      )
-    );
-
   const blocked = blockedResult[0]?.blocked ?? 0;
-
   const totalRequests = accepted + blocked;
-
-  // Get category breakdown for blocked requests
-  const blockedLogs = await db.query.observabilityLogs.findMany({
-    columns: {
-      guardrailResults: true,
-    },
-    where: and(
-      ...baseFilters,
-      notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
-      isNotNull(observabilityLogs.guardrailResults)
-    ),
-  });
 
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
     const results = log.guardrailResults as any;
     const violatedGuard = results?.violated_guard || results?._summary?.violation;
     const ruleId = violatedGuard?.rule_id || violatedGuard?.rule_id;
-    
+
     if (ruleId && typeof ruleId === 'string') {
       const category = ruleId.split('.')[0];
       if (category) {
@@ -275,29 +296,6 @@ export const getApplicationGraphStats = async ({
       count,
     }))
     .sort((a, b) => b.count - a.count);
-
-  const rows = await db
-    .select({
-      day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
-      passed: sql<number>`
-        count(
-          CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
-            ALLOWED_CODES.join(",")
-          )}]::int[]) THEN 1 END
-        )
-      `,
-      blocked: sql<number>`
-        count(
-          CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
-            ALLOWED_CODES.join(",")
-          )}]::int[]) THEN 1 END
-        )
-      `,
-    })
-    .from(observabilityLogs)
-    .where(and(...baseFilters))
-    .groupBy(sql`1`)
-    .orderBy(sql`1`);
 
   // Generate full 30 days
   const daily = [];
@@ -340,53 +338,72 @@ export const getTenantGraphStats = async ({
     gte(observabilityLogs.createdAt, startDateStr), // ✅ Use string instead of Date
   ];
 
-  // ----- TOTAL ACCEPTED -----
-  const acceptedResult = await db
-    .select({
-      accepted: sql<number>`count(*)`,
-    })
-    .from(observabilityLogs)
-    .where(
-      and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
-    );
+  // These four queries are independent of one another — run them concurrently
+  // instead of paying for four sequential round trips.
+  const [acceptedResult, blockedResult, blockedLogs, rows] = await Promise.all([
+    // ----- TOTAL ACCEPTED -----
+    db
+      .select({ accepted: sql<number>`count(*)` })
+      .from(observabilityLogs)
+      .where(
+        and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
+      ),
+    // ----- TOTAL BLOCKED -----
+    db
+      .select({ blocked: sql<number>`count(*)` })
+      .from(observabilityLogs)
+      .where(
+        and(
+          ...baseFilters,
+          notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
+        )
+      ),
+    // Category breakdown for blocked requests
+    db.query.observabilityLogs.findMany({
+      columns: {
+        guardrailResults: true,
+      },
+      where: and(
+        ...baseFilters,
+        notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
+        isNotNull(observabilityLogs.guardrailResults)
+      ),
+    }),
+    // Daily passed/blocked breakdown
+    db
+      .select({
+        day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
+        passed: sql<number>`
+          count(
+            CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
+              ALLOWED_CODES.join(",")
+            )}]::int[]) THEN 1 END
+          )
+        `,
+        blocked: sql<number>`
+          count(
+            CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
+              ALLOWED_CODES.join(",")
+            )}]::int[]) THEN 1 END
+          )
+        `,
+      })
+      .from(observabilityLogs)
+      .where(and(...baseFilters))
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
+  ]);
 
   const accepted = acceptedResult[0]?.accepted ?? 0;
-
-  // ----- TOTAL BLOCKED -----
-  const blockedResult = await db
-    .select({
-      blocked: sql<number>`count(*)`,
-    })
-    .from(observabilityLogs)
-    .where(
-      and(
-        ...baseFilters,
-        notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
-      )
-    );
-
   const blocked = blockedResult[0]?.blocked ?? 0;
-
   const totalRequests = accepted + blocked;
-
-  // Get category breakdown for blocked requests
-  const blockedLogs = await db.query.observabilityLogs.findMany({
-    columns: {
-      guardrailResults: true,
-    },
-    where: and(
-      ...baseFilters,
-      notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
-      isNotNull(observabilityLogs.guardrailResults)
-    ),
-  });
 
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
     const results = log.guardrailResults as any;
     const violatedGuard = results?.violated_guard || results?._summary?.violation;
     const ruleId = violatedGuard?.rule_id || violatedGuard?.rule_id;
-    
+
     if (ruleId && typeof ruleId === 'string') {
       const category = ruleId.split('.')[0];
       if (category) {
@@ -405,29 +422,6 @@ export const getTenantGraphStats = async ({
       count,
     }))
     .sort((a, b) => b.count - a.count);
-
-  const rows = await db
-    .select({
-      day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
-      passed: sql<number>`
-        count(
-          CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
-            ALLOWED_CODES.join(",")
-          )}]::int[]) THEN 1 END
-        )
-      `,
-      blocked: sql<number>`
-        count(
-          CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
-            ALLOWED_CODES.join(",")
-          )}]::int[]) THEN 1 END
-        )
-      `,
-    })
-    .from(observabilityLogs)
-    .where(and(...baseFilters))
-    .groupBy(sql`1`)
-    .orderBy(sql`1`);
 
   // Generate full 30 days
   const daily = [];

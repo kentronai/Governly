@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,13 +22,11 @@ import {
 import { useRouter } from "next/navigation";
 import { formatTimestamp } from "@/utils/formatTime";
 import {
-  Info,
   Search,
   MoreHorizontal,
   Pencil,
   FolderOpen,
   Plus,
-  Trash2,
   Eye,
   Archive,
 } from "lucide-react";
@@ -37,15 +36,21 @@ import {
   archiveApplication,
   getApplications,
 } from "@/lib/actions/applications";
-import { ApplicationModal } from "./ApplicationModal";
-import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
-import DynamicDetailsViewModal, {
-  createFieldConfig,
-} from "@/components/modal/DynamicDetailsViewModal";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import ApplicationLoader from "./ApplicationLoader";
 import Pagination from "@/components/common/pagination";
-import ApplicationView from "./ApplicationView";
+
+// These dialogs are not needed until the user opens them. Keeping them out of
+// the initial applications bundle materially reduces cold dev compilation.
+const ApplicationModal = dynamic(() =>
+  import("./ApplicationModal").then((module) => module.ApplicationModal)
+);
+const ApplicationView = dynamic(() => import("./ApplicationView"));
+const DeleteConfirmationModal = dynamic(() =>
+  import("@/components/common/DeleteConfirmationModal").then(
+    (module) => module.DeleteConfirmationModal
+  )
+);
 export interface Application {
   id: string;
   name: string;
@@ -183,7 +188,8 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
         }
         // @ts-ignore
         setApplications((prev) => [newApp.application, ...prev]);
-        // The default "Launch" policy is created server-side in createApplication.
+        // Standard, Strict, and Development policies are created atomically by
+        // the server-side createApplication action.
         const overviewPath = getApplicationOverviewPath(
           newApp.application,
           tenant,

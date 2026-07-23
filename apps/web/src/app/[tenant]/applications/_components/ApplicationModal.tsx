@@ -142,9 +142,8 @@ export function ApplicationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogTitle className="sr-only">{title}</DialogTitle>
-
       <DialogContent className="sm:max-w-[600px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogHeader className="p-6 pb-4 border-b">
           <h3 className="text-lg font-semibold">{title}</h3>
         </DialogHeader>

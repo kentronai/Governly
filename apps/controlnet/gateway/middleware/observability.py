@@ -208,6 +208,7 @@ async def _log_request_to_database(
             return
         
         policy_id = getattr(request.state, "policy_id", None)
+        agent_id = getattr(request.state, "agent_id", None)
         policy_hash = getattr(request.state, "policy_hash", "unknown")
         trace_id = getattr(request.state, "trace_id", request_id)
         body = getattr(request.state, "original_body", None)
@@ -232,6 +233,7 @@ async def _log_request_to_database(
             "model": body.get("model") if body and isinstance(body, dict) else None,
             "stream": body.get("stream", False) if body and isinstance(body, dict) else False,
             "user_agent": request.headers.get("user-agent"),
+            "policy_resolution_source": getattr(request.state, "policy_resolution_source", None),
         }
         
         if response_status_code >= 400:
@@ -255,6 +257,8 @@ async def _log_request_to_database(
                 response_payload=sanitize_payload(response_payload) if response_payload else None,
                 guardrail_results=guardrail_results,
                 policy_id=policy_id,
+                application_id=getattr(request.state, "application_id", None),
+                agent_id=agent_id,
                 metadata=metadata
             )
         
@@ -286,6 +290,7 @@ async def _log_error_to_database(
         
         body = getattr(request.state, "original_body", None)
         policy_id = getattr(request.state, "policy_id", None)
+        agent_id = getattr(request.state, "agent_id", None)
         
         async with get_session() as db_session:
             await db_log_request(
@@ -300,6 +305,7 @@ async def _log_error_to_database(
                 response_payload={"error": str(error), "error_type": type(error).__name__},
                 guardrail_results=None,
                 policy_id=policy_id,
+                agent_id=agent_id,
                 metadata={
                     "error": True,
                     "error_type": type(error).__name__,

@@ -35,6 +35,14 @@ import {
   routerPrompts,
   scanFindings,
   stakeholders,
+  awsDiscoveryConnections,
+  discoveryScans,
+  agentRules,
+  agents,
+  agentResources,
+  agentRecommendations,
+  agentPolicyEvaluations,
+  policyFindings,
 } from "./schema";
 
 export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
@@ -82,6 +90,14 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   routerCentroids: many(routerCentroids),
   routerPromptCentroids: many(routerPromptCentroids),
   scanFindings: many(scanFindings),
+  awsDiscoveryConnections: many(awsDiscoveryConnections),
+  discoveryScans: many(discoveryScans),
+  agentRules: many(agentRules),
+  agents: many(agents),
+  agentResources: many(agentResources),
+  agentRecommendations: many(agentRecommendations),
+  agentPolicyEvaluations: many(agentPolicyEvaluations),
+  policyFindings: many(policyFindings),
   stakeholders: many(stakeholders),
 }));
 
@@ -196,6 +212,20 @@ export const usersRelations = relations(users, ({ many }) => ({
   stakeholders_updatedBy: many(stakeholders, {
     relationName: "stakeholders_updatedBy_users_id",
   }),
+  awsDiscoveryConnections_createdBy: many(awsDiscoveryConnections, {
+    relationName: "awsDiscoveryConnections_createdBy_users_id",
+  }),
+  awsDiscoveryConnections_updatedBy: many(awsDiscoveryConnections, {
+    relationName: "awsDiscoveryConnections_updatedBy_users_id",
+  }),
+  discoveryScans: many(discoveryScans),
+  agentRules_createdBy: many(agentRules, {
+    relationName: "agentRules_createdBy_users_id",
+  }),
+  agentRules_updatedBy: many(agentRules, {
+    relationName: "agentRules_updatedBy_users_id",
+  }),
+  agents: many(agents),
 }));
 
 export const applicationDocumentationRelations = relations(
@@ -248,6 +278,7 @@ export const applicationsRelations = relations(
     observabilityLogs: many(observabilityLogs),
     redTeamingTests: many(redTeamingTests),
     risks: many(risks),
+    agents: many(agents),
     useCases: many(useCases),
     stakeholders: many(stakeholders),
   })
@@ -550,7 +581,7 @@ export const navigationItemsRelations = relations(
 
 export const observabilityLogsRelations = relations(
   observabilityLogs,
-  ({ one }) => ({
+  ({ one, many }) => ({
     tenant: one(tenants, {
       fields: [observabilityLogs.tenantId],
       references: [tenants.id],
@@ -563,6 +594,11 @@ export const observabilityLogsRelations = relations(
       fields: [observabilityLogs.policyId],
       references: [policies.id],
     }),
+    agent: one(agents, {
+      fields: [observabilityLogs.agentId],
+      references: [agents.id],
+    }),
+    policyFindings: many(policyFindings),
   })
 );
 
@@ -799,3 +835,143 @@ export const stakeholdersRelations = relations(stakeholders, ({ one }) => ({
     relationName: "stakeholders_updatedBy_users_id",
   }),
 }));
+
+export const awsDiscoveryConnectionsRelations = relations(
+  awsDiscoveryConnections,
+  ({ one, many }) => ({
+    tenant: one(tenants, {
+      fields: [awsDiscoveryConnections.tenantId],
+      references: [tenants.id],
+    }),
+    user_createdBy: one(users, {
+      fields: [awsDiscoveryConnections.createdBy],
+      references: [users.id],
+      relationName: "awsDiscoveryConnections_createdBy_users_id",
+    }),
+    user_updatedBy: one(users, {
+      fields: [awsDiscoveryConnections.updatedBy],
+      references: [users.id],
+      relationName: "awsDiscoveryConnections_updatedBy_users_id",
+    }),
+    discoveryScans: many(discoveryScans),
+    agents: many(agents),
+  })
+);
+
+export const discoveryScansRelations = relations(discoveryScans, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [discoveryScans.tenantId],
+    references: [tenants.id],
+  }),
+  connection: one(awsDiscoveryConnections, {
+    fields: [discoveryScans.connectionId],
+    references: [awsDiscoveryConnections.id],
+  }),
+  user_triggeredBy: one(users, {
+    fields: [discoveryScans.triggeredBy],
+    references: [users.id],
+  }),
+}));
+
+export const agentRulesRelations = relations(agentRules, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [agentRules.tenantId],
+    references: [tenants.id],
+  }),
+  user_createdBy: one(users, {
+    fields: [agentRules.createdBy],
+    references: [users.id],
+    relationName: "agentRules_createdBy_users_id",
+  }),
+  user_updatedBy: one(users, {
+    fields: [agentRules.updatedBy],
+    references: [users.id],
+    relationName: "agentRules_updatedBy_users_id",
+  }),
+}));
+
+export const agentsRelations = relations(agents, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [agents.tenantId],
+    references: [tenants.id],
+  }),
+  application: one(applications, {
+    fields: [agents.applicationId],
+    references: [applications.id],
+  }),
+  connection: one(awsDiscoveryConnections, {
+    fields: [agents.connectionId],
+    references: [awsDiscoveryConnections.id],
+  }),
+  integration: one(integrations, {
+    fields: [agents.integrationId],
+    references: [integrations.id],
+  }),
+  owner: one(users, {
+    fields: [agents.ownerUserId],
+    references: [users.id],
+  }),
+  agentResources: many(agentResources),
+  agentRecommendations: many(agentRecommendations),
+  policyEvaluations: many(agentPolicyEvaluations),
+  policyFindings: many(policyFindings),
+  observabilityLogs: many(observabilityLogs),
+}));
+
+export const agentPolicyEvaluationsRelations = relations(
+  agentPolicyEvaluations,
+  ({ one }) => ({
+    tenant: one(tenants, {
+      fields: [agentPolicyEvaluations.tenantId],
+      references: [tenants.id],
+    }),
+    agent: one(agents, {
+      fields: [agentPolicyEvaluations.agentId],
+      references: [agents.id],
+    }),
+  })
+);
+
+export const policyFindingsRelations = relations(policyFindings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [policyFindings.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [policyFindings.agentId],
+    references: [agents.id],
+  }),
+  application: one(applications, {
+    fields: [policyFindings.applicationId],
+    references: [applications.id],
+  }),
+  observabilityLog: one(observabilityLogs, {
+    fields: [policyFindings.observabilityLogId],
+    references: [observabilityLogs.id],
+  }),
+}));
+
+export const agentResourcesRelations = relations(agentResources, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [agentResources.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [agentResources.agentId],
+    references: [agents.id],
+  }),
+}));
+
+export const agentRecommendationsRelations = relations(
+  agentRecommendations,
+  ({ one }) => ({
+    tenant: one(tenants, {
+      fields: [agentRecommendations.tenantId],
+      references: [tenants.id],
+    }),
+    agent: one(agents, {
+      fields: [agentRecommendations.agentId],
+      references: [agents.id],
+    }),
+  })
+);

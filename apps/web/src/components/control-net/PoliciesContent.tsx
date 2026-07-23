@@ -14,7 +14,7 @@ export default function PoliciesContent({ initialPolicies }: PoliciesContentProp
     const newPolicy = policyData || {
       id: `policy-${Date.now()}`,
       name: `Policy ${policies.length + 1}`,
-      lastModified: new Date().toLocaleDateString(),
+      lastModified: new Date().toLocaleDateString("en-US"),
     };
     setPolicies([...policies, newPolicy]);
   };

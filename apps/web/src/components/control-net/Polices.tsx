@@ -19,6 +19,7 @@ import {
   Loader2,
   Upload,
   Pencil,
+  Star,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -78,6 +79,8 @@ export interface Policy {
   version: string;
   status?: string;
   isActive?: boolean;
+  isApplicationActive?: boolean;
+  isDefault?: boolean;
 }
 
 export interface PolicyDetails {
@@ -142,6 +145,8 @@ const fetchPolicies = async (
       description: policy.description || "",
       status: policy.status,
       isActive: policy.isActive,
+      isApplicationActive: policy.isApplicationActive,
+      isDefault: policy.isDefault,
       ai_system_policy_prompt: "",
       yaml: policy.yaml || "",
       rulesCount: policy.rulesCount,
@@ -1300,6 +1305,18 @@ const PoliciesTab = () => {
     setOpenDropdownId(null);
   };
 
+  const handleMakeDefault = async (policyId: string) => {
+    if (!tenant?.slug || !applicationId) return;
+    try {
+      const { makeApplicationPolicyDefault } = await import("@/lib/api/policies");
+      await makeApplicationPolicyDefault(tenant.slug, String(applicationId), policyId);
+      await loadPolicies();
+      successToast("Default runtime policy updated", "Policy", "selected");
+    } catch (error) {
+      errorToast(error instanceof Error ? error.message : "Failed to select default policy");
+    }
+  };
+
   const confirmDeletePolicy = async () => {
     if (!tenant || !policyToDelete) return;
 
@@ -1446,10 +1463,19 @@ const PoliciesTab = () => {
                   <TableCell className="font-medium">
                     <button
                       className="flex items-center gap-2  hover:text-blue-600 hover:underline transition-colors"
-                      onClick={() => router.push("policies/" + policy.id)}
+                      onClick={() =>
+                        router.push(
+                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`
+                        )
+                      }
                     >
                       <FileText className="h-4 w-4" />
                       {policy.name}
+                      {policy.isDefault && (
+                        <Badge className="ml-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          Default enforced
+                        </Badge>
+                      )}
                     </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-xs truncate">
@@ -1484,14 +1510,28 @@ const PoliciesTab = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-32">
                         <DropdownMenuItem
-                          onClick={() => router.push("policies/" + policy.id)}
+                          onClick={() =>
+                            router.push(
+                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`
+                            )
+                          }
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View
                         </DropdownMenuItem>
+                        {!policy.isDefault && (
+                          <DropdownMenuItem
+                            onClick={() => handleMakeDefault(policy.id)}
+                          >
+                            <Star className="mr-2 h-4 w-4" />
+                            Make default
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() =>
-                            router.push("policies/" + policy.id + "/edit")
+                            router.push(
+                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`
+                            )
                           }
                         >
                           <Pencil className="mr-2 h-4 w-4" />

@@ -480,7 +480,7 @@ export function ModelRegistryList({
                           Context Window
                         </p>
                         <p className="text-sm">
-                          {model.contextWindowTokens.toLocaleString()} tokens
+                          {model.contextWindowTokens.toLocaleString("en-US")} tokens
                         </p>
                       </div>
                     )}

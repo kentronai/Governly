@@ -43,3 +43,15 @@ export async function updateApplicationCompliancePolicy(
     throw error;
   }
 }
+
+export async function evaluateApplicationCompliancePolicy(
+  tenantSlugOrId: string,
+  applicationId: string,
+  policyId: string
+) {
+  return complianceActions.evaluateApplicationCompliancePolicyAction(
+    tenantSlugOrId,
+    applicationId,
+    policyId
+  );
+}

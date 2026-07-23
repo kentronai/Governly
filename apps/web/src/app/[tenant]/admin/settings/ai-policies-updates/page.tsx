@@ -188,7 +188,7 @@ const AIPolicyUpdate = () => {
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return "Not specified";
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString("en-US");
     } catch {
       return "Invalid date";
     }

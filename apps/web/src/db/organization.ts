@@ -1,9 +1,9 @@
 // src/db/organization.ts
-import { clerkClient } from '@clerk/nextjs/server';
-import { auth } from '@clerk/nextjs/server';
-import { db, tenants, users, memberships } from '@db';
-import { eq, and } from 'drizzle-orm';
-import { generateSlug, isSlugAvailable } from './tenant';
+import { clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { db, tenants, users, memberships } from "@db";
+import { eq, and } from "drizzle-orm";
+import { generateSlug, isSlugAvailable } from "./tenant";
 
 export interface CreateOrganizationData {
   name: string;
@@ -23,12 +23,12 @@ export interface InviteUserData {
  */
 export async function createOrganization(
   data: CreateOrganizationData,
-  options?: { createdByKentron?: boolean }
+  options?: { createdByKentron?: boolean },
 ) {
   const { userId } = await auth();
-  
+
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   // Generate slug if not provided - let Clerk validate uniqueness
@@ -36,44 +36,72 @@ export async function createOrganization(
 
   // Create organization in Clerk - Clerk handles slug uniqueness
   const clerk = await clerkClient();
-  
-  console.log('[createOrganization] Creating in Clerk:', {
+
+  console.log("[createOrganization] Creating in Clerk:", {
     name: data.name,
     slug,
     createdBy: userId,
   });
-  
-  let organization;
-  try {
-    organization = await clerk.organizations.createOrganization({
+
+  const createClerkOrganization = () =>
+    clerk.organizations.createOrganization({
       name: data.name,
       createdBy: userId,
-      slug: slug,
+      slug,
       publicMetadata: {
-        plan: data.plan || 'free',
-        createdByKentron: options?.createdByKentron || false, // Flag for webhook
+        plan: data.plan || "free",
+        createdByKentron: options?.createdByKentron || false,
         ...data.metadata,
       },
     });
-    
-    console.log('[createOrganization] Clerk org created:', organization.id);
+
+  let organization;
+  try {
+    organization = await createClerkOrganization();
+
+    console.log("[createOrganization] Clerk org created:", organization.id);
   } catch (clerkError: any) {
-    console.error('[createOrganization] Clerk API Error:', {
-      message: clerkError.message,
-      status: clerkError.status,
-      errors: clerkError.errors,
-      clerkTraceId: clerkError.clerkTraceId,
-    });
-    throw clerkError;
+    const organizationsDisabled = clerkError.errors?.some(
+      (error: { code?: string }) =>
+        error.code === "organization_not_enabled_in_instance",
+    );
+
+    // New Clerk development instances have Organizations disabled by default.
+    // Enable the feature once and retry so local onboarding works out of the
+    // box. Never mutate production instance settings automatically.
+    if (process.env.NODE_ENV !== "production" && organizationsDisabled) {
+      console.warn(
+        "[createOrganization] Enabling Organizations in Clerk development instance",
+      );
+      await clerk.instance.updateOrganizationSettings({
+        enabled: true,
+        maxAllowedMemberships: 5,
+      });
+      organization = await createClerkOrganization();
+      console.log("[createOrganization] Clerk org created:", organization.id);
+    } else {
+      console.error("[createOrganization] Clerk API Error:", {
+        message: clerkError.message,
+        status: clerkError.status,
+        errors: clerkError.errors,
+        clerkTraceId: clerkError.clerkTraceId,
+      });
+      throw clerkError;
+    }
   }
 
   // Verify organization was created
   if (!organization || !organization.id) {
-    throw new Error('Failed to create organization in Clerk');
+    throw new Error("Failed to create organization in Clerk");
   }
 
-  console.log('[createOrganization] Organization created in Clerk:', organization.id);
-  console.log('[createOrganization] Webhook will sync to database automatically');
+  console.log(
+    "[createOrganization] Organization created in Clerk:",
+    organization.id,
+  );
+  console.log(
+    "[createOrganization] Webhook will sync to database automatically",
+  );
 
   // Return organization - webhook handles DB sync
   return {
@@ -85,15 +113,18 @@ export async function createOrganization(
 /**
  * Create a personal organization for a user (auto-create on first sign-in)
  */
-export async function createPersonalOrganization(userId: string, userEmail: string) {
-  const userName = userEmail.split('@')[0];
+export async function createPersonalOrganization(
+  userId: string,
+  userEmail: string,
+) {
+  const userName = userEmail.split("@")[0];
   const name = `${userName}'s Workspace`;
-  
+
   return createOrganization({
     name,
-    plan: 'free',
+    plan: "free",
     metadata: {
-      type: 'personal',
+      type: "personal",
       autoCreated: true,
     },
   });
@@ -103,16 +134,16 @@ export async function createPersonalOrganization(userId: string, userEmail: stri
  * Invite a user to an organization
  */
 export async function inviteUserToOrganization(
-  organizationId: string, 
-  data: InviteUserData
+  organizationId: string,
+  data: InviteUserData,
 ) {
   const { userId } = await auth();
-  
+
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
-  console.log('[inviteUserToOrganization] Inviting user:', {
+  console.log("[inviteUserToOrganization] Inviting user:", {
     organizationId,
     inviterUserId: userId,
     emailAddress: data.email,
@@ -121,7 +152,7 @@ export async function inviteUserToOrganization(
 
   // Create invitation in Clerk
   const clerk = await clerkClient();
-  
+
   try {
     const invitation = await clerk.organizations.createOrganizationInvitation({
       organizationId,
@@ -129,13 +160,16 @@ export async function inviteUserToOrganization(
       emailAddress: data.email,
       role: data.role,
       // Redirect to root - will auto-redirect to /{tenantSlug}/applications based on page.tsx logic
-      redirectUrl: data.redirectUrl || process.env.NEXT_PUBLIC_APP_URL || '/',
+      redirectUrl: data.redirectUrl || process.env.NEXT_PUBLIC_APP_URL || "/",
     });
-    
-    console.log('[inviteUserToOrganization] Invitation created:', invitation.id);
+
+    console.log(
+      "[inviteUserToOrganization] Invitation created:",
+      invitation.id,
+    );
     return invitation;
   } catch (clerkError: any) {
-    console.error('[inviteUserToOrganization] Clerk Invitation Error:', {
+    console.error("[inviteUserToOrganization] Clerk Invitation Error:", {
       message: clerkError.message,
       status: clerkError.status,
       errors: clerkError.errors,
@@ -162,9 +196,9 @@ export async function getOrganizationMembers(organizationId: string) {
  * Update user role in organization
  */
 export async function updateUserRole(
-  organizationId: string, 
-  userId: string, 
-  role: string
+  organizationId: string,
+  userId: string,
+  role: string,
 ) {
   // Update in Clerk
   const clerk = await clerkClient();
@@ -175,16 +209,17 @@ export async function updateUserRole(
   });
 
   // Update in local database
-  await db.update(memberships)
-    .set({ 
+  await db
+    .update(memberships)
+    .set({
       role,
       updatedAt: new Date().toISOString(),
     })
     .where(
       and(
         eq(memberships.tenantId, organizationId),
-        eq(memberships.userId, userId)
-      )
+        eq(memberships.userId, userId),
+      ),
     );
 }
 
@@ -192,8 +227,8 @@ export async function updateUserRole(
  * Remove user from organization
  */
 export async function removeUserFromOrganization(
-  organizationId: string, 
-  userId: string
+  organizationId: string,
+  userId: string,
 ) {
   // Remove from Clerk
   const clerk = await clerkClient();
@@ -203,12 +238,13 @@ export async function removeUserFromOrganization(
   });
 
   // Remove from local database
-  await db.delete(memberships)
+  await db
+    .delete(memberships)
     .where(
       and(
         eq(memberships.tenantId, organizationId),
-        eq(memberships.userId, userId)
-      )
+        eq(memberships.userId, userId),
+      ),
     );
 }
 
@@ -217,9 +253,9 @@ export async function removeUserFromOrganization(
  */
 export async function getUserOrganizations(userId?: string) {
   const { userId: currentUserId } = await auth();
-  
+
   if (!currentUserId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   const targetUserId = userId || currentUserId;
@@ -231,8 +267,8 @@ export async function getUserOrganizations(userId?: string) {
   });
 
   // Get local tenant data for all organizations
-  const organizationIds = clerkOrganizations.data.map(m => m.organization.id);
-  
+  const organizationIds = clerkOrganizations.data.map((m) => m.organization.id);
+
   if (organizationIds.length === 0) {
     return [];
   }
@@ -243,8 +279,8 @@ export async function getUserOrganizations(userId?: string) {
   });
 
   // Map Clerk organizations with local tenant data
-  return clerkOrganizations.data.map(clerkOrg => {
-    const tenant = localTenants.find(t => t.id === clerkOrg.organization.id);
+  return clerkOrganizations.data.map((clerkOrg) => {
+    const tenant = localTenants.find((t) => t.id === clerkOrg.organization.id);
     return {
       ...clerkOrg.organization,
       tenant,

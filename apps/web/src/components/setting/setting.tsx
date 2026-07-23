@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { ComplianceEvidenceManager } from "@/components/compliance/ComplianceEvidenceManager";
 
 // UI Components
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ import Pagination from "@/components/common/pagination";
 
 // Icons
 import { IoShareSocial } from "react-icons/io5";
-import { MoreHorizontal, Search, Loader2, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Search, Loader2, Pencil, Trash2, RefreshCw, AlertTriangle, ShieldCheck } from "lucide-react";
 
 // API & Utilities
 import { useDebounce } from "@/hooks/useDebounce";
@@ -62,6 +63,15 @@ interface PolicyPack {
   state: string | null;
   parentPolicyId: string | null;
   disable: boolean;
+  applicabilityStatus?: string;
+  complianceStatus?: string;
+  coverageScore?: number;
+  evaluation?: {
+    summary?: string;
+    controls?: Array<{ key: string; title: string; status: string; reason: string; mappedField?: string; mappedRoute?: string; requiredEvidence?: string[]; guidance?: string; priority?: "high" | "medium" | "low" }>;
+  };
+  gaps?: Array<{ key: string; title: string; status: string; reason: string; mappedField?: string; mappedRoute?: string; requiredEvidence?: string[]; guidance?: string; priority?: "high" | "medium" | "low" }>;
+  evaluatedAt?: string | null;
 }
 
 interface SettingsProps {
@@ -302,21 +312,13 @@ const Settings: FC<SettingsProps> = ({
   const queryClient = useQueryClient();
   const { slug } = useParams();
   const [selectedPolicies, setSelectedPolicies] = useState<PolicyPack[]>([]);
+  const [evaluatingPolicyId, setEvaluatingPolicyId] = useState<string | null>(null);
   const { refreshApplicationPolicyStatus, applicationPolicy: policiesData } =
     useTenant();
 
   useEffect(() => {
     if (policiesData) {
-      // Display only these three specific policies by name
-      const allowedPolicyNames = [
-        "EU AI Act (Regulation 2024/1689)",
-        "ISO/IEC 42001",
-        "NIST AI Risk Management Framework",
-      ];
-      const filteredPolicies = policiesData.filter((p) =>
-        allowedPolicyNames.includes(p.name)
-      );
-      setSelectedPolicies(filteredPolicies);
+      setSelectedPolicies(policiesData);
     }
   }, [policiesData]);
 
@@ -375,6 +377,22 @@ const Settings: FC<SettingsProps> = ({
         return;
       }
       refreshApplicationPolicyStatus();
+      const evaluation = result.evaluation;
+      if (evaluation) {
+        setSelectedPolicies((current) => current.map((item) =>
+          item.id === policyId
+            ? {
+                ...item,
+                complianceStatus: evaluation.complianceStatus,
+                applicabilityStatus: evaluation.applicabilityStatus,
+                coverageScore: evaluation.coverageScore,
+                evaluation,
+                gaps: evaluation.gaps,
+                evaluatedAt: evaluation.evaluatedAt,
+              }
+            : item
+        ));
+      }
       successToast(
         `Policy ${newActiveState ? "enabled" : "disabled"} successfully`,
         "Policy",
@@ -391,14 +409,51 @@ const Settings: FC<SettingsProps> = ({
     }
   };
 
+  const handleEvaluate = async (policy: PolicyPack) => {
+    if (!tenant || !applicationId || Array.isArray(tenant) || Array.isArray(applicationId) || !policy.parentPolicyId) {
+      errorToast("Invalid application or policy");
+      return;
+    }
+    setEvaluatingPolicyId(policy.id);
+    try {
+      const { evaluateApplicationCompliancePolicy } = await import("@/lib/api/compliance-policies");
+      const result = await evaluateApplicationCompliancePolicy(tenant, applicationId, policy.parentPolicyId);
+      setSelectedPolicies((current) => current.map((item) =>
+        item.id === policy.id
+          ? {
+              ...item,
+              complianceStatus: result.evaluation.complianceStatus,
+              applicabilityStatus: result.evaluation.applicabilityStatus,
+              coverageScore: result.evaluation.coverageScore,
+              evaluation: result.evaluation,
+              gaps: result.evaluation.gaps,
+              evaluatedAt: result.evaluation.evaluatedAt,
+            }
+          : item
+      ));
+      refreshApplicationPolicyStatus();
+      successToast("Compliance evidence re-evaluated", "Policy", "checked");
+    } catch (error) {
+      errorToast(error instanceof Error ? error.message : "Compliance evaluation failed");
+    } finally {
+      setEvaluatingPolicyId(null);
+    }
+  };
+
   const renderPolicyCard = (policy: PolicyPack) => {
-    const compliancePercentage = Math.round(
-      (policy.projectsCompliant / policy.totalProjects) * 100
-    );
+    const status = policy.complianceStatus ?? "not_evaluated";
+    const score = Number(policy.coverageScore ?? 0);
+    const statusClasses: Record<string, string> = {
+      compliant: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      partially_compliant: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+      non_compliant: "bg-red-500/10 text-red-600 border-red-500/20",
+      not_applicable: "bg-slate-500/10 text-slate-500 border-slate-500/20",
+      not_evaluated: "bg-muted text-muted-foreground border-border",
+    };
 
     return (
       <Card key={policy.id} className="hover:shadow-md transition-shadow">
-        <CardContent className="min-h-32">
+        <CardContent className="min-h-48">
           <div className="flex items-start justify-between  ">
             <div className="flex items-start gap-3 flex-1">
               <div
@@ -440,21 +495,83 @@ const Settings: FC<SettingsProps> = ({
                     </Badge>
                   )}
                 </div>
+                {policy.isActive && (
+                  <div className="mt-3 rounded-md border bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className={cn("border text-[11px] capitalize", statusClasses[status])}>
+                        {status.replaceAll("_", " ")}
+                      </Badge>
+                      {status !== "not_applicable" && (
+                        <span className="text-xs font-semibold">{score.toFixed(0)}% evidence coverage</span>
+                      )}
+                    </div>
+                    {status === "compliant" ? (
+                      <p className="flex items-start gap-1.5 text-xs text-emerald-600">
+                        <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        All mapped controls currently have verifiable evidence.
+                      </p>
+                    ) : policy.gaps?.length ? (
+                      <div className="space-y-1">
+                        {policy.gaps.slice(0, 2).map((gap) => (
+                          <p key={gap.key} className="flex items-start gap-1.5 text-xs text-red-600">
+                            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>{gap.title}: {gap.reason}</span>
+                          </p>
+                        ))}
+                        {policy.gaps.length > 2 && (
+                          <p className="text-xs text-muted-foreground">+{policy.gaps.length - 2} more control gap(s)</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Enable and run an evidence check to calculate compliance.</p>
+                    )}
+                    {policy.evaluatedAt && (
+                      <p className="text-[11px] text-muted-foreground">Last checked {new Date(policy.evaluatedAt).toLocaleString()}</p>
+                    )}
+                    {policy.gaps?.length ? <div className="space-y-2 border-t pt-2">
+                      <p className="text-xs font-semibold">Generated compliance tasks</p>
+                      {policy.gaps.slice(0, 4).map((gap) => <div key={`task-${gap.key}`} className="rounded border bg-background p-2">
+                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium">{gap.title}</span><Badge variant="outline" className="text-[10px] capitalize">{gap.priority ?? "medium"}</Badge></div>
+                        {gap.mappedField && <a href={`/${String(tenant)}/applications/${String(applicationId)}/${gap.mappedRoute || "settings"}`} className="mt-1 block text-[11px] text-primary hover:underline">Complete {gap.mappedField}</a>}
+                        {gap.requiredEvidence?.length ? <p className="mt-1 text-[11px] text-muted-foreground">Evidence needed: {gap.requiredEvidence.join("; ")}</p> : null}
+                        {gap.guidance && <p className="mt-1 text-[11px] text-muted-foreground">{gap.guidance}</p>}
+                      </div>)}
+                    </div> : null}
+                    {policy.parentPolicyId && policy.evaluation?.controls?.length && typeof tenant === "string" && typeof applicationId === "string" ? <div className="border-t pt-3">
+                      <ComplianceEvidenceManager tenant={tenant} applicationId={applicationId} policyId={policy.parentPolicyId} controls={policy.evaluation.controls.map((control) => ({ key: control.key, title: control.title }))} onChanged={() => handleEvaluate(policy)} />
+                    </div> : null}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </CardContent>
         <CardFooter>
-          <div className="flex w-full items-center justify-between pt-2 border-t mt-auto">
+          <div className="flex w-full items-center justify-between gap-3 pt-2 border-t mt-auto">
             <span className="text-xs font-medium text-muted-foreground">
               Policy Status
             </span>
+            <div className="flex items-center gap-2">
+              {policy.isActive && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => handleEvaluate(policy)}
+                  disabled={evaluatingPolicyId === policy.id || !hasWorkspaceDetailsWritePermission}
+                >
+                  <RefreshCw className={cn("h-3 w-3 mr-1", evaluatingPolicyId === policy.id && "animate-spin")} />
+                  Re-check
+                </Button>
+              )}
             <Switch
               checked={policy.isActive}
               onCheckedChange={() => handleTogglePolicyStatus(policy.id)}
               disabled={!hasWorkspaceDetailsWritePermission}
               className=""
             />
+            </div>
           </div>
         </CardFooter>
       </Card>
@@ -471,13 +588,18 @@ const Settings: FC<SettingsProps> = ({
         <div>
           <h2 className="text-xl font-semibold  mb-2">Policy Management</h2>
           <p className="text-muted-foreground text-sm">
-            Control which compliance frameworks are enforced across your app.
+            Assign regulations to this application and verify every mapped control against live Norix evidence. Missing evidence fails closed and appears as a gap.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {selectedPolicies.map(renderPolicyCard)}
         </div>
+        {!selectedPolicies.length && (
+          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            No organization policies are enabled. Enable them in Admin → Compliance → Compliance Policies first.
+          </div>
+        )}
       </div>
     </div>
   );

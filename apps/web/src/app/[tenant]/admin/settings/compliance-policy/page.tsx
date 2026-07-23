@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   ColumnDef,
@@ -260,6 +261,7 @@ const OrganizationPolicies = () => {
 
       <Dialog open={open !== ""} onOpenChange={() => setOpen("")}>
         <DialogContent className="text-black">
+          <DialogTitle className="sr-only">Edit Short Text</DialogTitle>
           <DialogHeader>
             <span className="flex w-full items-center">
               <h2 className="flex mx-3 text-black font-semibold text-lg">
