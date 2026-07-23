@@ -1,4 +1,9 @@
-import { fetchDatabricksPages, normalizeDatabricksHost } from "./api-client";
+import {
+  DatabricksApiError,
+  databricksApi,
+  fetchDatabricksPages,
+  normalizeDatabricksHost,
+} from "./api-client";
 
 describe("Databricks API client", () => {
   const originalFetch = global.fetch;
@@ -65,6 +70,50 @@ describe("Databricks API client", () => {
         "catalogs",
       ),
     ).rejects.toThrow("repeated pagination token");
+  });
+
+  it("uses provider-specific page size parameters", async () => {
+    const fetchMock = jest.fn().mockResolvedValue(response({ apps: [] }));
+    global.fetch = fetchMock;
+
+    await fetchDatabricksPages(
+      {
+        hostUrl: "https://dbc-1234.cloud.databricks.com",
+        accessToken: "secret-token",
+      },
+      "/api/2.0/apps",
+      "apps",
+      undefined,
+      { pageSizeParam: "page_size", pageSizeValue: "100" },
+    );
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("page_size=100");
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("max_results");
+  });
+
+  it("preserves HTTP status and Databricks error code", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      json: async () => ({
+        error_code: "FEATURE_DISABLED",
+        message: "Apps are not enabled",
+      }),
+    } as Response);
+
+    await expect(
+      databricksApi(
+        {
+          hostUrl: "https://dbc-1234.cloud.databricks.com",
+          accessToken: "secret-token",
+        },
+        "/api/2.0/apps",
+      ),
+    ).rejects.toMatchObject<Partial<DatabricksApiError>>({
+      status: 404,
+      errorCode: "FEATURE_DISABLED",
+    });
   });
 });
 

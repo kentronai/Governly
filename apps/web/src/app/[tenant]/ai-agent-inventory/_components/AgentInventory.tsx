@@ -108,6 +108,9 @@ const PLATFORM_LABELS: Record<string, string> = {
   gcp_functions: "Google Cloud Functions",
   databricks_model_serving: "Databricks Model Serving",
   databricks_unity_catalog: "Databricks Unity Catalog",
+  databricks_apps: "Databricks Apps",
+  databricks_jobs: "Databricks Jobs",
+  databricks_genie: "Databricks Genie Agent",
 };
 const platformLabel = (value: string) =>
   PLATFORM_LABELS[value] ?? value.replaceAll("_", " ");

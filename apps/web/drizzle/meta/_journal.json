@@ -162,6 +162,13 @@
       "when": 1784812000000,
       "tag": "0022_rename_databricks_unity_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784813000000,
+      "tag": "0023_databricks_agent_deployments",
+      "breakpoints": true
     }
   ]
 }

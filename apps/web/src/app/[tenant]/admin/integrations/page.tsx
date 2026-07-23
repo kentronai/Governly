@@ -798,12 +798,39 @@ export default function IntegrationsPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">
+                            Genie Agents
+                          </span>
+                          <span className="font-medium">
+                            {Number(
+                              integration.configuration.lastDiscoveryCounts
+                                .databricks_genie_space ?? 0,
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
                             Serving endpoints
                           </span>
                           <span className="font-medium">
                             {Number(
                               integration.configuration.lastDiscoveryCounts
                                 .databricks_serving_endpoint ?? 0,
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            Apps / Jobs scanned
+                          </span>
+                          <span className="font-medium">
+                            {Number(
+                              integration.configuration.lastDiscoveryCounts
+                                .databricks_app ?? 0,
+                            )}{" "}
+                            /{" "}
+                            {Number(
+                              integration.configuration.lastDiscoveryCounts
+                                .databricks_job ?? 0,
                             )}
                           </span>
                         </div>
@@ -1129,10 +1156,12 @@ export default function IntegrationsPage() {
                   <Info />
                   <AlertTitle>Databricks Unity Catalog</AlertTitle>
                   <AlertDescription>
-                    NORIX validates the workspace, then discovers visible
-                    catalogs, schemas, tables, Unity Catalog models, and Model
-                    Serving endpoints. The token needs Unity Catalog and
-                    serving-endpoint read access.
+                    NORIX validates the workspace, then discovers Mosaic AI and
+                    Responses agents on Model Serving, Databricks Apps, Genie
+                    Agents, agent Jobs, referenced notebooks, and their Unity
+                    Catalog models and data. The token needs read access to
+                    Unity Catalog, Model Serving, Apps, Genie, Jobs, and
+                    Workspace.
                   </AlertDescription>
                 </Alert>
                 <FormField

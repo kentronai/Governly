@@ -3,6 +3,17 @@ export interface DatabricksCredentials {
   accessToken: string;
 }
 
+export class DatabricksApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly errorCode?: string,
+  ) {
+    super(message);
+    this.name = "DatabricksApiError";
+  }
+}
+
 const DATABRICKS_HOST_SUFFIXES = [".databricks.com", ".azuredatabricks.net"];
 
 export function normalizeDatabricksHost(value: string): string {
@@ -63,10 +74,12 @@ export async function databricksApi<T>(
     message?: string;
   };
   if (!response.ok) {
-    throw new Error(
+    throw new DatabricksApiError(
       payload.message ||
         payload.error_code ||
         `Databricks API returned HTTP ${response.status}`,
+      response.status,
+      payload.error_code,
     );
   }
   return payload;
@@ -77,12 +90,20 @@ export async function fetchDatabricksPages<T>(
   path: string,
   collectionKey: string,
   baseQuery?: Record<string, string>,
+  pagination: {
+    pageSizeParam?: string;
+    pageSizeValue?: string;
+  } = {},
 ): Promise<T[]> {
   const items: T[] = [];
   let pageToken: string | undefined;
   const seenTokens = new Set<string>();
   do {
-    const query = new URLSearchParams({ max_results: "0", ...baseQuery });
+    const query = new URLSearchParams({
+      [pagination.pageSizeParam || "max_results"]:
+        pagination.pageSizeValue || "0",
+      ...baseQuery,
+    });
     if (pageToken) query.set("page_token", pageToken);
     const payload = await databricksApi<Record<string, unknown>>(
       credentials,

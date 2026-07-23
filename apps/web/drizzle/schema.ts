@@ -212,6 +212,9 @@ export const agentPlatform = pgEnum("agent_platform", [
   "databricks_model_serving",
   "databricks_unity_catalog",
   "other",
+  "databricks_apps",
+  "databricks_jobs",
+  "databricks_genie",
 ]);
 export const agentResourceType = pgEnum("agent_resource_type", [
   "bedrock_agent",
@@ -249,6 +252,10 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "databricks_catalog",
   "databricks_schema",
   "databricks_table",
+  "databricks_app",
+  "databricks_job",
+  "databricks_notebook",
+  "databricks_genie_space",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [

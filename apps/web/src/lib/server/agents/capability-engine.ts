@@ -91,6 +91,9 @@ export function buildCapabilityFacts(
       "gcp_cloud_function",
       "gcp_vertex_reasoning_engine",
       "databricks_serving_endpoint",
+      "databricks_app",
+      "databricks_job",
+      "databricks_genie_space",
     ].includes(r.resourceType),
   );
 
@@ -204,7 +207,10 @@ export function buildCapabilityFacts(
         r.resourceType === "azure_ai_foundry_project" ||
         r.resourceType === "gcp_vertex_reasoning_engine" ||
         r.resourceType === "databricks_serving_endpoint" ||
-        r.resourceType === "databricks_registered_model",
+        r.resourceType === "databricks_registered_model" ||
+        r.resourceType === "databricks_app" ||
+        r.resourceType === "databricks_job" ||
+        r.resourceType === "databricks_genie_space",
     ),
     resourceCount: agent.resources.length,
   };

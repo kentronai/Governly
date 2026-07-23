@@ -33,7 +33,11 @@ export type DiscoveredResourceType =
   | "databricks_registered_model"
   | "databricks_catalog"
   | "databricks_schema"
-  | "databricks_table";
+  | "databricks_table"
+  | "databricks_app"
+  | "databricks_job"
+  | "databricks_notebook"
+  | "databricks_genie_space";
 
 export interface RawDiscoveredResource {
   resourceType: DiscoveredResourceType;

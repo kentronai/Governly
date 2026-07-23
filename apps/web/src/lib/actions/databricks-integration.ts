@@ -55,7 +55,7 @@ export async function ensureDatabricksIntegrationCatalogEntry(
     });
   }
   const description =
-    "Discovers Unity Catalog catalogs, schemas, tables, registered models, and Model Serving endpoints with real governance evidence.";
+    "Discovers deployed agents across Databricks Apps, Model Serving, Genie, Jobs, and workspace notebooks, with Unity Catalog governance evidence.";
   if (existing) {
     const [updated] = await db
       .update(integrations)
@@ -115,7 +115,15 @@ export async function createDatabricksConnection(input: {
       configuration: {
         hostUrl,
         authentication: "personal_access_token",
-        discoveryScopes: ["unity-catalog", "serving-endpoints", "current-user"],
+        discoveryScopes: [
+          "unity-catalog",
+          "serving-endpoints",
+          "apps",
+          "jobs",
+          "genie",
+          "workspace",
+          "current-user",
+        ],
       },
       credentialsEncrypted: encryptSecret(
         JSON.stringify({ hostUrl, accessToken }),

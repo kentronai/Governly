@@ -21,6 +21,7 @@ import { detectOwnership } from "@/lib/server/agents/ownership-engine";
 import { generateRecommendations } from "@/lib/server/agents/recommendations-engine";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 import {
+  DatabricksApiError,
   databricksApi,
   fetchDatabricksPages,
   normalizeDatabricksHost,
@@ -119,6 +120,106 @@ interface ServingEndpoint {
   tags?: Array<{ key?: string; value?: string }>;
   ai_gateway?: unknown;
   route_optimized?: boolean;
+  task?: string;
+  description?: string;
+  endpoint_url?: string;
+  permission_level?: string;
+}
+
+interface DatabricksAppDeployment {
+  deployment_id?: string;
+  source_code_path?: string;
+  command?: string[];
+  create_time?: string;
+  update_time?: string;
+  creator?: string;
+  status?: { state?: string; message?: string };
+  git_source?: Record<string, unknown>;
+  env_vars?: Array<{ name?: string; value?: string }>;
+}
+
+interface DatabricksApp {
+  id?: string;
+  name: string;
+  description?: string;
+  url?: string;
+  creator?: string;
+  updater?: string;
+  create_time?: string;
+  update_time?: string;
+  default_source_code_path?: string;
+  app_status?: { state?: string; message?: string };
+  compute_status?: { state?: string; message?: string };
+  active_deployment?: DatabricksAppDeployment;
+  pending_deployment?: DatabricksAppDeployment;
+  resources?: Array<Record<string, unknown>>;
+  effective_user_api_scopes?: string[];
+  service_principal_name?: string;
+}
+
+interface DatabricksJobTask {
+  task_key?: string;
+  description?: string;
+  notebook_task?: { notebook_path?: string };
+  spark_python_task?: { python_file?: string };
+  python_wheel_task?: { package_name?: string; entry_point?: string };
+  run_job_task?: { job_id?: number };
+  existing_cluster_id?: string;
+  job_cluster_key?: string;
+}
+
+interface DatabricksJob {
+  job_id: number;
+  creator_user_name?: string;
+  created_time?: number;
+  run_as_user_name?: string;
+  settings?: {
+    name?: string;
+    description?: string;
+    tags?: Record<string, string>;
+    tasks?: DatabricksJobTask[];
+    schedule?: Record<string, unknown>;
+    continuous?: Record<string, unknown>;
+    trigger?: Record<string, unknown>;
+    deployment?: Record<string, unknown>;
+    git_source?: Record<string, unknown>;
+    run_as?: Record<string, unknown>;
+    max_concurrent_runs?: number;
+    timeout_seconds?: number;
+  };
+  trigger_state?: Record<string, unknown>;
+  latest_run?: {
+    run_id?: number;
+    start_time?: number;
+    end_time?: number;
+    run_duration?: number;
+    state?: {
+      life_cycle_state?: string;
+      result_state?: string;
+      state_message?: string;
+    };
+    run_page_url?: string;
+  };
+}
+
+interface WorkspaceObject {
+  object_id?: number;
+  resource_id?: string;
+  object_type?: string;
+  path?: string;
+  language?: string;
+  created_at?: number;
+  modified_at?: number;
+}
+
+interface GenieSpace {
+  space_id: string;
+  title?: string;
+  description?: string;
+  warehouse_id?: string;
+  parent_path?: string;
+  etag?: string;
+  serialized_space?: string;
 }
 
 export interface DatabricksDiscovery {
@@ -128,6 +229,10 @@ export interface DatabricksDiscovery {
   tables: Table[];
   models: RegisteredModel[];
   endpoints: ServingEndpoint[];
+  apps: DatabricksApp[];
+  jobs: DatabricksJob[];
+  notebooks: WorkspaceObject[];
+  genieSpaces: GenieSpace[];
   agents: CorrelatedAgent[];
   counts: Record<string, number>;
 }
@@ -180,6 +285,86 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+async function getJobDetails(
+  credentials: DatabricksCredentials,
+  jobId: number,
+): Promise<DatabricksJob> {
+  let pageToken: string | undefined;
+  let combined: DatabricksJob | undefined;
+  const seenTokens = new Set<string>();
+  do {
+    const query = new URLSearchParams({ job_id: String(jobId) });
+    if (pageToken) query.set("page_token", pageToken);
+    const page = await databricksApi<
+      DatabricksJob & { next_page_token?: string }
+    >(credentials, "/api/2.2/jobs/get", query);
+    if (!combined) {
+      combined = page;
+    } else {
+      combined.settings = {
+        ...combined.settings,
+        tasks: [
+          ...(combined.settings?.tasks ?? []),
+          ...(page.settings?.tasks ?? []),
+        ],
+      };
+    }
+    const next = page.next_page_token;
+    if (next && seenTokens.has(next)) {
+      throw new Error(
+        `Databricks returned a repeated pagination token for job ${jobId}`,
+      );
+    }
+    if (next) seenTokens.add(next);
+    pageToken = next;
+  } while (pageToken);
+  if (!combined) throw new Error(`Databricks job ${jobId} was not returned`);
+  return combined;
+}
+
+async function discoverWorkspaceNotebooks(
+  credentials: DatabricksCredentials,
+): Promise<WorkspaceObject[]> {
+  const queue = ["/"];
+  const visited = new Set<string>();
+  const notebooks: WorkspaceObject[] = [];
+  let objectsVisited = 0;
+  const maximumObjects = 50_000;
+
+  while (queue.length > 0) {
+    const paths = queue.splice(0, 5);
+    const pages = await Promise.all(
+      paths.map((path) =>
+        databricksApi<{ objects?: WorkspaceObject[] }>(
+          credentials,
+          "/api/2.0/workspace/list",
+          new URLSearchParams({ path }),
+        ),
+      ),
+    );
+    for (const page of pages) {
+      for (const item of page.objects ?? []) {
+        objectsVisited += 1;
+        if (objectsVisited > maximumObjects) {
+          throw new Error(
+            `Workspace inventory exceeds ${maximumObjects} objects; narrow the workspace or use a dedicated discovery principal`,
+          );
+        }
+        if (item.object_type === "NOTEBOOK") notebooks.push(item);
+        if (
+          ["DIRECTORY", "REPO"].includes(item.object_type || "") &&
+          item.path &&
+          !visited.has(item.path)
+        ) {
+          visited.add(item.path);
+          queue.push(item.path);
+        }
+      }
+    }
+  }
+  return notebooks;
+}
+
 function tags(endpoint: ServingEndpoint): Record<string, string> {
   return Object.fromEntries(
     (endpoint.tags ?? []).flatMap((tag) =>
@@ -188,15 +373,217 @@ function tags(endpoint: ServingEndpoint): Record<string, string> {
   );
 }
 
+function sanitizeServedEntity(entity: ServedEntity) {
+  return {
+    entityName: entity.entity_name,
+    entityVersion: entity.entity_version,
+    name: entity.name,
+    workloadType: entity.workload_type,
+    workloadSize: entity.workload_size,
+    scaleToZeroEnabled: entity.scale_to_zero_enabled,
+    externalModel: entity.external_model
+      ? {
+          name: entity.external_model.name,
+          provider: entity.external_model.provider,
+          task: entity.external_model.task,
+        }
+      : undefined,
+  };
+}
+
+function sanitizeEndpoint(endpoint: ServingEndpoint) {
+  return {
+    id: endpoint.id,
+    name: endpoint.name,
+    description: endpoint.description,
+    task: endpoint.task,
+    creator: endpoint.creator,
+    creationTimestamp: endpoint.creation_timestamp,
+    lastUpdatedTimestamp: endpoint.last_updated_timestamp,
+    state: endpoint.state,
+    tags: endpoint.tags,
+    routeOptimized: endpoint.route_optimized,
+    endpointUrl: endpoint.endpoint_url,
+    permissionLevel: endpoint.permission_level,
+    aiGatewayConfigured: Boolean(endpoint.ai_gateway),
+    servedEntities: [
+      ...(endpoint.config?.served_entities ?? []),
+      ...(endpoint.config?.served_models ?? []),
+    ].map(sanitizeServedEntity),
+  };
+}
+
+function sanitizeApp(app: DatabricksApp) {
+  const deployment = (value?: DatabricksAppDeployment) =>
+    value
+      ? {
+          ...value,
+          env_vars: (value.env_vars ?? []).map((item) => ({
+            name: item.name,
+          })),
+        }
+      : undefined;
+  return {
+    ...app,
+    active_deployment: deployment(app.active_deployment),
+    pending_deployment: deployment(app.pending_deployment),
+  };
+}
+
+function sanitizeJob(job: DatabricksJob) {
+  return {
+    job_id: job.job_id,
+    creator_user_name: job.creator_user_name,
+    created_time: job.created_time,
+    run_as_user_name: job.run_as_user_name,
+    trigger_state: job.trigger_state,
+    latest_run: job.latest_run,
+    settings: {
+      name: job.settings?.name,
+      description: job.settings?.description,
+      tags: job.settings?.tags,
+      schedule: job.settings?.schedule,
+      continuous: job.settings?.continuous,
+      trigger: job.settings?.trigger,
+      deployment: job.settings?.deployment,
+      git_source: job.settings?.git_source,
+      run_as: job.settings?.run_as,
+      max_concurrent_runs: job.settings?.max_concurrent_runs,
+      timeout_seconds: job.settings?.timeout_seconds,
+      tasks: (job.settings?.tasks ?? []).map((task) => ({
+        task_key: task.task_key,
+        description: task.description,
+        notebook_path: task.notebook_task?.notebook_path,
+        python_file: task.spark_python_task?.python_file,
+        python_package: task.python_wheel_task?.package_name,
+        python_entry_point: task.python_wheel_task?.entry_point,
+        child_job_id: task.run_job_task?.job_id,
+        existing_cluster_id: task.existing_cluster_id,
+        job_cluster_key: task.job_cluster_key,
+      })),
+    },
+  };
+}
+
+function genieConfiguration(space: GenieSpace): Record<string, unknown> | null {
+  if (!space.serialized_space) return null;
+  try {
+    return JSON.parse(space.serialized_space) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function genieDataSourceNames(space: GenieSpace): string[] {
+  const configuration = genieConfiguration(space);
+  const dataSources = configuration?.data_sources as
+    | {
+        tables?: Array<{ identifier?: string }>;
+        metric_views?: Array<{ identifier?: string }>;
+      }
+    | undefined;
+  return [
+    ...(dataSources?.tables ?? []),
+    ...(dataSources?.metric_views ?? []),
+  ].flatMap((item) => (item.identifier ? [item.identifier] : []));
+}
+
+function appHasAgentSignal(app: DatabricksApp): boolean {
+  if (
+    hasAgentSignal({
+      name: app.name,
+      description: app.description,
+      path:
+        app.active_deployment?.source_code_path || app.default_source_code_path,
+    })
+  ) {
+    return true;
+  }
+  const resources = JSON.stringify(app.resources ?? []).toLowerCase();
+  if (
+    resources.includes("serving_endpoint") ||
+    resources.includes("genie_space")
+  ) {
+    return true;
+  }
+  return (app.active_deployment?.command ?? []).some((item) =>
+    /responsesagent|chatagent|agent_framework|langgraph|langchain|crewai|autogen/i.test(
+      item,
+    ),
+  );
+}
+
+function jobHasAgentSignal(job: DatabricksJob): boolean {
+  const settings = job.settings;
+  if (
+    hasAgentSignal({
+      name: settings?.name,
+      description: settings?.description,
+      tags: settings?.tags,
+    })
+  ) {
+    return true;
+  }
+  return (settings?.tasks ?? []).some((task) =>
+    [
+      task.task_key,
+      task.description,
+      task.notebook_task?.notebook_path,
+      task.spark_python_task?.python_file,
+      task.python_wheel_task?.package_name,
+      task.python_wheel_task?.entry_point,
+    ].some((item) => AI_SIGNAL.test(item || "")),
+  );
+}
+
+function endpointHasAgentSignal(
+  endpoint: ServingEndpoint,
+  models: Map<string, RegisteredModel>,
+): boolean {
+  if (
+    hasAgentSignal({
+      name: endpoint.name,
+      description: endpoint.description,
+      tags: tags(endpoint),
+    }) ||
+    /agent|responses/i.test(endpoint.task || "")
+  ) {
+    return true;
+  }
+  const entities = [
+    ...(endpoint.config?.served_entities ?? []),
+    ...(endpoint.config?.served_models ?? []),
+  ];
+  return entities.some((entity) => {
+    const model = entity.entity_name ? models.get(entity.entity_name) : null;
+    return model ? hasAgentSignal(model) : false;
+  });
+}
+
 function hasAgentSignal(value: {
   name?: string;
   full_name?: string;
   comment?: string;
+  description?: string;
+  path?: string;
   properties?: Record<string, string>;
+  tags?: Record<string, string>;
 }): boolean {
-  if (AI_SIGNAL.test(value.full_name || value.name || "")) return true;
-  if (AI_SIGNAL.test(value.comment || "")) return true;
-  return Object.entries(value.properties ?? {}).some(
+  if (
+    [
+      value.full_name,
+      value.name,
+      value.comment,
+      value.description,
+      value.path,
+    ].some((item) => AI_SIGNAL.test(item || ""))
+  ) {
+    return true;
+  }
+  return Object.entries({
+    ...(value.properties ?? {}),
+    ...(value.tags ?? {}),
+  }).some(
     ([key, item]) =>
       AI_SIGNAL.test(key) ||
       (["norix.agent", "ai.agent", "agent"].includes(key.toLowerCase()) &&
@@ -204,8 +591,10 @@ function hasAgentSignal(value: {
   );
 }
 
-function iso(epoch?: number): string | null {
-  return epoch ? new Date(epoch).toISOString() : null;
+function isoValue(value?: number | string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function resource(
@@ -213,8 +602,8 @@ function resource(
   id: string,
   name: string,
   metadata: Record<string, unknown>,
-  createdAt?: number,
-  updatedAt?: number,
+  createdAt?: number | string,
+  updatedAt?: number | string,
   resourceTags: Record<string, string> = {},
 ): RawDiscoveredResource {
   return {
@@ -224,8 +613,8 @@ function resource(
     resourceName: name,
     region: "workspace",
     tags: resourceTags,
-    createdAt: iso(createdAt),
-    lastUpdatedAt: iso(updatedAt),
+    createdAt: isoValue(createdAt),
+    lastUpdatedAt: isoValue(updatedAt),
     metadata: {
       ...metadata,
       evidenceSource: "databricks_rest_api",
@@ -333,10 +722,227 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
       model,
     ]),
   );
+  const tableMap = new Map(
+    discovery.tables.map((table) => [
+      table.full_name ||
+        `${table.catalog_name}.${table.schema_name}.${table.name}`,
+      table,
+    ]),
+  );
   const agentsFound: CorrelatedAgent[] = [];
   const servedModelNames = new Set<string>();
+  const notebookMap = new Map(
+    discovery.notebooks.flatMap((notebook) =>
+      notebook.path ? [[notebook.path, notebook]] : [],
+    ),
+  );
+
+  for (const space of discovery.genieSpaces) {
+    const genieResource = resource(
+      "databricks_genie_space",
+      `databricks:genie:${space.space_id}`,
+      space.title || `Genie Agent ${space.space_id}`,
+      {
+        spaceId: space.space_id,
+        title: space.title,
+        description: space.description,
+        warehouseId: space.warehouse_id,
+        parentPath: space.parent_path,
+        etag: space.etag,
+        configuration: genieConfiguration(space),
+        dataSources: genieDataSourceNames(space),
+        hasWrite: true,
+        discoveryQualification:
+          "Native Genie Agent returned by the Databricks Genie management API.",
+      },
+    );
+    const dataResources = genieDataSourceNames(space).flatMap((name) => {
+      const table = tableMap.get(name);
+      return table
+        ? [
+            resource(
+              "databricks_table",
+              `databricks:table:${name}`,
+              name,
+              {
+                owner: table.owner,
+                comment: table.comment,
+                tableType: table.table_type,
+                dataSourceFormat: table.data_source_format,
+                discoveryQualification:
+                  "Unity Catalog asset is configured as a Genie Agent data source.",
+              },
+              table.created_at,
+              table.updated_at,
+            ),
+          ]
+        : [];
+    });
+    agentsFound.push({
+      externalAgentId: genieResource.resourceId,
+      name: genieResource.resourceName,
+      platform: "databricks_genie",
+      region: "workspace",
+      discoverySource: "databricks_genie_space",
+      resources: [genieResource, ...dataResources],
+    });
+  }
+
+  for (const app of discovery.apps.filter(appHasAgentSignal)) {
+    const appId = app.id || app.name;
+    const appResource = resource(
+      "databricks_app",
+      `databricks:app:${appId}`,
+      app.name,
+      {
+        appId: app.id,
+        description: app.description,
+        url: app.url,
+        creator: app.creator,
+        updater: app.updater,
+        appStatus: app.app_status,
+        computeStatus: app.compute_status,
+        providerStatus:
+          app.app_status?.state ||
+          app.compute_status?.state ||
+          (app.active_deployment ? "DEPLOYED" : "NOT_DEPLOYED"),
+        servicePrincipalName: app.service_principal_name,
+        effectiveUserApiScopes: app.effective_user_api_scopes,
+        activeDeployment: app.active_deployment
+          ? {
+              ...app.active_deployment,
+              env_vars: (app.active_deployment.env_vars ?? []).map((item) => ({
+                name: item.name,
+              })),
+            }
+          : null,
+        pendingDeployment: app.pending_deployment
+          ? {
+              ...app.pending_deployment,
+              env_vars: (app.pending_deployment.env_vars ?? []).map((item) => ({
+                name: item.name,
+              })),
+            }
+          : null,
+        resources: app.resources ?? [],
+        hasWrite: true,
+        publicNetworkAccess: app.url ? "Enabled" : "Disabled",
+        discoveryQualification:
+          "Databricks App metadata, command, or declared resources identify an AI-agent deployment.",
+      },
+      app.create_time,
+      app.update_time,
+    );
+    const sourcePath =
+      app.active_deployment?.source_code_path || app.default_source_code_path;
+    const sourceNotebook = sourcePath
+      ? notebookMap.get(sourcePath.replace(/^\/Workspace/, ""))
+      : undefined;
+    const resources = [appResource];
+    if (sourceNotebook?.path) {
+      resources.push(
+        resource(
+          "databricks_notebook",
+          `databricks:notebook:${sourceNotebook.resource_id || sourceNotebook.object_id || sourceNotebook.path}`,
+          sourceNotebook.path,
+          {
+            objectId: sourceNotebook.object_id,
+            resourceId: sourceNotebook.resource_id,
+            language: sourceNotebook.language,
+            discoveryQualification:
+              "Notebook is the deployed source of an agent-identified Databricks App.",
+          },
+          sourceNotebook.created_at,
+          sourceNotebook.modified_at,
+        ),
+      );
+    }
+    agentsFound.push({
+      externalAgentId: appResource.resourceId,
+      name: app.name,
+      platform: "databricks_apps",
+      region: "workspace",
+      discoverySource: "databricks_app",
+      resources,
+    });
+  }
+
+  for (const job of discovery.jobs.filter(jobHasAgentSignal)) {
+    const settings = job.settings;
+    const jobResource = resource(
+      "databricks_job",
+      `databricks:job:${job.job_id}`,
+      settings?.name || `Job ${job.job_id}`,
+      {
+        jobId: job.job_id,
+        description: settings?.description,
+        creator: job.creator_user_name,
+        runAs: job.run_as_user_name || settings?.run_as,
+        tags: settings?.tags ?? {},
+        schedule: settings?.schedule,
+        continuous: settings?.continuous,
+        trigger: settings?.trigger,
+        triggerState: job.trigger_state,
+        latestRun: job.latest_run,
+        deployment: settings?.deployment,
+        gitSource: settings?.git_source,
+        maxConcurrentRuns: settings?.max_concurrent_runs,
+        timeoutSeconds: settings?.timeout_seconds,
+        tasks: (settings?.tasks ?? []).map((task) => ({
+          taskKey: task.task_key,
+          description: task.description,
+          notebookPath: task.notebook_task?.notebook_path,
+          pythonFile: task.spark_python_task?.python_file,
+          pythonPackage: task.python_wheel_task?.package_name,
+          pythonEntryPoint: task.python_wheel_task?.entry_point,
+          childJobId: task.run_job_task?.job_id,
+          existingClusterId: task.existing_cluster_id,
+          jobClusterKey: task.job_cluster_key,
+        })),
+        hasWrite: true,
+        discoveryQualification:
+          "Databricks Job name, description, tags, or task definitions explicitly identify an agent workflow.",
+      },
+      job.created_time,
+      job.latest_run?.end_time || job.latest_run?.start_time,
+      settings?.tags ?? {},
+    );
+    const notebooks = (settings?.tasks ?? []).flatMap((task) => {
+      const path = task.notebook_task?.notebook_path;
+      const notebook = path ? notebookMap.get(path) : undefined;
+      if (!path) return [];
+      return [
+        resource(
+          "databricks_notebook",
+          `databricks:notebook:${notebook?.resource_id || notebook?.object_id || path}`,
+          path,
+          {
+            objectId: notebook?.object_id,
+            resourceId: notebook?.resource_id,
+            language: notebook?.language,
+            discoveryQualification:
+              "Notebook is referenced by an agent-identified Databricks Job task.",
+          },
+          notebook?.created_at,
+          notebook?.modified_at,
+        ),
+      ];
+    });
+    agentsFound.push({
+      externalAgentId: jobResource.resourceId,
+      name: jobResource.resourceName,
+      platform: "databricks_jobs",
+      region: "workspace",
+      discoverySource: "databricks_job",
+      resources: [
+        jobResource,
+        ...new Map(notebooks.map((item) => [item.resourceId, item])).values(),
+      ],
+    });
+  }
 
   for (const endpoint of discovery.endpoints) {
+    if (!endpointHasAgentSignal(endpoint, modelMap)) continue;
     const entities = [
       ...(endpoint.config?.served_entities ?? []),
       ...(endpoint.config?.served_models ?? []),
@@ -347,13 +953,18 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
       endpoint.name,
       {
         endpointId: endpoint.id,
+        task: endpoint.task,
+        description: endpoint.description,
+        endpointUrl: endpoint.endpoint_url,
+        permissionLevel: endpoint.permission_level,
         creator: endpoint.creator,
         state: endpoint.state,
+        providerStatus: endpoint.state?.ready,
         trafficConfig: endpoint.config?.traffic_config,
         autoCaptureConfig: endpoint.config?.auto_capture_config,
         aiGateway: endpoint.ai_gateway,
         routeOptimized: endpoint.route_optimized,
-        servedEntities: entities,
+        servedEntities: entities.map(sanitizeServedEntity),
         hasWrite: true,
         publicNetworkAccess: "Enabled",
         discoveryQualification:
@@ -409,12 +1020,124 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
   return agentsFound;
 }
 
+async function listApps(credentials: DatabricksCredentials, detailed = true) {
+  let summaries: DatabricksApp[];
+  try {
+    summaries = await fetchDatabricksPages<DatabricksApp>(
+      credentials,
+      "/api/2.0/apps",
+      "apps",
+      undefined,
+      { pageSizeParam: "page_size", pageSizeValue: "100" },
+    );
+  } catch (error) {
+    if (error instanceof DatabricksApiError && error.status === 404) return [];
+    throw error;
+  }
+  return detailed
+    ? mapWithConcurrency(summaries, 5, (app) =>
+        databricksApi<DatabricksApp>(
+          credentials,
+          `/api/2.0/apps/${encodeURIComponent(app.name)}`,
+        ),
+      )
+    : summaries;
+}
+
+async function listJobs(credentials: DatabricksCredentials, detailed = true) {
+  const summaries = await fetchDatabricksPages<DatabricksJob>(
+    credentials,
+    "/api/2.2/jobs/list",
+    "jobs",
+    { expand_tasks: "true" },
+    { pageSizeParam: "limit", pageSizeValue: "100" },
+  );
+  return detailed
+    ? mapWithConcurrency(summaries, 5, async (job) => {
+        const [details, runResult] = await Promise.all([
+          getJobDetails(credentials, job.job_id),
+          databricksApi<{
+            runs?: DatabricksJob["latest_run"][];
+          }>(
+            credentials,
+            "/api/2.2/jobs/runs/list",
+            new URLSearchParams({
+              job_id: String(job.job_id),
+              limit: "1",
+            }),
+          ),
+        ]);
+        return { ...details, latest_run: runResult.runs?.[0] };
+      })
+    : summaries;
+}
+
+async function listServingEndpoints(
+  credentials: DatabricksCredentials,
+  detailed = true,
+) {
+  const payload = await databricksApi<{ endpoints?: ServingEndpoint[] }>(
+    credentials,
+    "/api/2.0/serving-endpoints",
+  );
+  const endpoints = payload.endpoints ?? [];
+  return detailed
+    ? mapWithConcurrency(endpoints, 5, (endpoint) =>
+        databricksApi<ServingEndpoint>(
+          credentials,
+          `/api/2.0/serving-endpoints/${encodeURIComponent(endpoint.name)}`,
+        ),
+      )
+    : endpoints;
+}
+
+async function listGenieSpaces(
+  credentials: DatabricksCredentials,
+  detailed = true,
+) {
+  let spaces: GenieSpace[];
+  try {
+    spaces = await fetchDatabricksPages<GenieSpace>(
+      credentials,
+      "/api/2.0/genie/spaces",
+      "spaces",
+      undefined,
+      { pageSizeParam: "page_size", pageSizeValue: "100" },
+    );
+  } catch (error) {
+    if (error instanceof DatabricksApiError && error.status === 404) return [];
+    throw error;
+  }
+  if (!detailed) return spaces;
+  return mapWithConcurrency(spaces, 5, async (space) => {
+    try {
+      return await databricksApi<GenieSpace>(
+        credentials,
+        `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}`,
+        new URLSearchParams({ include_serialized_space: "true" }),
+      );
+    } catch {
+      // CAN USE can enumerate and invoke a Genie Agent while serialized
+      // configuration requires CAN EDIT. Preserve the real list evidence.
+      return space;
+    }
+  });
+}
+
 export async function testDatabricksConnection(
   connection: DatabricksConnection,
 ) {
   try {
     const credentials = parseCredentials(connection);
-    const [identity, catalogResult, endpointResult] = await Promise.all([
+    const [
+      identity,
+      catalogResult,
+      endpoints,
+      apps,
+      jobs,
+      genieSpaces,
+      workspaceRoot,
+    ] = await Promise.all([
       databricksApi<DatabricksIdentity>(
         credentials,
         "/api/2.0/preview/scim/v2/Me",
@@ -424,9 +1147,14 @@ export async function testDatabricksConnection(
         "/api/2.1/unity-catalog/catalogs",
         "catalogs",
       ),
-      databricksApi<{ endpoints?: ServingEndpoint[] }>(
+      listServingEndpoints(credentials, false),
+      listApps(credentials, false),
+      listJobs(credentials, false),
+      listGenieSpaces(credentials, false),
+      databricksApi<{ objects?: WorkspaceObject[] }>(
         credentials,
-        "/api/2.0/serving-endpoints",
+        "/api/2.0/workspace/list",
+        new URLSearchParams({ path: "/" }),
       ),
     ]);
     return {
@@ -434,7 +1162,11 @@ export async function testDatabricksConnection(
       workspaceHost: new URL(credentials.hostUrl).hostname,
       principal: identity.userName || identity.displayName || identity.id,
       catalogsVisible: catalogResult.length,
-      servingEndpointsVisible: endpointResult.endpoints?.length ?? 0,
+      servingEndpointsVisible: endpoints.length,
+      appsVisible: apps.length,
+      jobsVisible: jobs.length,
+      genieAgentsVisible: genieSpaces.length,
+      workspaceObjectsVisible: workspaceRoot.objects?.length ?? 0,
     };
   } catch (error) {
     return {
@@ -449,7 +1181,16 @@ export async function discoverDatabricks(
   connection: DatabricksConnection,
 ): Promise<DatabricksDiscovery> {
   const credentials = parseCredentials(connection);
-  const [identity, catalogs, models, endpointResult] = await Promise.all([
+  const [
+    identity,
+    catalogs,
+    models,
+    endpoints,
+    apps,
+    jobs,
+    notebooks,
+    genieSpaces,
+  ] = await Promise.all([
     databricksApi<DatabricksIdentity>(
       credentials,
       "/api/2.0/preview/scim/v2/Me",
@@ -464,10 +1205,11 @@ export async function discoverDatabricks(
       "/api/2.1/unity-catalog/models",
       "registered_models",
     ),
-    databricksApi<{ endpoints?: ServingEndpoint[] }>(
-      credentials,
-      "/api/2.0/serving-endpoints",
-    ),
+    listServingEndpoints(credentials),
+    listApps(credentials),
+    listJobs(credentials),
+    discoverWorkspaceNotebooks(credentials),
+    listGenieSpaces(credentials),
   ]);
   const schemas = (
     await mapWithConcurrency(catalogs, 5, (catalog) =>
@@ -494,8 +1236,18 @@ export async function discoverDatabricks(
       ),
     )
   ).flat();
-  const endpoints = endpointResult.endpoints ?? [];
-  const discovered = { identity, catalogs, schemas, tables, models, endpoints };
+  const discovered = {
+    identity,
+    catalogs,
+    schemas,
+    tables,
+    models,
+    endpoints,
+    apps,
+    jobs,
+    notebooks,
+    genieSpaces,
+  };
   const foundAgents = correlate(discovered);
   return {
     ...discovered,
@@ -506,11 +1258,15 @@ export async function discoverDatabricks(
       databricks_table: tables.length,
       databricks_registered_model: models.length,
       databricks_serving_endpoint: endpoints.length,
+      databricks_app: apps.length,
+      databricks_job: jobs.length,
+      databricks_notebook: notebooks.length,
+      databricks_genie_space: genieSpaces.length,
     },
   };
 }
 
-async function persistUnityCatalogInventory(
+async function persistDatabricksInventory(
   tenantId: string,
   integrationId: string,
   discovery: DatabricksDiscovery,
@@ -573,7 +1329,46 @@ async function persistUnityCatalogInventory(
       resourceType: "databricks_serving_endpoint",
       resourceName: item.name,
       parentResourceId: null,
-      metadata: item,
+      metadata: sanitizeEndpoint(item),
+    })),
+    ...discovery.apps.map((item) => ({
+      externalResourceId: `databricks:app:${item.id || item.name}`,
+      resourceType: "databricks_app",
+      resourceName: item.name,
+      parentResourceId: null,
+      metadata: sanitizeApp(item),
+    })),
+    ...discovery.jobs.map((item) => ({
+      externalResourceId: `databricks:job:${item.job_id}`,
+      resourceType: "databricks_job",
+      resourceName: item.settings?.name || `Job ${item.job_id}`,
+      parentResourceId: null,
+      metadata: sanitizeJob(item),
+    })),
+    ...discovery.notebooks.flatMap((item) =>
+      item.path
+        ? [
+            {
+              externalResourceId: `databricks:notebook:${item.resource_id || item.object_id || item.path}`,
+              resourceType: "databricks_notebook",
+              resourceName: item.path,
+              parentResourceId: null,
+              metadata: item,
+            },
+          ]
+        : [],
+    ),
+    ...discovery.genieSpaces.map((item) => ({
+      externalResourceId: `databricks:genie:${item.space_id}`,
+      resourceType: "databricks_genie_space",
+      resourceName: item.title || `Genie Agent ${item.space_id}`,
+      parentResourceId: null,
+      metadata: {
+        ...item,
+        serialized_space: undefined,
+        configuration: genieConfiguration(item),
+        dataSources: genieDataSourceNames(item),
+      },
     })),
   ];
 
@@ -621,7 +1416,7 @@ export async function runDatabricksDiscoveryScan(
     const workspaceHost = new URL(credentials.hostUrl).hostname;
     const now = new Date().toISOString();
     const seenExternalIds: string[] = [];
-    await persistUnityCatalogInventory(tenantId, integrationId, discovery, now);
+    await persistDatabricksInventory(tenantId, integrationId, discovery, now);
 
     for (const agent of discovery.agents) {
       seenExternalIds.push(agent.externalAgentId);
@@ -643,6 +1438,17 @@ export async function runDatabricksDiscoveryScan(
       const modelResource = agent.resources.find(
         (item) => item.resourceType === "databricks_registered_model",
       );
+      const providerStatus = String(
+        agent.resources[0]?.metadata.providerStatus ?? "",
+      ).toUpperCase();
+      const providerInactive = [
+        "CRASHED",
+        "UNAVAILABLE",
+        "STOPPED",
+        "ERROR",
+        "NOT_READY",
+        "NOT_DEPLOYED",
+      ].includes(providerStatus);
       const values = {
         tenantId,
         connectionId: null,
@@ -661,9 +1467,11 @@ export async function runDatabricksDiscoveryScan(
         ownerSource: ownership.ownerSource,
         ownerConfidence: String(ownership.ownerConfidence),
         businessFunction: ownership.businessFunction,
-        status: (facts.isDormant ? "dormant" : "active") as
-          | "dormant"
-          | "active",
+        status: (providerInactive
+          ? "inactive"
+          : facts.isDormant
+            ? "dormant"
+            : "active") as "inactive" | "dormant" | "active",
         lastUsedAt: null,
         capabilities: facts,
         autonomyLevel: autonomy.level,
