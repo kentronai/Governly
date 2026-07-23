@@ -280,7 +280,7 @@ export function AgentInventory({
         </div>
       </div>
 
-      <div className="grid max-w-4xl grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fill,160px)] gap-2">
         <SummaryCard
           label="Total AI Agents"
           value={summary?.totalAiAgents}
