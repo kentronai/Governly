@@ -85,6 +85,24 @@ async def chat_completions(request: Request):
             # Populate request.state for observability
             request.state.violations = violations
             request.state.violation_phase = violations[0].get('phase', 'input') if violations else 'input'
+            from gateway.services.agent_identity_service import resolve_agent_identity
+            agent_id, application_id = await resolve_agent_identity(
+                tenant_id=tenant_context.tenant_id,
+                agent_identifier=request.headers.get("x-agent-id") or body.get("agent_id"),
+                application_id=request.headers.get("x-application-id") or body.get("application_id"),
+            )
+            request.state.agent_id = agent_id
+            request.state.application_id = application_id
+            explicit_policy_id = request.headers.get("x-policy-id") or body.get("policy_id")
+            if application_id:
+                from gateway.services.application_policy_service import resolve_application_policy
+                resolved_policy_id, policy_source = await resolve_application_policy(
+                    tenant_id=tenant_context.tenant_id,
+                    application_id=application_id,
+                    explicit_policy_id=explicit_policy_id,
+                )
+                request.state.policy_id = resolved_policy_id
+                request.state.policy_resolution_source = policy_source
             
             return _build_violation_response(result, initial_ctx, tenant_context)
         
@@ -94,6 +112,9 @@ async def chat_completions(request: Request):
         # Store policy_id for observability
         if ctx.get("policy_id"):
             request.state.policy_id = ctx["policy_id"]
+        request.state.application_id = ctx.get("application_id")
+        request.state.agent_id = ctx.get("agent_id")
+        request.state.policy_resolution_source = ctx.get("policy_resolution_source")
         
         # Get guard metadata
         input_guards_executed = get_input_guards_metadata(ctx["policy_metadata"])

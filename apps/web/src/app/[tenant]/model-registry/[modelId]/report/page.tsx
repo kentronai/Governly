@@ -506,7 +506,7 @@ export default function ModelReportPage() {
                   <p className="text-sm ">
                     {new Date(
                       scanResult.created_at || new Date()
-                    ).toLocaleString()}
+                    ).toLocaleString("en-US")}
                   </p>
                 </div>
               </div>
@@ -603,7 +603,7 @@ export default function ModelReportPage() {
                         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
                           <span>Scanner: {finding.scanner}</span>
                           <span>
-                            {new Date(finding.created_at).toLocaleString()}
+                            {new Date(finding.created_at).toLocaleString("en-US")}
                           </span>
                         </div>
                       </div>

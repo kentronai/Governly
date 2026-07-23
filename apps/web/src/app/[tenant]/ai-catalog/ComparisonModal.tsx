@@ -311,7 +311,7 @@ const ComparisonModal: React.FC<{
             <Calendar className="w-4 h-4" />
             <span>
               Last Audited:{" "}
-              {new Date(tool.collection_date).toLocaleDateString()}
+              {new Date(tool.collection_date).toLocaleDateString("en-US")}
             </span>
             <span>
               | Verified:{" "}

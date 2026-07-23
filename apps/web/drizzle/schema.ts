@@ -70,7 +70,7 @@ export const documentationStatus = pgEnum("documentation_status", [
 ]);
 export const euAiActRiskClassification = pgEnum(
   "eu_ai_act_risk_classification",
-  ["unacceptable", "high", "limited", "minimal"]
+  ["unacceptable", "high", "limited", "minimal"],
 );
 export const guardTier = pgEnum("guard_tier", ["T0", "T1", "T2"]);
 export const httpMethod = pgEnum("http_method", [
@@ -179,6 +179,86 @@ export const syncStatus = pgEnum("sync_status", [
   "failed",
   "pending",
 ]);
+export const awsAuthMethod = pgEnum("aws_auth_method", [
+  "iam_role",
+  "access_key",
+  "cross_account",
+]);
+export const discoveryScanStatus = pgEnum("discovery_scan_status", [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+]);
+export const agentPlatform = pgEnum("agent_platform", [
+  "aws_bedrock",
+  "aws_agentcore",
+  "aws_lambda",
+  "aws_step_functions",
+  "aws_ec2",
+  "amazon_q",
+  "azure_openai",
+  "azure_ai_foundry",
+  "azure_functions",
+  "azure_logic_apps",
+  "azure_virtual_machines",
+  "azure_container_apps",
+  "azure_aks",
+  "gcp_vertex_ai",
+  "gcp_cloud_run",
+  "gcp_compute",
+  "gcp_gke",
+  "gcp_functions",
+  "other",
+]);
+export const agentResourceType = pgEnum("agent_resource_type", [
+  "bedrock_agent",
+  "agentcore_runtime",
+  "bedrock_agent_alias",
+  "knowledge_base",
+  "guardrail",
+  "prompt",
+  "lambda_function",
+  "step_function",
+  "cloudwatch_log_group",
+  "iam_role",
+  "secrets_manager_secret",
+  "api_gateway_api",
+  "eventbridge_rule",
+  "ec2_instance",
+  "azure_openai_account",
+  "azure_ai_foundry_project",
+  "azure_function",
+  "azure_logic_app",
+  "azure_managed_identity",
+  "azure_storage_account",
+  "azure_key_vault",
+  "azure_api_management",
+  "azure_virtual_machine",
+  "azure_container_app",
+  "azure_aks_cluster",
+  "gcp_vertex_reasoning_engine",
+  "gcp_cloud_run_service",
+  "gcp_compute_instance",
+  "gcp_gke_cluster",
+  "gcp_cloud_function",
+]);
+export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
+export const agentStatus = pgEnum("agent_status", [
+  "active",
+  "inactive",
+  "dormant",
+]);
+export const ruleEngineType = pgEnum("rule_engine_type", [
+  "capability",
+  "autonomy",
+  "risk",
+]);
+export const agentRecommendationStatus = pgEnum("agent_recommendation_status", [
+  "open",
+  "resolved",
+  "dismissed",
+]);
 export const testSeverity = pgEnum("test_severity", [
   "low",
   "medium",
@@ -247,51 +327,51 @@ export const guardrails = pgTable(
   (table) => [
     index("idx_guardrails_category").using(
       "btree",
-      table.category.asc().nullsLast().op("text_ops")
+      table.category.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_certified").using(
       "btree",
-      table.isCertified.asc().nullsLast().op("bool_ops")
+      table.isCertified.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_guardrails_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_family").using(
       "btree",
-      table.family.asc().nullsLast().op("text_ops")
+      table.family.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_global").using(
       "btree",
-      table.isGlobal.asc().nullsLast().op("bool_ops")
+      table.isGlobal.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_guardrails_infrastructure").using(
       "btree",
-      table.infrastructure.asc().nullsLast().op("enum_ops")
+      table.infrastructure.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_guardrails_key").using(
       "btree",
-      table.key.asc().nullsLast().op("text_ops")
+      table.key.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_metadata_gin").using(
       "gin",
-      table.metadata.asc().nullsLast().op("jsonb_ops")
+      table.metadata.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_guardrails_pack_name").using(
       "btree",
-      table.packName.asc().nullsLast().op("text_ops")
+      table.packName.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_params_gin").using(
       "gin",
-      table.defaultParams.asc().nullsLast().op("jsonb_ops")
+      table.defaultParams.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_guardrails_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_guardrails_tier").using(
       "btree",
-      table.tier.asc().nullsLast().op("enum_ops")
+      table.tier.asc().nullsLast().op("enum_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -316,9 +396,9 @@ export const guardrails = pgTable(
     unique("uq_guardrails_tenant_key_version").on(
       table.tenantId,
       table.key,
-      table.version
+      table.version,
     ),
-  ]
+  ],
 );
 
 export const scanFindings = pgTable(
@@ -342,23 +422,23 @@ export const scanFindings = pgTable(
   (table) => [
     index("idx_scan_findings_cve").using(
       "btree",
-      table.cveId.asc().nullsLast().op("text_ops")
+      table.cveId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_scan_findings_rule").using(
       "btree",
-      table.ruleId.asc().nullsLast().op("text_ops")
+      table.ruleId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_scan_findings_scan").using(
       "btree",
-      table.scanId.asc().nullsLast().op("uuid_ops")
+      table.scanId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_scan_findings_severity").using(
       "btree",
-      table.severity.asc().nullsLast().op("text_ops")
+      table.severity.asc().nullsLast().op("text_ops"),
     ),
     index("idx_scan_findings_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -370,7 +450,7 @@ export const scanFindings = pgTable(
       foreignColumns: [modelScans.id],
       name: "scan_findings_scan_id_fkey",
     }).onDelete("cascade"),
-  ]
+  ],
 );
 
 export const modelArtifacts = pgTable(
@@ -401,27 +481,27 @@ export const modelArtifacts = pgTable(
   (table) => [
     index("idx_model_artifacts_approval").using(
       "btree",
-      table.approvalStatus.asc().nullsLast().op("text_ops")
+      table.approvalStatus.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_artifacts_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_artifacts_format").using(
       "btree",
-      table.detectedFormat.asc().nullsLast().op("text_ops")
+      table.detectedFormat.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_artifacts_metadata_gin").using(
       "gin",
-      table.artifactMetadata.asc().nullsLast().op("jsonb_ops")
+      table.artifactMetadata.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_model_artifacts_sha256").using(
       "btree",
-      table.sha256.asc().nullsLast().op("text_ops")
+      table.sha256.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_artifacts_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -439,7 +519,7 @@ export const modelArtifacts = pgTable(
       name: "model_artifacts_updated_by_fkey",
     }).onDelete("set null"),
     unique("uq_model_artifacts_tenant_sha256").on(table.tenantId, table.sha256),
-  ]
+  ],
 );
 
 export const modelScans = pgTable(
@@ -471,23 +551,23 @@ export const modelScans = pgTable(
   (table) => [
     index("idx_model_scans_artifact").using(
       "btree",
-      table.artifactId.asc().nullsLast().op("uuid_ops")
+      table.artifactId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_model_scans_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_scans_sbom_gin").using(
       "gin",
-      table.sbom.asc().nullsLast().op("jsonb_ops")
+      table.sbom.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_model_scans_status").using(
       "btree",
-      table.status.asc().nullsLast().op("text_ops")
+      table.status.asc().nullsLast().op("text_ops"),
     ),
     index("idx_model_scans_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -509,7 +589,7 @@ export const modelScans = pgTable(
       foreignColumns: [users.id],
       name: "model_scans_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const policies = pgTable(
@@ -546,27 +626,27 @@ export const policies = pgTable(
   (table) => [
     index("idx_policies_compiled_gin").using(
       "gin",
-      table.compiled.asc().nullsLast().op("jsonb_ops")
+      table.compiled.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_policies_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policies_hash").using(
       "btree",
-      table.hash.asc().nullsLast().op("text_ops")
+      table.hash.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policies_metadata_gin").using(
       "gin",
-      table.metadata.asc().nullsLast().op("jsonb_ops")
+      table.metadata.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_policies_status").using(
       "btree",
-      table.status.asc().nullsLast().op("enum_ops")
+      table.status.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_policies_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -583,7 +663,7 @@ export const policies = pgTable(
       foreignColumns: [users.id],
       name: "policies_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const policyGuardrails = pgTable(
@@ -613,27 +693,27 @@ export const policyGuardrails = pgTable(
   (table) => [
     index("idx_policy_guardrails_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_guardrails_params_gin").using(
       "gin",
-      table.params.asc().nullsLast().op("jsonb_ops")
+      table.params.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_policy_guardrails_phase").using(
       "btree",
-      table.phase.asc().nullsLast().op("text_ops")
+      table.phase.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_guardrails_policy").using(
       "btree",
-      table.policyId.asc().nullsLast().op("uuid_ops")
+      table.policyId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_policy_guardrails_target_gin").using(
       "gin",
-      table.target.asc().nullsLast().op("jsonb_ops")
+      table.target.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_policy_guardrails_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.policyId],
@@ -664,9 +744,9 @@ export const policyGuardrails = pgTable(
       table.policyId,
       table.guardrailId,
       table.phase,
-      table.orderIndex
+      table.orderIndex,
     ),
-  ]
+  ],
 );
 
 export const observabilityLogs = pgTable(
@@ -675,6 +755,9 @@ export const observabilityLogs = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     tenantId: text("tenant_id").notNull(),
     applicationId: uuid("application_id"),
+    // Optional concrete discovered agent. Runtime clients set X-Agent-ID;
+    // keeping this nullable preserves application-only and legacy traffic.
+    agentId: uuid("agent_id"),
     policyId: uuid("policy_id"),
     requestId: text("request_id").notNull(),
     timestamp: timestamp({ withTimezone: true, mode: "string" }).notNull(),
@@ -693,19 +776,34 @@ export const observabilityLogs = pgTable(
   (table) => [
     index("idx_observability_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_observability_agent").using(
+      "btree",
+      table.agentId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_observability_request").using(
       "btree",
-      table.requestId.asc().nullsLast().op("text_ops")
+      table.requestId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_observability_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_observability_timestamp").using(
       "btree",
-      table.timestamp.desc().nullsFirst().op("timestamptz_ops")
+      table.timestamp.desc().nullsFirst().op("timestamptz_ops"),
+    ),
+    index("idx_observability_tenant_created").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+      table.createdAt.desc().nullsFirst().op("timestamptz_ops"),
+    ),
+    index("idx_observability_tenant_app_created").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
+      table.createdAt.desc().nullsFirst().op("timestamptz_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -723,7 +821,7 @@ export const observabilityLogs = pgTable(
       name: "observability_logs_policy_id_fkey",
     }).onDelete("set null"),
     unique("observability_logs_request_id_unique").on(table.requestId),
-  ]
+  ],
 );
 
 export const reports = pgTable(
@@ -756,15 +854,15 @@ export const reports = pgTable(
   (table) => [
     index("idx_reports_status").using(
       "btree",
-      table.status.asc().nullsLast().op("enum_ops")
+      table.status.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_reports_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_reports_type").using(
       "btree",
-      table.reportType.asc().nullsLast().op("enum_ops")
+      table.reportType.asc().nullsLast().op("enum_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -776,7 +874,7 @@ export const reports = pgTable(
       foreignColumns: [users.id],
       name: "reports_generated_by_fkey",
     }).onDelete("restrict"),
-  ]
+  ],
 );
 
 export const stakeholders = pgTable(
@@ -803,11 +901,11 @@ export const stakeholders = pgTable(
   (table) => [
     index("idx_stakeholders_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_stakeholders_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -829,7 +927,7 @@ export const stakeholders = pgTable(
       foreignColumns: [users.id],
       name: "stakeholders_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const tenants = pgTable(
@@ -856,14 +954,14 @@ export const tenants = pgTable(
   (table) => [
     index("idx_tenants_created_by_kentron").using(
       "btree",
-      table.createdByKentron.asc().nullsLast().op("bool_ops")
+      table.createdByKentron.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_tenants_slug").using(
       "btree",
-      table.slug.asc().nullsLast().op("text_ops")
+      table.slug.asc().nullsLast().op("text_ops"),
     ),
     unique("tenants_slug_unique").on(table.slug),
-  ]
+  ],
 );
 
 export const redTeamingTests = pgTable(
@@ -892,19 +990,19 @@ export const redTeamingTests = pgTable(
   (table) => [
     index("idx_red_teaming_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_red_teaming_status").using(
       "btree",
-      table.testStatus.asc().nullsLast().op("enum_ops")
+      table.testStatus.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_red_teaming_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_red_teaming_type").using(
       "btree",
-      table.testType.asc().nullsLast().op("enum_ops")
+      table.testType.asc().nullsLast().op("enum_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -926,7 +1024,7 @@ export const redTeamingTests = pgTable(
       foreignColumns: [users.id],
       name: "red_teaming_tests_created_by_fkey",
     }).onDelete("restrict"),
-  ]
+  ],
 );
 
 export const applicationModels = pgTable(
@@ -961,11 +1059,11 @@ export const applicationModels = pgTable(
   (table) => [
     index("idx_app_models_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_app_models_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -987,7 +1085,7 @@ export const applicationModels = pgTable(
       foreignColumns: [users.id],
       name: "application_models_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const users = pgTable(
@@ -1009,9 +1107,9 @@ export const users = pgTable(
   (table) => [
     index("idx_users_email").using(
       "btree",
-      table.email.asc().nullsLast().op("text_ops")
+      table.email.asc().nullsLast().op("text_ops"),
     ),
-  ]
+  ],
 );
 export const applicationDocumentation = pgTable(
   "application_documentation",
@@ -1040,15 +1138,15 @@ export const applicationDocumentation = pgTable(
   (table) => [
     index("idx_app_doc_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_app_doc_section").using(
       "btree",
-      table.sectionType.asc().nullsLast().op("enum_ops")
+      table.sectionType.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_app_doc_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
 
     foreignKey({
@@ -1077,14 +1175,14 @@ export const applicationDocumentation = pgTable(
     unique("uq_app_doc_section_field").on(
       table.applicationId,
       table.sectionType,
-      table.fieldKey
+      table.fieldKey,
     ),
     sql`
       CREATE UNIQUE INDEX IF NOT EXISTS uq_app_doc_with_risk
       ON application_documentation (application_id, section_type, field_key, risk_id)
       WHERE risk_id IS NOT NULL;
     `,
-  ]
+  ],
 );
 
 export const processedWebhookEvents = pgTable("processed_webhook_events", {
@@ -1145,22 +1243,22 @@ export const onnxModels = pgTable(
   (table) => [
     index("idx_onnx_models_active").using(
       "btree",
-      table.isActive.asc().nullsLast().op("bool_ops")
+      table.isActive.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_onnx_models_family").using(
       "gin",
-      table.family.asc().nullsLast().op("array_ops")
+      table.family.asc().nullsLast().op("array_ops"),
     ),
     index("idx_onnx_models_metadata_gin").using(
       "gin",
-      table.metadata.asc().nullsLast().op("jsonb_ops")
+      table.metadata.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_onnx_models_model_type").using(
       "btree",
-      table.modelType.asc().nullsLast().op("text_ops")
+      table.modelType.asc().nullsLast().op("text_ops"),
     ),
     unique("onnx_models_model_id_unique").on(table.modelId),
-  ]
+  ],
 );
 
 export const attachments = pgTable(
@@ -1186,15 +1284,15 @@ export const attachments = pgTable(
     index("idx_attachments_entity").using(
       "btree",
       table.entityType.asc().nullsLast().op("text_ops"),
-      table.entityId.asc().nullsLast().op("uuid_ops")
+      table.entityId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_attachments_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_attachments_uploaded_by").using(
       "btree",
-      table.uploadedBy.asc().nullsLast().op("text_ops")
+      table.uploadedBy.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1206,7 +1304,7 @@ export const attachments = pgTable(
       foreignColumns: [users.id],
       name: "attachments_uploaded_by_fkey",
     }).onDelete("restrict"),
-  ]
+  ],
 );
 
 export const complianceAssessments = pgTable(
@@ -1244,19 +1342,19 @@ export const complianceAssessments = pgTable(
   (table) => [
     index("idx_compliance_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_compliance_framework").using(
       "btree",
-      table.frameworkId.asc().nullsLast().op("uuid_ops")
+      table.frameworkId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_compliance_status").using(
       "btree",
-      table.assessmentStatus.asc().nullsLast().op("enum_ops")
+      table.assessmentStatus.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_compliance_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1283,7 +1381,7 @@ export const complianceAssessments = pgTable(
       foreignColumns: [users.id],
       name: "compliance_assessments_assessed_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const auditEvents = pgTable(
@@ -1305,23 +1403,23 @@ export const auditEvents = pgTable(
   (table) => [
     index("idx_audit_events_action").using(
       "btree",
-      table.action.asc().nullsLast().op("text_ops")
+      table.action.asc().nullsLast().op("text_ops"),
     ),
     index("idx_audit_events_actor").using(
       "btree",
-      table.actorUserId.asc().nullsLast().op("text_ops")
+      table.actorUserId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_audit_events_created").using(
       "btree",
-      table.createdAt.asc().nullsLast().op("timestamptz_ops")
+      table.createdAt.asc().nullsLast().op("timestamptz_ops"),
     ),
     index("idx_audit_events_target").using(
       "btree",
-      table.targetType.asc().nullsLast().op("text_ops")
+      table.targetType.asc().nullsLast().op("text_ops"),
     ),
     index("idx_audit_events_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1333,7 +1431,7 @@ export const auditEvents = pgTable(
       foreignColumns: [users.id],
       name: "audit_events_actor_user_id_fkey",
     }).onDelete("restrict"),
-  ]
+  ],
 );
 
 export const memberships = pgTable(
@@ -1353,11 +1451,11 @@ export const memberships = pgTable(
   (table) => [
     index("idx_memberships_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_memberships_user").using(
       "btree",
-      table.userId.asc().nullsLast().op("text_ops")
+      table.userId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1370,7 +1468,7 @@ export const memberships = pgTable(
       name: "memberships_user_id_fkey",
     }).onDelete("cascade"),
     unique("uq_memberships_tenant_user").on(table.tenantId, table.userId),
-  ]
+  ],
 );
 
 export const apiKeys = pgTable(
@@ -1403,19 +1501,19 @@ export const apiKeys = pgTable(
   (table) => [
     index("idx_api_keys_active").using(
       "btree",
-      table.isActive.asc().nullsLast().op("bool_ops")
+      table.isActive.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_api_keys_key_hash").using(
       "btree",
-      table.keyHash.asc().nullsLast().op("text_ops")
+      table.keyHash.asc().nullsLast().op("text_ops"),
     ),
     index("idx_api_keys_key_prefix").using(
       "btree",
-      table.keyPrefix.asc().nullsLast().op("text_ops")
+      table.keyPrefix.asc().nullsLast().op("text_ops"),
     ),
     index("idx_api_keys_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1433,7 +1531,7 @@ export const apiKeys = pgTable(
       name: "api_keys_revoked_by_fkey",
     }).onDelete("set null"),
     unique("uq_api_keys_key_hash").on(table.keyHash),
-  ]
+  ],
 );
 
 export const governanceControls = pgTable(
@@ -1456,7 +1554,7 @@ export const governanceControls = pgTable(
   (table) => [
     index("idx_governance_controls_framework").using(
       "btree",
-      table.frameworkId.asc().nullsLast().op("uuid_ops")
+      table.frameworkId.asc().nullsLast().op("uuid_ops"),
     ),
     foreignKey({
       columns: [table.frameworkId],
@@ -1464,7 +1562,7 @@ export const governanceControls = pgTable(
       name: "governance_controls_framework_id_fkey",
     }).onDelete("cascade"),
     unique("uq_governance_control").on(table.frameworkId, table.controlId),
-  ]
+  ],
 );
 
 export const providerModels = pgTable(
@@ -1509,39 +1607,39 @@ export const providerModels = pgTable(
   (table) => [
     index("idx_provider_models_artifact").using(
       "btree",
-      table.modelArtifactId.asc().nullsLast().op("uuid_ops")
+      table.modelArtifactId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_provider_models_category").using(
       "btree",
-      table.category.asc().nullsLast().op("enum_ops")
+      table.category.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_provider_models_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_provider_models_family").using(
       "btree",
-      table.family.asc().nullsLast().op("text_ops")
+      table.family.asc().nullsLast().op("text_ops"),
     ),
     index("idx_provider_models_pricing_gin").using(
       "gin",
-      table.pricingMetadata.asc().nullsLast().op("jsonb_ops")
+      table.pricingMetadata.asc().nullsLast().op("jsonb_ops"),
     ),
     index("idx_provider_models_provider").using(
       "btree",
-      table.provider.asc().nullsLast().op("enum_ops")
+      table.provider.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_provider_models_risk_level").using(
       "btree",
-      table.riskLevel.asc().nullsLast().op("enum_ops")
+      table.riskLevel.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_provider_models_status").using(
       "btree",
-      table.availabilityStatus.asc().nullsLast().op("enum_ops")
+      table.availabilityStatus.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_provider_models_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1566,14 +1664,14 @@ export const providerModels = pgTable(
     unique("uq_provider_models_tenant").on(
       table.provider,
       table.modelId,
-      table.tenantId
+      table.tenantId,
     ),
     unique("uq_provider_models_artifact").on(table.modelArtifactId),
     check(
       "chk_provider_models_url_when_available",
-      sql`availability_status <> 'available' OR model_url IS NOT NULL`
+      sql`availability_status <> 'available' OR model_url IS NOT NULL`,
     ),
-  ]
+  ],
 );
 
 export const governanceFrameworks = pgTable(
@@ -1594,7 +1692,7 @@ export const governanceFrameworks = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique("uq_governance_frameworks_slug").on(table.slug)]
+  (table) => [unique("uq_governance_frameworks_slug").on(table.slug)],
 );
 
 export const integrations = pgTable(
@@ -1632,15 +1730,15 @@ export const integrations = pgTable(
   (table) => [
     index("idx_integrations_enabled").using(
       "btree",
-      table.isEnabled.asc().nullsLast().op("bool_ops")
+      table.isEnabled.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_integrations_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_integrations_type").using(
       "btree",
-      table.integrationType.asc().nullsLast().op("enum_ops")
+      table.integrationType.asc().nullsLast().op("enum_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1657,7 +1755,7 @@ export const integrations = pgTable(
       foreignColumns: [users.id],
       name: "integrations_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const datasets = pgTable(
@@ -1689,15 +1787,15 @@ export const datasets = pgTable(
   (table) => [
     index("idx_datasets_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_datasets_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_datasets_type").using(
       "btree",
-      table.datasetType.asc().nullsLast().op("enum_ops")
+      table.datasetType.asc().nullsLast().op("enum_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1719,7 +1817,7 @@ export const datasets = pgTable(
       foreignColumns: [users.id],
       name: "datasets_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const euAiActAssessments = pgTable(
@@ -1729,7 +1827,7 @@ export const euAiActAssessments = pgTable(
     tenantId: text("tenant_id").notNull(),
     applicationId: uuid("application_id").notNull(),
     riskClassification: euAiActRiskClassification(
-      "risk_classification"
+      "risk_classification",
     ).notNull(),
     assessmentDate: timestamp("assessment_date", {
       withTimezone: true,
@@ -1764,15 +1862,15 @@ export const euAiActAssessments = pgTable(
   (table) => [
     index("idx_eu_ai_act_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_eu_ai_act_classification").using(
       "btree",
-      table.riskClassification.asc().nullsLast().op("enum_ops")
+      table.riskClassification.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_eu_ai_act_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1794,7 +1892,7 @@ export const euAiActAssessments = pgTable(
       foreignColumns: [users.id],
       name: "eu_ai_act_assessments_approved_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const applications = pgTable(
@@ -1822,15 +1920,15 @@ export const applications = pgTable(
   (table) => [
     index("idx_applications_created_by").using(
       "btree",
-      table.createdBy.asc().nullsLast().op("text_ops")
+      table.createdBy.asc().nullsLast().op("text_ops"),
     ),
     index("idx_applications_status").using(
       "btree",
-      table.status.asc().nullsLast().op("enum_ops")
+      table.status.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_applications_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1847,7 +1945,7 @@ export const applications = pgTable(
       foreignColumns: [users.id],
       name: "applications_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const navigationItems = pgTable(
@@ -1877,19 +1975,19 @@ export const navigationItems = pgTable(
   (table) => [
     index("idx_nav_items_module").using(
       "btree",
-      table.moduleType.asc().nullsLast().op("enum_ops")
+      table.moduleType.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_nav_items_order").using(
       "btree",
-      table.orderIndex.asc().nullsLast().op("int4_ops")
+      table.orderIndex.asc().nullsLast().op("int4_ops"),
     ),
     index("idx_nav_items_parent").using(
       "btree",
-      table.parentId.asc().nullsLast().op("uuid_ops")
+      table.parentId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_nav_items_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1901,7 +1999,7 @@ export const navigationItems = pgTable(
       foreignColumns: [table.id],
       name: "navigation_items_parent_id_fkey",
     }).onDelete("cascade"),
-  ]
+  ],
 );
 
 export const useCases = pgTable(
@@ -1933,15 +2031,15 @@ export const useCases = pgTable(
   (table) => [
     index("idx_use_cases_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_use_cases_function").using(
       "btree",
-      table.function.asc().nullsLast().op("text_ops")
+      table.function.asc().nullsLast().op("text_ops"),
     ),
     index("idx_use_cases_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -1963,7 +2061,7 @@ export const useCases = pgTable(
       foreignColumns: [users.id],
       name: "use_cases_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
 );
 
 export const integrationsAdmin = pgTable(
@@ -1993,7 +2091,7 @@ export const integrationsAdmin = pgTable(
   (table) => [
     unique("unique_tenant_integration").on(table.tenantId, table.name),
     unique("unique_integration_name").on(table.name),
-  ]
+  ],
 );
 
 export const globalAiPolicies = pgTable("global_ai_policies", {
@@ -2025,6 +2123,7 @@ export const applicationPolicies = pgTable(
     applicationId: uuid("application_id").notNull(),
     policyId: uuid("policy_id").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    isDefault: boolean("is_default").default(false).notNull(),
     priority: integer().default(0).notNull(),
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
@@ -2036,21 +2135,21 @@ export const applicationPolicies = pgTable(
   (table) => [
     index("idx_app_policies_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_app_policies_policy_name").using(
       "btree",
-      table.policyName.asc().nullsLast().op("text_ops")
+      table.policyName.asc().nullsLast().op("text_ops"),
     ),
     index("idx_app_policies_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     uniqueIndex("uq_app_policies_name_version").using(
       "btree",
       table.applicationId.asc().nullsLast().op("uuid_ops"),
       table.policyName.asc().nullsLast().op("text_ops"),
-      table.policyVersion.asc().nullsLast().op("text_ops")
+      table.policyVersion.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -2073,7 +2172,7 @@ export const applicationPolicies = pgTable(
       name: "application_policies_created_by_fkey",
     }).onDelete("restrict"),
     unique("uq_app_policies").on(table.applicationId, table.policyId),
-  ]
+  ],
 );
 
 export const riskList = pgTable("risk_list", {
@@ -2083,7 +2182,7 @@ export const riskList = pgTable("risk_list", {
   severity: varchar({ length: 50 }),
   likelihood: varchar({ length: 50 }),
   createdAt: timestamp("created_at", { mode: "string" }).default(
-    sql`CURRENT_TIMESTAMP`
+    sql`CURRENT_TIMESTAMP`,
   ),
   category: text().array(),
 });
@@ -2107,7 +2206,7 @@ export const riskCategories = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique("uq_risk_categories_slug").on(table.slug)]
+  (table) => [unique("uq_risk_categories_slug").on(table.slug)],
 );
 
 export const riskCategoryLinks = pgTable(
@@ -2124,12 +2223,12 @@ export const riskCategoryLinks = pgTable(
   (table) => [
     index("idx_risk_category_links_category").using(
       "btree",
-      table.categoryId.asc().nullsLast().op("uuid_ops")
+      table.categoryId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_risk_category_links_entity").using(
       "btree",
       table.entityType.asc().nullsLast().op("text_ops"), // TEXT → text_ops
-      table.entityId.asc().nullsLast().op("uuid_ops") // UUID → uuid_ops ✅
+      table.entityId.asc().nullsLast().op("uuid_ops"), // UUID → uuid_ops ✅
     ),
     foreignKey({
       columns: [table.categoryId],
@@ -2139,9 +2238,9 @@ export const riskCategoryLinks = pgTable(
     unique("uq_risk_category_links").on(
       table.categoryId,
       table.entityType,
-      table.entityId
+      table.entityId,
     ),
-  ]
+  ],
 );
 
 export const routerCentroids = pgTable(
@@ -2166,15 +2265,15 @@ export const routerCentroids = pgTable(
   (table) => [
     index("idx_router_centroids_active").using(
       "btree",
-      table.isActive.asc().nullsLast().op("bool_ops")
+      table.isActive.asc().nullsLast().op("bool_ops"),
     ),
     index("idx_router_centroids_family").using(
       "btree",
-      table.family.asc().nullsLast().op("text_ops")
+      table.family.asc().nullsLast().op("text_ops"),
     ),
     index("idx_router_centroids_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -2193,9 +2292,9 @@ export const routerCentroids = pgTable(
     }).onDelete("set null"),
     unique("uq_router_centroids_tenant_family").on(
       table.tenantId,
-      table.family
+      table.family,
     ),
-  ]
+  ],
 );
 
 export const routerPromptCentroids = pgTable(
@@ -2215,15 +2314,15 @@ export const routerPromptCentroids = pgTable(
   (table) => [
     index("idx_router_prompt_centroids_centroid").using(
       "btree",
-      table.centroidId.asc().nullsLast().op("uuid_ops")
+      table.centroidId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_router_prompt_centroids_prompt").using(
       "btree",
-      table.promptId.asc().nullsLast().op("uuid_ops")
+      table.promptId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_router_prompt_centroids_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -2246,7 +2345,7 @@ export const routerPromptCentroids = pgTable(
       name: "router_prompt_centroids_created_by_fkey",
     }).onDelete("restrict"),
     unique("uq_router_prompt_centroids").on(table.promptId, table.centroidId),
-  ]
+  ],
 );
 
 export const routerPrompts = pgTable(
@@ -2267,9 +2366,9 @@ export const routerPrompts = pgTable(
   (table) => [
     index("idx_router_prompts_active").using(
       "btree",
-      table.isActive.asc().nullsLast().op("bool_ops")
+      table.isActive.asc().nullsLast().op("bool_ops"),
     ),
-  ]
+  ],
 );
 
 export const providerModelMetadata = pgTable(
@@ -2292,13 +2391,13 @@ export const providerModelMetadata = pgTable(
   (table) => [
     index("idx_provider_model_metadata_display_name").using(
       "btree",
-      table.displayName.asc().nullsLast().op("text_ops")
+      table.displayName.asc().nullsLast().op("text_ops"),
     ),
     index("idx_provider_model_metadata_provider").using(
       "btree",
-      table.provider.asc().nullsLast().op("enum_ops")
+      table.provider.asc().nullsLast().op("enum_ops"),
     ),
-  ]
+  ],
 );
 
 export const policyCenter = pgTable(
@@ -2316,6 +2415,26 @@ export const policyCenter = pgTable(
     icon: text(),
     color: text(),
     type: text(),
+    fullDescription: text("full_description"),
+    purpose: text(),
+    scope: text(),
+    requirements: jsonb().default([]).notNull(),
+    riskCategories: text("risk_categories").array().default([]).notNull(),
+    industriesAffected: text("industries_affected")
+      .array()
+      .default([])
+      .notNull(),
+    governingAuthority: text("governing_authority"),
+    effectiveDate: date("effective_date"),
+    version: text(),
+    legalStatus: text("legal_status"),
+    officialUrl: text("official_url"),
+    references: jsonb().default([]).notNull(),
+    // Machine-readable requirements evaluated against live application data.
+    // Policy cards remain presentation-only; this mapping is the enforcement
+    // source of truth used by the compliance evaluation engine.
+    controlMappings: jsonb("control_mappings").default([]).notNull(),
+    applicabilityRules: jsonb("applicability_rules").default([]).notNull(),
     disable: boolean().default(false).notNull(),
     tenantId: text("tenant_id"),
     parentPolicyId: text("parent_policy_id"),
@@ -2325,21 +2444,21 @@ export const policyCenter = pgTable(
   (table) => [
     index("idx_policy_center_category").using(
       "btree",
-      table.category.asc().nullsLast().op("text_ops")
+      table.category.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_country").using(
       "btree",
-      table.country.asc().nullsLast().op("text_ops")
+      table.country.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_name").using(
       "btree",
-      table.name.asc().nullsLast().op("text_ops")
+      table.name.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_state").using(
       "btree",
-      table.state.asc().nullsLast().op("text_ops")
+      table.state.asc().nullsLast().op("text_ops"),
     ),
-  ]
+  ],
 );
 
 export const applicationPolicyCenter = pgTable(
@@ -2350,26 +2469,104 @@ export const applicationPolicyCenter = pgTable(
     tenantId: text("tenant_id"),
     applicationId: text("application_id"),
     isActive: boolean().default(false),
+    applicabilityStatus: text("applicability_status")
+      .default("not_evaluated")
+      .notNull(),
+    complianceStatus: text("compliance_status")
+      .default("not_evaluated")
+      .notNull(),
+    coverageScore: numeric("coverage_score", { precision: 5, scale: 2 })
+      .default("0")
+      .notNull(),
+    evaluation: jsonb().default({}).notNull(),
+    gaps: jsonb().default([]).notNull(),
+    evidence: jsonb().default([]).notNull(),
+    evaluatedAt: timestamp("evaluated_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
   },
   (table) => [
     index("idx_policy_center_application_id").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("text_ops")
+      table.applicationId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_policy_id").using(
       "btree",
-      table.policyId.asc().nullsLast().op("text_ops")
+      table.policyId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_tenant_app").using(
       "btree",
       table.tenantId.asc().nullsLast().op("text_ops"),
-      table.applicationId.asc().nullsLast().op("text_ops")
+      table.applicationId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_policy_center_tenant_id").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
-  ]
+  ],
+);
+
+// Evidence can be organization-wide (applicationId null) or application
+// specific. Organization evidence is inherited during every application
+// compliance evaluation without copying the file or link.
+export const complianceEvidence = pgTable(
+  "compliance_evidence",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    applicationId: uuid("application_id"),
+    policyId: text("policy_id"),
+    controlKey: text("control_key").notNull(),
+    scope: text().default("application").notNull(),
+    evidenceType: text("evidence_type").notNull(),
+    name: text().notNull(),
+    description: text(),
+    externalUrl: text("external_url"),
+    fileName: text("file_name"),
+    mimeType: text("mime_type"),
+    fileSize: integer("file_size"),
+    fileContentBase64: text("file_content_base64"),
+    metadata: jsonb().default({}).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_compliance_evidence_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_compliance_evidence_application").using(
+      "btree",
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_compliance_evidence_policy_control").using(
+      "btree",
+      table.policyId.asc().nullsLast().op("text_ops"),
+      table.controlKey.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "compliance_evidence_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.applicationId],
+      foreignColumns: [applications.id],
+      name: "compliance_evidence_application_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.uploadedBy],
+      foreignColumns: [users.id],
+      name: "compliance_evidence_uploaded_by_fkey",
+    }).onDelete("restrict"),
+  ],
 );
 
 export const risks = pgTable(
@@ -2391,7 +2588,7 @@ export const risks = pgTable(
       mode: "string",
     }),
     mitigationAttachments: jsonb("mitigation_attachments").$defaultFn(
-      () => ({})
+      () => ({}),
     ),
     metadata: jsonb().default({}).notNull(),
     createdBy: text("created_by").notNull(),
@@ -2418,19 +2615,19 @@ export const risks = pgTable(
   (table) => [
     index("idx_risks_app").using(
       "btree",
-      table.applicationId.asc().nullsLast().op("uuid_ops")
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
     ),
     index("idx_risks_level").using(
       "btree",
-      table.riskLevel.asc().nullsLast().op("enum_ops")
+      table.riskLevel.asc().nullsLast().op("enum_ops"),
     ),
     index("idx_risks_tenant").using(
       "btree",
-      table.tenantId.asc().nullsLast().op("text_ops")
+      table.tenantId.asc().nullsLast().op("text_ops"),
     ),
     index("idx_risks_use_case").using(
       "btree",
-      table.useCaseId.asc().nullsLast().op("uuid_ops")
+      table.useCaseId.asc().nullsLast().op("uuid_ops"),
     ),
     foreignKey({
       columns: [table.tenantId],
@@ -2457,5 +2654,640 @@ export const risks = pgTable(
       foreignColumns: [users.id],
       name: "risks_updated_by_fkey",
     }).onDelete("set null"),
-  ]
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// AI Agent Discovery (AWS) — Phase 1
+// ---------------------------------------------------------------------------
+
+export const awsDiscoveryConnections = pgTable(
+  "aws_discovery_connections",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    name: text().notNull(),
+    authMethod: awsAuthMethod("auth_method").notNull(),
+    region: text().notNull(),
+    roleArn: text("role_arn"),
+    externalId: text("external_id"),
+    crossAccountRoleArn: text("cross_account_role_arn"),
+    encryptedAccessKeyId: text("encrypted_access_key_id"),
+    encryptedSecretAccessKey: text("encrypted_secret_access_key"),
+    lastValidatedAt: timestamp("last_validated_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    lastValidationError: text("last_validation_error"),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    metadata: jsonb().default({}).notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedBy: text("updated_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_aws_connections_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "aws_discovery_connections_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.createdBy],
+      foreignColumns: [users.id],
+      name: "aws_discovery_connections_created_by_fkey",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.updatedBy],
+      foreignColumns: [users.id],
+      name: "aws_discovery_connections_updated_by_fkey",
+    }).onDelete("set null"),
+  ],
+);
+
+export const azureDiscoveryConnections = pgTable(
+  "azure_discovery_connections",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    name: text().default("Azure").notNull(),
+    azureTenantId: text("azure_tenant_id").notNull(),
+    subscriptionId: text("subscription_id").notNull(),
+    clientId: text("client_id").notNull(),
+    encryptedClientSecret: text("encrypted_client_secret").notNull(),
+    lastValidatedAt: timestamp("last_validated_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    lastValidationError: text("last_validation_error"),
+    lastScanAt: timestamp("last_scan_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    lastScanStatus: text("last_scan_status"),
+    lastScanSummary: jsonb("last_scan_summary").default({}).notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    metadata: jsonb().default({}).notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedBy: text("updated_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_azure_connections_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "azure_discovery_connections_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.createdBy],
+      foreignColumns: [users.id],
+      name: "azure_discovery_connections_created_by_fkey",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.updatedBy],
+      foreignColumns: [users.id],
+      name: "azure_discovery_connections_updated_by_fkey",
+    }).onDelete("set null"),
+    unique("uq_azure_connections_tenant_subscription").on(
+      table.tenantId,
+      table.subscriptionId,
+    ),
+  ],
+);
+
+export const discoveryScans = pgTable(
+  "discovery_scans",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    connectionId: uuid("connection_id"),
+    azureConnectionId: uuid("azure_connection_id"),
+    integrationId: uuid("integration_id"),
+    status: discoveryScanStatus().default("queued").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    finishedAt: timestamp("finished_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    nextScanAt: timestamp("next_scan_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    agentsDiscovered: integer("agents_discovered").default(0).notNull(),
+    resourcesScanned: jsonb("resources_scanned").default({}).notNull(),
+    errorMessage: text("error_message"),
+    triggeredBy: text("triggered_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_discovery_scans_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_discovery_scans_connection").using(
+      "btree",
+      table.connectionId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_discovery_scans_azure_connection").using(
+      "btree",
+      table.azureConnectionId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_discovery_scans_integration").using(
+      "btree",
+      table.integrationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_discovery_scans_created").using(
+      "btree",
+      table.createdAt.desc().nullsFirst().op("timestamptz_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "discovery_scans_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.connectionId],
+      foreignColumns: [awsDiscoveryConnections.id],
+      name: "discovery_scans_connection_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.azureConnectionId],
+      foreignColumns: [azureDiscoveryConnections.id],
+      name: "discovery_scans_azure_connection_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.integrationId],
+      foreignColumns: [integrations.id],
+      name: "discovery_scans_integration_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.triggeredBy],
+      foreignColumns: [users.id],
+      name: "discovery_scans_triggered_by_fkey",
+    }).onDelete("set null"),
+  ],
+);
+
+// The configurable rule store backing the capability/autonomy/risk engines.
+// Rules are data (condition + weight), evaluated generically by
+// lib/server/agents/rule-engine.ts — new or adjusted rules are a row edit,
+// never a code change. tenantId is nullable so global default rules can be
+// seeded once and optionally overridden per tenant.
+export const agentRules = pgTable(
+  "agent_rules",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id"),
+    engineType: ruleEngineType("engine_type").notNull(),
+    ruleKey: text("rule_key").notNull(),
+    description: text().notNull(),
+    condition: jsonb().notNull(),
+    weight: numeric({ precision: 6, scale: 2 }).default("0").notNull(),
+    resultValue: text("result_value"),
+    severity: text(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    priority: integer().default(0).notNull(),
+    createdBy: text("created_by"),
+    updatedBy: text("updated_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_agent_rules_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_agent_rules_engine").using(
+      "btree",
+      table.engineType.asc().nullsLast().op("enum_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "agent_rules_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.createdBy],
+      foreignColumns: [users.id],
+      name: "agent_rules_created_by_fkey",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.updatedBy],
+      foreignColumns: [users.id],
+      name: "agent_rules_updated_by_fkey",
+    }).onDelete("set null"),
+    unique("uq_agent_rules_tenant_key").on(table.tenantId, table.ruleKey),
+  ],
+);
+
+// The core Agent entity. Deliberately distinct from `applications` — an
+// Agent is a concrete discovered AI system (e.g. a Bedrock Agent); it may
+// optionally reference an Application via a nullable FK, but is never
+// modeled as one.
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    applicationId: uuid("application_id"),
+    connectionId: uuid("connection_id"),
+    azureConnectionId: uuid("azure_connection_id"),
+    integrationId: uuid("integration_id"),
+    externalAgentId: text("external_agent_id").notNull(),
+    name: text().notNull(),
+    platform: agentPlatform().notNull(),
+    region: text().notNull(),
+    accountId: text("account_id").notNull(),
+    model: text(),
+    knowledgeBaseId: text("knowledge_base_id"),
+    iamRoleArn: text("iam_role_arn"),
+    credentialType: credentialAuthType("credential_type"),
+    ownerUserId: text("owner_user_id"),
+    ownerSource: text("owner_source"),
+    ownerConfidence: numeric("owner_confidence", { precision: 5, scale: 2 }),
+    businessFunction: text("business_function"),
+    status: agentStatus().default("active").notNull(),
+    lastUsedAt: timestamp("last_used_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    capabilities: jsonb().default({}).notNull(),
+    autonomyLevel: autonomyLevel("autonomy_level"),
+    autonomyReason: text("autonomy_reason"),
+    autonomyEvidence: jsonb("autonomy_evidence").default([]).notNull(),
+    autonomyConfidence: numeric("autonomy_confidence", {
+      precision: 5,
+      scale: 2,
+    }),
+    autonomyClassifiedAt: timestamp("autonomy_classified_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    riskScore: numeric("risk_score", { precision: 5, scale: 2 }),
+    riskLevel: riskLevel("risk_level"),
+    riskFactors: jsonb("risk_factors").default([]).notNull(),
+    discoverySource: agentResourceType("discovery_source"),
+    firstSeenAt: timestamp("first_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    syncStatus: syncStatus("sync_status").default("success").notNull(),
+    rawMetadata: jsonb("raw_metadata").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_agents_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_agents_application").using(
+      "btree",
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agents_connection").using(
+      "btree",
+      table.connectionId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agents_azure_connection").using(
+      "btree",
+      table.azureConnectionId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agents_integration").using(
+      "btree",
+      table.integrationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agents_risk_level").using(
+      "btree",
+      table.riskLevel.asc().nullsLast().op("enum_ops"),
+    ),
+    index("idx_agents_autonomy_level").using(
+      "btree",
+      table.autonomyLevel.asc().nullsLast().op("enum_ops"),
+    ),
+    index("idx_agents_owner").using(
+      "btree",
+      table.ownerUserId.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "agents_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.applicationId],
+      foreignColumns: [applications.id],
+      name: "agents_application_id_fkey",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.connectionId],
+      foreignColumns: [awsDiscoveryConnections.id],
+      name: "agents_connection_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.azureConnectionId],
+      foreignColumns: [azureDiscoveryConnections.id],
+      name: "agents_azure_connection_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.integrationId],
+      foreignColumns: [integrations.id],
+      name: "agents_integration_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.ownerUserId],
+      foreignColumns: [users.id],
+      name: "agents_owner_user_id_fkey",
+    }).onDelete("set null"),
+    unique("uq_agents_connection_external_id").on(
+      table.connectionId,
+      table.externalAgentId,
+    ),
+    unique("uq_agents_azure_connection_external_id").on(
+      table.azureConnectionId,
+      table.externalAgentId,
+    ),
+    unique("uq_agents_integration_external_id").on(
+      table.integrationId,
+      table.externalAgentId,
+    ),
+  ],
+);
+
+// Effective policy coverage for every discovered agent. Rows are materialized
+// from tenant-wide compliance policies and linked-application runtime policies
+// so inventory screens never have to infer whether an agent is governed.
+export const agentPolicyEvaluations = pgTable(
+  "agent_policy_evaluations",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    policyType: text("policy_type").notNull(),
+    policyId: text("policy_id").notNull(),
+    policyName: text("policy_name").notNull(),
+    assignmentSource: text("assignment_source").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    complianceStatus: text("compliance_status")
+      .default("not_evaluated")
+      .notNull(),
+    coverageScore: numeric("coverage_score", { precision: 5, scale: 2 })
+      .default("0")
+      .notNull(),
+    evaluation: jsonb().default({}).notNull(),
+    gaps: jsonb().default([]).notNull(),
+    evidence: jsonb().default([]).notNull(),
+    evaluatedAt: timestamp("evaluated_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_agent_policy_evaluations_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_agent_policy_evaluations_agent").using(
+      "btree",
+      table.agentId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agent_policy_evaluations_status").using(
+      "btree",
+      table.complianceStatus.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "agent_policy_evaluations_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.agentId],
+      foreignColumns: [agents.id],
+      name: "agent_policy_evaluations_agent_id_fkey",
+    }).onDelete("cascade"),
+    unique("uq_agent_policy_evaluation").on(
+      table.agentId,
+      table.policyType,
+      table.policyId,
+    ),
+  ],
+);
+
+// Durable, queryable findings. Runtime blocks, compliance gaps and discovery
+// posture failures all land here with their original evidence and provenance.
+export const policyFindings = pgTable(
+  "policy_findings",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    agentId: uuid("agent_id"),
+    applicationId: uuid("application_id"),
+    observabilityLogId: uuid("observability_log_id"),
+    policyType: text("policy_type").notNull(),
+    policyId: text("policy_id").notNull(),
+    source: text().notNull(),
+    findingKey: text("finding_key").notNull(),
+    category: text(),
+    severity: text().default("medium").notNull(),
+    status: text().default("open").notNull(),
+    title: text().notNull(),
+    description: text().notNull(),
+    evidence: jsonb().default({}).notNull(),
+    occurrenceCount: integer("occurrence_count").default(1).notNull(),
+    firstDetectedAt: timestamp("first_detected_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    lastDetectedAt: timestamp("last_detected_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_policy_findings_tenant_detected").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+      table.lastDetectedAt.desc().nullsFirst().op("timestamptz_ops"),
+    ),
+    index("idx_policy_findings_agent").using(
+      "btree",
+      table.agentId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_policy_findings_application").using(
+      "btree",
+      table.applicationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_policy_findings_status").using(
+      "btree",
+      table.status.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "policy_findings_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.agentId],
+      foreignColumns: [agents.id],
+      name: "policy_findings_agent_id_fkey",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.applicationId],
+      foreignColumns: [applications.id],
+      name: "policy_findings_application_id_fkey",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.observabilityLogId],
+      foreignColumns: [observabilityLogs.id],
+      name: "policy_findings_observability_log_id_fkey",
+    }).onDelete("cascade"),
+    unique("uq_policy_finding_observation").on(
+      table.observabilityLogId,
+      table.findingKey,
+    ),
+  ],
+);
+
+export const agentResources = pgTable(
+  "agent_resources",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    resourceType: agentResourceType("resource_type").notNull(),
+    resourceArn: text("resource_arn"),
+    resourceName: text("resource_name"),
+    region: text(),
+    rawData: jsonb("raw_data").default({}).notNull(),
+    discoveredAt: timestamp("discovered_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_agent_resources_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_agent_resources_agent").using(
+      "btree",
+      table.agentId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agent_resources_type").using(
+      "btree",
+      table.resourceType.asc().nullsLast().op("enum_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "agent_resources_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.agentId],
+      foreignColumns: [agents.id],
+      name: "agent_resources_agent_id_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const agentRecommendations = pgTable(
+  "agent_recommendations",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    agentId: uuid("agent_id").notNull(),
+    recommendationType: text("recommendation_type").notNull(),
+    reason: text().notNull(),
+    severity: riskLevel().notNull(),
+    suggestedFix: text("suggested_fix").notNull(),
+    status: agentRecommendationStatus().default("open").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+  },
+  (table) => [
+    index("idx_agent_recommendations_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_agent_recommendations_agent").using(
+      "btree",
+      table.agentId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_agent_recommendations_status").using(
+      "btree",
+      table.status.asc().nullsLast().op("enum_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "agent_recommendations_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.agentId],
+      foreignColumns: [agents.id],
+      name: "agent_recommendations_agent_id_fkey",
+    }).onDelete("cascade"),
+  ],
 );

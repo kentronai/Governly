@@ -152,6 +152,46 @@ async def test_scheduler_intelligent_gating_low_risk():
 
 
 @pytest.mark.asyncio
+async def test_enforcement_boundary_runs_all_enabled_guards_and_blocks_any_violation():
+    """Provider-bound requests cannot use similarity routing to bypass enabled guards."""
+    execution_order = []
+
+    async def t0_guard(ctx):
+        execution_order.append("T0")
+        return Right_(ctx)
+
+    async def t1_guard(ctx):
+        execution_order.append("T1")
+        return Left_([Violation(
+            rule_id="jailbreak.detect",
+            severity="medium",
+            message="Enabled policy violation",
+            score=0.4,
+        )])
+
+    async def t2_guard(ctx):
+        execution_order.append("T2")
+        return Right_(ctx)
+
+    scheduler = SmartGuardScheduler()
+    result = await scheduler.execute_policy(
+        [
+            {"guard": t0_guard, "tier": "T0"},
+            {"guard": t1_guard, "tier": "T1"},
+            {"guard": t2_guard, "tier": "T2"},
+        ],
+        {"messages": [{"role": "user", "content": "test"}]},
+        risk_level="low",
+        max_similarity=0.01,
+        enforce_all=True,
+    )
+
+    assert result["_tag"] == "Left"
+    assert execution_order == ["T0", "T1"]
+    assert result["left"][0]["rule_id"] == "jailbreak.detect"
+
+
+@pytest.mark.asyncio
 async def test_scheduler_intelligent_gating_high_score():
     """Test that T1 runs when T0 has high scores"""
     execution_order = []

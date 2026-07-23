@@ -51,4 +51,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Run the service (Cloud Run sets PORT=8080, local uses 8002)
 # Use exec form to ensure proper signal handling and PORT env var usage
 CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8002}"]
-

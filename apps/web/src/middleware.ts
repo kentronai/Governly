@@ -1,30 +1,33 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { isKentronEmail } from '@db';
+import { isKentronEmail } from "@db";
 
 // Routes that don't require authentication
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/api/webhooks(.*)',
-  '/404(.*)',
-  '/unauthorized(.*)',
-  '/network-error',
-  '/admin(.*)',
-  '/unauthorized',
-  '/',
-  '/health',
-  '/public(.*)',
-  '/_next(.*)',
-  '/favicon.ico',
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/webhooks(.*)",
+  "/404(.*)",
+  "/unauthorized(.*)",
+  "/network-error",
+  "/unauthorized",
+  "/",
+  "/health",
+  "/public(.*)",
+  "/_next(.*)",
+  "/favicon.ico",
 ]);
 
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
-const isTenantRoute = createRouteMatcher(['/[tenant](.*)']);
+const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
+const isTenantRoute = createRouteMatcher(["/[tenant](.*)"]);
 
 const extractTenantFromPath = (pathname: string): string | null => {
-  const parts = pathname.split('/').filter(Boolean);
-  if (parts.length >= 1 && !parts[0].startsWith('admin') && !parts[0].startsWith('api')) {
+  const parts = pathname.split("/").filter(Boolean);
+  if (
+    parts.length >= 1 &&
+    !parts[0].startsWith("admin") &&
+    !parts[0].startsWith("api")
+  ) {
     return parts[0];
   }
   return null;
@@ -32,7 +35,7 @@ const extractTenantFromPath = (pathname: string): string | null => {
 
 const isUserAdmin = (orgRole: string | undefined): boolean => {
   if (!orgRole) return false;
-  return ['org:admin', 'admin', 'org:owner'].includes(orgRole);
+  return ["org:admin", "admin", "org:owner"].includes(orgRole);
 };
 
 export default clerkMiddleware(async (auth, req) => {
@@ -49,46 +52,48 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Protect all routes - require authentication
   if (!userId) {
-    return NextResponse.redirect(new URL('/sign-in', req.url));
+    const signInUrl = new URL("/sign-in", req.url);
+    signInUrl.searchParams.set(
+      "redirect_url",
+      `${req.nextUrl.pathname}${req.nextUrl.search}`,
+    );
+    return NextResponse.redirect(signInUrl);
   }
 
   // Get user email from session claims
   const userEmail = sessionClaims?.email as string | undefined;
 
   // If user has no organization context, redirect to onboarding
-  if (!orgId && pathname !== '/admin/client-onboarding') {
+  if (!orgId && pathname !== "/admin/client-onboarding") {
     // Only Kentron users can access admin to create organizations
     const isKentronUser = userEmail ? isKentronEmail(userEmail) : false;
     if (isKentronUser) {
-      return NextResponse.redirect(new URL('/admin/client-onboarding', req.url));
+      return NextResponse.redirect(
+        new URL("/admin/client-onboarding", req.url),
+      );
     } else {
       // Regular users need to wait for invitation
-      return NextResponse.redirect(new URL('/unauthorized?reason=no-organization', req.url));
+      return NextResponse.redirect(
+        new URL("/unauthorized?reason=no-organization", req.url),
+      );
     }
   }
 
-  // Check organization creation routes - only Kentron users allowed to ACCESS the page
-  // NOTE: The page itself can create orgs for ANY user (kentron.ai or external)
-  const isKentronOnlyRoute = pathname.includes('/admin/client-onboarding');
-  
-  if (isKentronOnlyRoute) {
-    const isKentronUser = userEmail ? isKentronEmail(userEmail) : false;
-    if (!isKentronUser) {
-      return NextResponse.redirect(new URL('/unauthorized?reason=kentron-only', req.url));
-    }
-  }
+  // The onboarding page checks the user's primary Clerk email server-side.
+  // Clerk's default session claims do not contain `email`, so middleware must
+  // not reject the route based on sessionClaims.email.
 
   // Handle tenant-based routing
   if (isTenantRoute(req)) {
     const tenantSlug = extractTenantFromPath(pathname);
-    
+
     if (!tenantSlug) {
-      return NextResponse.redirect(new URL('/unauthorized', req.url));
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
 
     // For tenant routes, we need orgId to match the tenant
     if (!orgId) {
-      return NextResponse.redirect(new URL('/', req.url));
+      return NextResponse.redirect(new URL("/", req.url));
     }
 
     // Note: We'll validate tenant access in the tenant layout
@@ -96,9 +101,11 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Check admin routes (except onboarding which is handled above)
-  if (isAdminRoute(req) && pathname !== '/admin/client-onboarding') {
+  if (isAdminRoute(req) && pathname !== "/admin/client-onboarding") {
     if (!orgId || !isUserAdmin(orgRole)) {
-      return NextResponse.redirect(new URL('/unauthorized?reason=admin-access-required', req.url));
+      return NextResponse.redirect(
+        new URL("/unauthorized?reason=admin-access-required", req.url),
+      );
     }
   }
 
@@ -116,7 +123,7 @@ export const config = {
     // unanchored lookahead treats them as `.js`/`.css` and skips middleware,
     // which causes the 404 handler's <ClerkProvider> → auth() to throw with
     // "Clerk can't detect usage of clerkMiddleware()".
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)$).*)',
-    '/(api|trpc)(.*)',
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)$).*)",
+    "/(api|trpc)(.*)",
   ],
 };

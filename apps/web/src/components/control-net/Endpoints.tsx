@@ -51,9 +51,9 @@ const CreateEndpointModal: React.FC<{
       modelName: formData.modelName,
       type: "foundationModels",
       lastModified:
-        new Date().toLocaleDateString() +
+        new Date().toLocaleDateString("en-US") +
         " & " +
-        new Date().toLocaleTimeString(),
+        new Date().toLocaleTimeString("en-US"),
     };
     onSave(newEndpoint);
     onClose();

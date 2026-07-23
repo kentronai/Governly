@@ -206,7 +206,7 @@ function ArchivedApplications() {
                   <TableCell className="text-sm pl-4  font-normal">
                     {new Date(
                       app?.archivedAt || app?.updatedAt
-                    ).toLocaleDateString()}
+                    ).toLocaleDateString("en-US")}
                   </TableCell>
                   <TableCell className="text-sm pl-4 font-normal">
                     {app.archivedBy || "Unknown"}

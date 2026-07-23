@@ -54,7 +54,7 @@ export function ObservabilityDashboard({ initialLogs, stats, tenant, tenantId, s
   );
 
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+    return new Date(timestamp).toLocaleString("en-US");
   };
 
   const getStatusBadge = (statusCode?: number | null) => {

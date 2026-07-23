@@ -115,8 +115,8 @@ const ComplianceDashboard = () => {
 
       {/* Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogTitle className="sr-only">{selectedControl?.title}</DialogTitle>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto text-[#18181B] bg-white">
+          <DialogTitle className="sr-only">{selectedControl?.title}</DialogTitle>
           <DialogHeader className="text-[#18181B]">
             <h1 className="text-lg font-medium text-gray-900">
               {selectedControl?.title}

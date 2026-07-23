@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "idx_observability_tenant_created" ON "observability_logs" USING btree ("tenant_id" text_ops,"created_at" timestamptz_ops);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_observability_tenant_app_created" ON "observability_logs" USING btree ("tenant_id" text_ops,"application_id" uuid_ops,"created_at" timestamptz_ops);

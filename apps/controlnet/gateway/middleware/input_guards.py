@@ -79,7 +79,23 @@ class InputGuardsMiddleware(BaseHTTPMiddleware):
                 )
                 
                 # Extract policy_id for logging (pipeline may not have set it yet)
-                policy_id = self._extract_policy_id(request, body)
+                policy_id = request.headers.get("x-policy-id") or body.get("policy_id")
+                from gateway.services.agent_identity_service import resolve_agent_identity
+                agent_id, application_id = await resolve_agent_identity(
+                    tenant_id=request.state.tenant_context.tenant_id,
+                    agent_identifier=request.headers.get("x-agent-id") or body.get("agent_id"),
+                    application_id=request.headers.get("x-application-id") or body.get("application_id"),
+                )
+                if application_id:
+                    from gateway.services.application_policy_service import resolve_application_policy
+                    policy_id, policy_source = await resolve_application_policy(
+                        tenant_id=request.state.tenant_context.tenant_id,
+                        application_id=application_id,
+                        explicit_policy_id=policy_id,
+                    )
+                    request.state.policy_resolution_source = policy_source
+                elif not policy_id:
+                    policy_id = self._extract_policy_id(request, body)
                 
                 # Get guard metadata for logging
                 input_guards_list = await self._get_input_guards_metadata(
@@ -93,6 +109,8 @@ class InputGuardsMiddleware(BaseHTTPMiddleware):
                 # POPULATE request.state FOR OBSERVABILITY MIDDLEWARE
                 # ================================================
                 request.state.policy_id = policy_id
+                request.state.agent_id = agent_id
+                request.state.application_id = application_id
                 request.state.violations = violations
                 request.state.violation_phase = violation.get('phase', 'input')
                 request.state.input_guards_executed = input_guards_list
@@ -120,6 +138,9 @@ class InputGuardsMiddleware(BaseHTTPMiddleware):
             # Store policy_id for observability
             if ctx.get("policy_id"):
                 request.state.policy_id = ctx["policy_id"]
+            request.state.application_id = ctx.get("application_id")
+            request.state.agent_id = ctx.get("agent_id")
+            request.state.policy_resolution_source = ctx.get("policy_resolution_source")
             
             # Store processed context for route handler
             request.state.processed_body = ctx.get("body", body)

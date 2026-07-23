@@ -127,7 +127,7 @@ const ToolCard: React.FC<{
 
       <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
         <Calendar className="w-3 h-3" />
-        Last Audited: {new Date(tool.collection_date).toLocaleDateString()}
+        Last Audited: {new Date(tool.collection_date).toLocaleDateString("en-US")}
       </div>
     </div>
   );

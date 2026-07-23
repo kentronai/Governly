@@ -92,8 +92,8 @@ const ModelModals: React.FC<ModelModalsProps> = ({
         open={openModal === 'edit model'}
         onOpenChange={(open) => !open && onEditClose()}
       >
-        <DialogTitle className="sr-only">Edit AI Vault</DialogTitle>
         <DialogContent className="sm:max-w-[600px] text-black p-0 gap-0 z-50">
+          <DialogTitle className="sr-only">Edit AI Vault</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Edit AI Vault
@@ -259,8 +259,8 @@ const ModelModals: React.FC<ModelModalsProps> = ({
         open={openModal === 'create model'}
         onOpenChange={(open) => !open && onCreateClose()}
       >
-        <DialogTitle className="sr-only">Create AI Vault</DialogTitle>
         <DialogContent className="sm:max-w-[600px] text-black p-0 gap-0">
+          <DialogTitle className="sr-only">Create AI Vault</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Create AI Vault

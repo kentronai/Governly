@@ -1,14 +1,14 @@
 "use server";
 import * as policyCenterActions from "@/lib/actions/policy-center";
 import { createAuditEvent } from "@/db";
-import { auth, currentUser } from "@clerk/nextjs/server";
-import { IoMdReturnLeft } from "react-icons/io";
+import { auth } from "@clerk/nextjs/server";
 export interface GetPolicyCenterPoliciesOptions {
   category?: string;
   country?: string;
   state?: string;
   active?: string;
   search?: string;
+  type?: string;
 }
 
 /**

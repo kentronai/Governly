@@ -458,6 +458,7 @@ export default function Playground() {
         headers: {
           "X-Tenant-ID": tenant?.id || "",
           "X-Policy-ID": selectedPolicy || "",
+          "X-Application-ID": String(applicationId || ""),
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -624,6 +625,7 @@ export default function Playground() {
         method: "POST",
         headers: {
           "X-Policy-ID": selectedPolicy,
+          "X-Application-ID": String(applicationId || ""),
         },
         body: JSON.stringify({
           model: selectedModel,

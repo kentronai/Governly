@@ -215,7 +215,7 @@ services:
       # inside the container fail with "connection refused").
       HOSTNAME: "0.0.0.0"
     healthcheck:
-      # node:18-alpine has wget but not curl. /api/health may 404 if route is
+      # node:20-alpine has wget but not curl. /api/health may 404 if route is
       # missing in this build, so accept any 2xx/3xx response from /.
       test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=5", "http://127.0.0.1:8080/"]
       interval: 30s

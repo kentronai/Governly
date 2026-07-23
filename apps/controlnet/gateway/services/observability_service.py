@@ -86,6 +86,7 @@ async def log_request(
     guardrail_results: Optional[Dict[str, Any]],
     policy_id: Optional[str] = None,
     application_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
@@ -216,6 +217,7 @@ async def log_request(
                 id,
                 tenant_id,
                 application_id,
+                agent_id,
                 policy_id,
                 request_id,
                 timestamp,
@@ -231,6 +233,7 @@ async def log_request(
                 :id,
                 :tenant_id,
                 :application_id,
+                :agent_id,
                 :policy_id,
                 :request_id,
                 :timestamp,
@@ -244,6 +247,9 @@ async def log_request(
                 CAST(:metadata AS jsonb)
             )
             ON CONFLICT (request_id) DO UPDATE SET
+                application_id = EXCLUDED.application_id,
+                agent_id = EXCLUDED.agent_id,
+                policy_id = EXCLUDED.policy_id,
                 status_code = EXCLUDED.status_code,
                 latency_ms = EXCLUDED.latency_ms,
                 response_payload = EXCLUDED.response_payload,
@@ -258,6 +264,7 @@ async def log_request(
                 "id": log_id,
                 "tenant_id": tenant_id,
                 "application_id": application_id,
+                "agent_id": agent_id,
                 "policy_id": policy_id,
                 "request_id": request_id,
                 "timestamp": timestamp,
@@ -271,6 +278,57 @@ async def log_request(
                 "metadata": metadata_json,
             }
         )
+
+        # A guardrail block is a durable finding, not just a transient log row.
+        # It is safe to upsert by (observation, rule) when streaming retries the
+        # same request ID.
+        is_blocked = bool(guardrail_results) and (
+            guardrail_results.get("policy_decision") == "block"
+            or guardrail_results.get("blocked") is True
+            or (guardrail_results.get("_summary") or {}).get("was_blocked") is True
+        )
+        if is_blocked:
+            violated = guardrail_results.get("violated_guard") or {}
+            finding_key = violated.get("rule_id") or "policy.violation"
+            await db_session.execute(text("""
+                INSERT INTO policy_findings (
+                    tenant_id, agent_id, application_id, observability_log_id,
+                    policy_type, policy_id, source, finding_key, category,
+                    severity, status, title, description, evidence,
+                    first_detected_at, last_detected_at, updated_at
+                ) VALUES (
+                    :tenant_id, :agent_id, :application_id,
+                    (SELECT id FROM observability_logs WHERE request_id = :request_id),
+                    'runtime', :policy_id, 'controlnet_runtime', :finding_key,
+                    :category, :severity, 'open', :title, :description,
+                    CAST(:evidence AS jsonb), :timestamp, :timestamp, :timestamp
+                )
+                ON CONFLICT (observability_log_id, finding_key) DO UPDATE SET
+                    agent_id = EXCLUDED.agent_id,
+                    application_id = EXCLUDED.application_id,
+                    evidence = EXCLUDED.evidence,
+                    occurrence_count = policy_findings.occurrence_count + 1,
+                    last_detected_at = EXCLUDED.last_detected_at,
+                    updated_at = EXCLUDED.updated_at
+            """), {
+                "tenant_id": tenant_id,
+                "agent_id": agent_id,
+                "application_id": application_id,
+                "request_id": request_id,
+                "policy_id": policy_id or "unresolved",
+                "finding_key": finding_key,
+                "category": finding_key.split(".")[0] if "." in finding_key else "policy",
+                "severity": violated.get("severity") or "high",
+                "title": f"Runtime policy breach: {finding_key}",
+                "description": violated.get("message") or "A ControlNet guardrail blocked this request.",
+                "evidence": json.dumps({
+                    "request_id": request_id,
+                    "violation": violated,
+                    "phase": (metadata or {}).get("violation_phase", "unknown"),
+                    "status_code": status_code,
+                }),
+                "timestamp": timestamp,
+            })
         
         # ✅ NOTE: Don't commit here - get_session() context manager handles commit
         # Committing here would cause a double commit which is harmless but unnecessary
@@ -502,4 +560,3 @@ async def get_guardrail_performance(
         {"tenant_id": tenant_id, "start_time": start_time}
     )
     return [dict(row._mapping) for row in result.fetchall()]
-

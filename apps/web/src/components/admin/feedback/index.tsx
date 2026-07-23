@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -63,6 +64,9 @@ export default function Feedback() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="">
+        <DialogTitle className="sr-only">
+          {openModal === "feedback" ? "Feedback Form" : "Support"}
+        </DialogTitle>
         <DialogHeader>
           {openModal === "feedback" && (
             <div className="flex w-full items-center">

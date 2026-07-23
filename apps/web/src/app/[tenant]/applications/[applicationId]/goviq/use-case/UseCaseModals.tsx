@@ -241,8 +241,8 @@ export const UseCaseModals: React.FC<UseCaseModalsProps> = ({
         open={openModal === "create use case"}
         onOpenChange={(open) => !open && onCreateClose()}
       >
-        <DialogTitle className="sr-only">Create Use Case</DialogTitle>
         <DialogContent className="sm:max-w-[1100px] text-black p-0 gap-0 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Create Use Case</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Create Use Case
@@ -283,8 +283,8 @@ export const UseCaseModals: React.FC<UseCaseModalsProps> = ({
         open={openModal === "edit use case"}
         onOpenChange={(open) => !open && onEditClose()}
       >
-        <DialogTitle className="sr-only">Edit Use Case</DialogTitle>
         <DialogContent className="sm:max-w-[1000px] text-black p-0 gap-0 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Edit Use Case</DialogTitle>
           <div className="p-6 pb-4 space-y-1 border-b">
             <h3 className="text-lg font-semibold leading-none tracking-tight">
               Edit Use Case

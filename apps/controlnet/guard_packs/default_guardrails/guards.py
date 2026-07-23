@@ -220,9 +220,17 @@ def jailbreak_detect(
         # Count pattern matches
         pattern_matches = sum(1 for pattern in compiled_patterns if pattern.search(text))
         
-        # Calculate score based on number of matches
-        # More matches = higher confidence of jailbreak attempt
-        score = min(pattern_matches * 0.25, 1.0)
+        # Every pattern is deliberately narrow (explicit instruction
+        # override, safety bypass, DAN/developer-mode activation, etc.). A
+        # single clear match must cross the default 0.6 threshold; requiring
+        # three different attack phrases allowed common one-line jailbreaks
+        # to pass. Additional matches increase confidence without changing the
+        # fail-closed decision.
+        score = (
+            min(0.65 + ((pattern_matches - 1) * 0.15), 1.0)
+            if pattern_matches
+            else 0.0
+        )
         
         if score >= threshold:
             violations = [Violation(
@@ -510,7 +518,10 @@ def pii_detect(
                     all_spans.append({
                         "start": match.start(),
                         "end": match.end(),
-                        "text": match.group(),
+                        # Never copy the detected secret into violation
+                        # evidence or observability logs. Positions and type
+                        # are sufficient for audit/reproduction.
+                        "replacement": f"[{pii_type}]",
                         "type": pii_type
                     })
         
@@ -560,4 +571,3 @@ def pii_detect(
         return Right_(ctx)
     
     return run
-

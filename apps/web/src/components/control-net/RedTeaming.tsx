@@ -97,9 +97,9 @@ const CreateRedTeamingTaskModal = ({
       testPercentage: 10,
       testType: formData.selectedTests[0] || "Custom Test",
       dateRun:
-        new Date().toLocaleDateString() +
+        new Date().toLocaleDateString("en-US") +
         " & " +
-        new Date().toLocaleTimeString(),
+        new Date().toLocaleTimeString("en-US"),
       riskScore: (Math.random() * 50 + 10).toFixed(2) + "%",
       status: "Running",
     };

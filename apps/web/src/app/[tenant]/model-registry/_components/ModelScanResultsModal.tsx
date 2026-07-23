@@ -179,7 +179,7 @@ export function ModelScanResultsModal({ isOpen, onClose, scanResult, modelName, 
                 {scanResult.created_at && (
                   <div>
                     <span className="font-medium text-blue-800">Scanned:</span>
-                    <div className="text-blue-700">{new Date(scanResult.created_at).toLocaleDateString()}</div>
+                    <div className="text-blue-700">{new Date(scanResult.created_at).toLocaleDateString("en-US")}</div>
                   </div>
                 )}
               </div>

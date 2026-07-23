@@ -71,7 +71,17 @@ async def extract_request_params(ctx: Ctx) -> Either:
         model_id = extract_model_id_from_request(request, body)
         user_api_key = extract_user_api_key_from_request(request, context)
         
-        # Extract policy_id with fallback chain
+        # Resolve an application-scoped policy first. X-Application-ID (or the
+        # body application_id) makes the application's active default binding
+        # and prevents cross-application policy selection.
+        application_id = request.headers.get("x-application-id") or body.get("application_id")
+        agent_identifier = request.headers.get("x-agent-id") or body.get("agent_id")
+        from gateway.services.agent_identity_service import resolve_agent_identity
+        agent_id, application_id = await resolve_agent_identity(
+            tenant_id=context.tenant_id,
+            agent_identifier=agent_identifier,
+            application_id=application_id,
+        )
         policy_id = request.headers.get("x-policy-id")
         
         # If not in header, check body (for third-party app compatibility)
@@ -80,8 +90,25 @@ async def extract_request_params(ctx: Ctx) -> Either:
             if policy_id:
                 logger.info(f"📋 Using policy_id from request body: {policy_id}")
         
-        # If still not found, check for default policy
-        if not policy_id:
+        if application_id:
+            from gateway.services.application_policy_service import resolve_application_policy
+            policy_id, policy_resolution_source = await resolve_application_policy(
+                tenant_id=context.tenant_id,
+                application_id=application_id,
+                explicit_policy_id=policy_id,
+            )
+            logger.info(
+                "application_policy_resolved",
+                application_id=application_id,
+                policy_id=policy_id,
+                source=policy_resolution_source,
+            )
+        else:
+            policy_resolution_source = "explicit" if policy_id else "system_default"
+
+        # Backward compatibility for clients that have not yet supplied an
+        # application identifier. Application-aware clients never use this.
+        if not policy_id and not application_id:
             # Get default policy from settings if available
             settings = getattr(request.app.state, 'settings', None)
             if settings and hasattr(settings, 'default_policy_id'):
@@ -104,6 +131,9 @@ async def extract_request_params(ctx: Ctx) -> Either:
             "model_id": model_id,
             "user_api_key": user_api_key,
             "policy_id": policy_id,
+            "application_id": application_id,
+            "agent_id": agent_id,
+            "policy_resolution_source": policy_resolution_source,
             "trace_id": trace_id
         })
     except ValueError as e:
@@ -726,18 +756,20 @@ async def execute_input_guards_tiered(ctx: Ctx) -> Either:
     )
     
     if "guards_by_tier" not in policy_metadata:
-        logger.warning(
+        logger.error(
             "decision.t0_no_guards_configured",
             extra={
                 "trace_id": trace_id,
                 "policy_id": policy_id
             }
         )
-        return Right_({
-            **ctx,
-            "input_guards_passed": True,
-            "tiers_run": []
-        })
+        return Left_([{
+            "rule_id": "policy.no_input_guards",
+            "message": "The selected policy has no executable input guards. Request blocked fail-closed.",
+            "severity": "critical",
+            "phase": "input",
+            "evidence": {"policy_id": policy_id, "reason": "guards_by_tier_missing"}
+        }])
     
     # Extract guards organized by tier
     guards_by_tier = policy_metadata["guards_by_tier"]
@@ -754,18 +786,20 @@ async def execute_input_guards_tiered(ctx: Ctx) -> Either:
             })
     
     if not all_guards:
-        logger.warning(
+        logger.error(
             "decision.t0_no_guards_to_execute",
             extra={
                 "trace_id": trace_id,
                 "policy_id": policy_id
             }
         )
-        return Right_({
-            **ctx,
-            "input_guards_passed": True,
-            "tiers_run": []
-        })
+        return Left_([{
+            "rule_id": "policy.no_input_guards",
+            "message": "The selected policy resolved to zero executable input guards. Request blocked fail-closed.",
+            "severity": "critical",
+            "phase": "input",
+            "evidence": {"policy_id": policy_id, "reason": "guards_by_tier_empty"}
+        }])
     
     # === DECISION LOG: GUARDS STRUCTURE ===
     logger.info(
@@ -835,7 +869,11 @@ async def execute_input_guards_tiered(ctx: Ctx) -> Either:
             guards=all_guards,
             context=guard_context,
             risk_level=risk_level,
-            max_similarity=max_similarity  # ✨ NEW: Pass similarity for bounds checking
+            max_similarity=max_similarity,
+            # This pipeline is the last boundary before any LLM provider call.
+            # Routing may prioritize expensive detectors, but it must never
+            # bypass a guard that the tenant explicitly enabled.
+            enforce_all=True,
         )
         
         if result["_tag"] == "Left":
@@ -927,4 +965,3 @@ def _extract_max_similarity(detected_risks: List[Any]) -> Optional[float]:
     
     scores = [risk.similarity for risk in detected_risks if hasattr(risk, "similarity")]
     return max(scores) if scores else None
-

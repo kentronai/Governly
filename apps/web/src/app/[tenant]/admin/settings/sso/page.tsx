@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 
 const SSOSettings = () => {
@@ -64,6 +65,7 @@ const SSOSettings = () => {
       </div>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="text-black">
+          <DialogTitle className="sr-only">New SSO</DialogTitle>
           <DialogHeader>
             <span className="flex w-full items-center">
               <h2 className="flex mx-3 text-black font-semibold text-lg">

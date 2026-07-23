@@ -33,72 +33,69 @@ export const getObservabilityStats = cache(
           isNull(applications.deletedAt),
           ne(applications.status, "Archived")
         ),
+        columns: { id: true },
       })
-    ).map((ele) => {
-      return ele.id;
-    });
+    ).map((ele) => ele.id);
     const applicationsCount = applicationsList.length;
-    const policies = (
-      await db.query.applicationPolicies.findMany({
-        where: inArray(applicationPolicies.applicationId, applicationsList),
-      })
-    ).map((ele) => ele.policyId);
 
-    const policyGuardrailList = (
-      await db.query.policyGuardrails.findMany({
-        where: and(inArray(policyGuardrails.policyId, policies)),
-        columns: { guardrailId: true },
-      })
-    ).map((ele) => ele.guardrailId);
-
-    const guardrailCount = Array.from(
-      new Set(
-        (
-          await db.query.guardrails.findMany({
-            where: and(inArray(guardrails.id, policyGuardrailList)),
+    const policies = applicationsList.length
+      ? (
+          await db.query.applicationPolicies.findMany({
+            where: inArray(applicationPolicies.applicationId, applicationsList),
+            columns: { policyId: true },
           })
-        ).map((ele) => ele.fallbackGuardrailId)
-      )
-    ).length;
+        ).map((ele) => ele.policyId)
+      : [];
 
-    const models = (
-      await db.query.applicationModels.findMany({
-        where: and(eq(applicationModels.tenantId, tenantId)),
-      })
-    ).length;
+    const [policyGuardrailList, models, logStats] = await Promise.all([
+      policies.length
+        ? db.query.policyGuardrails
+            .findMany({
+              where: inArray(policyGuardrails.policyId, policies),
+              columns: { guardrailId: true },
+            })
+            .then((rows) => rows.map((ele) => ele.guardrailId))
+        : Promise.resolve([] as string[]),
+      db.query.applicationModels
+        .findMany({
+          where: eq(applicationModels.tenantId, tenantId),
+          columns: { id: true },
+        })
+        .then((rows) => rows.length),
+      db
+        .select({
+          requestCount: sql<number>`count(*)`,
+          allowCount: sql<number>`count(*) filter (where ${observabilityLogs.statusCode} in (200, 201))`,
+          averageLatency: sql<number>`coalesce(avg(${observabilityLogs.latencyMs}) filter (where ${observabilityLogs.latencyMs} > 0), 0)`,
+        })
+        .from(observabilityLogs)
+        .where(
+          and(
+            eq(observabilityLogs.tenantId, tenantId),
+            isNotNull(observabilityLogs.statusCode),
+            notInArray(observabilityLogs.statusCode, [500])
+          )
+        )
+        .then((rows) => rows[0]),
+    ]);
 
-    // Get all logs for metrics calculation
-    const allLogs = await db.query.observabilityLogs.findMany({
-      columns: {
-        path: true,
-        guardrailResults: true,
-        latencyMs: true,
-        statusCode: true,
-        createdAt: true,
-        requestPayload: true,
-      },
-      where: and(
-        eq(observabilityLogs.tenantId, tenantId),
-        isNotNull(observabilityLogs.statusCode),
-        notInArray(observabilityLogs.statusCode, [500])
-      ),
-      orderBy: (logs, { desc }) => [desc(logs.createdAt)],
-    });
+    const guardrailCount = policyGuardrailList.length
+      ? Array.from(
+          new Set(
+            (
+              await db.query.guardrails.findMany({
+                where: inArray(guardrails.id, policyGuardrailList),
+                columns: { fallbackGuardrailId: true },
+              })
+            ).map((ele) => ele.fallbackGuardrailId)
+          )
+        ).length
+      : 0;
 
-    const requestCount = allLogs.length;
-
-    const allowCount = allLogs.filter((log) => {
-      return log.statusCode === 200 || log.statusCode === 201;
-    }).length;
+    const requestCount = Number(logStats?.requestCount ?? 0);
+    const allowCount = Number(logStats?.allowCount ?? 0);
     const blockCount = requestCount - allowCount;
-
-    const logsWithLatency = allLogs.filter((log) => log.latencyMs != null && log.latencyMs > 0);
-    const totalLatency = logsWithLatency.reduce(
-      (sum, log) => sum + log.latencyMs!,
-      0
-    );
-    const averageLatency =
-      logsWithLatency.length > 0 ? Math.round(totalLatency / logsWithLatency.length) : 0;
+    const averageLatency = Math.round(Number(logStats?.averageLatency ?? 0));
 
     return {
       models,

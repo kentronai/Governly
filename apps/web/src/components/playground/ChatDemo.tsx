@@ -264,7 +264,7 @@ export default function ChatDemo() {
                           </Badge>
                         )}
                         <span className="text-xs text-gray-500">
-                          {message.timestamp.toLocaleTimeString()}
+                          {message.timestamp.toLocaleTimeString("en-US")}
                         </span>
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>

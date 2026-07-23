@@ -78,6 +78,69 @@
       "when": 1779030540000,
       "tag": "0010_provider_models_url_invariant",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784355579950,
+      "tag": "0011_luxuriant_kylun",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784574712370,
+      "tag": "0012_dark_sleepwalker",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784622851073,
+      "tag": "0013_petite_nightmare",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784623913397,
+      "tag": "0014_rare_skreet",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784637333455,
+      "tag": "0015_lowly_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784657317127,
+      "tag": "0016_lumpy_micromacro",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784708904605,
+      "tag": "0017_clever_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784710000000,
+      "tag": "0018_real_policy_enforcement",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784800000000,
+      "tag": "0019_multicloud_agent_discovery",
+      "breakpoints": true
     }
   ]
 }

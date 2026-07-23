@@ -1,6 +1,8 @@
 import React from "react";
 import Feedback from "@/components/admin/feedback";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { db, users } from "@db";
+import { eq } from "drizzle-orm";
 import OpsTabs from "@/components/ops/Tabs";
 import { notFound } from "next/navigation";
 export default async function OpsLayout({
@@ -8,15 +10,18 @@ export default async function OpsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await currentUser();
-
-  if (!user) {
+  const { userId } = await auth();
+  if (!userId) {
     notFound();
   }
 
-  const email = user.primaryEmailAddress?.emailAddress;
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true },
+  });
+  const email = user?.email?.toLowerCase();
 
-  if (email && !email.endsWith("@kentron.ai")) {
+  if (!email?.endsWith("@kentron.ai")) {
     notFound();
   }
   return (

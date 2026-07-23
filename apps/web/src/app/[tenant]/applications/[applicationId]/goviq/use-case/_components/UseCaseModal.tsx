@@ -118,8 +118,8 @@ export function UseCaseModal({ isOpen, mode, useCase, onClose, onSubmit, isPendi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogTitle className="sr-only">{mode === 'create' ? 'Create Use Case' : 'Edit Use Case'}</DialogTitle>
       <DialogContent className="sm:max-w-[700px] text-black p-0 gap-0 max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="sr-only">{mode === 'create' ? 'Create Use Case' : 'Edit Use Case'}</DialogTitle>
         <div className="p-6 pb-4 space-y-1 border-b">
           <h3 className="text-lg font-semibold leading-none tracking-tight">
             {mode === 'create' ? 'Create Use Case' : 'Edit Use Case'}
@@ -340,4 +340,3 @@ export function UseCaseModal({ isOpen, mode, useCase, onClose, onSubmit, isPendi
     </Dialog>
   );
 }
-

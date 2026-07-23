@@ -65,7 +65,7 @@ const AIManagementDashboard: React.FC = () => {
       name: `gpt-4o-ebay-${endpoints.length + 1}`,
       modelName: "gpt-4o",
       type: "foundationModels",
-      lastModified: new Date().toLocaleDateString() + " & " + new Date().toLocaleTimeString(),
+      lastModified: new Date().toLocaleDateString("en-US") + " & " + new Date().toLocaleTimeString("en-US"),
     }
 
     if (!endpointData) {
@@ -89,7 +89,7 @@ const AIManagementDashboard: React.FC = () => {
       model: "gpt-4o",
       testPercentage: 10,
       testType: "Bias Test",
-      dateRun: new Date().toLocaleDateString() + " & " + new Date().toLocaleTimeString(),
+      dateRun: new Date().toLocaleDateString("en-US") + " & " + new Date().toLocaleTimeString("en-US"),
       riskScore: (Math.random() * 50 + 10).toFixed(2) + "%",
       status: Math.random() > 0.5 ? "Finished" : "Running",
     }
@@ -112,7 +112,7 @@ const AIManagementDashboard: React.FC = () => {
       recordCount: Math.floor(Math.random() * 100000) + 10000,
       size: `${(Math.random() * 500 + 50).toFixed(1)} MB`,
       type: randomType,
-      lastUpdated: new Date().toLocaleDateString(),
+      lastUpdated: new Date().toLocaleDateString("en-US"),
       tags: randomTags,
       status: randomStatus,
     }

@@ -81,7 +81,8 @@ class SmartGuardScheduler:
         guards: List[Dict[str, Any]],
         context: Ctx,
         risk_level: Literal["low", "medium", "high", "critical"] = "medium",
-        max_similarity: Optional[float] = None
+        max_similarity: Optional[float] = None,
+        enforce_all: bool = False,
     ) -> Either:
         """
         Execute policy with tiered approach + similarity bounds
@@ -96,12 +97,15 @@ class SmartGuardScheduler:
             context: Context to process
             risk_level: Risk level (informational, not used for gating)
             max_similarity: Maximum similarity score from routing (optional)
+            enforce_all: Run every configured tier. This is required at the
+                pre-provider enforcement boundary so a routing false negative
+                can never bypass an enabled guard.
             
         Returns:
             Either with violations or context
         """
         # Check similarity bounds for early exit
-        if max_similarity is not None:
+        if max_similarity is not None and not enforce_all:
             logger.info(f"🔍 Checking similarity bounds: similarity={max_similarity:.3f}, lower={self.similarity_lower_bound}, upper={self.similarity_upper_bound}")
             bounds_result = self._check_similarity_bounds(max_similarity, context)
             if bounds_result is not None:
@@ -120,21 +124,21 @@ class SmartGuardScheduler:
         # Execute T0 guards (always run, parallel)
         if t0_guards:
             t0_result = await self._execute_parallel(t0_guards, context, "T0")
-            if t0_result.has_critical_violations():
-                logger.info("Early exit: T0 critical violations detected")
+            if t0_result.violations and (enforce_all or t0_result.has_critical_violations()):
+                logger.info("Early exit: T0 policy violation detected")
                 return t0_result.result
         
         # Execute T1 guards (check similarity bounds)
-        if t1_guards and self._should_run_t1(max_similarity):
+        if t1_guards and (enforce_all or self._should_run_t1(max_similarity)):
             t1_result = await self._execute_parallel(t1_guards, context, "T1")
-            if t1_result.has_critical_violations():
-                logger.info("Early exit: T1 critical violations detected")
+            if t1_result.violations and (enforce_all or t1_result.has_critical_violations()):
+                logger.info("Early exit: T1 policy violation detected")
                 return t1_result.result
         elif t1_guards:
             logger.info(f"⚡ Skipping T1: similarity {max_similarity} out of bounds")
         
         # Execute T2 guards (check similarity bounds)
-        if t2_guards and self._should_run_t2(max_similarity):
+        if t2_guards and (enforce_all or self._should_run_t2(max_similarity)):
             logger.info(f"Running T2 guards: {len(t2_guards)} ONNX models...")
             t2_result = await self._execute_parallel(t2_guards, context, "T2")
             return t2_result.result

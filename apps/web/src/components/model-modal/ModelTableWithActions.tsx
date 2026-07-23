@@ -135,7 +135,7 @@ const WorkspaceTableWithActions: React.FC<WorkspaceTableWithActionsProps> = ({
         </TableCell>
 
         <TableCell className="text-[#18181B] font-sm font-normal leading-[20px] font-sans hover:text-gray-600">
-          {new Date(workspace.lastModifiedDate).toLocaleDateString()}
+          {new Date(workspace.lastModifiedDate).toLocaleDateString("en-US")}
         </TableCell>
 
         <TableCell className="text-[#18181B] font-sm font-normal leading-[20px] font-sans hover:text-gray-600">

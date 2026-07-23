@@ -1,9 +1,9 @@
 // src/app/[tenant]/layout.tsx
 import { headers } from "next/headers";
 import { ReactNode } from "react";
-import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { notFound, redirect } from "next/navigation";
-import { db, tenants } from "@db";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { db, tenants, users } from "@db";
 import { eq } from "drizzle-orm";
 import { TenantProvider } from "@/contexts/TenantContext";
 import LayoutWithConditionalSidebar from "@/components/app/LayoutWithConditionalSidebar";
@@ -50,23 +50,39 @@ async function ensureTenantForOrg(orgId: string) {
   });
   const metadata = (org.publicMetadata ?? {}) as Record<string, unknown>;
 
-  await db
-    .insert(tenants)
-    .values({
-      id: org.id,
-      name: org.name,
-      slug: org.slug || slugify(org.name),
-      plan: (metadata.plan as string) || "free",
-      createdByKentron: Boolean(metadata.createdByKentron),
-      metadata,
-    })
-    .onConflictDoUpdate({
-      target: tenants.id,
-      set: {
+  try {
+    await db
+      .insert(tenants)
+      .values({
+        id: org.id,
         name: org.name,
         slug: org.slug || slugify(org.name),
-      },
-    });
+        plan: (metadata.plan as string) || "free",
+        createdByKentron: Boolean(metadata.createdByKentron),
+        metadata,
+      })
+      .onConflictDoUpdate({
+        target: tenants.id,
+        set: {
+          name: org.name,
+          slug: org.slug || slugify(org.name),
+        },
+      });
+  } catch (error: any) {
+    // Parallel RSC requests can both observe the tenant as missing and race to
+    // insert it. If the other request won, reuse that row instead of turning a
+    // harmless unique-constraint race into a failed page render.
+    const postgresCode = error?.cause?.code || error?.code;
+    if (postgresCode === "23505") {
+      const concurrentlyCreatedTenant = await db.query.tenants.findFirst({
+        where: eq(tenants.id, orgId),
+      });
+      if (concurrentlyCreatedTenant) {
+        return concurrentlyCreatedTenant;
+      }
+    }
+    throw error;
+  }
 
   return db.query.tenants.findFirst({
     where: eq(tenants.id, orgId),
@@ -86,16 +102,6 @@ export default async function TenantLayout({
   const { tenant: tenantSlug } = await params;
   const { userId, orgId } = await auth();
 
-  const user = await currentUser();
-
-  if (!user) {
-    notFound();
-  }
-
-  const email = user.primaryEmailAddress?.emailAddress;
-
-  const isAdminUser = !!email && email.endsWith("@kentron.ai");
-
   const pathname =
     headersList.get("x-pathname") || headersList.get("referer") || "";
 
@@ -103,6 +109,15 @@ export default async function TenantLayout({
   if (!userId) {
     redirect("/sign-in");
   }
+
+  // The user is synchronized locally by the Clerk webhook. Reading the email
+  // from PostgreSQL avoids a Clerk Backend API request on every page render,
+  // which previously caused transient Clerk failures to appear as RSC errors.
+  const localUser = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true },
+  });
+  const isAdminUser = localUser?.email?.toLowerCase().endsWith("@kentron.ai") ?? false;
 
   // Find tenant by slug
   const tenant = await db.query.tenants.findFirst({

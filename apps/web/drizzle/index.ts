@@ -11,15 +11,15 @@ declare global {
   var __db: ReturnType<typeof postgres> | undefined;
 }
 
-if (!global.__db) {
-  global.__db = postgres(connectionString, {
+if (!globalThis.__db) {
+  globalThis.__db = postgres(connectionString, {
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
   });
 }
 
-const queryClient = global.__db;
+const queryClient = globalThis.__db;
 
 export const db = drizzle(queryClient, {
   schema: {

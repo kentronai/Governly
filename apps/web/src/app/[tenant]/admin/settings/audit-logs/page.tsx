@@ -501,8 +501,8 @@ const AuditLogs = () => {
             if (!open) setSelectedLog(null);
           }}
         >
-          <DialogTitle className="sr-only">Log Details</DialogTitle>
           <DialogContent className="sm:max-w-[700px] max-h-[85vh] border-none  p-0 flex flex-col">
+            <DialogTitle className="sr-only">Log Details</DialogTitle>
             <div className="p-6 overflow-y-auto flex-1">
               <DialogHeader className=" mb-4">
                 <h2 className="text-[18px] leading-[100%] font-semibold text-start">

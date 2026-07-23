@@ -139,6 +139,9 @@ export function StakeholderModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]  p-0 gap-0 z-50 max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="sr-only">
+          {mode === "create" ? "Add Stakeholder" : "Edit Stakeholder"}
+        </DialogTitle>
         <div className="p-6 pb-4 space-y-1 border-b">
           <h3 className="text-lg font-semibold leading-none tracking-tight">
             {mode === "create" ? "Add Stakeholder" : "Edit Stakeholder"}

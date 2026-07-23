@@ -4,16 +4,11 @@
 
 'use server';
 
-import { db, policyCenter } from '@db';
-import { eq, and, isNull } from 'drizzle-orm';
+import { db, policyCenter, applicationPolicyCenter } from '@db';
+import { eq, and, isNull, ilike, or } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
-import {
-  getPolicyCenterPolicies,
-  getPolicyCenterPoliciesByCategory,
-  getPolicyCenterPoliciesByCountry,
-  getActivePolicyCenterPolicies,
-} from '@/lib/queries/policy-center';
+import { rolloutTenantCompliancePolicy } from '@/lib/server/policy-enforcement/compliance-rollout';
 
 export interface GetPolicyCenterPoliciesOptions {
   category?: string;
@@ -21,6 +16,7 @@ export interface GetPolicyCenterPoliciesOptions {
   state?: string;
   active?: string;
   search?: string;
+  type?: string;
 }
 
 /**
@@ -34,46 +30,25 @@ export const getPolicyCenterPoliciesAction = async (
     throw new Error('Authentication Failed');
   }
 
-  const { category, country, state, active, search } = options || {};
-
-  let policies;
-
-  // Use query functions for optimized server-side filtering
-  if (category && country) {
-    // When both filters are provided, fetch by category first then filter by country
-    policies = await getPolicyCenterPoliciesByCategory(category);
-    policies = policies.filter((p) => p.country === country);
-  } else if (category) {
-    policies = await getPolicyCenterPoliciesByCategory(category);
-  } else if (country) {
-    policies = await getPolicyCenterPoliciesByCountry(country);
-  } else if (active === 'true' || active === '1') {
-    policies = await getActivePolicyCenterPolicies();
-  } else {
-    policies = await getPolicyCenterPolicies();
+  const { category, country, state, active, search, type } = options || {};
+  const filters = [isNull(policyCenter.parentPolicyId), isNull(policyCenter.tenantId)];
+  if (category) filters.push(eq(policyCenter.category, category));
+  if (country) filters.push(eq(policyCenter.country, country));
+  if (type) filters.push(eq(policyCenter.type, type));
+  if (state === 'federal') filters.push(isNull(policyCenter.state));
+  else if (state) filters.push(eq(policyCenter.state, state));
+  if (search?.trim()) {
+    const term = `%${search.trim()}%`;
+    filters.push(or(
+      ilike(policyCenter.name, term), ilike(policyCenter.description, term),
+      ilike(policyCenter.country, term), ilike(policyCenter.governingAuthority, term)
+    )!);
   }
 
-  // Additional client-side filtering for state
-  if (state) {
-    if (state === 'federal') {
-      // For federal policies, state is null or empty
-      policies = policies.filter((p) => !p.state || p.state === '');
-    } else {
-      policies = policies.filter((p) => p.state === state);
-    }
-  }
-
-  // Filter by search term
-  let filteredPolicies = policies;
-  if (search) {
-    const searchLower = search.toLowerCase();
-    filteredPolicies = policies.filter(
-      (policy) =>
-        policy.name?.toLowerCase().includes(searchLower) ||
-        policy.description?.toLowerCase().includes(searchLower) ||
-        policy.category?.toLowerCase().includes(searchLower)
-    );
-  }
+  const policies = await db.query.policyCenter.findMany({
+    where: and(...filters),
+    orderBy: (rows, { asc }) => [asc(rows.country), asc(rows.name)],
+  });
 
   const orgActivePolicies = (
     await db.query.policyCenter.findMany({
@@ -84,12 +59,15 @@ export const getPolicyCenterPoliciesAction = async (
     })
   ).map((ele) => ele.parentPolicyId) as string[];
 
-  const data = filteredPolicies.map((ele) => {
+  let data = policies.map((ele) => {
     return {
       ...ele,
       isActive: orgActivePolicies.includes(ele.id),
     };
   });
+
+  if (active === 'enabled') data = data.filter((policy) => policy.isActive);
+  if (active === 'disabled') data = data.filter((policy) => !policy.isActive);
 
   return {
     success: true,
@@ -207,9 +185,8 @@ export const updatePolicyCenterPolicyStatus = async (
     });
 
     if (!exist) {
-      const [newPolicy] = await db
-        .insert(policyCenter)
-        .values({
+      const [newPolicy] = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(policyCenter).values({
           name: verify.name,
           description: verify.description,
           category: verify.category,
@@ -221,31 +198,54 @@ export const updatePolicyCenterPolicyStatus = async (
           icon: verify.icon,
           color: verify.color,
           type: verify.type,
+          fullDescription: verify.fullDescription,
+          purpose: verify.purpose,
+          scope: verify.scope,
+          requirements: verify.requirements,
+          riskCategories: verify.riskCategories,
+          industriesAffected: verify.industriesAffected,
+          governingAuthority: verify.governingAuthority,
+          effectiveDate: verify.effectiveDate,
+          version: verify.version,
+          legalStatus: verify.legalStatus,
+          officialUrl: verify.officialUrl,
+          references: verify.references,
+          controlMappings: verify.controlMappings,
+          applicabilityRules: verify.applicabilityRules,
           disable: verify.disable,
           metadata: verify.metadata,
           parentPolicyId: verify.id,
           tenantId: orgId,
           isActive,
-        })
-        .returning();
-
+        }).returning();
+        if (!isActive) {
+          await tx.update(applicationPolicyCenter).set({ isActive: false }).where(and(
+            eq(applicationPolicyCenter.tenantId, orgId), eq(applicationPolicyCenter.policyId, id)
+          ));
+        }
+        return [created];
+      });
       exist = newPolicy;
     } else {
-      const [updated] = await db
-        .update(policyCenter)
-        .set({ isActive })
-        .where(eq(policyCenter.id, exist.id))
-        .returning();
-
-      exist = updated;
+      exist = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(policyCenter).set({ isActive }).where(eq(policyCenter.id, exist!.id)).returning();
+        if (!isActive) {
+          await tx.update(applicationPolicyCenter).set({ isActive: false }).where(and(
+            eq(applicationPolicyCenter.tenantId, orgId), eq(applicationPolicyCenter.policyId, id)
+          ));
+        }
+        return updated;
+      });
     }
 
-    revalidatePath('/admin/settings/policy-center');
+    const rollout = await rolloutTenantCompliancePolicy(orgId, id, isActive);
+    revalidatePath('/[tenant]/admin/settings/policy-center', 'page');
 
     return {
       policy:exist,
       success: true,
       message: `Status updated for policy ${id}`,
+      rollout,
     };
   } catch (error) {
     console.error('Error updating policy center policy:', error);

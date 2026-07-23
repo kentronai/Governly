@@ -268,7 +268,6 @@ const AttachmentPill = ({
         open={showPreviewModal} 
         onOpenChange={setShowPreviewModal}
       >
-        <DialogTitle className="sr-only">File Preview</DialogTitle>
         <DialogContent
           className="max-w-none w-screen h-screen m-0 p-0"
           onKeyDown={(e) => {
@@ -277,6 +276,7 @@ const AttachmentPill = ({
             }
           }}
         >
+          <DialogTitle className="sr-only">File Preview</DialogTitle>
           <div className="relative w-full h-full overflow-hidden bg-black flex items-center justify-center">
             <div className="absolute top-2 right-2 z-10 flex gap-2">
               <Button 

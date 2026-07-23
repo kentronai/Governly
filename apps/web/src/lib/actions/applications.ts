@@ -5,16 +5,32 @@
 
 "use server";
 
-import { db, applications, memberships, stakeholders, users, tenants } from "@db";
+import {
+  db,
+  applications,
+  memberships,
+  stakeholders,
+  users,
+  tenants,
+  policies,
+  applicationPolicies,
+  guardrails,
+  policyGuardrails,
+} from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
-import { createDefaultLaunchPolicy } from "@/lib/actions/default-launch-policy";
-import { eq, and, sql, isNull, or, ilike } from "drizzle-orm";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import {
+  DEFAULT_APPLICATION_POLICIES,
+  DEFAULT_APPLICATION_POLICY_VERSION,
+  buildDefaultPolicyYaml,
+} from "@/lib/default-application-policies";
+import { eq, and, sql, isNull, or, ilike, inArray } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   getApplicationsWithSummary,
   getArchivedApplications,
 } from "@/lib/queries/applications";
+import { applyActiveCompliancePoliciesToApplication } from "@/lib/server/policy-enforcement/compliance-rollout";
 
 interface CreateApplicationInput {
   tenantId: string;
@@ -36,7 +52,7 @@ interface UpdateApplicationInput {
 
 // Create application
 export const createApplication = async (input: CreateApplicationInput) => {
-  const { userId, orgId, orgRole, getToken } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
@@ -47,16 +63,17 @@ export const createApplication = async (input: CreateApplicationInput) => {
   }
 
   const goviqEnabled = true;
-  const clerkUser = await currentUser();
-  const primaryEmail = clerkUser?.primaryEmailAddress?.emailAddress;
-  const firstName = clerkUser?.firstName || "";
-  const lastName = clerkUser?.lastName || "";
-  const name =
-    `${firstName} ${lastName}`.trim() ||
-    primaryEmail ||
-    "Unknown user";
 
-  const { application } = await db.transaction(async (tx) => {
+  const { application, tenantSlug } = await db.transaction(async (tx) => {
+    const tenant = await tx.query.tenants.findFirst({
+      where: eq(tenants.id, input.tenantId),
+      columns: { slug: true },
+    });
+
+    if (!tenant) {
+      throw new Error("Tenant not found");
+    }
+
     let user = await tx.query.users.findFirst({
       where: eq(users.id, userId),
       columns: {
@@ -70,20 +87,12 @@ export const createApplication = async (input: CreateApplicationInput) => {
         .insert(users)
         .values({
           id: userId,
-          email: primaryEmail || `${userId}@unknown.local`,
-          name,
-          firstName,
-          lastName,
-          imageUrl: clerkUser?.imageUrl || null,
+          email: `${userId}@unknown.local`,
+          name: "Unknown user",
         })
         .onConflictDoUpdate({
           target: users.id,
           set: {
-            email: primaryEmail || `${userId}@unknown.local`,
-            name,
-            firstName,
-            lastName,
-            imageUrl: clerkUser?.imageUrl || null,
             updatedAt: new Date().toISOString(),
           },
         })
@@ -142,10 +151,171 @@ export const createApplication = async (input: CreateApplicationInput) => {
         updatedBy: userId,
       })
       .returning();
-    return { application, stakeholder };
+
+    // Create the application's three ControlNet policies in this same database
+    // transaction. Any policy/link failure rolls back the application and its
+    // stakeholder, preventing partially-created applications.
+    const defaultPolicyNames = DEFAULT_APPLICATION_POLICIES.map(
+      (definition) => definition.name
+    );
+    const existingPolicyLinks = await tx
+      .select({ policyName: applicationPolicies.policyName })
+      .from(applicationPolicies)
+      .where(
+        and(
+          eq(applicationPolicies.applicationId, application.id),
+          eq(
+            applicationPolicies.policyVersion,
+            DEFAULT_APPLICATION_POLICY_VERSION
+          ),
+          inArray(applicationPolicies.policyName, defaultPolicyNames)
+        )
+      );
+    const existingPolicyNames = new Set(
+      existingPolicyLinks.map((link) => link.policyName)
+    );
+    const missingDefinitions = DEFAULT_APPLICATION_POLICIES.filter(
+      (definition) => !existingPolicyNames.has(definition.name)
+    );
+
+    const createdPolicies = missingDefinitions.length
+      ? await tx
+          .insert(policies)
+          .values(
+            missingDefinitions.map((definition) => ({
+              tenantId: input.tenantId,
+              name: definition.name,
+              version: DEFAULT_APPLICATION_POLICY_VERSION,
+              slug: `${application.id}-${definition.profile}-policy`,
+              description: definition.description,
+              yaml: buildDefaultPolicyYaml(definition),
+              isActive: true,
+              status: "active" as const,
+              compositionStrategy: {
+                input: "allOf",
+                output: "allOf",
+                tool_args: "allOf",
+                tool_result: "allOf",
+              },
+              metadata: {
+                autoCreated: true,
+                applicationId: application.id,
+                defaultProfile: definition.profile,
+                isApplicationDefault: definition.isDefault,
+              },
+              createdBy: userId,
+              updatedBy: userId,
+            }))
+          )
+          .returning({ id: policies.id, name: policies.name })
+      : [];
+
+    if (createdPolicies.length !== missingDefinitions.length) {
+      throw new Error("Failed to create all default application policies");
+    }
+
+    const createdPolicyByName = new Map(
+      createdPolicies.map((policy) => [policy.name, policy.id])
+    );
+
+    if (missingDefinitions.length > 0) {
+      await tx.insert(applicationPolicies).values(
+        missingDefinitions.map((definition) => ({
+          tenantId: input.tenantId,
+          applicationId: application.id,
+          policyId: createdPolicyByName.get(definition.name)!,
+          policyName: definition.name,
+          policyVersion: DEFAULT_APPLICATION_POLICY_VERSION,
+          // The Standard Policy is the application's selected default. Strict
+          // and Development remain available but are not selected initially.
+          isActive: definition.isDefault,
+          isDefault: definition.isDefault,
+          priority: definition.priority,
+          createdBy: userId,
+        }))
+      );
+    }
+
+    // Link catalog guardrail rows when they are installed. The YAML remains the
+    // executable ControlNet source of truth, so local setups without a seeded
+    // guardrail catalog still receive valid default policies.
+    const guardKeys = [
+      ...new Set(
+        missingDefinitions.flatMap((definition) =>
+          definition.guards.map((guard) => guard.key)
+        )
+      ),
+    ];
+
+    if (guardKeys.length > 0) {
+      const catalogGuards = await tx
+        .select({
+          id: guardrails.id,
+          key: guardrails.key,
+          tenantId: guardrails.tenantId,
+          defaultParams: guardrails.defaultParams,
+        })
+        .from(guardrails)
+        .where(
+          and(
+            inArray(guardrails.key, guardKeys),
+            or(
+              eq(guardrails.tenantId, input.tenantId),
+              isNull(guardrails.tenantId)
+            ),
+            isNull(guardrails.deletedAt)
+          )
+        );
+
+      const catalogGuardByKey = new Map<
+        string,
+        (typeof catalogGuards)[number]
+      >();
+      for (const guard of catalogGuards) {
+        const current = catalogGuardByKey.get(guard.key);
+        if (!current || (current.tenantId === null && guard.tenantId !== null)) {
+          catalogGuardByKey.set(guard.key, guard);
+        }
+      }
+
+      const policyGuardrailRows = missingDefinitions.flatMap((definition) => {
+        const policyId = createdPolicyByName.get(definition.name)!;
+        return definition.guards.flatMap((guard, orderIndex) => {
+          const catalogGuard = catalogGuardByKey.get(guard.key);
+          if (!catalogGuard) return [];
+
+          return [
+            {
+              tenantId: input.tenantId,
+              policyId,
+              guardrailId: catalogGuard.id,
+              phase: "input",
+              params: {
+                ...((catalogGuard.defaultParams as Record<string, unknown>) || {}),
+                ...(guard.params || {}),
+              },
+              orderIndex,
+              enabled: true,
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          ];
+        });
+      });
+
+      if (policyGuardrailRows.length > 0) {
+        await tx.insert(policyGuardrails).values(policyGuardrailRows);
+      }
+    }
+
+    return { application, stakeholder, tenantSlug: tenant.slug };
   });
 
-  revalidatePath(`/${input.tenantId}/applications`);
+  revalidatePath(`/${tenantSlug}/applications`);
+  revalidatePath(`/${tenantSlug}/policies`);
+  revalidatePath(
+    `/${tenantSlug}/applications/${application.id}/control-net/policies`
+  );
 
   // Audit: application created
   try {
@@ -161,45 +331,14 @@ export const createApplication = async (input: CreateApplicationInput) => {
     console.error("Failed to write audit event (application.created):", e);
   }
 
-  // Auto-create the default "Launch" policy for the new application.
-  // Additive + error-isolated: a policy failure must NOT fail application creation.
-  try {
-    const token = await getToken();
-    const result = await createDefaultLaunchPolicy({
-      orgId: input.tenantId,
-      applicationId: application.id,
-      userId,
-      token,
-    });
-    if (
-      !result.created &&
-      result.reason &&
-      !result.reason.startsWith("already_exists")
-    ) {
-      console.warn(
-        `Default Launch policy not created for application ${application.id}: ${result.reason}`
-      );
-    }
-  } catch (e) {
-    console.error("Failed to create default Launch policy:", e);
-    try {
-      await createAuditEvent({
-        tenantId: input.tenantId,
-        actorUserId: userId,
-        action: "application.default_policy_failed",
-        targetType: "application",
-        targetId: application.id,
-        metadata: { error: e instanceof Error ? e.message : String(e) },
-      });
-    } catch {
-      // best-effort audit; ignore
-    }
-  }
+  // Organization-level compliance policies are true defaults: a new
+  // application is evaluated immediately and does not require another toggle.
+  await applyActiveCompliancePoliciesToApplication(input.tenantId, application.id);
 
   return {
     application,
     success: true,
-    message: "Application with same name already exists",
+    message: "Application created successfully",
   };
 };
 

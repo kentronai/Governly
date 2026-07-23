@@ -48,17 +48,32 @@ class PolicyMiddleware(BaseHTTPMiddleware):
         try:
             # Get policy_id from header or use system default
             policy_id = request.headers.get("x-policy-id")
+            application_id = request.headers.get("x-application-id")
+
+            # Ensure tenant_id is set (from AuthenticationMiddleware)
+            if not hasattr(request.state, 'tenant_id') or not request.state.tenant_id:
+                logger.warning(f"Policy middleware: tenant_id not set for {request.url.path}")
+                return await call_next(request)
+
+            if application_id:
+                from gateway.services.application_policy_service import resolve_application_policy
+                policy_id, source = await resolve_application_policy(
+                    tenant_id=request.state.tenant_id,
+                    application_id=application_id,
+                    explicit_policy_id=policy_id,
+                )
+                request.state.application_id = application_id
+                request.state.policy_resolution_source = source
             
+            if not policy_id and "/chat/completions" in request.url.path:
+                # The chat pipeline can also resolve application_id/policy_id
+                # from its JSON body. Do not pre-load an unrelated global
+                # policy before that body has been parsed.
+                return await call_next(request)
             if not policy_id:
                 # Use system default policy (configured in settings)
                 # PolicyCache handles this via default_policy_id from settings
                 policy_id = None  # PolicyCache will use default_policy_id if None
-            
-            # Ensure tenant_id is set (from AuthenticationMiddleware)
-            if not hasattr(request.state, 'tenant_id') or not request.state.tenant_id:
-                logger.warning(f"Policy middleware: tenant_id not set for {request.url.path}")
-                # Skip policy loading if tenant_id not available (auth might have failed)
-                return await call_next(request)
             
             # Load policy from cache
             policy_cache = request.app.state.policy_cache
@@ -85,11 +100,10 @@ class PolicyMiddleware(BaseHTTPMiddleware):
                 content={
                     "error": {
                         "type": "policy_not_found",
-                        "message": f"Policy '{policy_id}' not found"
+                        "message": str(e)
                     }
                 }
             )
         
         # Continue to next middleware
         return await call_next(request)
-

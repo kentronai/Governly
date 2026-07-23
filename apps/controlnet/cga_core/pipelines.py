@@ -21,19 +21,19 @@ def chat_completions_pipeline() -> Guard:
     
     Execution order (sequential with fail-fast):
     1. Extract request parameters (model_id, API key, policy_id)
-    2. Resolve model to provider routing config
-    3. Load policy and compiled guards (T0/T1/T2 structure)
-    4. Apply prompt-based routing (filters T2 ONNX models by risk categories)
-    5. Run ONNX detection (T2 models, filtered by routing) ✨ NEW STEP
-    6. Execute input guards with SmartGuardScheduler:
+    2. Load policy and compiled guards (T0/T1/T2 structure)
+    3. Apply prompt-based routing (used as detection evidence, never as a bypass)
+    4. Run ONNX detection
+    5. Execute every enabled input guard with SmartGuardScheduler:
        ├─ T0: Regex/fast checks (always, < 10ms, parallel execution)
-       ├─ T1: Semantic checks (dual-trigger gating, < 30ms, parallel execution)
-       └─ T2: Additional ML guards (dual-trigger gating, < 100ms, parallel execution)
+       ├─ T1: Semantic checks (< 30ms, parallel execution)
+       └─ T2: Additional ML guards (< 100ms, parallel execution)
+    6. Only after every guard passes, resolve the provider client.
     
     Key architectural change:
-    - ONNX is now a SEPARATE pipeline step (step 5)
-    - This makes the pipeline clearer and follows single responsibility
-    - Guards (step 6) are purely guardrail checks, no ONNX mixing
+    Provider resolution is deliberately last. A blocked request never reaches
+    provider setup and can never make an OpenAI, Azure OpenAI, Gemini, Claude,
+    or other registered-provider API call.
     
     Each step returns Either:
     - Right(ctx) → continue to next step
@@ -44,10 +44,9 @@ def chat_completions_pipeline() -> Guard:
     """
     return seq(
         extract_request_params,
-        resolve_model_target,
         resolve_policy,
-        apply_prompt_routing,      # Filters T2 ONNX models by risk
-        run_onnx_detection,        # ✨ NEW: Separate ONNX inference step
-        execute_input_guards_tiered # Clean guard execution (no ONNX mixing)
+        apply_prompt_routing,
+        run_onnx_detection,
+        execute_input_guards_tiered,
+        resolve_model_target,
     )
-

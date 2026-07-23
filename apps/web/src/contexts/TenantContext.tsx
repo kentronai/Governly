@@ -115,30 +115,14 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
       const activePolicy = active.map(
         (ele: any) => ele.parentPolicyId as string
       );
+      const activePolicyNames = new Set(active.map((ele: any) => ele.name as string));
 
       setPolicyStatus({
-        euAiAct:
-          activePolicy.find(
-            (ele) => ele === "2ff845fe-410e-4e14-b7ce-07711b269d6a"
-          ) !== undefined,
-        iso42001:
-          activePolicy.find(
-            (ele) => ele === "dfa263a6-b5aa-4d61-9628-739dae438883"
-          ) !== undefined,
+        euAiAct: activePolicyNames.has("EU AI Act (Regulation 2024/1689)"),
+        iso42001: activePolicyNames.has("ISO/IEC 42001"),
         allActivePolicies: activePolicy,
       });
       setActivePolicy(activePolicy);
-      console.log({
-        euAiAct:
-          activePolicy.find(
-            (ele) => ele === "2ff845fe-410e-4e14-b7ce-07711b269d6a"
-          ) !== undefined,
-        iso42001:
-          activePolicy.find(
-            (ele) => ele === "dfa263a6-b5aa-4d61-9628-739dae438883"
-          ) !== undefined,
-        allActivePolicies: activePolicy,
-      });
     } catch (error) {
       console.error("Error fetching policy status:", error);
     }

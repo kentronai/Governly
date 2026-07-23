@@ -1,6 +1,11 @@
 "use client";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "../ui/dialog";
 import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 export function ActivateDialog({ isOpen }: { isOpen: boolean }) {
@@ -14,13 +19,15 @@ export function ActivateDialog({ isOpen }: { isOpen: boolean }) {
           </div>
         </div>
 
-        <h2 className="text-xl font-semibold">Feature Activation Required</h2>
-        <p className="text-sm text-muted-foreground">
+        <DialogTitle className="text-xl font-semibold text-center">
+          Feature Activation Required
+        </DialogTitle>
+        <DialogDescription className="text-sm text-muted-foreground text-center">
           To activate this feature, contact
           <span className="text-blue-500 font-medium text-sm pl-1">
             feedback@kentron.ai
           </span>
-        </p>
+        </DialogDescription>
 
         <Button
           onClick={() => {

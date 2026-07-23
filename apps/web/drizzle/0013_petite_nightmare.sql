@@ -1,0 +1,2 @@
+ALTER TYPE "public"."agent_platform" ADD VALUE 'aws_agentcore' BEFORE 'aws_lambda';--> statement-breakpoint
+ALTER TYPE "public"."agent_resource_type" ADD VALUE 'agentcore_runtime' BEFORE 'bedrock_agent_alias';
