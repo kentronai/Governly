@@ -90,6 +90,7 @@ export function buildCapabilityFacts(
       "gcp_gke_cluster",
       "gcp_cloud_function",
       "gcp_vertex_reasoning_engine",
+      "databricks_serving_endpoint",
     ].includes(r.resourceType),
   );
 
@@ -201,7 +202,9 @@ export function buildCapabilityFacts(
         r.resourceType === "agentcore_runtime" ||
         r.resourceType === "azure_openai_account" ||
         r.resourceType === "azure_ai_foundry_project" ||
-        r.resourceType === "gcp_vertex_reasoning_engine",
+        r.resourceType === "gcp_vertex_reasoning_engine" ||
+        r.resourceType === "databricks_serving_endpoint" ||
+        r.resourceType === "databricks_registered_model",
     ),
     resourceCount: agent.resources.length,
   };

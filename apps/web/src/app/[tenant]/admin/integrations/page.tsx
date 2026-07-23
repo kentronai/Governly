@@ -75,6 +75,13 @@ import {
   testGoogleCloudIntegrationConnection,
   triggerGoogleCloudDiscovery,
 } from "@/lib/actions/gcp-integration";
+import {
+  createDatabricksConnection,
+  deleteDatabricksConnection,
+  ensureDatabricksIntegrationCatalogEntry,
+  testDatabricksIntegrationConnection,
+  triggerDatabricksDiscovery,
+} from "@/lib/actions/databricks-integration";
 import { ensureUniversalAgentIntegrationCatalogEntry } from "@/lib/actions/universal-agent-integration";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -87,6 +94,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
+const DISCOVERY_INTEGRATIONS = new Set([
+  "AWS",
+  "Azure",
+  "Google Cloud",
+  "Databricks",
+]);
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
 
@@ -209,6 +222,7 @@ export default function IntegrationsPage() {
         ensureAwsIntegrationCatalogEntry(tenant.id),
         ensureAzureIntegrationCatalogEntry(tenant.id),
         ensureGoogleCloudIntegrationCatalogEntry(tenant.id),
+        ensureDatabricksIntegrationCatalogEntry(tenant.id),
         ensureUniversalAgentIntegrationCatalogEntry(tenant.id),
       ]);
       setIntegrations(await fetchIntegrations(tenant.id));
@@ -300,7 +314,10 @@ export default function IntegrationsPage() {
     if (["OpenAI", "Anthropic", "Cohere"].includes(selected.name)) {
       return Boolean(credentials.apiKey.trim());
     }
-    if (["Databricks", "Snowflake"].includes(selected.name)) {
+    if (selected.name === "Databricks") {
+      return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
+    }
+    if (selected.name === "Snowflake") {
       return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
     }
     try {
@@ -401,11 +418,38 @@ export default function IntegrationsPage() {
           "",
           `Google Cloud connected — ${scan.agentsDiscovered} agents discovered`,
         );
+      } else if (selected.name === "Databricks") {
+        const connection = await createDatabricksConnection({
+          tenantSlugOrId: tenant.id,
+          workspaceUrl: credentials.hostUrl,
+          accessToken: credentials.apiKey,
+        });
+        const tested = await testDatabricksIntegrationConnection(
+          tenant.id,
+          connection.id,
+        );
+        if (!tested.ok) throw new Error(tested.error);
+        setRunning(selected.id);
+        const scan = await triggerDatabricksDiscovery(tenant.id, connection.id);
+        if (scan.status === "failed") {
+          throw new Error(scan.errorMessage || "Databricks discovery failed");
+        }
+        successToast(
+          "",
+          "",
+          "",
+          `Databricks connected — ${scan.agentsDiscovered} agents and ${Object.values(
+            scan.resourcesScanned,
+          ).reduce(
+            (sum, count) => sum + Number(count),
+            0,
+          )} Unity Catalog resources discovered`,
+        );
       } else {
         let secret: Record<string, unknown>;
         if (["OpenAI", "Anthropic", "Cohere"].includes(selected.name)) {
           secret = { apiKey: credentials.apiKey };
-        } else if (["Databricks", "Snowflake"].includes(selected.name)) {
+        } else if (selected.name === "Snowflake") {
           secret = {
             hostUrl: credentials.hostUrl,
             apiKey: credentials.apiKey,
@@ -449,6 +493,8 @@ export default function IntegrationsPage() {
         await removeIntegrationCredentials(tenant.id, integration.id);
       } else if (integration.name === "Google Cloud") {
         await deleteGoogleCloudConnection(tenant.id, integration.id);
+      } else if (integration.name === "Databricks") {
+        await deleteDatabricksConnection(tenant.id, integration.id);
       } else {
         await removeIntegrationCredentials(tenant.id, integration.id);
       }
@@ -482,6 +528,8 @@ export default function IntegrationsPage() {
         result = await triggerAzureDiscovery(tenant.id, id);
       } else if (integration.name === "Google Cloud") {
         result = await triggerGoogleCloudDiscovery(tenant.id, integration.id);
+      } else if (integration.name === "Databricks") {
+        result = await triggerDatabricksDiscovery(tenant.id, integration.id);
       }
       if (!result) return;
       if (result.status === "failed")
@@ -722,6 +770,44 @@ export default function IntegrationsPage() {
                         </span>
                       </div>
                     ) : null}
+                    {integration.name === "Databricks" &&
+                    integration.configuration.lastDiscoveryCounts ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            Unity Catalog assets
+                          </span>
+                          <span className="font-medium">
+                            {[
+                              "databricks_catalog",
+                              "databricks_schema",
+                              "databricks_table",
+                              "databricks_registered_model",
+                            ].reduce(
+                              (sum, key) =>
+                                sum +
+                                Number(
+                                  integration.configuration.lastDiscoveryCounts[
+                                    key
+                                  ] ?? 0,
+                                ),
+                              0,
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            Serving endpoints
+                          </span>
+                          <span className="font-medium">
+                            {Number(
+                              integration.configuration.lastDiscoveryCounts
+                                .databricks_serving_endpoint ?? 0,
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
                     {integration.name === "Universal Agent Collector" ? (
                       <div className="space-y-1 border-t pt-3">
                         <span className="text-xs text-muted-foreground">
@@ -745,7 +831,7 @@ export default function IntegrationsPage() {
                       </Button>
                     ) : (
                       <>
-                        {CLOUD_PROVIDERS.has(integration.name) ? (
+                        {DISCOVERY_INTEGRATIONS.has(integration.name) ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1036,8 +1122,47 @@ export default function IntegrationsPage() {
                   autoComplete="new-password"
                 />
               </FormField>
-            ) : selected &&
-              ["Databricks", "Snowflake"].includes(selected.name) ? (
+            ) : selected?.name === "Databricks" ? (
+              <>
+                <Alert>
+                  <Info />
+                  <AlertTitle>Databricks Unity Catalog</AlertTitle>
+                  <AlertDescription>
+                    NORIX validates the workspace, then discovers visible
+                    catalogs, schemas, tables, Unity Catalog models, and Model
+                    Serving endpoints. The token needs Unity Catalog and
+                    serving-endpoint read access.
+                  </AlertDescription>
+                </Alert>
+                <FormField
+                  label="Workspace URL"
+                  required
+                  help="Use the workspace root URL. Do not include /api or another path."
+                >
+                  <Input
+                    value={credentials.hostUrl}
+                    onChange={(event) =>
+                      setCredential("hostUrl", event.target.value)
+                    }
+                    placeholder="https://dbc-12345678-abcd.cloud.databricks.com"
+                  />
+                </FormField>
+                <FormField
+                  label="Personal Access Token"
+                  required
+                  help="Encrypted before storage and never returned to the browser."
+                >
+                  <Input
+                    type="password"
+                    value={credentials.apiKey}
+                    onChange={(event) =>
+                      setCredential("apiKey", event.target.value)
+                    }
+                    autoComplete="new-password"
+                  />
+                </FormField>
+              </>
+            ) : selected?.name === "Snowflake" ? (
               <>
                 <FormField label="Host URL" required>
                   <Input

@@ -36,6 +36,8 @@ export interface CorrelatedAgent {
     | "gcp_compute"
     | "gcp_gke"
     | "gcp_functions"
+    | "databricks_model_serving"
+    | "databricks_unity_catalog"
     | "other";
   region: string;
   discoverySource: RawDiscoveredResource["resourceType"];

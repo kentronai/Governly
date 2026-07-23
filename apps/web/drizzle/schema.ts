@@ -209,6 +209,8 @@ export const agentPlatform = pgEnum("agent_platform", [
   "gcp_compute",
   "gcp_gke",
   "gcp_functions",
+  "databricks_model_serving",
+  "databricks_unity_catalog",
   "other",
 ]);
 export const agentResourceType = pgEnum("agent_resource_type", [
@@ -242,6 +244,11 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "gcp_compute_instance",
   "gcp_gke_cluster",
   "gcp_cloud_function",
+  "databricks_serving_endpoint",
+  "databricks_registered_model",
+  "databricks_catalog",
+  "databricks_schema",
+  "databricks_table",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [
@@ -2844,6 +2851,70 @@ export const discoveryScans = pgTable(
       foreignColumns: [users.id],
       name: "discovery_scans_triggered_by_fkey",
     }).onDelete("set null"),
+  ],
+);
+
+// Provider-neutral inventory for resources discovered through integrations.
+// Unlike agent_resources, these rows also retain governed assets that are not
+// themselves executable agents (for example Unity Catalog tables).
+export const integrationDiscoveredResources = pgTable(
+  "integration_discovered_resources",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    integrationId: uuid("integration_id").notNull(),
+    provider: text().notNull(),
+    externalResourceId: text("external_resource_id").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceName: text("resource_name").notNull(),
+    parentResourceId: text("parent_resource_id"),
+    metadata: jsonb().default({}).notNull(),
+    firstSeenAt: timestamp("first_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_integration_resources_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_integration_resources_integration").using(
+      "btree",
+      table.integrationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_integration_resources_type").using(
+      "btree",
+      table.resourceType.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "integration_discovered_resources_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.integrationId],
+      foreignColumns: [integrations.id],
+      name: "integration_discovered_resources_integration_id_fkey",
+    }).onDelete("cascade"),
+    unique("uq_integration_discovered_resource").on(
+      table.integrationId,
+      table.externalResourceId,
+    ),
   ],
 );
 

@@ -10,6 +10,7 @@ import {
 import { runDiscoveryScan } from "@/lib/server/aws/discovery-orchestrator";
 import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator";
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
+import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 
 function authorized(request: NextRequest): boolean {
   const expected =
@@ -104,6 +105,20 @@ async function run(request: NextRequest) {
           integrationId: integration.id,
           provider: "Google Cloud",
           ...(await runGoogleCloudDiscoveryScan(
+            integration.tenantId,
+            integration.id,
+            integration,
+            null,
+          )),
+        });
+      } else if (
+        integration.name === "Databricks" &&
+        integration.credentialsEncrypted
+      ) {
+        results.push({
+          integrationId: integration.id,
+          provider: "Databricks",
+          ...(await runDatabricksDiscoveryScan(
             integration.tenantId,
             integration.id,
             integration,

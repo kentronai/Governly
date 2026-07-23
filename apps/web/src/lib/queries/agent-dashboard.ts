@@ -149,6 +149,8 @@ export const getPlatformDistribution = cache(async (tenantId: string) => {
     gcp_compute: "Google Compute Engine",
     gcp_gke: "Google GKE",
     gcp_functions: "Google Cloud Functions",
+    databricks_model_serving: "Databricks Model Serving",
+    databricks_unity_catalog: "Databricks Unity Catalog",
   };
   return rows.map((row) => ({
     label: labels[row.platform] ?? "Other",
