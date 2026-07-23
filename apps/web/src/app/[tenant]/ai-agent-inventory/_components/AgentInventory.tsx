@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatTimestamp } from "@/utils/formatTime";
@@ -48,12 +48,13 @@ import {
 import {
   fetchAgents,
   fetchAgentDetail,
-  fetchAgentFilterOptions,
   fetchAgentInventorySummary,
-  fetchAgentApplicationOptions,
   assignAgentToApplication,
 } from "@/lib/actions/agents";
-import type { AgentInventorySummary } from "@/lib/queries/agents";
+import type {
+  AgentInventoryInitialData,
+  AgentInventorySummary,
+} from "@/lib/queries/agents";
 
 const ALL = "__all__";
 const UNOWNED = "__unowned__";
@@ -123,16 +124,18 @@ function relativeFromNow(iso: string | null): string {
 export function AgentInventory({
   tenant,
   initialAutonomy,
+  initialData,
 }: {
   tenant: string;
   initialAutonomy?: string;
+  initialData: AgentInventoryInitialData;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [rows, setRows] = useState<any[]>(initialData.list.rows);
+  const [total, setTotal] = useState(initialData.list.total);
+  const [totalPages, setTotalPages] = useState(initialData.list.totalPages);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [riskLevel, setRiskLevel] = useState(ALL);
   const [autonomyLevel, setAutonomyLevel] = useState(
@@ -143,24 +146,15 @@ export function AgentInventory({
   const [status, setStatus] = useState(ALL);
   const [platform, setPlatform] = useState(ALL);
   const [ownerFilter, setOwnerFilter] = useState(ALL);
-  const [options, setOptions] = useState<{
-    platforms: string[];
-    riskLevels: string[];
-    autonomyLevels: string[];
-    statuses: string[];
-  }>({
-    platforms: [],
-    riskLevels: [],
-    autonomyLevels: [],
-    statuses: [],
-  });
+  const [options] = useState(initialData.options);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<any | null>(null);
-  const [summary, setSummary] = useState<AgentInventorySummary | null>(null);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
-  const [applicationOptions, setApplicationOptions] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [summary, setSummary] = useState<AgentInventorySummary | null>(
+    initialData.summary,
+  );
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [applicationOptions] = useState(initialData.applicationOptions);
+  const hasMounted = useRef(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -215,19 +209,17 @@ export function AgentInventory({
   }, [load, loadSummary]);
 
   useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
     const t = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   useEffect(() => {
-    fetchAgentFilterOptions(tenant).then(setOptions as any);
-    fetchAgentApplicationOptions(tenant).then(setApplicationOptions);
-  }, [tenant]);
-
-  useEffect(() => {
-    void loadSummary();
-    const interval = window.setInterval(() => void loadSummary(), 30_000);
+    const interval = window.setInterval(() => void loadSummary(), 60_000);
     return () => window.clearInterval(interval);
   }, [loadSummary]);
 

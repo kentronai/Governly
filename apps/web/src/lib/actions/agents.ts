@@ -7,21 +7,32 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { agents, applications, db, tenants } from "@db";
-import { and, eq, isNull } from "drizzle-orm";
-import { getAgents, getAgentDetail, getAgentFilterOptions, getAgentInventorySummary, type AgentListFilters } from "@/lib/queries/agents";
+import { and, eq, isNull, or } from "drizzle-orm";
+import {
+  getAgentApplicationOptions,
+  getAgents,
+  getAgentDetail,
+  getAgentFilterOptions,
+  getAgentInventorySummary,
+  type AgentListFilters,
+} from "@/lib/queries/agents";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 import { revalidatePath } from "next/cache";
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  return tenantRow[0].id;
+  const [tenantRow] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(or(eq(tenants.id, tenantSlugOrId), eq(tenants.slug, tenantSlugOrId)))
+    .limit(1);
+  if (!tenantRow) throw new Error("Tenant not found");
+  return tenantRow.id;
 }
 
-export const fetchAgents = async (tenantSlugOrId: string, filters: AgentListFilters) => {
+export const fetchAgents = async (
+  tenantSlugOrId: string,
+  filters: AgentListFilters,
+) => {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
@@ -29,7 +40,10 @@ export const fetchAgents = async (tenantSlugOrId: string, filters: AgentListFilt
   return getAgents(tenantId, filters);
 };
 
-export const fetchAgentDetail = async (tenantSlugOrId: string, agentId: string) => {
+export const fetchAgentDetail = async (
+  tenantSlugOrId: string,
+  agentId: string,
+) => {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
@@ -59,30 +73,33 @@ export const fetchAgentApplicationOptions = async (tenantSlugOrId: string) => {
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
   if (tenantId !== orgId) throw new Error("Tenant access denied");
-  return db.select({ id: applications.id, name: applications.name }).from(applications).where(and(
-    eq(applications.tenantId, tenantId),
-    isNull(applications.deletedAt)
-  )).orderBy(applications.name);
+  return getAgentApplicationOptions(tenantId);
 };
 
 export const assignAgentToApplication = async (
   tenantSlugOrId: string,
   agentId: string,
-  applicationId: string | null
+  applicationId: string | null,
 ) => {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
   if (tenantId !== orgId) throw new Error("Tenant access denied");
   if (applicationId) {
-    const application = await db.query.applications.findFirst({ where: and(
-      eq(applications.id, applicationId), eq(applications.tenantId, tenantId), isNull(applications.deletedAt)
-    ) });
+    const application = await db.query.applications.findFirst({
+      where: and(
+        eq(applications.id, applicationId),
+        eq(applications.tenantId, tenantId),
+        isNull(applications.deletedAt),
+      ),
+    });
     if (!application) throw new Error("Application not found");
   }
-  const [updated] = await db.update(agents).set({ applicationId, updatedAt: new Date().toISOString() }).where(and(
-    eq(agents.id, agentId), eq(agents.tenantId, tenantId)
-  )).returning({ id: agents.id });
+  const [updated] = await db
+    .update(agents)
+    .set({ applicationId, updatedAt: new Date().toISOString() })
+    .where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)))
+    .returning({ id: agents.id });
   if (!updated) throw new Error("Agent not found");
   await syncAgentPolicyEvaluations(tenantId, agentId);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-inventory`);
