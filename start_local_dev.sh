@@ -30,44 +30,20 @@ fi
 
 echo -e "${GREEN}Starting services...${NC}"
 
-# Start stateful/backend services first. Next.js runs natively on the host to
-# avoid Docker Desktop bind-mount latency during route compilation and HMR.
+# Start stateful services and run the one-shot migration separately. Compose
+# treats a successful exited migration as unhealthy when it is mixed into a
+# long-running `up --wait` invocation.
 docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
-    postgres redis migrate controlnet onnx-service model-guard
+    postgres redis
+docker compose -f docker-compose.dev.yml run --rm migrate
+docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
+    controlnet onnx-service model-guard
+docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
+    --no-deps web
 
-if ! curl -fsS http://127.0.0.1:3001/sign-in >/dev/null 2>&1; then
-    if [ ! -x apps/web/node_modules/.bin/next ]; then
-        echo -e "${YELLOW}Installing web dependencies...${NC}"
-        (cd apps/web && npm install)
-    fi
-
-    echo -e "${GREEN}Starting host-native Next.js...${NC}"
-    (
-        cd apps/web
-        mkdir -p .next
-        nohup npm run dev:turbo > .next/host-dev.log 2>&1 &
-        echo $! > .next/host-dev.pid
-    )
-
-    web_ready=false
-    for attempt in $(seq 1 90); do
-        if curl -fsS http://127.0.0.1:3001/sign-in >/dev/null 2>&1; then
-            web_ready=true
-            break
-        fi
-        sleep 1
-    done
-    if [ "$web_ready" != "true" ]; then
-        echo -e "${RED}Next.js did not become ready. Check apps/web/.next/host-dev.log${NC}"
-        exit 1
-    fi
-else
-    echo -e "${GREEN}Reusing the host Next.js server already running on port 3001.${NC}"
-fi
-
-# Nginx starts only after its host-native web upstream is reachable, avoiding
-# transient 502 responses during startup.
-docker compose -f docker-compose.dev.yml up -d nginx
+# Nginx starts only after the web health check has successfully queried
+# PostgreSQL, preventing both transient 502s and false healthy states.
+docker compose -f docker-compose.dev.yml up -d --force-recreate --no-deps nginx
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
