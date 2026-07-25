@@ -218,6 +218,7 @@ export const agentPlatform = pgEnum("agent_platform", [
   "databricks_apps",
   "databricks_jobs",
   "databricks_genie",
+  "crewai",
 ]);
 export const agentResourceType = pgEnum("agent_resource_type", [
   "bedrock_agent",
@@ -260,6 +261,10 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "databricks_notebook",
   "databricks_genie_space",
   "kubernetes_workload",
+  "crewai_deployment",
+  "crewai_crew",
+  "crewai_agent",
+  "crewai_task",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [

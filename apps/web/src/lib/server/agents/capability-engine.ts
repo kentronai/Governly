@@ -95,6 +95,10 @@ export function buildCapabilityFacts(
       "databricks_job",
       "databricks_genie_space",
       "kubernetes_workload",
+      // A deployed CrewAI crew is an executing agent runtime: it runs tasks
+      // autonomously via its member agents, so it is execute-capable.
+      "crewai_deployment",
+      "crewai_crew",
     ].includes(r.resourceType),
   );
 
@@ -216,7 +220,9 @@ export function buildCapabilityFacts(
         r.resourceType === "databricks_registered_model" ||
         r.resourceType === "databricks_app" ||
         r.resourceType === "databricks_job" ||
-        r.resourceType === "databricks_genie_space",
+        r.resourceType === "databricks_genie_space" ||
+        r.resourceType === "crewai_deployment" ||
+        r.resourceType === "crewai_crew",
     ),
     resourceCount: agent.resources.length,
   };

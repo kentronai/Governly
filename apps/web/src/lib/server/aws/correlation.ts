@@ -43,6 +43,7 @@ export interface CorrelatedAgent {
     | "databricks_jobs"
     | "databricks_genie"
     | "kubernetes"
+    | "crewai"
     | "other";
   region: string;
   discoverySource: RawDiscoveredResource["resourceType"];
