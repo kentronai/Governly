@@ -7,6 +7,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { AgentInventory } from "./_components/AgentInventory";
 import { AgentDiscoveryNav } from "@/components/agent-discovery/AgentDiscoveryNav";
+import { resolveAgentDiscoveryTenantId } from "@/lib/queries/agent-dashboard";
 import { getAgentInventoryInitialData } from "@/lib/queries/agents";
 
 interface PageProps {
@@ -14,9 +15,10 @@ interface PageProps {
   searchParams: Promise<{ autonomy?: string }>;
 }
 
-const VALID_AUTONOMY = ["L1", "L2", "L3", "L4"];
-
-export default async function AgentInventoryPage({ params, searchParams }: PageProps) {
+export default async function AgentInventoryPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { tenant } = await params;
   const { autonomy } = await searchParams;
   const { userId, orgId } = await auth();
@@ -25,13 +27,20 @@ export default async function AgentInventoryPage({ params, searchParams }: PageP
     throw new Error("Authentication required");
   }
 
-  // Fetch the server-rendered initial state so the client component hydrates
-  // with real data (and the autonomy filter from the URL) instead of crashing
-  // on an undefined `initialData`.
-  const autonomyLevel =
-    autonomy && VALID_AUTONOMY.includes(autonomy) ? autonomy : undefined;
-  const initialData = await getAgentInventoryInitialData(orgId, {
-    autonomyLevel,
+  const tenantId = await resolveAgentDiscoveryTenantId(tenant);
+  if (tenantId !== orgId) {
+    throw new Error("Tenant access denied");
+  }
+
+  // Server-rendered initial state so the client hydrates with real data (and
+  // the autonomy filter from the URL) instead of crashing on undefined data.
+  const initialData = await getAgentInventoryInitialData(tenantId, {
+    autonomyLevel:
+      autonomy && ["L1", "L2", "L3", "L4"].includes(autonomy)
+        ? autonomy
+        : undefined,
+    page: 1,
+    pageSize: 25,
   });
 
   return (
