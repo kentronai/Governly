@@ -760,16 +760,8 @@ export default function IntegrationsPage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((integration) => {
-              const agentsDiscovered =
-                (integration.name === DATABRICKS_UNITY_CATALOG ||
-                  integration.name === KUBERNETES_CLUSTER ||
-                  integration.name === CREWAI) &&
-                integration.configuration.lastAgentsDiscovered !== undefined
-                  ? Number(integration.configuration.lastAgentsDiscovered ?? 0)
-                  : null;
               const hasDetails =
                 Boolean(integration.lastSyncAt) ||
-                agentsDiscovered !== null ||
                 Boolean(integration.errorMessage);
               const connectionFailed = integration.syncStatus === "failed";
               const connectionPending = integration.syncStatus === "pending";
@@ -832,16 +824,6 @@ export default function IntegrationsPage() {
                             </span>
                             <span className="text-right font-medium">
                               {formatUtc(integration.lastSyncAt)}
-                            </span>
-                          </div>
-                        ) : null}
-                        {agentsDiscovered !== null ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">
-                              Agents discovered
-                            </span>
-                            <span className="font-medium">
-                              {agentsDiscovered}
                             </span>
                           </div>
                         ) : null}
