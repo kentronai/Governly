@@ -40,26 +40,24 @@ export interface CrewAIConnection {
   credentialsEncrypted: string | null;
 }
 
-/** Shape of a CrewAI deployment as returned by the platform API. Parsed
- * defensively because field names vary across CrewAI API versions. */
-interface CrewAIDeploymentRaw {
+/**
+ * A deployed crew as returned by GET /crewai_plus/api/v1/crews. Verified
+ * against the live API; parsed defensively for forward-compatibility.
+ * Example: { uuid, name, status: "Crew is Online", state: "Successful",
+ *   description, public_url, token, error_message, tags: [] }
+ */
+interface CrewAICrewRaw {
   uuid?: string;
   id?: string | number;
   name?: string;
-  display_name?: string;
   status?: string;
   state?: string;
+  description?: string;
+  public_url?: string;
+  error_message?: string | null;
+  tags?: string[];
   created_at?: string;
   updated_at?: string;
-  crew?: {
-    name?: string;
-    agents?: Array<{ role?: string; name?: string }>;
-    tasks?: Array<{ name?: string; description?: string }>;
-    tools?: string[];
-  };
-  agents?: Array<{ role?: string; name?: string }>;
-  tools?: string[];
-  environment_variables?: Record<string, unknown> | string[];
   [key: string]: unknown;
 }
 
@@ -85,8 +83,8 @@ export function parseCrewAICredentials(
   };
 }
 
-/** Verifies the token by identifying the caller. Falls back to the deployments
- * listing when the identity endpoint is unavailable. */
+/** Verifies the token by listing crews; a 200 (even empty) means the PAT is
+ * valid for this organization. */
 export async function testCrewAIConnection(
   connection: CrewAIConnection,
 ): Promise<{ ok: boolean; error?: string; organization?: string }> {
@@ -97,110 +95,65 @@ export async function testCrewAIConnection(
     return { ok: false, error: (error as Error).message };
   }
   try {
-    const me = await crewaiApi<{
-      organization?: { name?: string };
-      organization_name?: string;
-      email?: string;
-    }>(credentials, CREWAI_ENDPOINTS.me);
-    return {
-      ok: true,
-      organization:
-        me.organization?.name || me.organization_name || me.email,
-    };
-  } catch (identityError) {
-    // Some org tokens can list deployments without access to /me — treat a
-    // successful deployments call as a valid connection.
-    try {
-      await crewaiApi(credentials, CREWAI_ENDPOINTS.deployments);
-      return { ok: true };
-    } catch {
-      return { ok: false, error: (identityError as Error).message };
-    }
+    await crewaiApi(credentials, CREWAI_ENDPOINTS.crews);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
   }
 }
 
-function readDeployments(payload: unknown): CrewAIDeploymentRaw[] {
-  if (Array.isArray(payload)) return payload as CrewAIDeploymentRaw[];
+function readCrews(payload: unknown): CrewAICrewRaw[] {
+  if (Array.isArray(payload)) return payload as CrewAICrewRaw[];
   if (payload && typeof payload === "object") {
     const obj = payload as Record<string, unknown>;
-    for (const key of ["deployments", "results", "data", "items"]) {
-      if (Array.isArray(obj[key])) return obj[key] as CrewAIDeploymentRaw[];
+    for (const key of ["crews", "data", "results", "items"]) {
+      if (Array.isArray(obj[key])) return obj[key] as CrewAICrewRaw[];
     }
   }
   return [];
 }
 
-const INACTIVE_STATES = new Set([
-  "stopped",
-  "failed",
-  "error",
-  "inactive",
-  "deleted",
-  "archived",
-  "not_deployed",
-]);
+// CrewAI reports health in `status` (e.g. "Crew is Online") and `state`
+// (e.g. "Successful"); anything else, or a non-empty error_message, is inactive.
+function isCrewActive(crew: CrewAICrewRaw): boolean {
+  if (crew.error_message) return false;
+  const status = (crew.status ?? "").toLowerCase();
+  const state = (crew.state ?? "").toLowerCase();
+  return status.includes("online") || state === "successful";
+}
 
 /**
- * Maps one CrewAI deployment to a CorrelatedAgent. Capability metadata is
- * derived only from what the deployment payload actually exposes (tools,
- * environment variables, member agents) so classification stays evidence-based.
+ * Maps one deployed crew to a CorrelatedAgent. A crew is an autonomous
+ * multi-agent runtime (execute-capable); its public deployment URL is a public
+ * endpoint. Tool/permission evidence is not exposed by the crews listing, so
+ * classification stays at the evidence-backed floor rather than inventing it.
  */
-function toCorrelatedAgent(
-  deployment: CrewAIDeploymentRaw,
-  baseHost: string,
-): CorrelatedAgent {
+function toCorrelatedAgent(crew: CrewAICrewRaw, baseHost: string): CorrelatedAgent {
   const externalAgentId = String(
-    deployment.uuid ?? deployment.id ?? deployment.name ?? crypto.randomUUID(),
+    crew.uuid ?? crew.id ?? crew.name ?? crypto.randomUUID(),
   );
-  const name =
-    deployment.name ||
-    deployment.display_name ||
-    deployment.crew?.name ||
-    `CrewAI deployment ${externalAgentId}`;
+  const name = crew.name || `CrewAI crew ${externalAgentId}`;
+  const tags = (crew.tags ?? []).reduce<Record<string, string>>((acc, t) => {
+    acc[t] = "true";
+    return acc;
+  }, {});
 
-  const tools = deployment.crew?.tools ?? deployment.tools ?? [];
-  const memberAgents = deployment.crew?.agents ?? deployment.agents ?? [];
-  const tasks = deployment.crew?.tasks ?? [];
-  const envVars = Array.isArray(deployment.environment_variables)
-    ? deployment.environment_variables
-    : Object.keys(deployment.environment_variables ?? {});
-
-  // A crew with tools can call out and act; expose that as capability evidence.
-  const hasTools = tools.length > 0;
-
-  const deploymentResource: RawDiscoveredResource = {
-    resourceType: "crewai_deployment",
+  const crewResource: RawDiscoveredResource = {
+    resourceType: "crewai_crew",
     resourceId: externalAgentId,
     resourceArn: null,
     resourceName: name,
     region: "crewai",
-    tags: {},
-    createdAt: deployment.created_at ?? null,
-    lastUpdatedAt: deployment.updated_at ?? null,
+    tags,
+    createdAt: crew.created_at ?? null,
+    lastUpdatedAt: crew.updated_at ?? null,
     metadata: {
-      providerStatus: deployment.status ?? deployment.state ?? "unknown",
-      hasWrite: hasTools,
-      environmentKeys: envVars,
-      toolCount: tools.length,
-      tools,
-      agentRoles: memberAgents.map((a) => a.role || a.name).filter(Boolean),
-      taskCount: tasks.length,
+      providerStatus: crew.status ?? crew.state ?? "unknown",
+      description: crew.description ?? null,
+      publicUrl: crew.public_url ?? null,
+      publicNetworkAccess: crew.public_url ? "Enabled" : "Disabled",
+      errorMessage: crew.error_message ?? null,
       baseHost,
-    },
-  };
-
-  const crewResource: RawDiscoveredResource = {
-    resourceType: "crewai_crew",
-    resourceId: `${externalAgentId}:crew`,
-    resourceArn: null,
-    resourceName: deployment.crew?.name || name,
-    region: "crewai",
-    tags: {},
-    createdAt: deployment.created_at ?? null,
-    lastUpdatedAt: deployment.updated_at ?? null,
-    metadata: {
-      memberAgentCount: memberAgents.length,
-      hasWrite: hasTools,
     },
   };
 
@@ -209,23 +162,22 @@ function toCorrelatedAgent(
     name,
     platform: "crewai",
     region: "crewai",
-    discoverySource: "crewai_deployment",
-    resources: [deploymentResource, crewResource],
+    discoverySource: "crewai_crew",
+    resources: [crewResource],
   };
 }
 
 export async function discoverCrewAI(credentials: CrewAICredentials): Promise<{
+  crews: CrewAICrewRaw[];
   agents: CorrelatedAgent[];
   baseHost: string;
 }> {
   const baseHost = new URL(credentials.baseUrl).hostname;
-  const payload = await crewaiApi<unknown>(
-    credentials,
-    CREWAI_ENDPOINTS.deployments,
-  );
-  const deployments = readDeployments(payload);
+  const payload = await crewaiApi<unknown>(credentials, CREWAI_ENDPOINTS.crews);
+  const crews = readCrews(payload);
   return {
-    agents: deployments.map((d) => toCorrelatedAgent(d, baseHost)),
+    crews,
+    agents: crews.map((c) => toCorrelatedAgent(c, baseHost)),
     baseHost,
   };
 }
@@ -253,7 +205,9 @@ export async function runCrewAIDiscoveryScan(
     const now = new Date().toISOString();
     const seenExternalIds: string[] = [];
 
-    for (const agent of discovery.agents) {
+    for (let i = 0; i < discovery.agents.length; i += 1) {
+      const agent = discovery.agents[i];
+      const crew = discovery.crews[i];
       seenExternalIds.push(agent.externalAgentId);
       const ownership = await detectOwnership(agent);
       const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
@@ -270,10 +224,7 @@ export async function runCrewAIDiscoveryScan(
           eq(agents.externalAgentId, agent.externalAgentId),
         ),
       });
-      const providerStatus = String(
-        agent.resources[0]?.metadata.providerStatus ?? "",
-      ).toLowerCase();
-      const providerInactive = INACTIVE_STATES.has(providerStatus);
+      const providerInactive = !isCrewActive(crew);
       const values = {
         tenantId,
         connectionId: null,
@@ -395,7 +346,7 @@ export async function runCrewAIDiscoveryScan(
         status: "completed",
         finishedAt: now,
         agentsDiscovered: discovery.agents.length,
-        resourcesScanned: { crewai_deployment: discovery.agents.length },
+        resourcesScanned: { crewai_crew: discovery.agents.length },
         errorMessage: null,
       })
       .where(eq(discoveryScans.id, scan.id));
@@ -420,7 +371,7 @@ export async function runCrewAIDiscoveryScan(
       scanId: scan.id,
       status: "completed" as const,
       agentsDiscovered: discovery.agents.length,
-      resourcesScanned: { crewai_deployment: discovery.agents.length },
+      resourcesScanned: { crewai_crew: discovery.agents.length },
     };
   } catch (error) {
     const message =
