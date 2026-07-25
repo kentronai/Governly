@@ -7,6 +7,7 @@ import { GovernancePanel } from "@/components/ai-console/GovernancePanel";
 import { Shield, Bell, FileText, Settings } from "lucide-react";
 
 import { ActivateDialog } from "@/components/common/FeatureActivation";
+import { Button } from "@/components/ui/button";
 
 const Page = ({ isEnabled }: { isEnabled: boolean }) => {
   return (
@@ -30,17 +31,17 @@ const Page = ({ isEnabled }: { isEnabled: boolean }) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button className="p-2 rounded-lg hover:bg-accent transition-colors relative">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-risk-high rounded-full animate-pulse-glow" />
-              </button>
-              <button className="p-2 rounded-lg hover:bg-accent transition-colors">
-                <FileText className="w-5 h-5 text-muted-foreground" />
-              </button>
-              <button className="p-2 rounded-lg hover:bg-accent transition-colors">
-                <Settings className="w-5 h-5 text-muted-foreground" />
-              </button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-risk-high animate-pulse-glow" />
+              </Button>
+              <Button variant="ghost" size="icon">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon">
+                <Settings className="h-5 w-5 text-muted-foreground" />
+              </Button>
             </div>
           </div>
         </header>

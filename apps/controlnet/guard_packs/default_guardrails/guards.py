@@ -413,36 +413,63 @@ HARMFUL_INSTRUCTION_REQUEST_PATTERNS = [
     ),
 ]
 
+# The act phrases allow up to a few filler words between the verb and its
+# object — e.g. "steal SOMEONE ELSE money", "hack ANY COMPANY website" — because
+# rigid adjacency (`steal money`, `hack a website`) was trivially bypassed by
+# inserting qualifiers, synonyms, or typos. The separate request-phrase
+# requirement below keeps this from over-firing on benign text.
+_GAP = r"(?:\w+\s+){0,4}"  # up to 4 filler words between verb and target
+
 HARMFUL_ACT_PATTERNS = {
     "violent_crime": [
         re.compile(
-            r"\b(?:kill|murder|assassinate|kidnap|abduct|poison|"
-            r"seriously\s+(?:hurt|injure)|attack)\b",
+            r"\b(?:kill|murder|assassinate|kidnap|abduct|poison|strangle|"
+            r"seriously\s+(?:hurt|injure)|(?:physically\s+)?attack)\b",
             re.IGNORECASE,
         ),
     ],
     "theft_and_burglary": [
         re.compile(
-            r"\b(?:rob(?:bing)?\s+(?:a\s+)?(?:bank|store|house|person)|"
-            r"bank\s+robbery|burglar(?:y|ize)|break\s+into|"
-            r"steal\s+(?:money|cash|credentials|a\s+car))\b",
+            rf"\brob(?:bing)?\s+{_GAP}"
+            r"(?:bank|store|shop|house|home|person|people|someone|business|company)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:bank\s+robbery|burglar(?:y|ize)|break\s+(?:in|into)|shoplift)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            rf"\bsteal(?:ing)?\s+{_GAP}"
+            r"(?:money|cash|funds|credentials|car|wallet|goods|property|jewel)",
             re.IGNORECASE,
         ),
     ],
     "fraud_and_cybercrime": [
         re.compile(
-            r"\b(?:commit\s+fraud|launder\s+money|phish(?:ing)?|"
-            r"scam\s+(?:people|customers|users)|"
-            r"hack\s+(?:an?\s+)?(?:account|bank|server|website)|"
-            r"bypass\s+(?:authentication|security)|"
-            r"steal\s+(?:passwords?|credit\s+cards?|identit(?:y|ies)))\b",
+            r"\b(?:commit(?:ting)?\s+fraud|launder(?:ing)?\s+money|phish(?:ing)?|"
+            rf"scam(?:ming)?\s+{_GAP}(?:people|customers|users|someone|victims)|"
+            rf"bypass(?:ing)?\s+{_GAP}"
+            r"(?:authentication|security|login|2fa|mfa|password|firewall|paywall))\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            rf"\bhack(?:ing)?\s+(?:in(?:to)?\s+)?{_GAP}"
+            r"(?:account|bank|server|website|site|network|system|database|db|"
+            r"app|portal|email|wi[- ]?fi|phone|computer|device|api|cloud)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            rf"\bsteal(?:ing)?\s+{_GAP}"
+            r"(?:password|credit\s+card|identit(?:y|ies)|data|"
+            r"personal\s+info|account)",
             re.IGNORECASE,
         ),
     ],
     "weapons_and_explosives": [
         re.compile(
-            r"\b(?:make|build|assemble|hide|detonate)\s+(?:an?\s+)?"
-            r"(?:bomb|explosive|weapon|gun|poison)\b",
+            rf"\b(?:make|build|assemble|hide|detonate|manufacture|create)\s+{_GAP}"
+            r"(?:bomb|explosive|weapon|gun|firearm|grenade|poison|malware|"
+            r"ransomware|virus)\b",
             re.IGNORECASE,
         ),
     ],

@@ -23,6 +23,7 @@ import {
 } from "@/lib/actions/provider-models";
 import { ProviderModelModal } from "./ProviderModelModal";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
+import { LocalTime } from "@/components/common/LocalTime";
 import { ModelScanResultsModal } from "./ModelScanResultsModal";
 import {
   selectModelForTenant,
@@ -684,7 +685,7 @@ export function ModelRegistryList({
                         {model.lastTestedAt && (
                           <p className="text-xs text-muted-foreground">
                             Last tested{" "}
-                            {new Date(model.lastTestedAt).toLocaleString()}
+                            <LocalTime value={model.lastTestedAt} />
                           </p>
                         )}
                         <Button

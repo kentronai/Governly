@@ -31,6 +31,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -760,16 +761,8 @@ export default function IntegrationsPage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((integration) => {
-              const agentsDiscovered =
-                (integration.name === DATABRICKS_UNITY_CATALOG ||
-                  integration.name === KUBERNETES_CLUSTER ||
-                  integration.name === CREWAI) &&
-                integration.configuration.lastAgentsDiscovered !== undefined
-                  ? Number(integration.configuration.lastAgentsDiscovered ?? 0)
-                  : null;
               const hasDetails =
                 Boolean(integration.lastSyncAt) ||
-                agentsDiscovered !== null ||
                 Boolean(integration.errorMessage);
               const connectionFailed = integration.syncStatus === "failed";
               const connectionPending = integration.syncStatus === "pending";
@@ -832,16 +825,6 @@ export default function IntegrationsPage() {
                             </span>
                             <span className="text-right font-medium">
                               {formatUtc(integration.lastSyncAt)}
-                            </span>
-                          </div>
-                        ) : null}
-                        {agentsDiscovered !== null ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">
-                              Agents discovered
-                            </span>
-                            <span className="font-medium">
-                              {agentsDiscovered}
                             </span>
                           </div>
                         ) : null}
@@ -913,10 +896,10 @@ export default function IntegrationsPage() {
         }}
         modal={true}
       >
-        <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-[460px] dialog-content">
-          <div className="flex max-h-[88vh] flex-col p-5">
-            <DialogHeader className="mb-4 p-0">
-              <DialogTitle className="text-[16px] font-semibold">
+        <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-lg dialog-content">
+          <div className="flex max-h-[88vh] flex-col p-6">
+            <DialogHeader className="mb-4">
+              <DialogTitle>
                 Add {selected?.name} credentials
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -1319,13 +1302,12 @@ export default function IntegrationsPage() {
               )}
             </div>
 
-            <div className="mt-5 flex justify-end gap-2 border-t pt-4">
+            <DialogFooter className="mt-5 border-t pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={closeCredentials}
                 disabled={saving}
-                className="h-9 rounded px-4"
               >
                 Cancel
               </Button>
@@ -1333,14 +1315,13 @@ export default function IntegrationsPage() {
                 type="button"
                 onClick={() => void save()}
                 disabled={!valid || saving}
-                className="h-9 rounded px-4"
               >
                 {saving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 Save
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

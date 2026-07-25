@@ -32,6 +32,8 @@ export default async function AgentInventoryPage({
     throw new Error("Tenant access denied");
   }
 
+  // Server-rendered initial state so the client hydrates with real data (and
+  // the autonomy filter from the URL) instead of crashing on undefined data.
   const initialData = await getAgentInventoryInitialData(tenantId, {
     autonomyLevel:
       autonomy && ["L1", "L2", "L3", "L4"].includes(autonomy)

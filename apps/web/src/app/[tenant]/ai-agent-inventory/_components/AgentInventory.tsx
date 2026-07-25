@@ -37,12 +37,9 @@ import {
   RefreshCw,
   LayoutDashboard,
   Bot,
-  AlertOctagon,
-  ShieldAlert,
   UserX,
   ShieldOff,
   BadgeX,
-  Siren,
 } from "lucide-react";
 import {
   fetchAgents,
@@ -50,6 +47,7 @@ import {
   fetchAgentInventorySummary,
   assignAgentToApplication,
 } from "@/lib/actions/agents";
+import { refreshAgentInventory } from "@/lib/actions/agent-inventory-refresh";
 import type {
   AgentInventoryInitialData,
   AgentInventorySummary,
@@ -245,8 +243,16 @@ export function AgentInventory({
   }, [tenant]);
 
   const refreshAll = useCallback(async () => {
+    // Re-run discovery across every connected provider (real-time), then reload
+    // the inventory and summary so the whole view reflects fresh data.
+    setIsLoading(true);
+    try {
+      await refreshAgentInventory(tenant);
+    } catch {
+      // Fall through to a plain reload even if a provider scan failed.
+    }
     await Promise.all([load(), loadSummary()]);
-  }, [load, loadSummary]);
+  }, [tenant, load, loadSummary]);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -331,22 +337,6 @@ export function AgentInventory({
           description="Agent records discovered from connected providers or ingestion."
         />
         <SummaryCard
-          label="Critical Risk"
-          value={summary?.criticalRisk}
-          icon={AlertOctagon}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Discovered agents currently classified as Critical risk."
-        />
-        <SummaryCard
-          label="High Risk"
-          value={summary?.highRisk}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-orange-600 dark:text-orange-400"
-          description="Discovered agents currently classified as High risk."
-        />
-        <SummaryCard
           label="Unowned Agents"
           value={summary?.unownedAgents}
           icon={UserX}
@@ -355,36 +345,12 @@ export function AgentInventory({
           description="Agents with no provider owner evidence mapped to a NORIX user."
         />
         <SummaryCard
-          label="L4 Agents"
-          value={summary?.l4Agents}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Agents with evidence-backed privileged autonomous control."
-        />
-        <SummaryCard
-          label="L3 Agents"
-          value={summary?.l3Agents}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-orange-600 dark:text-orange-400"
-          description="Agents with evidence-backed tool, write, API, or sensitive-data control."
-        />
-        <SummaryCard
           label="Non-Compliant Agents"
           value={summary?.nonCompliantAgents}
           icon={BadgeX}
           loading={isSummaryLoading}
           tone="text-red-600 dark:text-red-400"
           description="Agents with an active compliance policy evaluation marked non-compliant."
-        />
-        <SummaryCard
-          label="Open Findings"
-          value={summary?.agentsWithOpenFindings}
-          icon={Siren}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Agents with unresolved runtime breaches or evidence-backed compliance gaps."
         />
         <SummaryCard
           label="Missing Runtime Evidence"
@@ -407,41 +373,51 @@ export function AgentInventory({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <FilterSelect
-          label="Risk"
-          value={riskLevel}
-          onChange={setRiskLevel}
-          options={options.riskLevels}
-        />
-        <FilterSelect
-          label="Autonomy"
-          value={autonomyLevel}
-          onChange={setAutonomyLevel}
-          options={options.autonomyLevels}
-        />
-        <FilterSelect
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={options.statuses}
-        />
-        <FilterSelect
-          label="Platform"
-          value={platform}
-          onChange={setPlatform}
-          options={options.platforms}
-          formatOption={platformLabel}
-        />
-        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
-            <SelectValue placeholder="Owner" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Owner: All</SelectItem>
-            <SelectItem value={UNOWNED}>Unowned</SelectItem>
-          </SelectContent>
-        </Select>
-        {hasActiveFilters && (
+        {/* Radix Select generates its aria-controls id with useId(). Rendering
+            these filters only after mount keeps the server HTML and the first
+            client render identical (a placeholder, no Radix ids on either side),
+            which avoids the hydration id mismatch this page was throwing. */}
+        {mounted ? (
+          <>
+            <FilterSelect
+              label="Risk"
+              value={riskLevel}
+              onChange={setRiskLevel}
+              options={options.riskLevels}
+            />
+            <FilterSelect
+              label="Autonomy"
+              value={autonomyLevel}
+              onChange={setAutonomyLevel}
+              options={options.autonomyLevels}
+            />
+            <FilterSelect
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={options.statuses}
+            />
+            <FilterSelect
+              label="Platform"
+              value={platform}
+              onChange={setPlatform}
+              options={options.platforms}
+              formatOption={platformLabel}
+            />
+            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+              <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+                <SelectValue placeholder="Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Owner: All</SelectItem>
+                <SelectItem value={UNOWNED}>Unowned</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        ) : (
+          <div className="h-8 w-full max-w-[720px] rounded-md border bg-muted/10" />
+        )}
+        {mounted && hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
@@ -476,7 +452,7 @@ export function AgentInventory({
               <TableHead>Open Gaps</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Region / Account</TableHead>
-              <TableHead>Last Seen</TableHead>
+              <TableHead>Last Active</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1144,7 +1120,7 @@ function AgentDetailModal({
                   value={formatTimestamp(agent.firstSeenAt)}
                 />
                 <Field
-                  label="Last Seen"
+                  label="Last Active"
                   value={formatTimestamp(agent.lastSeenAt)}
                 />
                 <Field label="Sync Status" value={agent.syncStatus} />

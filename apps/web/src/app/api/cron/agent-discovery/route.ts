@@ -12,6 +12,8 @@ import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
+import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
+import { assignFallbackOwnership } from "@/lib/server/agents/ownership-fallback";
 import { runKubernetesDiscoveryScan } from "@/lib/server/kubernetes/discovery-orchestrator";
 
 function authorized(request: NextRequest): boolean {
@@ -184,6 +186,17 @@ async function run(request: NextRequest) {
               ? error.message
               : "Scheduled discovery failed",
         });
+      }
+    }
+
+    // Once every provider has been refreshed, align the autonomy of agents that
+    // are the same logical agent deployed across platforms.
+    for (const tenantId of new Set(enabled.map((i) => i.tenantId))) {
+      try {
+        await alignAutonomyByIdentity(tenantId);
+        await assignFallbackOwnership(tenantId);
+      } catch {
+        // Non-fatal: normalization is a display refinement, not core discovery.
       }
     }
 

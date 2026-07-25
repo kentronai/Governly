@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getModelScanResultsByUrl } from "@/lib/actions/model-scans";
 import { getProviderModelById } from "@/lib/actions/provider-models";
+import { LocalTime } from "@/components/common/LocalTime";
 
 interface SecurityFinding {
   id: string;
@@ -504,9 +505,7 @@ export default function ModelReportPage() {
                     </span>
                   </div>
                   <p className="text-sm ">
-                    {new Date(
-                      scanResult.created_at || new Date()
-                    ).toLocaleString("en-US")}
+                    <LocalTime value={scanResult.created_at || new Date()} />
                   </p>
                 </div>
               </div>
@@ -602,9 +601,8 @@ export default function ModelReportPage() {
 
                         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
                           <span>Scanner: {finding.scanner}</span>
-                          <span>
-                            {new Date(finding.created_at).toLocaleString("en-US")}
-                          </span>
+                          <LocalTime value={finding.created_at} />
+
                         </div>
                       </div>
                     ))}

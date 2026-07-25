@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { LocalTime } from '@/components/common/LocalTime';
 import { Shield, AlertCircle, CheckCircle, Clock, ExternalLink, Info } from 'lucide-react';
 
 interface ScanResult {
@@ -179,7 +180,7 @@ export function ModelScanResultsModal({ isOpen, onClose, scanResult, modelName, 
                 {scanResult.created_at && (
                   <div>
                     <span className="font-medium text-blue-800">Scanned:</span>
-                    <div className="text-blue-700">{new Date(scanResult.created_at).toLocaleDateString("en-US")}</div>
+                    <div className="text-blue-700"><LocalTime value={scanResult.created_at} mode="date" /></div>
                   </div>
                 )}
               </div>

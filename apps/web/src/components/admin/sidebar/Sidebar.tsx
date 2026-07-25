@@ -178,10 +178,6 @@ const Sidebar = () => {
   };
   const { activePolicy, policyStatus, tenant: tenantInfo } = useTenant();
 
-  const isEuActive = useMemo(() => {
-    return policyStatus.euAiAct;
-  }, [policyStatus.euAiAct]);
-
   const isISOActive = useMemo(() => {
     return policyStatus.iso42001;
   }, [policyStatus.iso42001]);
@@ -300,21 +296,8 @@ const Sidebar = () => {
                   Compliance Policies
                 </SubNavItem>
               </NavItem>
-              {isEuActive && (
-                <>
-                  <NavItem
-                    href={`/${tenant}/admin/settings/eu-ai-act`}
-                    icon={<Scale size={16} strokeWidth={1.5} />}
-                    active={pathname.includes("/admin/settings/eu-ai-act")}
-                  >
-                    <SubNavItem
-                      active={pathname.includes("/admin/settings/eu-ai-act")}
-                    >
-                      EU AI Act
-                    </SubNavItem>
-                  </NavItem>
-                </>
-              )}
+              {/* EU AI Act removed from nav: its policies are surfaced through
+                  Compliance Policies (policy-center) instead. */}
 
               {isISOActive && (
                 <>
