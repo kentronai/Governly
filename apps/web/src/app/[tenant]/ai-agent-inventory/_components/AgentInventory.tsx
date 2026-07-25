@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatTimestamp } from "@/utils/formatTime";
@@ -42,18 +42,18 @@ import {
   UserX,
   ShieldOff,
   BadgeX,
-  Moon,
   Siren,
 } from "lucide-react";
 import {
   fetchAgents,
   fetchAgentDetail,
-  fetchAgentFilterOptions,
   fetchAgentInventorySummary,
-  fetchAgentApplicationOptions,
   assignAgentToApplication,
 } from "@/lib/actions/agents";
-import type { AgentInventorySummary } from "@/lib/queries/agents";
+import type {
+  AgentInventoryInitialData,
+  AgentInventorySummary,
+} from "@/lib/queries/agents";
 
 const ALL = "__all__";
 const UNOWNED = "__unowned__";
@@ -92,6 +92,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   aws_lambda: "AWS Lambda",
   aws_step_functions: "AWS Step Functions",
   aws_ec2: "AWS EC2",
+  aws_eks: "AWS EKS",
   amazon_q: "Amazon Q",
   azure_openai: "Azure OpenAI",
   azure_ai_foundry: "Azure AI Foundry",
@@ -105,9 +106,44 @@ const PLATFORM_LABELS: Record<string, string> = {
   gcp_compute: "Google Compute Engine",
   gcp_gke: "Google GKE",
   gcp_functions: "Google Cloud Functions",
+  kubernetes: "Kubernetes",
+  databricks_model_serving: "Databricks Model Serving",
+  databricks_unity_catalog: "Databricks Unity Catalog",
+  databricks_apps: "Databricks Apps",
+  databricks_jobs: "Databricks Jobs",
+  databricks_genie: "Databricks Genie Agent",
 };
 const platformLabel = (value: string) =>
   PLATFORM_LABELS[value] ?? value.replaceAll("_", " ");
+
+function ownerDisplay(value?: string | null): React.ReactNode {
+  return value ? (
+    value
+  ) : (
+    <span className="text-orange-600 dark:text-orange-400">Unowned</span>
+  );
+}
+
+function functionDisplay(value?: string | null): React.ReactNode {
+  return value ? (
+    value
+  ) : (
+    <span className="text-muted-foreground">Not provided</span>
+  );
+}
+
+// The stored level is authoritative: classifyAutonomy() already caps a
+// classification at what discovered provider evidence supports before writing
+// it. This deliberately does NOT re-derive the cap client-side — doing so gave
+// the table a second, divergent definition that silently disagreed with the
+// summary cards (which count the column) whenever a row went stale.
+function autonomyLevelDisplay(agent: any): string | null {
+  return agent.autonomyLevel ?? null;
+}
+
+function autonomyReasonDisplay(agent: any): string {
+  return agent.autonomyReason ?? "—";
+}
 
 function relativeFromNow(iso: string | null): string {
   if (!iso) return "Never";
@@ -123,16 +159,18 @@ function relativeFromNow(iso: string | null): string {
 export function AgentInventory({
   tenant,
   initialAutonomy,
+  initialData,
 }: {
   tenant: string;
   initialAutonomy?: string;
+  initialData: AgentInventoryInitialData;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [rows, setRows] = useState<any[]>(initialData.list.rows);
+  const [total, setTotal] = useState(initialData.list.total);
+  const [totalPages, setTotalPages] = useState(initialData.list.totalPages);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [riskLevel, setRiskLevel] = useState(ALL);
   const [autonomyLevel, setAutonomyLevel] = useState(
@@ -143,24 +181,20 @@ export function AgentInventory({
   const [status, setStatus] = useState(ALL);
   const [platform, setPlatform] = useState(ALL);
   const [ownerFilter, setOwnerFilter] = useState(ALL);
-  const [options, setOptions] = useState<{
-    platforms: string[];
-    riskLevels: string[];
-    autonomyLevels: string[];
-    statuses: string[];
-  }>({
-    platforms: [],
-    riskLevels: [],
-    autonomyLevels: [],
-    statuses: [],
-  });
+  const [options] = useState(initialData.options);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<any | null>(null);
-  const [summary, setSummary] = useState<AgentInventorySummary | null>(null);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
-  const [applicationOptions, setApplicationOptions] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [summary, setSummary] = useState<AgentInventorySummary | null>(
+    initialData.summary,
+  );
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [applicationOptions] = useState(initialData.applicationOptions);
+  const hasMounted = useRef(false);
+  // Relative timestamps depend on the current clock, so the server HTML and the
+  // first client render would disagree and trip a hydration error. Gate them
+  // behind mount: server and first client render both show the static
+  // placeholder, then the live value appears once we are purely client-side.
+  const [mounted, setMounted] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -215,19 +249,19 @@ export function AgentInventory({
   }, [load, loadSummary]);
 
   useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
     const t = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
-  useEffect(() => {
-    fetchAgentFilterOptions(tenant).then(setOptions as any);
-    fetchAgentApplicationOptions(tenant).then(setApplicationOptions);
-  }, [tenant]);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    void loadSummary();
-    const interval = window.setInterval(() => void loadSummary(), 30_000);
+    const interval = window.setInterval(() => void loadSummary(), 60_000);
     return () => window.clearInterval(interval);
   }, [loadSummary]);
 
@@ -288,13 +322,13 @@ export function AgentInventory({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fill,160px)] gap-2">
         <SummaryCard
-          label="Total AI Agents"
+          label="Total Agents"
           value={summary?.totalAiAgents}
           icon={Bot}
           loading={isSummaryLoading}
-          description="All tenant-scoped agents discovered from connected cloud accounts."
+          description="Agent records discovered from connected providers or ingestion."
         />
         <SummaryCard
           label="Critical Risk"
@@ -313,52 +347,44 @@ export function AgentInventory({
           description="Discovered agents currently classified as High risk."
         />
         <SummaryCard
-          label="Unowned Applications"
-          value={summary?.unownedApplications}
+          label="Unowned Agents"
+          value={summary?.unownedAgents}
           icon={UserX}
           loading={isSummaryLoading}
           tone="text-orange-600 dark:text-orange-400"
-          description="Applications without a stakeholder whose assigned role is Owner."
+          description="Agents with no provider owner evidence mapped to a NORIX user."
         />
         <SummaryCard
-          label="Missing ControlNet Policy"
-          value={summary?.missingControlnetPolicy}
-          icon={ShieldOff}
+          label="L4 Agents"
+          value={summary?.l4Agents}
+          icon={ShieldAlert}
           loading={isSummaryLoading}
-          tone="text-amber-600 dark:text-amber-400"
-          description="Applications without an active default runtime policy."
+          tone="text-red-600 dark:text-red-400"
+          description="Agents with evidence-backed privileged autonomous control."
         />
         <SummaryCard
-          label="Non-Compliant"
-          value={summary?.nonCompliant}
+          label="L3 Agents"
+          value={summary?.l3Agents}
+          icon={ShieldAlert}
+          loading={isSummaryLoading}
+          tone="text-orange-600 dark:text-orange-400"
+          description="Agents with evidence-backed tool, write, API, or sensitive-data control."
+        />
+        <SummaryCard
+          label="Non-Compliant Agents"
+          value={summary?.nonCompliantAgents}
           icon={BadgeX}
           loading={isSummaryLoading}
           tone="text-red-600 dark:text-red-400"
-          description="Applications with at least one active policy evaluation marked non-compliant."
+          description="Agents with an active compliance policy evaluation marked non-compliant."
         />
         <SummaryCard
-          label="Dormant Applications"
-          value={summary?.dormantApplications}
-          icon={Moon}
-          loading={isSummaryLoading}
-          tone="text-muted-foreground"
-          description="Applications older than 30 days with no runtime request in the last 30 days."
-        />
-        <SummaryCard
-          label="Policy Violations (30D)"
-          value={summary?.policyViolations30d}
-          icon={Siren}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Runtime requests blocked by ControlNet guardrails during the last 30 days."
-        />
-        <SummaryCard
-          label="Agents With Open Findings"
+          label="Open Findings"
           value={summary?.agentsWithOpenFindings}
           icon={Siren}
           loading={isSummaryLoading}
           tone="text-red-600 dark:text-red-400"
-          description="Discovered agents with unresolved runtime breaches or evidence-backed compliance gaps."
+          description="Agents with unresolved runtime breaches or evidence-backed compliance gaps."
         />
         <SummaryCard
           label="Missing Runtime Evidence"
@@ -375,7 +401,7 @@ export function AgentInventory({
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by agent name, business function, model, owner…"
+          placeholder="Search by agent name, function, model, owner…"
           className="pl-9"
         />
       </div>
@@ -443,7 +469,7 @@ export function AgentInventory({
               <TableHead>Agent</TableHead>
               <TableHead>Platform</TableHead>
               <TableHead>Owner</TableHead>
-              <TableHead>Business Function</TableHead>
+              <TableHead>Function</TableHead>
               <TableHead>Autonomy</TableHead>
               <TableHead>Risk</TableHead>
               <TableHead>Compliance</TableHead>
@@ -462,7 +488,7 @@ export function AgentInventory({
                 >
                   {isLoading
                     ? "Loading agents…"
-                    : "No agents discovered yet. Connect AWS, Azure, Google Cloud, or the Universal Agent Collector in Admin → Integrations."}
+                    : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or Kubernetes Cluster in Admin → Integrations."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -482,24 +508,27 @@ export function AgentInventory({
                     {platformLabel(r.platform)}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {r.ownerName ?? (
-                      <span className="text-orange-600 dark:text-orange-400">
-                        Unowned
-                      </span>
-                    )}
+                    <div className="space-y-0.5">
+                      <div>{ownerDisplay(r.ownerName)}</div>
+                      {!r.ownerName ? (
+                        <div className="text-[11px] text-muted-foreground">
+                          no provider owner match
+                        </div>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {r.businessFunction ?? "—"}
+                    {functionDisplay(r.businessFunction)}
                   </TableCell>
                   <TableCell>
-                    {r.autonomyLevel ? (
+                    {autonomyLevelDisplay(r) ? (
                       <Badge
                         className={cn(
                           "border-transparent",
-                          AUTONOMY_STYLES[r.autonomyLevel],
+                          AUTONOMY_STYLES[autonomyLevelDisplay(r)!],
                         )}
                       >
-                        {r.autonomyLevel}
+                        {autonomyLevelDisplay(r)}
                       </Badge>
                     ) : (
                       "—"
@@ -576,7 +605,7 @@ export function AgentInventory({
                     {r.region} · {r.accountId}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {relativeFromNow(r.lastSeenAt)}
+                    {mounted ? relativeFromNow(r.lastSeenAt) : "—"}
                   </TableCell>
                 </TableRow>
               ))
@@ -746,14 +775,14 @@ function AgentDetailModal({
                     {agent.riskLevel} risk
                   </Badge>
                 )}
-                {agent.autonomyLevel && (
+                {autonomyLevelDisplay(agent) && (
                   <Badge
                     className={cn(
                       "border-transparent",
-                      AUTONOMY_STYLES[agent.autonomyLevel],
+                      AUTONOMY_STYLES[autonomyLevelDisplay(agent)!],
                     )}
                   >
-                    {agent.autonomyLevel}
+                    {autonomyLevelDisplay(agent)}
                   </Badge>
                 )}
               </div>
@@ -770,14 +799,22 @@ function AgentDetailModal({
                   value={
                     agent.owner
                       ? `${agent.owner.name}${agent.owner.email ? ` · ${agent.owner.email}` : ""}`
-                      : "Unowned"
+                      : "Unowned · no provider owner match"
                   }
                   warn={!agent.owner}
                 />
-                <Field label="Owner Source" value={agent.ownerSource ?? "—"} />
                 <Field
-                  label="Business Function"
-                  value={agent.businessFunction ?? "—"}
+                  label="Owner Evidence"
+                  value={
+                    agent.ownerSource ??
+                    "No owner evidence matched a NORIX user"
+                  }
+                  warn={!agent.ownerSource}
+                />
+                <Field
+                  label="Function"
+                  value={agent.businessFunction ?? "Not provided by provider"}
+                  warn={!agent.businessFunction}
                 />
                 <div className="px-3 py-2 space-y-1.5">
                   <span className="text-xs text-muted-foreground">
@@ -988,7 +1025,10 @@ function AgentDetailModal({
               </Section>
 
               <Section title="Autonomy">
-                <Field label="Level" value={agent.autonomyLevel ?? "—"} />
+                <Field
+                  label="Level"
+                  value={autonomyLevelDisplay(agent) ?? "—"}
+                />
                 <Field
                   label="Confidence"
                   value={
@@ -997,7 +1037,7 @@ function AgentDetailModal({
                       : "—"
                   }
                 />
-                <Field label="Reason" value={agent.autonomyReason ?? "—"} />
+                <Field label="Reason" value={autonomyReasonDisplay(agent)} />
               </Section>
 
               <Section title="Risk">

@@ -42,9 +42,15 @@ export default async function NewPolicyPage({ params }: PageProps) {
         tenantSlug={tenantSlug}
         userId={userId}
         availableGuardrails={availableGuardrails.map(g => ({
-          ...g,
+          // Project to exactly the shape PolicyCreationClient expects rather
+          // than spreading the whole drizzle row (whose jsonb defaultParams is
+          // typed `unknown` and whose extra columns don't match the prop type).
+          id: g.id,
+          key: g.key,
           name: g.name || g.key,
+          tier: g.tier,
           description: g.description || "",
+          defaultParams: (g.defaultParams ?? {}) as Record<string, unknown>,
         }))}
       />
     </div>

@@ -8,7 +8,8 @@ Guards:
 1. profanity_detect: T0 regex-based profanity detection
 2. jailbreak_detect: T1 pattern-based jailbreak/prompt injection detection
 3. toxicity_detect: T1 pattern-based toxicity detection
-4. pii_detect: T0 regex-based PII detection with anonymization
+4. harmful_instructions_detect: T0 actionable wrongdoing detection
+5. pii_detect: T0 regex-based PII detection with anonymization
 """
 
 import re
@@ -390,6 +391,148 @@ def toxicity_detect(
         
         return Right_(ctx)
     
+    return run
+
+
+# ============================================================================
+# HARMFUL / CRIMINAL INSTRUCTIONS DETECTION (T0)
+# ============================================================================
+
+# Require both an instruction-seeking phrase and a concrete harmful act. This
+# blocks actionable requests while allowing high-level news, history, safety,
+# prevention, and clearly non-instructional fictional discussion.
+HARMFUL_INSTRUCTION_REQUEST_PATTERNS = [
+    re.compile(
+        r"\b(?:how\s+to|how\s+(?:do|can|would|should)\s+(?:i|we|you)|"
+        r"give\s+me\s+(?:the\s+)?(?:steps|instructions|plan)|"
+        r"(?:step[- ]by[- ]step|detailed)\s+(?:guide|instructions|plan)|"
+        r"(?:best|easiest|fastest|safest)\s+way\s+to|"
+        r"help\s+me\s+(?:to\s+)?|"
+        r"(?:teach|show|tell)\s+me\s+how\s+to)\b",
+        re.IGNORECASE,
+    ),
+]
+
+HARMFUL_ACT_PATTERNS = {
+    "violent_crime": [
+        re.compile(
+            r"\b(?:kill|murder|assassinate|kidnap|abduct|poison|"
+            r"seriously\s+(?:hurt|injure)|attack)\b",
+            re.IGNORECASE,
+        ),
+    ],
+    "theft_and_burglary": [
+        re.compile(
+            r"\b(?:rob(?:bing)?\s+(?:a\s+)?(?:bank|store|house|person)|"
+            r"bank\s+robbery|burglar(?:y|ize)|break\s+into|"
+            r"steal\s+(?:money|cash|credentials|a\s+car))\b",
+            re.IGNORECASE,
+        ),
+    ],
+    "fraud_and_cybercrime": [
+        re.compile(
+            r"\b(?:commit\s+fraud|launder\s+money|phish(?:ing)?|"
+            r"scam\s+(?:people|customers|users)|"
+            r"hack\s+(?:an?\s+)?(?:account|bank|server|website)|"
+            r"bypass\s+(?:authentication|security)|"
+            r"steal\s+(?:passwords?|credit\s+cards?|identit(?:y|ies)))\b",
+            re.IGNORECASE,
+        ),
+    ],
+    "weapons_and_explosives": [
+        re.compile(
+            r"\b(?:make|build|assemble|hide|detonate)\s+(?:an?\s+)?"
+            r"(?:bomb|explosive|weapon|gun|poison)\b",
+            re.IGNORECASE,
+        ),
+    ],
+}
+
+
+@guard(
+    "harmful_instructions.detect",
+    tier="T0",
+    description="Blocks requests for actionable criminal or harmful instructions",
+    performance_budget_ms=5.0,
+)
+def harmful_instructions_detect(
+    threshold: float = 0.75,
+    severity: Literal["low", "med", "high", "critical"] = "high",
+    categories: Optional[List[str]] = None,
+) -> Guard:
+    """Detect requests for operational instructions enabling serious wrongdoing."""
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(
+            f"Invalid threshold={threshold}. Must be between 0.0 and 1.0"
+        )
+
+    if isinstance(categories, str):
+        categories = [categories]
+    selected_categories = categories or list(HARMFUL_ACT_PATTERNS.keys())
+    compiled_categories = {
+        category: HARMFUL_ACT_PATTERNS[category]
+        for category in selected_categories
+        if category in HARMFUL_ACT_PATTERNS
+    }
+
+    async def run(ctx: Ctx) -> Either:
+        text = ctx.get("output", "")
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = (
+                    last_msg.get("content", "")
+                    if isinstance(last_msg, dict)
+                    else str(last_msg)
+                )
+
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+
+        asks_for_instructions = any(
+            pattern.search(text)
+            for pattern in HARMFUL_INSTRUCTION_REQUEST_PATTERNS
+        )
+        detected_categories = [
+            category
+            for category, patterns in compiled_categories.items()
+            if any(pattern.search(text) for pattern in patterns)
+        ]
+
+        # An explicit instruction request plus a concrete harmful act is a
+        # high-confidence match. Multiple categories raise confidence further.
+        score = (
+            min(0.92 + (0.04 * (len(detected_categories) - 1)), 1.0)
+            if asks_for_instructions and detected_categories
+            else 0.0
+        )
+
+        if score >= threshold:
+            return Left_(
+                [
+                    Violation(
+                        rule_id="harmful_instructions.detect",
+                        severity=severity,
+                        message=(
+                            "Request for actionable criminal or harmful "
+                            "instructions detected"
+                        ),
+                        score=score,
+                        evidence={
+                            "detected_categories": detected_categories,
+                            "instruction_request": True,
+                            "threshold": threshold,
+                            "text_preview": (
+                                text[:200] + "..." if len(text) > 200 else text
+                            ),
+                        },
+                    )
+                ]
+            )
+
+        return Right_(ctx)
+
     return run
 
 

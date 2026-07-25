@@ -90,6 +90,11 @@ export function buildCapabilityFacts(
       "gcp_gke_cluster",
       "gcp_cloud_function",
       "gcp_vertex_reasoning_engine",
+      "databricks_serving_endpoint",
+      "databricks_app",
+      "databricks_job",
+      "databricks_genie_space",
+      "kubernetes_workload",
     ].includes(r.resourceType),
   );
 
@@ -159,6 +164,11 @@ export function buildCapabilityFacts(
       ((runtime.metadata.environmentKeys as string[]) ?? []).some((key) =>
         EXTERNAL_API_ENV_PATTERN.test(key),
       ),
+    ) ||
+    agent.resources.some((resource) =>
+      ((resource.metadata.environmentKeys as string[]) ?? []).some((key) =>
+        EXTERNAL_API_ENV_PATTERN.test(key),
+      ),
     );
 
   return {
@@ -201,7 +211,12 @@ export function buildCapabilityFacts(
         r.resourceType === "agentcore_runtime" ||
         r.resourceType === "azure_openai_account" ||
         r.resourceType === "azure_ai_foundry_project" ||
-        r.resourceType === "gcp_vertex_reasoning_engine",
+        r.resourceType === "gcp_vertex_reasoning_engine" ||
+        r.resourceType === "databricks_serving_endpoint" ||
+        r.resourceType === "databricks_registered_model" ||
+        r.resourceType === "databricks_app" ||
+        r.resourceType === "databricks_job" ||
+        r.resourceType === "databricks_genie_space",
     ),
     resourceCount: agent.resources.length,
   };

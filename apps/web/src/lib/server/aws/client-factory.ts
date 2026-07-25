@@ -25,7 +25,23 @@ import { APIGatewayClient } from "@aws-sdk/client-api-gateway";
 import { ApiGatewayV2Client } from "@aws-sdk/client-apigatewayv2";
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { EC2Client } from "@aws-sdk/client-ec2";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { decryptSecret } from "@/lib/server/crypto";
+
+const AWS_MAX_ATTEMPTS = 3;
+const AWS_REQUEST_HANDLER = new NodeHttpHandler({
+  // 5s was not enough to complete a TLS handshake to geographically distant
+  // regions from a container, so regions like eu-central-1 were dropped from
+  // every scan with "the request socket did not establish a connection within
+  // the configured timeout" and their resources silently went stale.
+  connectionTimeout: 15_000,
+  requestTimeout: 30_000,
+});
+
+export const awsDiscoveryClientConfig = {
+  maxAttempts: AWS_MAX_ATTEMPTS,
+  requestHandler: AWS_REQUEST_HANDLER,
+} as const;
 
 // Defined locally (rather than imported from @aws-sdk/types) since that
 // package is a transitive dependency not hoisted into this workspace.
@@ -87,7 +103,10 @@ export async function resolveAwsCredentials(
     );
   }
 
-  const sts = new STSClient({ region: connection.region || "us-east-1" });
+  const sts = new STSClient({
+    region: connection.region || "us-east-1",
+    ...awsDiscoveryClientConfig,
+  });
   const assumed = await sts.send(
     new AssumeRoleCommand({
       RoleArn: roleArn,
@@ -121,24 +140,72 @@ export async function buildAwsClients(
     options.credentials ?? (await resolveAwsCredentials(connection));
   const region = options.region ?? connection.region ?? "us-east-1";
 
-  const sts = new STSClient({ region, credentials });
+  const sts = new STSClient({
+    region,
+    credentials,
+    ...awsDiscoveryClientConfig,
+  });
   const identity = await sts.send(new GetCallerIdentityCommand({}));
   const accountId = identity.Account ?? "unknown";
 
   return {
     region,
     accountId,
-    bedrock: new BedrockClient({ region, credentials }),
-    bedrockAgent: new BedrockAgentClient({ region, credentials }),
-    lambda: new LambdaClient({ region, credentials }),
-    stepFunctions: new SFNClient({ region, credentials }),
-    cloudWatchLogs: new CloudWatchLogsClient({ region, credentials }),
-    iam: new IAMClient({ region, credentials }),
-    secretsManager: new SecretsManagerClient({ region, credentials }),
-    apiGateway: new APIGatewayClient({ region, credentials }),
-    apiGatewayV2: new ApiGatewayV2Client({ region, credentials }),
-    eventBridge: new EventBridgeClient({ region, credentials }),
-    ec2: new EC2Client({ region, credentials }),
+    bedrock: new BedrockClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    bedrockAgent: new BedrockAgentClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    lambda: new LambdaClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    stepFunctions: new SFNClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    cloudWatchLogs: new CloudWatchLogsClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    iam: new IAMClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    secretsManager: new SecretsManagerClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    apiGateway: new APIGatewayClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    apiGatewayV2: new ApiGatewayV2Client({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    eventBridge: new EventBridgeClient({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    ec2: new EC2Client({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
   };
 }
 
@@ -151,6 +218,7 @@ export async function testAwsConnection(
     const sts = new STSClient({
       region: connection.region || "us-east-1",
       credentials,
+      ...awsDiscoveryClientConfig,
     });
     const identity = await sts.send(new GetCallerIdentityCommand({}));
     return { ok: true, accountId: identity.Account ?? "unknown" };

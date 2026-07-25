@@ -230,6 +230,9 @@ export const ensureAwsIntegrationCatalogEntry = async (
       .set({
         description:
           "Discovers Bedrock, AgentCore, Lambda, and explicitly identified EC2 agent workloads across enabled AWS regions.",
+        // Connected integrations are always active; the old separate
+        // enable/disable control was intentionally removed from the UI.
+        isEnabled: existing.isCredentialsAdded || existing.isEnabled,
         metadata: {
           ...(existing.metadata as Record<string, unknown>),
           logoUrl: "/logos/AWS.svg",

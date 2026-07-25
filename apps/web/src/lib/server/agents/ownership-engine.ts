@@ -10,6 +10,25 @@ import type { CorrelatedAgent } from "../aws/correlation";
 
 const OWNER_TAG_KEYS = ["Owner", "owner", "norix:owner", "Team", "team"];
 const EMAIL_TAG_KEYS = ["Email", "email", "OwnerEmail", "owner-email"];
+const BUSINESS_FUNCTION_TAG_KEYS = [
+  "BusinessFunction",
+  "business-function",
+  "business_function",
+  "Function",
+  "function",
+  "norix:function",
+  "UseCase",
+  "use-case",
+  "use_case",
+  "BusinessUnit",
+  "business-unit",
+  "business_unit",
+  "CostCenter",
+  "cost-center",
+  "cost_center",
+  "Team",
+  "team",
+];
 
 export interface OwnershipResult {
   ownerUserId: string | null;
@@ -19,19 +38,21 @@ export interface OwnershipResult {
 }
 
 export async function detectOwnership(
-  agent: CorrelatedAgent
+  agent: CorrelatedAgent,
 ): Promise<OwnershipResult> {
   const allTags = agent.resources.reduce<Record<string, string>>((acc, r) => {
     return { ...acc, ...r.tags };
   }, {});
 
   const businessFunction =
-    allTags["BusinessFunction"] ?? allTags["business-function"] ?? allTags["Team"] ?? null;
+    BUSINESS_FUNCTION_TAG_KEYS.map((key) => allTags[key]).find(Boolean) ?? null;
 
   for (const emailKey of EMAIL_TAG_KEYS) {
     const email = allTags[emailKey];
     if (!email) continue;
-    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
     if (user) {
       return {
         ownerUserId: user.id,
@@ -39,6 +60,26 @@ export async function detectOwnership(
         ownerConfidence: 0.9,
         businessFunction,
       };
+    }
+  }
+
+  // Managed platforms such as Databricks return authoritative creator/owner
+  // principals directly in resource metadata instead of resource tags.
+  for (const resource of agent.resources) {
+    for (const key of ["owner", "creator", "runAs", "servicePrincipalName"]) {
+      const value = resource.metadata[key];
+      if (typeof value !== "string" || !value.includes("@")) continue;
+      const user = await db.query.users.findFirst({
+        where: eq(users.email, value),
+      });
+      if (user) {
+        return {
+          ownerUserId: user.id,
+          ownerSource: `provider_metadata:${key}`,
+          ownerConfidence: 0.85,
+          businessFunction,
+        };
+      }
     }
   }
 

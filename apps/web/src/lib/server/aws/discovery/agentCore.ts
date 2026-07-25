@@ -7,7 +7,10 @@ import {
   ListTagsForResourceCommand,
   type GetAgentRuntimeCommandOutput,
 } from "@aws-sdk/client-bedrock-agentcore-control";
-import type { AwsCredentialIdentity } from "../client-factory";
+import {
+  awsDiscoveryClientConfig,
+  type AwsCredentialIdentity,
+} from "../client-factory";
 import type { RawDiscoveredResource } from "./types";
 
 const MODEL_ENV_KEYS = new Set([
@@ -30,7 +33,11 @@ function modelFromEnvironment(environment: Record<string, string> | undefined): 
 }
 
 function clientFor(region: string, credentials: AwsCredentialIdentity) {
-  return new BedrockAgentCoreControlClient({ region, credentials });
+  return new BedrockAgentCoreControlClient({
+    region,
+    credentials,
+    ...awsDiscoveryClientConfig,
+  });
 }
 
 export async function hasAgentCoreRuntimes(

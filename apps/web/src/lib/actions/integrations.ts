@@ -31,11 +31,59 @@ export interface UpdateIntegrationInput {
   logoUrl?: string;
 }
 
-export const getIntegrations = async (tenantSlugOrId: string) => {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Authentication required");
+type CatalogEntryDefinition = {
+  name: string;
+  category: string;
+  description: string;
+  configuration?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  isEnabled?: boolean;
+  isCredentialsAdded?: boolean;
+  legacyNames?: string[];
+};
 
-  // Try to find by ID first (in case tenantSlugOrId is actually an ID), then by slug
+const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
+  {
+    name: "AWS",
+    category: "cloud_providers",
+    description:
+      "Discovers Bedrock, AgentCore, Lambda, and explicitly identified EC2 agent workloads across enabled AWS regions.",
+    metadata: { logoUrl: "/logos/AWS.svg" },
+  },
+  {
+    name: "Azure",
+    category: "cloud_providers",
+    description:
+      "Discovers Azure OpenAI, AI Foundry, and identified agent workloads on Functions, Logic Apps, VMs, Container Apps, and AKS.",
+  },
+  {
+    name: "Google Cloud",
+    category: "cloud_providers",
+    description:
+      "Discovers Vertex AI Agent Engine and explicitly identified agent workloads on Cloud Run, Compute Engine, GKE, and Cloud Functions.",
+  },
+  {
+    name: "Databricks Unity Catalog",
+    category: "data_platforms",
+    description:
+      "Discovers deployed agents across Databricks Apps, Model Serving, Genie, Jobs, and workspace notebooks, with Unity Catalog governance evidence.",
+    legacyNames: ["Databricks"],
+  },
+  {
+    name: "Kubernetes Cluster",
+    category: "runtime_platforms",
+    description:
+      "Registers deployed agent workloads from Kubernetes clusters through NORIX's authenticated cluster ingestion endpoint.",
+    configuration: {
+      endpoint: "/api/agent-discovery/ingest",
+      authentication: "x-api-key",
+      provider: "kubernetes",
+    },
+    legacyNames: ["Universal Agent Collector"],
+  },
+];
+
+async function resolveTenant(tenantSlugOrId: string) {
   let tenantRow = await db
     .select()
     .from(tenants)
@@ -49,12 +97,108 @@ export const getIntegrations = async (tenantSlugOrId: string) => {
       .limit(1);
   }
   if (!tenantRow.length) throw new Error("Tenant not found");
-  const tenantId = tenantRow[0].id;
+  return tenantRow[0];
+}
+
+async function ensureDefaultCatalogEntries(tenantId: string, userId: string) {
+  for (const entry of DEFAULT_CATALOG_ENTRIES) {
+    try {
+      let existing = await db.query.integrations.findFirst({
+        where: and(
+          eq(integrations.tenantId, tenantId),
+          eq(integrations.name, entry.name),
+        ),
+      });
+
+      for (const legacyName of entry.legacyNames ?? []) {
+        if (existing) break;
+        existing = await db.query.integrations.findFirst({
+          where: and(
+            eq(integrations.tenantId, tenantId),
+            eq(integrations.name, legacyName),
+          ),
+        });
+      }
+
+      if (existing) {
+        await db
+          .update(integrations)
+          .set({
+            name: entry.name,
+            category: entry.category,
+            description: entry.description,
+            isEnabled:
+              entry.isEnabled ??
+              (existing.isCredentialsAdded || existing.isEnabled),
+            isCredentialsAdded:
+              entry.isCredentialsAdded ?? existing.isCredentialsAdded,
+            configuration:
+              Object.keys(entry.configuration ?? {}).length > 0
+                ? {
+                    ...((existing.configuration as Record<string, unknown>) ??
+                      {}),
+                    ...entry.configuration,
+                  }
+                : existing.configuration,
+            metadata: {
+              ...((existing.metadata as Record<string, unknown>) ?? {}),
+              ...(entry.metadata ?? {}),
+            },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(integrations.id, existing.id));
+        continue;
+      }
+
+      await db.insert(integrations).values({
+        tenantId,
+        name: entry.name,
+        category: entry.category,
+        description: entry.description,
+        configuration: entry.configuration ?? {},
+        metadata: entry.metadata ?? {},
+        isEnabled: entry.isEnabled ?? false,
+        isCredentialsAdded: entry.isCredentialsAdded ?? false,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+    } catch (error) {
+      console.error(
+        `Failed to ensure ${entry.name} integration catalog entry:`,
+        error,
+      );
+    }
+  }
+}
+
+export const getIntegrations = async (tenantSlugOrId: string) => {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Authentication required");
+
+  const tenant = await resolveTenant(tenantSlugOrId);
+  const tenantId = tenant.id;
 
   const integrationsList = await db
     .select()
     .from(integrations)
     .where(eq(integrations.tenantId, tenantId))
+    .orderBy(integrations.name);
+
+  return { integrations: integrationsList };
+};
+
+export const getIntegrationsWithCatalog = async (tenantSlugOrId: string) => {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Authentication required");
+
+  const tenant = await resolveTenant(tenantSlugOrId);
+  await ensureDefaultCatalogEntries(tenant.id, userId);
+
+  const integrationsList = await db
+    .select()
+    .from(integrations)
+    .where(eq(integrations.tenantId, tenant.id))
     .orderBy(integrations.name);
 
   return { integrations: integrationsList };
@@ -201,11 +345,21 @@ export const saveEncryptedIntegrationCredentials = async (input: {
       .limit(1);
   }
   if (!tenantRow.length) throw new Error("Tenant not found");
+  const existing = await db.query.integrations.findFirst({
+    where: and(
+      eq(integrations.id, input.id),
+      eq(integrations.tenantId, tenantRow[0].id),
+    ),
+  });
+  if (!existing) throw new Error("Integration not found");
   const [integration] = await db
     .update(integrations)
     .set({
       credentialsEncrypted: encryptSecret(JSON.stringify(input.credentials)),
-      configuration: { credentialFields: Object.keys(input.credentials) },
+      configuration: {
+        ...((existing.configuration as Record<string, unknown>) ?? {}),
+        credentialFields: Object.keys(input.credentials),
+      },
       isCredentialsAdded: true,
       isEnabled: true,
       updatedBy: userId,

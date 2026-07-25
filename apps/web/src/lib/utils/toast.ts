@@ -44,6 +44,13 @@ export const successToast = (response: any, operation: string, action: string, m
   showSuccessToast(message, icon);
 };
 
+// A one-time informational toast (ℹ️). Used for benign notices that should be
+// shown once at the moment of an action rather than persisted as a standing
+// banner — e.g. an optional discovery capability that was skipped.
+export const infoToast = (message: string) => {
+  showSuccessToast(message, 'ℹ️');
+};
+
 export const errorToast = (error: any) => {
   let errorMessage = '';
 

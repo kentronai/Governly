@@ -10,27 +10,7 @@
 import { DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import type { AwsClientBundle } from "../client-factory";
 import type { RawDiscoveredResource } from "./types";
-
-const AI_SIGNAL =
-  /(^|[-_:/.])(ai|agent|llm|genai|copilot|assistant|langchain|crewai|autogen)([-_:/.]|$)/i;
-const SIGNAL_TAG_KEYS = new Set([
-  "ai",
-  "ai-agent",
-  "agent",
-  "norix:agent",
-  "norix-agent",
-  "workload-type",
-]);
-
-function hasAgentSignal(name: string, tags: Record<string, string>): boolean {
-  if (AI_SIGNAL.test(name)) return true;
-  return Object.entries(tags).some(
-    ([key, value]) =>
-      (SIGNAL_TAG_KEYS.has(key.toLowerCase()) || AI_SIGNAL.test(key)) &&
-      value.toLowerCase() !== "false" &&
-      value.toLowerCase() !== "disabled",
-  );
-}
+import { hasAgentSignal } from "./ec2-signals";
 
 export async function discoverEc2(
   clients: AwsClientBundle,

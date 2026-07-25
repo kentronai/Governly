@@ -72,7 +72,6 @@ async def info(request: Request):
             ],
             "config": {
                 "openai_api_key_configured": bool(settings.openai_api_key),
-                "openai_api_key_prefix": settings.openai_api_key[:10] if settings.openai_api_key else None,
                 "anthropic_api_key_configured": bool(settings.anthropic_api_key),
                 "redis_url": settings.redis_url,
                 "default_policy_id": settings.default_policy_id

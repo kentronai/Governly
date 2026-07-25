@@ -23,7 +23,15 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/healthz",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -52,7 +60,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    command: 
+    command:
       - "postgres"
       - "-c"
       - "max_connections=100"
@@ -88,7 +96,7 @@ services:
       redis:
         condition: service_healthy
     expose:
-      - "8000"  # Internal only
+      - "8000" # Internal only
     env_file:
       - .env
     volumes:
@@ -119,7 +127,7 @@ services:
       redis:
         condition: service_healthy
     expose:
-      - "8001"  # Internal only
+      - "8001" # Internal only
     env_file:
       - .env
     volumes:
@@ -130,7 +138,13 @@ services:
       - ./apps/model-guard/adapters:/app/adapters:ro
     healthcheck:
       # python:3.11-slim does not ship curl; use python's http client instead.
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=5).status==200 else 1)"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=5).status==200 else 1)",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -149,7 +163,7 @@ services:
       redis:
         condition: service_healthy
     expose:
-      - "8002"  # Internal only
+      - "8002" # Internal only
     env_file:
       - .env
     volumes:
@@ -206,7 +220,7 @@ services:
       controlnet:
         condition: service_healthy
     expose:
-      - "8080"  # Internal only
+      - "8080" # Internal only
     env_file:
       - .env
     environment:
@@ -214,20 +228,54 @@ services:
       # container's auto-assigned hostname (which makes localhost:8080 from
       # inside the container fail with "connection refused").
       HOSTNAME: "0.0.0.0"
+      AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:?AGENT_DISCOVERY_CRON_SECRET must be configured}
     healthcheck:
       # node:20-alpine has wget but not curl. /api/health may 404 if route is
       # missing in this build, so accept any 2xx/3xx response from /.
-      test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=5", "http://127.0.0.1:8080/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-qO-",
+          "--tries=1",
+          "--timeout=5",
+          "http://127.0.0.1:8080/",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
 
+  # Production recurring discovery worker. It calls the authenticated internal
+  # route immediately after startup and then after each completed interval.
+  agent-discovery-scheduler:
+    image: alpine:3.20
+    container_name: controlnet-agent-discovery-scheduler
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:?AGENT_DISCOVERY_CRON_SECRET must be configured}
+      AGENT_DISCOVERY_INTERVAL_SECONDS: ${AGENT_DISCOVERY_INTERVAL_SECONDS:-300}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          wget -qO- --timeout=900 \
+            --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
+            http://web:8080/api/cron/agent-discovery || true
+          sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
+        done
+
 volumes:
-  postgres_data:  # Persistent PostgreSQL data
+  postgres_data: # Persistent PostgreSQL data
   redis_data:
-  model_cache:  # Persistent storage for ModelGuard scans
-  onnx_model_cache:  # Persistent storage for ONNX models (survives container restarts)
+  model_cache: # Persistent storage for ModelGuard scans
+  onnx_model_cache: # Persistent storage for ONNX models (survives container restarts)
 
 networks:
   default:

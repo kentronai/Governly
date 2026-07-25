@@ -6,7 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  CircleAlert,
+  Loader2,
+  PlugZap,
+} from "lucide-react";
 import {
   createProviderModel,
   updateProviderModel,
@@ -15,6 +24,10 @@ import {
 import { ProviderModelModal } from "./ProviderModelModal";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 import { ModelScanResultsModal } from "./ModelScanResultsModal";
+import {
+  selectModelForTenant,
+  testModelConnection,
+} from "@/lib/actions/model-registry-runtime";
 
 interface ProviderModel {
   id: string;
@@ -38,6 +51,11 @@ interface ProviderModel {
   artifactMetadata?: any;
   detectedFormat?: string | null;
   approvalStatus?: string | null;
+  isSelected?: boolean | null;
+  connectionStatus?: "not_tested" | "testing" | "ready" | "error" | null;
+  connectionErrorCode?: string | null;
+  connectionMessage?: string | null;
+  lastTestedAt?: string | null;
 }
 
 interface CreateProviderModelResponse {
@@ -66,15 +84,16 @@ export function ModelRegistryList({
   const [isPending, startTransition] = useTransition();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [testingModelId, setTestingModelId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ProviderModel | null>(
-    null
+    null,
   );
 
   const filteredModels = models.filter(
     (m) =>
       m.modelId.toLowerCase().includes(search.toLowerCase()) ||
       m.displayName?.toLowerCase().includes(search.toLowerCase()) ||
-      m.provider.toLowerCase().includes(search.toLowerCase())
+      m.provider.toLowerCase().includes(search.toLowerCase()),
   );
 
   const getAvailabilityStatusColor = (status?: string | null) => {
@@ -128,7 +147,7 @@ export function ModelRegistryList({
     startTransition(async () => {
       try {
         const res = (await createProviderModel(
-          data
+          data,
         )) as CreateProviderModelResponse;
 
         if (!res || !res.status) {
@@ -157,7 +176,7 @@ export function ModelRegistryList({
       try {
         const updated = await updateProviderModel(selectedModel.id, data);
         setModels((prev) =>
-          prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+          prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
         );
         setIsModalOpen(false);
         setSelectedModel(null);
@@ -187,6 +206,73 @@ export function ModelRegistryList({
   const handleModelClick = (model: ProviderModel) => {
     const routePath = `/${tenant}/model-registry/${model.id}/report`;
     router.push(routePath);
+  };
+
+  const handleSelectForPlayground = async (model: ProviderModel) => {
+    startTransition(async () => {
+      try {
+        await selectModelForTenant(model.id);
+        setModels((current) =>
+          current.map((item) => ({
+            ...item,
+            isSelected: item.id === model.id,
+          })),
+        );
+        toast.success(`${model.displayName || model.modelId} is now selected.`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to select model.",
+        );
+      }
+    });
+  };
+
+  const handleTestConnection = async (model: ProviderModel) => {
+    setTestingModelId(model.id);
+    setModels((current) =>
+      current.map((item) =>
+        item.id === model.id ? { ...item, connectionStatus: "testing" } : item,
+      ),
+    );
+
+    try {
+      const result = await testModelConnection(model.id);
+      setModels((current) =>
+        current.map((item) =>
+          item.id === model.id
+            ? {
+                ...item,
+                connectionStatus: result.status,
+                connectionErrorCode: result.code,
+                connectionMessage: result.message,
+                lastTestedAt: result.lastTestedAt,
+              }
+            : item,
+        ),
+      );
+      if (result.status === "ready") {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Connection test failed.";
+      setModels((current) =>
+        current.map((item) =>
+          item.id === model.id
+            ? {
+                ...item,
+                connectionStatus: "error",
+                connectionMessage: message,
+              }
+            : item,
+        ),
+      );
+      toast.error(message);
+    } finally {
+      setTestingModelId(null);
+    }
   };
 
   return (
@@ -268,9 +354,15 @@ export function ModelRegistryList({
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {model.isSelected && (
+                      <Badge variant="secondary" className="gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Selected
+                      </Badge>
+                    )}
                     <Badge
                       className={getAvailabilityStatusColor(
-                        model.availabilityStatus
+                        model.availabilityStatus,
                       )}
                       variant="outline"
                     >
@@ -480,7 +572,8 @@ export function ModelRegistryList({
                           Context Window
                         </p>
                         <p className="text-sm">
-                          {model.contextWindowTokens.toLocaleString("en-US")} tokens
+                          {model.contextWindowTokens.toLocaleString("en-US")}{" "}
+                          tokens
                         </p>
                       </div>
                     )}
@@ -536,6 +629,78 @@ export function ModelRegistryList({
                         {model.tenantId ? "Organization" : "Global"}
                       </Badge>
                     </div>
+
+                    {(model.provider === "openai" ||
+                      model.provider === "gemini") && (
+                      <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              Connection
+                            </p>
+                            <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+                              {model.connectionStatus === "ready" ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : model.connectionStatus === "error" ? (
+                                <CircleAlert className="h-4 w-4 text-red-600" />
+                              ) : model.connectionStatus === "testing" ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <PlugZap className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {model.connectionStatus === "ready"
+                                ? "Ready"
+                                : model.connectionStatus === "error"
+                                  ? "Connection error"
+                                  : model.connectionStatus === "testing"
+                                    ? "Testing"
+                                    : "Not tested"}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={testingModelId === model.id}
+                            onClick={() => handleTestConnection(model)}
+                          >
+                            {testingModelId === model.id && (
+                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            )}
+                            Test
+                          </Button>
+                        </div>
+                        {model.connectionMessage && (
+                          <p
+                            className={`text-xs ${
+                              model.connectionStatus === "error"
+                                ? "text-red-600"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {model.connectionMessage}
+                          </p>
+                        )}
+                        {model.lastTestedAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Last tested{" "}
+                            {new Date(model.lastTestedAt).toLocaleString()}
+                          </p>
+                        )}
+                        <Button
+                          type="button"
+                          className="w-full"
+                          variant={model.isSelected ? "secondary" : "default"}
+                          size="sm"
+                          disabled={Boolean(model.isSelected) || isPending}
+                          onClick={() => handleSelectForPlayground(model)}
+                        >
+                          {model.isSelected
+                            ? "Selected for Playground"
+                            : "Use in Playground"}
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
               </CardContent>

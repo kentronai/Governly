@@ -56,8 +56,8 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
           eq(providerModels.tenantId, orgId),
           // @ts-ignore
           eq(providerModels.provider, input.provider),
-          eq(providerModels.modelId, input.modelId)
-        )
+          eq(providerModels.modelId, input.modelId),
+        ),
       )
       .limit(1);
 
@@ -86,7 +86,7 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
                 "x-tenant-id": orgId,
                 Authorization: "Bearer " + token,
               },
-            }
+            },
           );
         } catch (err: any) {
           console.warn("Request Failed", err);
@@ -138,7 +138,7 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
     } catch (auditError) {
       console.error(
         "Failed to log audit event for model creation:",
-        auditError
+        auditError,
       );
       // Don't fail the main operation if audit logging fails
     }
@@ -163,11 +163,11 @@ export const createProviderModel = createProviderModelInternal;
 
 export const updateProviderModel = async (
   id: string,
-  input: Partial<CreateProviderModelInput>
+  input: Partial<CreateProviderModelInput>,
 ) => {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
 
-  if (!userId) {
+  if (!userId || !orgId) {
     throw new Error("Authentication required");
   }
 
@@ -178,7 +178,7 @@ export const updateProviderModel = async (
       updatedBy: userId,
       updatedAt: new Date().toISOString(),
     } as any)
-    .where(eq(providerModels.id, id))
+    .where(and(eq(providerModels.id, id), eq(providerModels.tenantId, orgId)))
     .returning();
 
   if (!model) {
@@ -211,9 +211,9 @@ export const updateProviderModel = async (
 };
 
 export const deleteProviderModel = async (id: string) => {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
 
-  if (!userId) {
+  if (!userId || !orgId) {
     throw new Error("Authentication required");
   }
 
@@ -221,7 +221,7 @@ export const deleteProviderModel = async (id: string) => {
   const [existingModel] = await db
     .select()
     .from(providerModels)
-    .where(eq(providerModels.id, id))
+    .where(and(eq(providerModels.id, id), eq(providerModels.tenantId, orgId)))
     .limit(1);
 
   if (!existingModel) {
@@ -230,7 +230,7 @@ export const deleteProviderModel = async (id: string) => {
 
   const [model] = await db
     .delete(providerModels)
-    .where(eq(providerModels.id, id))
+    .where(and(eq(providerModels.id, id), eq(providerModels.tenantId, orgId)))
     .returning();
 
   // Log audit event for model deletion
@@ -259,16 +259,16 @@ export const deleteProviderModel = async (id: string) => {
 };
 
 export const getProviderModelById = async (id: string) => {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
 
-  if (!userId) {
+  if (!userId || !orgId) {
     throw new Error("Authentication required");
   }
 
   const [model] = await db
     .select()
     .from(providerModels)
-    .where(eq(providerModels.id, id))
+    .where(and(eq(providerModels.id, id), eq(providerModels.tenantId, orgId)))
     .limit(1);
 
   return model || null;

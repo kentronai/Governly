@@ -80,6 +80,9 @@ export default function BulkUploadDialog({
       const result = await bulkUpload(prompts);
 
       successToast(
+        "",
+        "",
+        "",
         `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`
       );
       setCsvText("");
@@ -115,6 +118,9 @@ export default function BulkUploadDialog({
       const result = await bulkUpload(prompts);
 
       successToast(
+        "",
+        "",
+        "",
         `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`
       );
       setJsonText("");
@@ -136,6 +142,9 @@ export default function BulkUploadDialog({
       const result = await syncToLanceDB();
 
       successToast(
+        "",
+        "",
+        "",
         result.synced === 0
           ? "No prompts found in database to sync"
           : `Success! Synced ${result.synced} prompts and computed ${result.centroids_computed} centroids`

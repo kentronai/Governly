@@ -15,6 +15,41 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ProviderAPIError(Exception):
+    """Safe provider failure that can be returned without leaking credentials."""
+
+    def __init__(self, status_code: int, code: str, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+
+
+def _build_provider_error(response: httpx.Response) -> ProviderAPIError:
+    code = "provider_request_failed"
+    try:
+        payload = response.json()
+        provider_error = payload.get("error", {})
+        code = provider_error.get("code") or provider_error.get("type") or code
+    except (ValueError, AttributeError):
+        pass
+
+    if code == "insufficient_quota":
+        message = (
+            "The configured OpenAI project has insufficient quota. "
+            "Add billing/credits or use a project key with available quota."
+        )
+    elif response.status_code in (401, 403):
+        message = "The provider rejected the configured credentials."
+    elif response.status_code == 429:
+        message = "The provider rate-limited this request. Please retry shortly."
+    elif response.status_code >= 500:
+        message = "The model provider is temporarily unavailable."
+    else:
+        message = f"The model provider rejected the request (HTTP {response.status_code})."
+
+    return ProviderAPIError(response.status_code, str(code), message)
+
+
 class OpenAIClient:
     """
     OpenAI API client for chat completions and embeddings.
@@ -65,18 +100,13 @@ class OpenAIClient:
             )
             
             if response.status_code != 200:
-                # Extract error details from provider
-                try:
-                    error_detail = response.json()
-                    error_msg = error_detail.get("error", {}).get("message", "Unknown error")
-                    logger.error(f"Provider API error: {error_msg}")
-                    raise httpx.HTTPStatusError(
-                        f"Provider API error: {error_msg}",
-                        request=response.request,
-                        response=response
-                    )
-                except Exception:
-                    response.raise_for_status()
+                error = _build_provider_error(response)
+                logger.error(
+                    "Provider API request failed: status=%s code=%s",
+                    error.status_code,
+                    error.code,
+                )
+                raise error
             
             return response.json()
     
@@ -106,7 +136,15 @@ class OpenAIClient:
                 headers=self.headers,
                 json=request_body
             ) as response:
-                response.raise_for_status()
+                if response.status_code != 200:
+                    await response.aread()
+                    error = _build_provider_error(response)
+                    logger.error(
+                        "Provider streaming request failed: status=%s code=%s",
+                        error.status_code,
+                        error.code,
+                    )
+                    raise error
                 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -168,4 +206,3 @@ def create_openai_client(api_key: str, base_url: str = "https://api.openai.com/v
         >>> response = await client.create_completion(request_body)
     """
     return OpenAIClient(api_key=api_key, base_url=base_url)
-

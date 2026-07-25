@@ -23,10 +23,10 @@ One row per scan run, FK → `aws_discovery_connections`.
 |---|---|
 | `status` | enum `discovery_scan_status`: `queued` \| `running` \| `completed` \| `failed` |
 | `started_at`, `finished_at` | duration = the difference |
-| `next_scan_at` | reserved for future scheduled/continuous sync — unused in this phase |
+| `next_scan_at` | reserved for per-connection scheduling; the Docker worker currently uses a global interval |
 | `agents_discovered` | count of logical agents from this scan |
 | `resources_scanned` | jsonb, per-AWS-service raw resource counts |
-| `triggered_by` | nullable FK → `users`; null means system-triggered (future scheduler) |
+| `triggered_by` | nullable FK → `users`; null means a system-triggered recurring scan |
 
 ## `agent_rules`
 

@@ -303,12 +303,11 @@ export const getArchivedApplications = cache(
     // Add search condition if search term is provided
     if (searchTerm && searchTerm.trim()) {
       const term = `%${searchTerm.trim()}%`;
-      conditions.push(
-        or(
-          ilike(applications.name, term),
-          ilike(applications.description, term)
-        )
+      const searchExpr = or(
+        ilike(applications.name, term),
+        ilike(applications.description, term)
       );
+      if (searchExpr) conditions.push(searchExpr);
     }
 
     let query = db

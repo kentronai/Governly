@@ -44,6 +44,27 @@ fi
 [ -f "${ENV_FILE}" ] || die "No .env or .env.prod found in ${PROJECT_ROOT}"
 info "Using env file: ${ENV_FILE}"
 
+# The recurring discovery worker and the internal route share this secret.
+# Generate it once during deployment when the environment does not provide it.
+if ! grep -Eq '^AGENT_DISCOVERY_CRON_SECRET=.{32,}$' "${ENV_FILE}"; then
+  DISCOVERY_SECRET="$(openssl rand -hex 32)"
+  ENV_TMP="${ENV_FILE}.agent-discovery.tmp"
+  if grep -q '^AGENT_DISCOVERY_CRON_SECRET=' "${ENV_FILE}"; then
+    awk -v secret="${DISCOVERY_SECRET}" '
+      /^AGENT_DISCOVERY_CRON_SECRET=/ {
+        print "AGENT_DISCOVERY_CRON_SECRET=" secret
+        next
+      }
+      { print }
+    ' "${ENV_FILE}" > "${ENV_TMP}"
+    mv "${ENV_TMP}" "${ENV_FILE}"
+  else
+    printf '\nAGENT_DISCOVERY_CRON_SECRET=%s\n' "${DISCOVERY_SECRET}" >> "${ENV_FILE}"
+  fi
+  chmod 600 "${ENV_FILE}"
+  success "Generated recurring agent-discovery secret"
+fi
+
 # Test SSH connectivity
 info "Testing SSH connection to ${EC2_IP}..."
 $SSH "echo 'SSH OK'" || die "SSH connection failed. Is the instance running and bootstrap complete?"

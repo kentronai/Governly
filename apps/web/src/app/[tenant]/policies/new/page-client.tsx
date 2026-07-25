@@ -21,6 +21,9 @@ interface Guardrail {
   name: string
   tier: string
   description: string
+  // Present on the drizzle rows the server spreads into this prop; consumed
+  // when building guardrail composition options below.
+  defaultParams?: Record<string, unknown>
 }
 
 interface PolicyCreationClientProps {

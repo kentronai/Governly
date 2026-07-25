@@ -8,6 +8,7 @@ Guardrails:
 - profanity.detect: Detects profane and offensive language (T0)
 - jailbreak.detect: Detects prompt injection and jailbreak attempts (T1)
 - toxicity.detect: Detects toxic, harmful, and abusive content (T1)
+- harmful_instructions.detect: Blocks actionable wrongdoing instructions (T0)
 - pii.detect: Detects and anonymizes Personal Identifiable Information (T0)
 
 All guards follow the Composable Guard Algebra (CGA) architecture and use
@@ -33,4 +34,3 @@ guards:
 from . import guards
 
 __all__ = ["guards"]
-

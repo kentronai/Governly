@@ -23,6 +23,7 @@ export interface CorrelatedAgent {
     | "aws_lambda"
     | "aws_step_functions"
     | "aws_ec2"
+    | "aws_eks"
     | "amazon_q"
     | "azure_openai"
     | "azure_ai_foundry"
@@ -36,6 +37,12 @@ export interface CorrelatedAgent {
     | "gcp_compute"
     | "gcp_gke"
     | "gcp_functions"
+    | "databricks_model_serving"
+    | "databricks_unity_catalog"
+    | "databricks_apps"
+    | "databricks_jobs"
+    | "databricks_genie"
+    | "kubernetes"
     | "other";
   region: string;
   discoverySource: RawDiscoveredResource["resourceType"];
