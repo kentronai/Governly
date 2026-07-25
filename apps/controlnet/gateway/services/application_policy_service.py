@@ -6,6 +6,24 @@ from sqlalchemy import text
 from gateway.db import get_session
 
 
+async def _resolve_tenant_default_policy(session, tenant_id: str) -> Optional[str]:
+    """The tenant-wide default policy the gateway enforces when a request has no
+    application-specific policy. Set from the tenant policy list in the web app
+    (policies.is_tenant_default). At most one active policy carries the flag."""
+    query = text("""
+        SELECT p.id::text
+        FROM policies p
+        WHERE p.tenant_id = :tenant_id
+          AND p.is_tenant_default = true
+          AND p.is_active = true
+          AND p.deleted_at IS NULL
+        LIMIT 1
+    """)
+    result = await session.execute(query, {"tenant_id": tenant_id})
+    row = result.fetchone()
+    return str(row[0]) if row else None
+
+
 async def resolve_application_policy(
     tenant_id: str,
     application_id: Optional[str],
@@ -14,14 +32,24 @@ async def resolve_application_policy(
     """
     Return (policy UUID, resolution source).
 
-    When application_id is supplied, an explicit policy must belong to that
-    application and the policy itself must be active. The application link's
-    is_active/is_default flags identify the automatic default; they must not
-    prevent a user from explicitly testing another linked policy. Without an
-    explicit policy, exactly the active default is selected.
+    Resolution order:
+      1. An explicit policy id, when the request names one for its application.
+      2. The application's active default policy.
+      3. The tenant-wide default policy (policies.is_tenant_default) — this is
+         the "enable once, enforce everywhere" fallback that applies whenever an
+         application has no policy of its own (or no application context at all).
+
+    The per-application policy always wins over the tenant default, so an app
+    that selects its own T0/T1/T2 policy is never overridden by the global one.
     """
     if not application_id:
-        return explicit_policy_id, "explicit" if explicit_policy_id else "unresolved"
+        if explicit_policy_id:
+            return explicit_policy_id, "explicit"
+        async with get_session() as session:
+            tenant_default = await _resolve_tenant_default_policy(session, tenant_id)
+        if tenant_default:
+            return tenant_default, "tenant_default"
+        return None, "unresolved"
 
     async with get_session() as session:
         if explicit_policy_id:
@@ -74,8 +102,15 @@ async def resolve_application_policy(
             "application_id": application_id,
         })
         row = result.fetchone()
-        if not row:
-            raise ValueError(
-                "No active default runtime policy is configured for this application."
-            )
-        return str(row[0]), "application_default"
+        if row:
+            return str(row[0]), "application_default"
+
+        # No application-specific policy: fall back to the tenant-wide default
+        # so an enabled global policy enforces everywhere automatically.
+        tenant_default = await _resolve_tenant_default_policy(session, tenant_id)
+        if tenant_default:
+            return tenant_default, "tenant_default"
+        raise ValueError(
+            "No active runtime policy is configured for this application, and "
+            "no tenant default policy is enabled."
+        )

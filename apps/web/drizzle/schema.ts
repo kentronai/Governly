@@ -626,6 +626,10 @@ export const policies = pgTable(
     description: text(),
     yaml: text(),
     isActive: boolean("is_active").default(true).notNull(),
+    // When true, this policy is the tenant-wide default the ControlNet gateway
+    // falls back to for any request whose application has no policy of its own.
+    // At most one active policy per tenant should carry this flag.
+    isTenantDefault: boolean("is_tenant_default").default(false).notNull(),
     metadata: jsonb().default({}).notNull(),
     createdBy: text("created_by").notNull(),
     updatedBy: text("updated_by"),
