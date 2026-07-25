@@ -28,6 +28,12 @@ const BUSINESS_FUNCTION_TAG_KEYS = [
   "cost_center",
   "Team",
   "team",
+  // Provider-native grouping tags that carry a real business/project context.
+  "Project",
+  "project",
+  "project-name",
+  "project_name",
+  "agentcore:project-name",
 ];
 
 export interface OwnershipResult {

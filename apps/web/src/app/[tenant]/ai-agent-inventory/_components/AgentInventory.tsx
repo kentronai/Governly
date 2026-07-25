@@ -40,7 +40,6 @@ import {
   UserX,
   ShieldOff,
   BadgeX,
-  Siren,
 } from "lucide-react";
 import {
   fetchAgents,
@@ -48,6 +47,7 @@ import {
   fetchAgentInventorySummary,
   assignAgentToApplication,
 } from "@/lib/actions/agents";
+import { refreshAgentInventory } from "@/lib/actions/agent-inventory-refresh";
 import type {
   AgentInventoryInitialData,
   AgentInventorySummary,
@@ -243,8 +243,16 @@ export function AgentInventory({
   }, [tenant]);
 
   const refreshAll = useCallback(async () => {
+    // Re-run discovery across every connected provider (real-time), then reload
+    // the inventory and summary so the whole view reflects fresh data.
+    setIsLoading(true);
+    try {
+      await refreshAgentInventory(tenant);
+    } catch {
+      // Fall through to a plain reload even if a provider scan failed.
+    }
     await Promise.all([load(), loadSummary()]);
-  }, [load, loadSummary]);
+  }, [tenant, load, loadSummary]);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -345,14 +353,6 @@ export function AgentInventory({
           description="Agents with an active compliance policy evaluation marked non-compliant."
         />
         <SummaryCard
-          label="Open Findings"
-          value={summary?.agentsWithOpenFindings}
-          icon={Siren}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Agents with unresolved runtime breaches or evidence-backed compliance gaps."
-        />
-        <SummaryCard
           label="Missing Runtime Evidence"
           value={summary?.agentsWithoutRuntimeEvidence}
           icon={ShieldOff}
@@ -442,7 +442,7 @@ export function AgentInventory({
               <TableHead>Open Gaps</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Region / Account</TableHead>
-              <TableHead>Last Seen</TableHead>
+              <TableHead>Last Active</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1110,7 +1110,7 @@ function AgentDetailModal({
                   value={formatTimestamp(agent.firstSeenAt)}
                 />
                 <Field
-                  label="Last Seen"
+                  label="Last Active"
                   value={formatTimestamp(agent.lastSeenAt)}
                 />
                 <Field label="Sync Status" value={agent.syncStatus} />
