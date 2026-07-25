@@ -7,11 +7,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { AgentInventory } from "./_components/AgentInventory";
 import { AgentDiscoveryNav } from "@/components/agent-discovery/AgentDiscoveryNav";
+import { getAgentInventoryInitialData } from "@/lib/queries/agents";
 
 interface PageProps {
   params: Promise<{ tenant: string }>;
   searchParams: Promise<{ autonomy?: string }>;
 }
+
+const VALID_AUTONOMY = ["L1", "L2", "L3", "L4"];
 
 export default async function AgentInventoryPage({ params, searchParams }: PageProps) {
   const { tenant } = await params;
@@ -22,10 +25,23 @@ export default async function AgentInventoryPage({ params, searchParams }: PageP
     throw new Error("Authentication required");
   }
 
+  // Fetch the server-rendered initial state so the client component hydrates
+  // with real data (and the autonomy filter from the URL) instead of crashing
+  // on an undefined `initialData`.
+  const autonomyLevel =
+    autonomy && VALID_AUTONOMY.includes(autonomy) ? autonomy : undefined;
+  const initialData = await getAgentInventoryInitialData(orgId, {
+    autonomyLevel,
+  });
+
   return (
     <div className="space-y-5 p-6">
       <AgentDiscoveryNav tenant={tenant} />
-      <AgentInventory tenant={tenant} initialAutonomy={autonomy} />
+      <AgentInventory
+        tenant={tenant}
+        initialAutonomy={autonomy}
+        initialData={initialData}
+      />
     </div>
   );
 }

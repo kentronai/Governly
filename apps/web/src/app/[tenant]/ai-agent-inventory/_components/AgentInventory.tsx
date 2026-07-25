@@ -37,8 +37,6 @@ import {
   RefreshCw,
   LayoutDashboard,
   Bot,
-  AlertOctagon,
-  ShieldAlert,
   UserX,
   ShieldOff,
   BadgeX,
@@ -331,44 +329,12 @@ export function AgentInventory({
           description="Agent records discovered from connected providers or ingestion."
         />
         <SummaryCard
-          label="Critical Risk"
-          value={summary?.criticalRisk}
-          icon={AlertOctagon}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Discovered agents currently classified as Critical risk."
-        />
-        <SummaryCard
-          label="High Risk"
-          value={summary?.highRisk}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-orange-600 dark:text-orange-400"
-          description="Discovered agents currently classified as High risk."
-        />
-        <SummaryCard
           label="Unowned Agents"
           value={summary?.unownedAgents}
           icon={UserX}
           loading={isSummaryLoading}
           tone="text-orange-600 dark:text-orange-400"
           description="Agents with no provider owner evidence mapped to a NORIX user."
-        />
-        <SummaryCard
-          label="L4 Agents"
-          value={summary?.l4Agents}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Agents with evidence-backed privileged autonomous control."
-        />
-        <SummaryCard
-          label="L3 Agents"
-          value={summary?.l3Agents}
-          icon={ShieldAlert}
-          loading={isSummaryLoading}
-          tone="text-orange-600 dark:text-orange-400"
-          description="Agents with evidence-backed tool, write, API, or sensitive-data control."
         />
         <SummaryCard
           label="Non-Compliant Agents"
