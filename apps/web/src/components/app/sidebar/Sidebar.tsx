@@ -15,12 +15,12 @@ import {
   Gauge,
   Route,
   ChevronDown,
+  CircleHelp,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FaQuestion } from "react-icons/fa";
 import { useTenant } from "@/contexts/TenantContext";
 
 interface NavItemProps {
@@ -56,7 +56,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
   const isAgentDiscoveryRoute =
     pathname.startsWith(`/${tenant}/ai-agent-discovery`) ||
     pathname.startsWith(`/${tenant}/ai-agent-inventory`);
-  const [isAgentDiscoveryOpen, setIsAgentDiscoveryOpen] = useState(isAgentDiscoveryRoute);
+  const [isAgentDiscoveryOpen, setIsAgentDiscoveryOpen] = useState(
+    isAgentDiscoveryRoute,
+  );
 
   useEffect(() => {
     if (isAgentDiscoveryRoute) setIsAgentDiscoveryOpen(true);
@@ -131,7 +133,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
             <div
               id="ai-agent-discovery-navigation"
               className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                isAgentDiscoveryOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                isAgentDiscoveryOpen
+                  ? "grid-rows-[1fr] opacity-100"
+                  : "grid-rows-[0fr] opacity-0"
               }`}
             >
               <div className="overflow-hidden">
@@ -139,7 +143,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                   <NavItem
                     href={`/${tenant}/ai-agent-discovery/dashboard`}
                     icon={<BarChart3 className="h-3.5 w-3.5" />}
-                    isActive={pathname === `/${tenant}/ai-agent-discovery/dashboard`}
+                    isActive={
+                      pathname === `/${tenant}/ai-agent-discovery/dashboard`
+                    }
                     className="py-1.5 text-xs"
                   >
                     Executive Risk Dashboard
@@ -147,7 +153,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                   <NavItem
                     href={`/${tenant}/ai-agent-inventory`}
                     icon={<Bot className="h-3.5 w-3.5" />}
-                    isActive={pathname.startsWith(`/${tenant}/ai-agent-inventory`)}
+                    isActive={pathname.startsWith(
+                      `/${tenant}/ai-agent-inventory`,
+                    )}
                     className="py-1.5 text-xs"
                   >
                     Agent Inventory
@@ -155,7 +163,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                   <NavItem
                     href={`/${tenant}/ai-agent-discovery/autonomy`}
                     icon={<Gauge className="h-3.5 w-3.5" />}
-                    isActive={pathname === `/${tenant}/ai-agent-discovery/autonomy`}
+                    isActive={
+                      pathname === `/${tenant}/ai-agent-discovery/autonomy`
+                    }
                     className="py-1.5 text-xs"
                   >
                     Agent Autonomy Levels
@@ -163,7 +173,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                   <NavItem
                     href={`/${tenant}/ai-agent-discovery/journey`}
                     icon={<Route className="h-3.5 w-3.5" />}
-                    isActive={pathname === `/${tenant}/ai-agent-discovery/journey`}
+                    isActive={
+                      pathname === `/${tenant}/ai-agent-discovery/journey`
+                    }
                     className="py-1.5 text-xs"
                   >
                     Registry Journey
@@ -237,7 +249,7 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
         <NavItem
           target="__blank__"
           href={`https://docs.kentron.ai/`}
-          icon={<FaQuestion />}
+          icon={<CircleHelp className="h-4 w-4" />}
           isActive={false}
         >
           Docs
