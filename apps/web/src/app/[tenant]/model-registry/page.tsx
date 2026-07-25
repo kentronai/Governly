@@ -3,24 +3,27 @@
  * Organization-approved API models catalog
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { getTenantModels } from '@/lib/queries/provider-models';
-import { ModelRegistryList } from './_components/ModelRegistryList';
+import { auth } from "@clerk/nextjs/server";
+import { getModelRegistryRuntime } from "@/lib/server/model-registry/runtime";
+import { ModelRegistryList } from "./_components/ModelRegistryList";
 
 interface ModelRegistryPageProps {
   params: Promise<{ tenant: string }>;
 }
 
-export default async function ModelRegistryPage({ params }: ModelRegistryPageProps) {
+export default async function ModelRegistryPage({
+  params,
+}: ModelRegistryPageProps) {
   const { tenant } = await params;
   const { userId, orgId } = await auth();
 
   if (!userId || !orgId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
-  // Fetch models from database (SSR) - only org-specific models
-  const models = await getTenantModels(orgId);
+  // Initialize the tenant's executable test model idempotently, then return
+  // tenant-scoped models together with persistent selection/connection state.
+  const models = await getModelRegistryRuntime(orgId);
 
   return (
     <div className="p-6">

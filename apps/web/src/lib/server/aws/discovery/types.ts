@@ -28,7 +28,17 @@ export type DiscoveredResourceType =
   | "gcp_cloud_run_service"
   | "gcp_compute_instance"
   | "gcp_gke_cluster"
-  | "gcp_cloud_function";
+  | "gcp_cloud_function"
+  | "databricks_serving_endpoint"
+  | "databricks_registered_model"
+  | "databricks_catalog"
+  | "databricks_schema"
+  | "databricks_table"
+  | "databricks_app"
+  | "databricks_job"
+  | "databricks_notebook"
+  | "databricks_genie_space"
+  | "kubernetes_workload";
 
 export interface RawDiscoveredResource {
   resourceType: DiscoveredResourceType;

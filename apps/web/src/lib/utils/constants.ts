@@ -1,4 +1,12 @@
-import { Filters } from '../../types';
+// Locally defined: `Filters` was imported from ../../types, which no longer
+// exports it. It is simply the set of supported filter keys below.
+export type Filters =
+  | 'classifiers'
+  | 'components'
+  | 'filetypes'
+  | 'participants'
+  | 'types'
+  | 'systemmsg';
 
 export const URL_REGEX = /(<https?:\/\/[^\s>]+>)/g;
 

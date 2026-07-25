@@ -30,6 +30,10 @@ interface Props {
   isLoading?: boolean;
   className?: string;
   variant?: "fixed" | "inline";
+  // Accepted for callers that pre-compute neighbour page numbers. The component
+  // derives navigation from `page`/`totalPages`, so these are optional hints.
+  nextPage?: number | null;
+  prevPage?: number | null;
 }
 
 export default function Pagination({

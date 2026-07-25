@@ -1,76 +1,98 @@
-const path = require('path');
-const dotenv = require('dotenv');
+const path = require("path");
+const dotenv = require("dotenv");
 
 dotenv.config({
   path: [
-    path.resolve(__dirname, '../../.env.local'),
-    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, "../../.env.local"),
+    path.resolve(__dirname, "../../.env"),
   ],
 });
 
 // Always use the web app's Clerk test instance during `next dev`, even when
 // the shell or root environment already contains production Clerk keys.
 // Production builds continue to use their injected live environment.
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
+  // Provider credentials injected by Docker are server secrets and must not
+  // be replaced by a developer's stale apps/web/.env.local value. That file
+  // intentionally overrides Clerk's local test configuration, so preserve
+  // the injected OpenAI runtime configuration across the override.
+  const injectedOpenAIApiKey = process.env.OPENAI_API_KEY;
+  const injectedOpenAIModel = process.env.OPENAI_MODEL;
+  const injectedGeminiApiKey = process.env.GEMINI_API_KEY;
+  const injectedGeminiModel = process.env.GEMINI_MODEL;
+
   dotenv.config({
-    path: path.resolve(__dirname, '.env.local'),
+    path: path.resolve(__dirname, ".env.local"),
     override: true,
   });
+
+  if (injectedOpenAIApiKey) {
+    process.env.OPENAI_API_KEY = injectedOpenAIApiKey;
+  }
+  if (injectedOpenAIModel) {
+    process.env.OPENAI_MODEL = injectedOpenAIModel;
+  }
+  if (injectedGeminiApiKey) {
+    process.env.GEMINI_API_KEY = injectedGeminiApiKey;
+  }
+  if (injectedGeminiModel) {
+    process.env.GEMINI_MODEL = injectedGeminiModel;
+  }
 }
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  output: "standalone",
   experimental: {
     // Avoid compiling entire barrel-export packages when a page uses only a
     // handful of components/icons. This keeps dev-route compilation small.
     optimizePackageImports: [
-      '@nextui-org/react',
-      'lucide-react',
-      'react-icons',
+      "@nextui-org/react",
+      "lucide-react",
+      "react-icons",
     ],
   },
   // Development uses Turbopack; the Webpack settings below remain available
   // for production builds.
-  // `root` is pinned explicitly because Turbopack otherwise walks up looking
-  // for a lockfile and can latch onto an unrelated one outside this repo
-  // (e.g. a stray ~/package-lock.json), which misidentifies the workspace
-  // root and breaks module resolution entirely.
+  // Keep Turbopack scoped to the web application. Pointing it at the monorepo
+  // root makes the dev server watch tens of thousands of unrelated cache,
+  // Python, model, and infrastructure files, which causes very slow cold
+  // route compilation on Docker Desktop bind mounts.
   turbopack: {
-    root: path.resolve(__dirname, '../..'),
+    root: path.resolve(__dirname),
   },
   images: {
     remotePatterns: [
       // AWS S3 (static assets, integration logos, ONNX model thumbs)
       {
-        protocol: 'https',
-        hostname: '*.s3.amazonaws.com',
+        protocol: "https",
+        hostname: "*.s3.amazonaws.com",
       },
       {
-        protocol: 'https',
-        hostname: '*.s3.us-east-1.amazonaws.com',
+        protocol: "https",
+        hostname: "*.s3.us-east-1.amazonaws.com",
       },
       {
-        protocol: 'https',
-        hostname: 's3.amazonaws.com',
+        protocol: "https",
+        hostname: "s3.amazonaws.com",
       },
       // Legacy GCP Storage (kept for back-compat with already-published URLs)
       {
-        protocol: 'https',
-        hostname: 'storage.googleapis.com',
+        protocol: "https",
+        hostname: "storage.googleapis.com",
       },
       // Clerk user avatars
       {
-        protocol: 'https',
-        hostname: 'img.clerk.com',
+        protocol: "https",
+        hostname: "img.clerk.com",
       },
       {
-        protocol: 'https',
-        hostname: 'clerk.com',
+        protocol: "https",
+        hostname: "clerk.com",
       },
       {
-        protocol: 'https',
-        hostname: 'images.clerk.dev',
+        protocol: "https",
+        hostname: "images.clerk.dev",
       },
     ],
   },
@@ -82,9 +104,9 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {
-      '.js': ['.js', '.ts', '.tsx'],
-    }
-    
+      ".js": [".js", ".ts", ".tsx"],
+    };
+
     // LanceDB configuration for Next.js
     if (!isServer) {
       config.resolve.fallback = {
@@ -94,50 +116,53 @@ const nextConfig = {
         tls: false,
       };
     }
-    
-    return config
+
+    return config;
   },
   // Proxy API calls to remote GCP gateway or local dev
   async rewrites() {
     // Use NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_API_URL, with fallback for build time
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 
-                      process.env.NEXT_PUBLIC_API_URL || 
-                      'https://placeholder.example.com'; // Placeholder for build, overridden at runtime
-    
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://placeholder.example.com"; // Placeholder for build, overridden at runtime
+
     // Only throw error if we're in a build context and it's truly missing
     // (Runtime will use the actual Cloud Run env var)
-    if (!backendUrl || backendUrl === 'https://placeholder.example.com') {
+    if (!backendUrl || backendUrl === "https://placeholder.example.com") {
       // Allow build to proceed with placeholder - actual value set at runtime
-      console.warn('NEXT_PUBLIC_BACKEND_URL not set at build time, using placeholder');
+      console.warn(
+        "NEXT_PUBLIC_BACKEND_URL not set at build time, using placeholder",
+      );
     }
-    
+
     return [
       {
-        source: '/v1/:path*',
+        source: "/v1/:path*",
         destination: `${backendUrl}/v1/:path*`,
       },
       {
-        source: '/modelguard/:path*',
+        source: "/modelguard/:path*",
         destination: `${backendUrl}/modelguard/:path*`,
       },
       {
-        source: '/docs',
+        source: "/docs",
         destination: `${backendUrl}/docs`,
       },
       {
-        source: '/redoc',
+        source: "/redoc",
         destination: `${backendUrl}/redoc`,
       },
       {
-        source: '/openapi.json',
+        source: "/openapi.json",
         destination: `${backendUrl}/openapi.json`,
       },
       {
-        source: '/healthz',
+        source: "/healthz",
         destination: `${backendUrl}/healthz`,
       },
       {
-        source: '/readyz',
+        source: "/readyz",
         destination: `${backendUrl}/readyz`,
       },
     ];

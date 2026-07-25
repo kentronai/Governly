@@ -29,16 +29,13 @@ def extract_model_id_from_request(request: Any, body: Dict[str, Any]) -> str:
     raise ValueError("Model ID not specified. Provide via X-Model-ID header or 'model' field in body.")
 
 
-def extract_user_api_key_from_request(request: Any, auth_context: Any) -> str:
+def extract_user_api_key_from_request(request: Any, auth_context: Any) -> Optional[str]:
     """Extract user's provider API key for BYOK mode"""
     # Playground mode (Clerk JWT)
     if auth_context.auth.auth_mode == "clerk_jwt":
-        import os
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            raise ValueError("Gateway configuration error: OPENAI_API_KEY not configured for playground mode.")
-        logger.info(f"🔑 Using environment OPENAI_API_KEY (prefix: {openai_key[:15]}...)")
-        return openai_key
+        # The authoritative provider is resolved only after every enabled
+        # policy/guardrail passes, so its server credential is loaded later.
+        return None
     
     # API key mode (standard BYOK)
     auth_header = request.headers.get("authorization")
@@ -154,6 +151,7 @@ async def extract_request_params(ctx: Ctx) -> Either:
 
 async def resolve_model_target(ctx: Ctx) -> Either:
     """Resolve model to provider routing config"""
+    import os
     from gateway.services.model_registry import resolve_model
     from gateway.llm_client import create_openai_client
     from gateway.db import get_db
@@ -167,14 +165,44 @@ async def resolve_model_target(ctx: Ctx) -> Either:
             )
             break  # Only need first iteration
         
-        # Create OpenAI-compatible client (works with all providers)
+        api_key = ctx.get("user_api_key")
+        if ctx["tenant_context"].auth.auth_mode == "clerk_jwt":
+            provider_env_keys = {
+                "openai": "OPENAI_API_KEY",
+                "gemini": "GEMINI_API_KEY",
+            }
+            env_key = provider_env_keys.get(model_target.provider.lower())
+            if not env_key:
+                raise ValueError(
+                    f"Provider '{model_target.provider}' is not configured for Playground."
+                )
+            api_key = os.getenv(env_key)
+            if not api_key:
+                raise ValueError(
+                    f"Gateway configuration error: {env_key} is not configured."
+                )
+            logger.info(
+                "playground_provider_credentials_loaded",
+                provider=model_target.provider,
+            )
+
+        if not api_key:
+            raise ValueError("Provider credentials were not supplied.")
+
+        # Gemini is called through Google's OpenAI-compatible endpoint, so the
+        # same client preserves the existing streaming response contract.
         provider_client = create_openai_client(
-            api_key=ctx["user_api_key"],
+            api_key=api_key,
             base_url=model_target.base_url
         )
         
         return Right_({
             **ctx,
+            "body": {
+                **ctx["body"],
+                "model": model_target.model_id,
+            },
+            "model_id": model_target.model_id,
             "model_target": model_target,
             "provider_client": provider_client
         })

@@ -1,5 +1,4 @@
 import { ClerkProvider } from "@/provider/clerk.provider";
-import { Providers } from "./providers";
 import { ThemedToaster } from "@/components/common/toaster";
 import "./globals.css";
 import { ReactNode } from "react";
@@ -30,11 +29,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {SpeedInsights && <SpeedInsights />}
               <ThemedToaster />
               {Analytics && <Analytics />}
-              <Providers>
-                <ErrorBoundary fallback={<ServerErrorPage />}>
-                  {children}
-                </ErrorBoundary>
-              </Providers>
+              <ErrorBoundary fallback={<ServerErrorPage />}>
+                {children}
+              </ErrorBoundary>
             </ClerkProvider>
           </PostHogProvider>
         </ThemeProvider>

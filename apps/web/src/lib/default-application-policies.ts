@@ -35,6 +35,10 @@ export const DEFAULT_APPLICATION_POLICIES: readonly DefaultApplicationPolicyDefi
         { key: "jailbreak.detect" },
         { key: "profanity.detect" },
         { key: "toxicity.detect" },
+        {
+          key: "harmful_instructions.detect",
+          params: { threshold: 0.75, severity: "high" },
+        },
       ],
       isDefault: true,
       priority: 100,
@@ -61,13 +65,17 @@ export const DEFAULT_APPLICATION_POLICIES: readonly DefaultApplicationPolicyDefi
           key: "profanity.detect",
           params: {
             threshold: 1,
-            severity: "high",
-            categories: ["moderate", "severe"],
+            severity: "critical",
+            categories: ["mild", "moderate", "severe"],
           },
         },
         {
           key: "toxicity.detect",
           params: { threshold: 0.3, severity: "critical" },
+        },
+        {
+          key: "harmful_instructions.detect",
+          params: { threshold: 0.45, severity: "critical" },
         },
       ],
       isDefault: false,

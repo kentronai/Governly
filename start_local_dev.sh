@@ -30,9 +30,26 @@ fi
 
 echo -e "${GREEN}Starting services...${NC}"
 
-# Start with Docker Compose and wait for service health. This prevents the
-# launcher from claiming readiness while Nginx would still return a 502.
-docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600
+# The web node_modules and Turbopack cache volumes are declared `external` so
+# they survive `docker compose down -v` and project renames. Creating them is
+# idempotent, so this is a no-op once they exist.
+docker volume create norix-web-node-modules >/dev/null
+docker volume create norix-web-next-cache >/dev/null
+
+# Start stateful services and run the one-shot migration separately. Compose
+# treats a successful exited migration as unhealthy when it is mixed into a
+# long-running `up --wait` invocation.
+docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
+    postgres redis
+docker compose -f docker-compose.dev.yml run --rm migrate
+docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
+    controlnet onnx-service model-guard
+docker compose -f docker-compose.dev.yml up -d --wait --wait-timeout 600 \
+    --no-deps web
+
+# Nginx starts only after the web health check has successfully queried
+# PostgreSQL, preventing both transient 502s and false healthy states.
+docker compose -f docker-compose.dev.yml up -d --force-recreate --no-deps nginx
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"

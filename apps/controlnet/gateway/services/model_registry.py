@@ -37,7 +37,7 @@ def get_default_base_url(provider: str) -> str:
     - azure_openai: https://api.openai.azure.com
     - together: https://api.together.xyz/v1
     - cohere: https://api.cohere.ai
-    - gemini: https://generativelanguage.googleapis.com/v1beta
+    - gemini: https://generativelanguage.googleapis.com/v1beta/openai
     """
     raise HTTPException(
         status_code=500,
@@ -55,7 +55,7 @@ def get_provider_auth_header(provider: str) -> str:
         "azure_openai": "api-key",
         "together": "Authorization",
         "cohere": "Authorization",
-        "gemini": "x-goog-api-key",
+        "gemini": "Authorization",
     }
     
     return auth_headers.get(provider.lower(), "Authorization")
@@ -63,7 +63,7 @@ def get_provider_auth_header(provider: str) -> str:
 
 def requires_format_transform(provider: str) -> bool:
     """Check if provider requires request/response format transformation"""
-    transform_providers = {"anthropic", "gemini", "cohere"}
+    transform_providers = {"anthropic", "cohere"}
     return provider.lower() in transform_providers
 
 
@@ -76,8 +76,9 @@ async def resolve_model(
     Resolve model ID to provider endpoint configuration.
     
     Lookup priority:
-    1. Tenant-specific models (tenant_id = ?)
-    2. Global models (tenant_id IS NULL)
+    1. The tenant's persisted Model Registry selection
+    2. The requested tenant-specific model
+    3. The requested global model
     
     Args:
         model_id: The model identifier (e.g., 'gpt-4o', 'claude-3-5-sonnet')
@@ -90,7 +91,26 @@ async def resolve_model(
     Raises:
         ValueError: If model is not found in registry
     """
-    logger.info(f"Resolving model: {model_id} for tenant: {tenant_id}")
+    logger.info("Resolving model for tenant=%s", tenant_id)
+
+    # A tenant's persisted Model Registry selection is authoritative for the
+    # NORIX Playground/runtime. This prevents a stale browser value or a
+    # modified request body from bypassing the model selected by the tenant.
+    selected_query = """
+        SELECT pm.provider, pm.model_id, pm.model_url, pm.pricing_metadata
+        FROM tenant_model_settings tms
+        JOIN provider_models pm ON pm.id = tms.provider_model_id
+        WHERE tms.tenant_id = :tenant_id
+          AND tms.is_selected = true
+          AND pm.availability_status = 'available'
+          AND (pm.tenant_id = :tenant_id OR pm.tenant_id IS NULL)
+        LIMIT 1
+    """
+    selected_result = await db_session.execute(
+        text(selected_query),
+        {"tenant_id": tenant_id},
+    )
+    selected_row = selected_result.fetchone()
     
     # Query provider_models table with priority ordering
     query = """
@@ -107,11 +127,20 @@ async def resolve_model(
         LIMIT 1
     """
     
-    result = await db_session.execute(
-        text(query),
-        {"model_id": model_id, "tenant_id": tenant_id}
-    )
-    row = result.fetchone()
+    if selected_row:
+        row = selected_row
+        if model_id != row[1]:
+            logger.info(
+                "Replacing requested model with tenant Model Registry selection "
+                "for tenant=%s",
+                tenant_id,
+            )
+    else:
+        result = await db_session.execute(
+            text(query),
+            {"model_id": model_id, "tenant_id": tenant_id}
+        )
+        row = result.fetchone()
     
     if not row:
         raise HTTPException(
@@ -193,4 +222,3 @@ async def validate_model_exists(
     )
     
     return result.fetchone() is not None
-

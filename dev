@@ -149,6 +149,10 @@ cmd_up() {
     
     echo ""
     info "Starting Docker services..."
+    # Externally-declared volumes must exist before Compose can adopt them.
+    # `docker volume create` is idempotent.
+    docker volume create norix-web-node-modules >/dev/null
+    docker volume create norix-web-next-cache >/dev/null
     docker-compose -f docker-compose.dev.yml up -d
     
     echo ""
@@ -450,6 +454,8 @@ cmd_clean() {
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         docker-compose -f docker-compose.dev.yml down -v
+        # `down -v` skips externally-declared volumes, so drop them explicitly.
+        docker volume rm -f norix-web-node-modules norix-web-next-cache >/dev/null
         docker system prune -af
         success "Cleaned"
     fi

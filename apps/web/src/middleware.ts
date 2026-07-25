@@ -1,12 +1,18 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { isKentronEmail } from "@db";
+import { isKentronEmail } from "@/lib/utils/validateEmail";
 
 // Routes that don't require authentication
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
+  "/api/health",
+  // Machine-to-machine cron entrypoints. These are not unauthenticated: each
+  // route verifies AGENT_DISCOVERY_CRON_SECRET / CRON_SECRET with a
+  // timing-safe compare. Without this exemption Clerk 302s them to /sign-in
+  // and the scheduled run silently never executes.
+  "/api/cron(.*)",
   "/404(.*)",
   "/unauthorized(.*)",
   "/network-error",

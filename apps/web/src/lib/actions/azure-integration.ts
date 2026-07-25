@@ -46,6 +46,9 @@ export async function ensureAzureIntegrationCatalogEntry(
       .set({
         description:
           "Discovers Azure OpenAI, AI Foundry, and identified agent workloads on Functions, Logic Apps, VMs, Container Apps, and AKS.",
+        // Connected integrations are always active; the old separate
+        // enable/disable control was intentionally removed from the UI.
+        isEnabled: existing.isCredentialsAdded || existing.isEnabled,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(integrations.id, existing.id))

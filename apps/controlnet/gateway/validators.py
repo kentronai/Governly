@@ -44,6 +44,24 @@ class ProfanityDetectParams(BaseModel):
     categories: Optional[List[str]] = Field(default=None, description="Profanity categories (mild/moderate/severe)")
 
 
+class HarmfulInstructionsDetectParams(BaseModel):
+    """Parameters for actionable harmful-instructions detection."""
+    threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+        default=0.75,
+        description="Detection threshold",
+    )
+    severity: Literal["low", "med", "high", "critical"] = Field(
+        default="high",
+        description="Severity level",
+    )
+    categories: Optional[List[str]] = Field(
+        default=None,
+        description="Harmful instruction categories (None = all)",
+    )
+
+
 class PoliticsDetectParams(BaseModel):
     """Parameters for politics detection guard"""
     patterns_strong: Optional[List[str]] = Field(default=None, description="Strong political patterns")
@@ -220,6 +238,7 @@ GUARD_SCHEMAS: Dict[str, type[BaseModel]] = {
     "toxicity.detect": ToxicityDetectParams,
     "jailbreak.detect": JailbreakDetectParams,
     "profanity.detect": ProfanityDetectParams,
+    "harmful_instructions.detect": HarmfulInstructionsDetectParams,
     
     # Legacy mappings (for backward compatibility)
     "pii.detect_pii": PIIDetectParams,
@@ -367,4 +386,3 @@ async def validate_policy_guardrails(
             errors.append(f"{guardrail_key}: {str(e)}")
     
     return errors
-

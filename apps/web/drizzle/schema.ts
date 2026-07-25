@@ -129,6 +129,7 @@ export const provider = pgEnum("provider", [
   "ollama",
   "azure_openai",
   "huggingface",
+  "gemini",
   "custom",
 ]);
 export const providerModelStatus = pgEnum("provider_model_status", [
@@ -196,6 +197,7 @@ export const agentPlatform = pgEnum("agent_platform", [
   "aws_lambda",
   "aws_step_functions",
   "aws_ec2",
+  "aws_eks",
   "amazon_q",
   "azure_openai",
   "azure_ai_foundry",
@@ -209,7 +211,13 @@ export const agentPlatform = pgEnum("agent_platform", [
   "gcp_compute",
   "gcp_gke",
   "gcp_functions",
+  "kubernetes",
+  "databricks_model_serving",
+  "databricks_unity_catalog",
   "other",
+  "databricks_apps",
+  "databricks_jobs",
+  "databricks_genie",
 ]);
 export const agentResourceType = pgEnum("agent_resource_type", [
   "bedrock_agent",
@@ -242,6 +250,16 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "gcp_compute_instance",
   "gcp_gke_cluster",
   "gcp_cloud_function",
+  "databricks_serving_endpoint",
+  "databricks_registered_model",
+  "databricks_catalog",
+  "databricks_schema",
+  "databricks_table",
+  "databricks_app",
+  "databricks_job",
+  "databricks_notebook",
+  "databricks_genie_space",
+  "kubernetes_workload",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [
@@ -1674,6 +1692,70 @@ export const providerModels = pgTable(
   ],
 );
 
+export const tenantModelSettings = pgTable(
+  "tenant_model_settings",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    providerModelId: uuid("provider_model_id").notNull(),
+    isSelected: boolean("is_selected").default(false).notNull(),
+    connectionStatus: text("connection_status").default("not_tested").notNull(),
+    connectionErrorCode: text("connection_error_code"),
+    connectionMessage: text("connection_message"),
+    lastTestedAt: timestamp("last_tested_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    selectedBy: text("selected_by"),
+    selectedAt: timestamp("selected_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_tenant_model_settings_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_tenant_model_settings_model").using(
+      "btree",
+      table.providerModelId.asc().nullsLast().op("uuid_ops"),
+    ),
+    uniqueIndex("uq_tenant_model_settings_selected")
+      .on(table.tenantId)
+      .where(sql`${table.isSelected} = true`),
+    unique("uq_tenant_model_settings_model").on(
+      table.tenantId,
+      table.providerModelId,
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "tenant_model_settings_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.providerModelId],
+      foreignColumns: [providerModels.id],
+      name: "tenant_model_settings_provider_model_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.selectedBy],
+      foreignColumns: [users.id],
+      name: "tenant_model_settings_selected_by_fkey",
+    }).onDelete("set null"),
+    check(
+      "chk_tenant_model_settings_connection_status",
+      sql`${table.connectionStatus} IN ('not_tested', 'testing', 'ready', 'error')`,
+    ),
+  ],
+);
+
 export const governanceFrameworks = pgTable(
   "governance_frameworks",
   {
@@ -2844,6 +2926,70 @@ export const discoveryScans = pgTable(
       foreignColumns: [users.id],
       name: "discovery_scans_triggered_by_fkey",
     }).onDelete("set null"),
+  ],
+);
+
+// Provider-neutral inventory for resources discovered through integrations.
+// Unlike agent_resources, these rows also retain governed assets that are not
+// themselves executable agents (for example Unity Catalog tables).
+export const integrationDiscoveredResources = pgTable(
+  "integration_discovered_resources",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    integrationId: uuid("integration_id").notNull(),
+    provider: text().notNull(),
+    externalResourceId: text("external_resource_id").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceName: text("resource_name").notNull(),
+    parentResourceId: text("parent_resource_id"),
+    metadata: jsonb().default({}).notNull(),
+    firstSeenAt: timestamp("first_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_integration_resources_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_integration_resources_integration").using(
+      "btree",
+      table.integrationId.asc().nullsLast().op("uuid_ops"),
+    ),
+    index("idx_integration_resources_type").using(
+      "btree",
+      table.resourceType.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "integration_discovered_resources_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.integrationId],
+      foreignColumns: [integrations.id],
+      name: "integration_discovered_resources_integration_id_fkey",
+    }).onDelete("cascade"),
+    unique("uq_integration_discovered_resource").on(
+      table.integrationId,
+      table.externalResourceId,
+    ),
   ],
 );
 

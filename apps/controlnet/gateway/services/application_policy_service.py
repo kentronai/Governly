@@ -15,9 +15,10 @@ async def resolve_application_policy(
     Return (policy UUID, resolution source).
 
     When application_id is supplied, an explicit policy must belong to that
-    application. Without an explicit policy, exactly the active default is
-    selected. This prevents a caller from bypassing an application's controls
-    with a policy from another application or tenant.
+    application and the policy itself must be active. The application link's
+    is_active/is_default flags identify the automatic default; they must not
+    prevent a user from explicitly testing another linked policy. Without an
+    explicit policy, exactly the active default is selected.
     """
     if not application_id:
         return explicit_policy_id, "explicit" if explicit_policy_id else "unresolved"
@@ -33,7 +34,6 @@ async def resolve_application_policy(
                   AND ap.application_id::text = :application_id
                   AND a.tenant_id = :tenant_id
                   AND a.deleted_at IS NULL
-                  AND ap.is_active = true
                   AND p.tenant_id = :tenant_id
                   AND p.is_active = true
                   AND p.deleted_at IS NULL
@@ -48,7 +48,7 @@ async def resolve_application_policy(
             row = result.fetchone()
             if not row:
                 raise ValueError(
-                    "The requested policy is not active for this application or tenant."
+                    "The requested policy is not linked and active for this application."
                 )
             return str(row[0]), "application_explicit"
 

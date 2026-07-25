@@ -42,9 +42,14 @@ export default async function NewPolicyPage({ params }: PageProps) {
         tenantSlug={tenantSlug}
         userId={userId}
         availableGuardrails={availableGuardrails.map(g => ({
-          ...g,
+          // Project to exactly the Guardrail prop shape rather than spreading
+          // the whole drizzle row (jsonb defaultParams is typed `unknown`).
+          id: g.id,
+          key: g.key,
           name: g.name || g.key,
+          tier: g.tier,
           description: g.description || "",
+          defaultParams: (g.defaultParams ?? {}) as Record<string, unknown>,
         }))}
       />
     </div>
