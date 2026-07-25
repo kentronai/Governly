@@ -220,9 +220,7 @@ export function buildCapabilityFacts(
         r.resourceType === "databricks_registered_model" ||
         r.resourceType === "databricks_app" ||
         r.resourceType === "databricks_job" ||
-        r.resourceType === "databricks_genie_space" ||
-        r.resourceType === "crewai_deployment" ||
-        r.resourceType === "crewai_crew",
+        r.resourceType === "databricks_genie_space",
     ),
     resourceCount: agent.resources.length,
   };

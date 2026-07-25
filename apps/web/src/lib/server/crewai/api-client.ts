@@ -18,15 +18,14 @@ export interface CrewAICredentials {
 export const CREWAI_DEFAULT_BASE_URL = "https://app.crewai.com";
 
 /**
- * Discovery endpoints, isolated so they are easy to adjust against a real
- * CrewAI org without touching call sites. The org-scoped deployments listing
- * is the primary discovery source.
+ * Discovery endpoints, verified against the live CrewAI Enterprise API. The
+ * org-scoped crews listing is the primary discovery source; each deployed crew
+ * is one governed agent. (The account `/me` endpoint uses a different auth
+ * context and rejects PATs, so it is intentionally not used.)
  */
 export const CREWAI_ENDPOINTS = {
-  /** Verifies the token and identifies the caller's organization. */
-  me: "/crewai_plus/api/v1/me",
-  /** Lists the organization's crew deployments. */
-  deployments: "/crewai_plus/api/v1/deployments",
+  /** Lists the organization's deployed crews. Returns a JSON array. */
+  crews: "/crewai_plus/api/v1/crews",
 } as const;
 
 const CREWAI_HOST_SUFFIXES = [".crewai.com"];
