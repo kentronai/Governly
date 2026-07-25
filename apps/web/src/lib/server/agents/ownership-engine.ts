@@ -10,6 +10,25 @@ import type { CorrelatedAgent } from "../aws/correlation";
 
 const OWNER_TAG_KEYS = ["Owner", "owner", "norix:owner", "Team", "team"];
 const EMAIL_TAG_KEYS = ["Email", "email", "OwnerEmail", "owner-email"];
+const BUSINESS_FUNCTION_TAG_KEYS = [
+  "BusinessFunction",
+  "business-function",
+  "business_function",
+  "Function",
+  "function",
+  "norix:function",
+  "UseCase",
+  "use-case",
+  "use_case",
+  "BusinessUnit",
+  "business-unit",
+  "business_unit",
+  "CostCenter",
+  "cost-center",
+  "cost_center",
+  "Team",
+  "team",
+];
 
 export interface OwnershipResult {
   ownerUserId: string | null;
@@ -26,10 +45,7 @@ export async function detectOwnership(
   }, {});
 
   const businessFunction =
-    allTags["BusinessFunction"] ??
-    allTags["business-function"] ??
-    allTags["Team"] ??
-    null;
+    BUSINESS_FUNCTION_TAG_KEYS.map((key) => allTags[key]).find(Boolean) ?? null;
 
   for (const emailKey of EMAIL_TAG_KEYS) {
     const email = allTags[emailKey];

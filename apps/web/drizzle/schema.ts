@@ -129,6 +129,7 @@ export const provider = pgEnum("provider", [
   "ollama",
   "azure_openai",
   "huggingface",
+  "gemini",
   "custom",
 ]);
 export const providerModelStatus = pgEnum("provider_model_status", [
@@ -196,6 +197,7 @@ export const agentPlatform = pgEnum("agent_platform", [
   "aws_lambda",
   "aws_step_functions",
   "aws_ec2",
+  "aws_eks",
   "amazon_q",
   "azure_openai",
   "azure_ai_foundry",
@@ -209,6 +211,7 @@ export const agentPlatform = pgEnum("agent_platform", [
   "gcp_compute",
   "gcp_gke",
   "gcp_functions",
+  "kubernetes",
   "databricks_model_serving",
   "databricks_unity_catalog",
   "other",
@@ -256,6 +259,7 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "databricks_job",
   "databricks_notebook",
   "databricks_genie_space",
+  "kubernetes_workload",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [
@@ -1684,6 +1688,70 @@ export const providerModels = pgTable(
     check(
       "chk_provider_models_url_when_available",
       sql`availability_status <> 'available' OR model_url IS NOT NULL`,
+    ),
+  ],
+);
+
+export const tenantModelSettings = pgTable(
+  "tenant_model_settings",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    providerModelId: uuid("provider_model_id").notNull(),
+    isSelected: boolean("is_selected").default(false).notNull(),
+    connectionStatus: text("connection_status").default("not_tested").notNull(),
+    connectionErrorCode: text("connection_error_code"),
+    connectionMessage: text("connection_message"),
+    lastTestedAt: timestamp("last_tested_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    selectedBy: text("selected_by"),
+    selectedAt: timestamp("selected_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_tenant_model_settings_tenant").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_tenant_model_settings_model").using(
+      "btree",
+      table.providerModelId.asc().nullsLast().op("uuid_ops"),
+    ),
+    uniqueIndex("uq_tenant_model_settings_selected")
+      .on(table.tenantId)
+      .where(sql`${table.isSelected} = true`),
+    unique("uq_tenant_model_settings_model").on(
+      table.tenantId,
+      table.providerModelId,
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "tenant_model_settings_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.providerModelId],
+      foreignColumns: [providerModels.id],
+      name: "tenant_model_settings_provider_model_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.selectedBy],
+      foreignColumns: [users.id],
+      name: "tenant_model_settings_selected_by_fkey",
+    }).onDelete("set null"),
+    check(
+      "chk_tenant_model_settings_connection_status",
+      sql`${table.connectionStatus} IN ('not_tested', 'testing', 'ready', 'error')`,
     ),
   ],
 );

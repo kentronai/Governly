@@ -94,6 +94,7 @@ export function buildCapabilityFacts(
       "databricks_app",
       "databricks_job",
       "databricks_genie_space",
+      "kubernetes_workload",
     ].includes(r.resourceType),
   );
 
@@ -161,6 +162,11 @@ export function buildCapabilityFacts(
     ) ||
     agentCoreRuntimes.some((runtime) =>
       ((runtime.metadata.environmentKeys as string[]) ?? []).some((key) =>
+        EXTERNAL_API_ENV_PATTERN.test(key),
+      ),
+    ) ||
+    agent.resources.some((resource) =>
+      ((resource.metadata.environmentKeys as string[]) ?? []).some((key) =>
         EXTERNAL_API_ENV_PATTERN.test(key),
       ),
     );

@@ -96,13 +96,20 @@ async def chat_completions(request: Request):
             explicit_policy_id = request.headers.get("x-policy-id") or body.get("policy_id")
             if application_id:
                 from gateway.services.application_policy_service import resolve_application_policy
-                resolved_policy_id, policy_source = await resolve_application_policy(
-                    tenant_id=tenant_context.tenant_id,
-                    application_id=application_id,
-                    explicit_policy_id=explicit_policy_id,
-                )
-                request.state.policy_id = resolved_policy_id
-                request.state.policy_resolution_source = policy_source
+                try:
+                    resolved_policy_id, policy_source = await resolve_application_policy(
+                        tenant_id=tenant_context.tenant_id,
+                        application_id=application_id,
+                        explicit_policy_id=explicit_policy_id,
+                    )
+                    request.state.policy_id = resolved_policy_id
+                    request.state.policy_resolution_source = policy_source
+                except ValueError:
+                    # The pipeline already produced a fail-closed violation.
+                    # Observability enrichment must never replace that response
+                    # with an unrelated HTTP 500.
+                    request.state.policy_id = explicit_policy_id
+                    request.state.policy_resolution_source = "invalid_explicit"
             
             return _build_violation_response(result, initial_ctx, tenant_context)
         
@@ -306,7 +313,26 @@ async def _handle_streaming(
                     request.state.violation_phase = "output"
         
         except Exception as e:
-            error_chunk = {"error": {"type": "internal_error", "message": str(e), "trace_id": trace_id}}
+            from ..llm_client import ProviderAPIError
+
+            if isinstance(e, ProviderAPIError):
+                error_chunk = {
+                    "error": {
+                        "type": "provider_error",
+                        "code": e.code,
+                        "message": str(e),
+                        "trace_id": trace_id,
+                    }
+                }
+            else:
+                logger.error("Streaming completion failed", exc_info=True)
+                error_chunk = {
+                    "error": {
+                        "type": "internal_error",
+                        "message": "The response stream failed unexpectedly.",
+                        "trace_id": trace_id,
+                    }
+                }
             yield f"data: {json.dumps(error_chunk)}\n\n"
         
         finally:
@@ -476,8 +502,22 @@ async def _handle_non_streaming(
         )
         
     except Exception as e:
+        from ..llm_client import ProviderAPIError
+
+        if isinstance(e, ProviderAPIError):
+            raise HTTPException(
+                status_code=e.status_code,
+                detail={
+                    "type": "provider_error",
+                    "code": e.code,
+                    "message": str(e),
+                },
+            )
         logger.error(f"Completion error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="The model provider request failed unexpectedly.",
+        )
 
 
 def _extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:

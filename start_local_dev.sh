@@ -30,6 +30,12 @@ fi
 
 echo -e "${GREEN}Starting services...${NC}"
 
+# The web node_modules and Turbopack cache volumes are declared `external` so
+# they survive `docker compose down -v` and project renames. Creating them is
+# idempotent, so this is a no-op once they exist.
+docker volume create norix-web-node-modules >/dev/null
+docker volume create norix-web-next-cache >/dev/null
+
 # Start stateful services and run the one-shot migration separately. Compose
 # treats a successful exited migration as unhealthy when it is mixed into a
 # long-running `up --wait` invocation.

@@ -12,6 +12,7 @@ import {
   agentResources,
   agentRecommendations,
   discoveryScans,
+  integrations,
 } from "@db";
 import { and, eq } from "drizzle-orm";
 import {
@@ -44,6 +45,72 @@ export interface RunScanResult {
   agentsDiscovered: number;
   resourcesScanned: Record<string, number>;
   errorMessage?: string;
+  // Benign "an optional capability was skipped" notices (e.g. a missing
+  // optional IAM permission). Returned so the caller can surface them ONCE at
+  // connect time, but deliberately never persisted to integrations.errorMessage
+  // — otherwise the card banner nags on every scan for something the operator
+  // has already chosen not to grant.
+  optionalNotice?: string;
+}
+
+/**
+ * True when a regional service simply has no endpoint in the region being
+ * scanned, which surfaces as a DNS resolution failure rather than an API error.
+ */
+function isServiceUnavailableInRegion(error: unknown): boolean {
+  for (let current = error, depth = 0; current && depth < 5; depth += 1) {
+    const code = (current as NodeJS.ErrnoException).code;
+    if (code === "ENOTFOUND" || code === "EAI_AGAIN") return true;
+    if (
+      current instanceof Error &&
+      /getaddrinfo (ENOTFOUND|EAI_AGAIN)/.test(current.message)
+    ) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * True when AgentCore was skipped only because the connection's IAM identity
+ * lacks the optional bedrock-agentcore:ListAgentRuntimes permission. This is a
+ * deliberate operator choice, not a fault, so it must not be persisted as a
+ * standing card warning.
+ */
+function isMissingOptionalAgentCorePermission(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /bedrock-agentcore:ListAgentRuntimes|not authorized|AccessDenied/i.test(
+    message,
+  );
+}
+
+function formatServiceWarning(
+  region: string,
+  service: string,
+  error: unknown,
+): string {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  return `${region} ${service}: ${message}`;
+}
+
+async function mapWithConcurrency<T>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const runners = Array.from(
+    { length: Math.min(concurrency, values.length) },
+    async () => {
+      while (nextIndex < values.length) {
+        const value = values[nextIndex];
+        nextIndex += 1;
+        await worker(value);
+      }
+    },
+  );
+  await Promise.all(runners);
 }
 
 export async function runDiscoveryScan(
@@ -81,9 +148,14 @@ export async function runDiscoveryScan(
     let accountId = "unknown";
     const regionErrors: string[] = [];
     const serviceWarnings: string[] = [];
+    // Regions where AgentCore was skipped for lack of the optional permission.
+    // Collapsed into a single non-persisted notice below, not one line/region.
+    const agentCorePermissionRegions: string[] = [];
     let ec2RegionsScanned = 0;
 
-    for (const region of regions) {
+    // Regional AWS APIs are independent. A small concurrency limit keeps the
+    // scan fast without flooding the customer's account or exhausting sockets.
+    await mapWithConcurrency(regions, 4, async (region) => {
       try {
         const clients = await buildAwsClients(connection, {
           region,
@@ -97,11 +169,7 @@ export async function runDiscoveryScan(
           ec2Resources.push(...(await discoverEc2(clients)));
           ec2RegionsScanned += 1;
         } catch (error) {
-          serviceWarnings.push(
-            `${region} EC2: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`,
-          );
+          serviceWarnings.push(formatServiceWarning(region, "EC2", error));
         }
 
         const regionBedrock = await discoverBedrock(clients);
@@ -113,11 +181,21 @@ export async function runDiscoveryScan(
             )),
           );
         } catch (error) {
-          serviceWarnings.push(
-            `${region} AgentCore: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`,
-          );
+          // A region where the service has no endpoint at all fails DNS
+          // resolution. That is expected for regional services like AgentCore
+          // and is not a scan fault — reporting it made healthy scans look
+          // broken and buried the warnings that are genuinely actionable.
+          if (isServiceUnavailableInRegion(error)) {
+            // expected: silently ignore
+          } else if (isMissingOptionalAgentCorePermission(error)) {
+            // Benign optional-permission skip — collected for a one-time
+            // notice, never persisted as a standing warning.
+            agentCorePermissionRegions.push(region);
+          } else {
+            serviceWarnings.push(
+              formatServiceWarning(region, "AgentCore", error),
+            );
+          }
         }
 
         const knownLambdaArns = new Set(
@@ -191,7 +269,7 @@ export async function runDiscoveryScan(
           `${region}: ${regionError instanceof Error ? regionError.message : "Unknown error"}`,
         );
       }
-    }
+    });
 
     if (regionErrors.length === regions.length && ec2RegionsScanned === 0) {
       throw new Error(`All regions failed: ${regionErrors.join("; ")}`);
@@ -403,6 +481,13 @@ export async function runDiscoveryScan(
       ? warningParts.join("; ")
       : undefined;
 
+    // Kept out of partialWarning on purpose: this is surfaced once at connect
+    // time (a toast) instead of a standing card banner that reappears on every
+    // scheduled scan.
+    const optionalNotice = agentCorePermissionRegions.length
+      ? `AgentCore discovery skipped in ${agentCorePermissionRegions.length} region(s) (${agentCorePermissionRegions.join(", ")}): the connection's IAM identity is missing the optional permission bedrock-agentcore:ListAgentRuntimes. Add it to discover Bedrock AgentCore runtimes; all other AWS discovery still completed.`
+      : undefined;
+
     await db
       .update(discoveryScans)
       .set({
@@ -413,6 +498,19 @@ export async function runDiscoveryScan(
         errorMessage: partialWarning ?? null,
       })
       .where(eq(discoveryScans.id, scan.id));
+    await db
+      .update(integrations)
+      .set({
+        isEnabled: true,
+        isCredentialsAdded: true,
+        lastSyncAt: new Date().toISOString(),
+        syncStatus: "success",
+        errorMessage: partialWarning ?? null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(eq(integrations.tenantId, tenantId), eq(integrations.name, "AWS")),
+      );
 
     return {
       scanId: scan.id,
@@ -420,6 +518,7 @@ export async function runDiscoveryScan(
       agentsDiscovered: correlated.length,
       resourcesScanned,
       errorMessage: partialWarning,
+      optionalNotice,
     };
   } catch (error) {
     const errorMessage =
@@ -432,6 +531,17 @@ export async function runDiscoveryScan(
         errorMessage,
       })
       .where(eq(discoveryScans.id, scan.id));
+    await db
+      .update(integrations)
+      .set({
+        lastSyncAt: new Date().toISOString(),
+        syncStatus: "failed",
+        errorMessage,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(eq(integrations.tenantId, tenantId), eq(integrations.name, "AWS")),
+      );
 
     return {
       scanId: scan.id,

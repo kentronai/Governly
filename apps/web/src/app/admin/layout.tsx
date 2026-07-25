@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+import { Providers } from "../providers";
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="bg-white min-h-screen">
-      {children}
+      <Providers>{children}</Providers>
     </div>
   );
 }

@@ -12,10 +12,32 @@ dotenv.config({
 // the shell or root environment already contains production Clerk keys.
 // Production builds continue to use their injected live environment.
 if (process.env.NODE_ENV !== "production") {
+  // Provider credentials injected by Docker are server secrets and must not
+  // be replaced by a developer's stale apps/web/.env.local value. That file
+  // intentionally overrides Clerk's local test configuration, so preserve
+  // the injected OpenAI runtime configuration across the override.
+  const injectedOpenAIApiKey = process.env.OPENAI_API_KEY;
+  const injectedOpenAIModel = process.env.OPENAI_MODEL;
+  const injectedGeminiApiKey = process.env.GEMINI_API_KEY;
+  const injectedGeminiModel = process.env.GEMINI_MODEL;
+
   dotenv.config({
     path: path.resolve(__dirname, ".env.local"),
     override: true,
   });
+
+  if (injectedOpenAIApiKey) {
+    process.env.OPENAI_API_KEY = injectedOpenAIApiKey;
+  }
+  if (injectedOpenAIModel) {
+    process.env.OPENAI_MODEL = injectedOpenAIModel;
+  }
+  if (injectedGeminiApiKey) {
+    process.env.GEMINI_API_KEY = injectedGeminiApiKey;
+  }
+  if (injectedGeminiModel) {
+    process.env.GEMINI_MODEL = injectedGeminiModel;
+  }
 }
 
 /** @type {import('next').NextConfig} */

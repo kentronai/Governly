@@ -38,4 +38,39 @@ describe("default application policies", () => {
       }
     },
   );
+
+  it("defines distinct protection levels", () => {
+    const byProfile = Object.fromEntries(
+      DEFAULT_APPLICATION_POLICIES.map((policy) => [policy.profile, policy]),
+    );
+
+    expect(byProfile.standard.guards.map((guard) => guard.key)).toEqual([
+      "pii.detect",
+      "jailbreak.detect",
+      "profanity.detect",
+      "toxicity.detect",
+      "harmful_instructions.detect",
+    ]);
+    expect(byProfile.strict.guards.map((guard) => guard.key)).toEqual([
+      "pii.detect",
+      "jailbreak.detect",
+      "profanity.detect",
+      "toxicity.detect",
+      "harmful_instructions.detect",
+    ]);
+    expect(byProfile.development.guards.map((guard) => guard.key)).toEqual([
+      "jailbreak.detect",
+    ]);
+
+    const standardHarmful = byProfile.standard.guards.find(
+      (guard) => guard.key === "harmful_instructions.detect",
+    );
+    const strictHarmful = byProfile.strict.guards.find(
+      (guard) => guard.key === "harmful_instructions.detect",
+    );
+    expect(strictHarmful?.params?.threshold).toBeLessThan(
+      standardHarmful?.params?.threshold as number,
+    );
+    expect(strictHarmful?.params?.severity).toBe("critical");
+  });
 });

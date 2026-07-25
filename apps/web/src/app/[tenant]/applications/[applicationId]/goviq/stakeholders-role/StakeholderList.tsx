@@ -23,7 +23,7 @@ import {
 
 // Custom Components
 import Pagination from '@/components/common/pagination';
-import DeleteConfirmationModal from '@/components/common/DeleteConfirmationModal';
+import { DeleteConfirmationModal } from '@/components/common/DeleteConfirmationModal';
 
 // Icons
 import {

@@ -91,6 +91,7 @@ apps/web/scripts/seed-agent-rules.ts            seeds the default configurable r
 - **Sync is idempotent.** Agents are keyed on `(connection_id, external_agent_id)`; a re-scan
   updates the existing row and replaces its `agent_resources`/open `agent_recommendations` rather
   than accumulating duplicates.
-- **Manual trigger only in this phase.** No scheduler/cron infrastructure exists in this repo yet.
-  `discovery_scans.next_scan_at` is reserved so scheduled/continuous sync can be added later
-  without a schema change.
+- **Automatic and manual refresh.** Saving a cloud connection runs its initial discovery
+  immediately. The Docker `agent-discovery-scheduler` then calls the authenticated discovery
+  route every five minutes by default, and the route prevents overlapping recurring runs.
+  Manual discovery remains available for an on-demand refresh.

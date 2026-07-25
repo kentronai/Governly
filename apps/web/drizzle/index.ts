@@ -15,7 +15,13 @@ if (!globalThis.__db) {
   globalThis.__db = postgres(connectionString, {
     max: 10,
     idle_timeout: 20,
-    connect_timeout: 10,
+    // Raised from 10s: under load (or right after Postgres restarts) a 10s
+    // connect budget surfaced transient "write CONNECT_TIMEOUT postgres:5432"
+    // errors to users. 30s absorbs those blips without hanging real outages.
+    connect_timeout: 30,
+    // Recycle connections hourly so a long-lived pool never accumulates
+    // half-dead sockets that fail the next query.
+    max_lifetime: 60 * 60,
   });
 }
 

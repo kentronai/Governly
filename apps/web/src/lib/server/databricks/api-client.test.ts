@@ -115,6 +115,48 @@ describe("Databricks API client", () => {
       errorCode: "FEATURE_DISABLED",
     });
   });
+
+  it.each([
+    [{ error_code: "PERMISSION_DENIED" }, "PERMISSION_DENIED"],
+    [{}, "Databricks API returned HTTP 500"],
+  ])("uses safe API error fallbacks for %j", async (payload, message) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Server Error",
+      json: async () => payload,
+    } as Response);
+
+    await expect(
+      databricksApi(
+        {
+          hostUrl: "https://dbc-1234.cloud.databricks.com",
+          accessToken: "secret-token",
+        },
+        "/api/2.0/apps",
+      ),
+    ).rejects.toThrow(message);
+  });
+
+  it("handles a successful response without a JSON body", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => {
+        throw new Error("No content");
+      },
+    } as unknown as Response);
+
+    await expect(
+      databricksApi(
+        {
+          hostUrl: "https://dbc-1234.cloud.databricks.com",
+          accessToken: "secret-token",
+        },
+        "/api/2.0/apps",
+      ),
+    ).resolves.toEqual({});
+  });
 });
 
 function response(payload: Record<string, unknown>): Response {

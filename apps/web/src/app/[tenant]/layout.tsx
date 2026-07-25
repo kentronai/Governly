@@ -9,6 +9,7 @@ import { TenantProvider } from "@/contexts/TenantContext";
 import LayoutWithConditionalSidebar from "@/components/app/LayoutWithConditionalSidebar";
 import { TenantHeader } from "@/components/app/TenantHeader";
 import { UserGuideModal } from "@/components/common/UserGuided";
+import { Providers } from "../providers";
 
 const tenantRouteAliases = new Set([
   "admin",
@@ -34,6 +35,39 @@ const slugify = (name: string): string =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || `org-${Date.now()}`;
+
+const getClaimEmail = (sessionClaims: unknown): string | null => {
+  if (!sessionClaims || typeof sessionClaims !== "object") {
+    return null;
+  }
+
+  const claims = sessionClaims as Record<string, unknown>;
+  const directEmail = claims.email;
+  if (typeof directEmail === "string" && directEmail.trim()) {
+    return directEmail;
+  }
+
+  const primaryEmail = claims.primary_email;
+  if (typeof primaryEmail === "string" && primaryEmail.trim()) {
+    return primaryEmail;
+  }
+
+  return null;
+};
+
+const getLocalUserEmail = async (userId: string): Promise<string | null> => {
+  try {
+    const localUser = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { email: true },
+    });
+
+    return localUser?.email ?? null;
+  } catch (error) {
+    console.error("Tenant layout user lookup failed", error);
+    return null;
+  }
+};
 
 async function ensureTenantForOrg(orgId: string) {
   let tenant = await db.query.tenants.findFirst({
@@ -100,7 +134,7 @@ export default async function TenantLayout({
 }: TenantLayoutProps) {
   const headersList = await headers();
   const { tenant: tenantSlug } = await params;
-  const { userId, orgId } = await auth();
+  const { userId, orgId, sessionClaims } = await auth();
 
   const pathname =
     headersList.get("x-pathname") || headersList.get("referer") || "";
@@ -110,14 +144,9 @@ export default async function TenantLayout({
     redirect("/sign-in");
   }
 
-  // The user is synchronized locally by the Clerk webhook. Reading the email
-  // from PostgreSQL avoids a Clerk Backend API request on every page render,
-  // which previously caused transient Clerk failures to appear as RSC errors.
-  const localUser = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: { email: true },
-  });
-  const isAdminUser = localUser?.email?.toLowerCase().endsWith("@kentron.ai") ?? false;
+  const userEmail =
+    (await getLocalUserEmail(userId)) ?? getClaimEmail(sessionClaims);
+  const isAdminUser = userEmail?.toLowerCase().endsWith("@kentron.ai") ?? false;
 
   // Find tenant by slug
   const tenant = await db.query.tenants.findFirst({
@@ -141,31 +170,35 @@ export default async function TenantLayout({
   }
 
   return (
-    <TenantProvider
-      tenantData={{
-        id: tenant.id,
-        slug: tenant.slug,
-        name: tenant.name,
-        plan: tenant.plan,
-        govIQEnabled: tenant.govIqEnabled || false,
-        controlnetEnabled: tenant.controlnetEnabled || true,
-        metadata: tenant.metadata,
-      }}
-    >
-      <div
-        className="tenant-layout h-screen flex flex-col overflow-hidden relative"
-        data-tenant-id={tenant.id}
-        data-tenant-slug={tenant.slug}
+    // Providers must sit outside TenantProvider: TenantProvider calls useQuery
+    // and therefore needs the QueryClientProvider to already be mounted above it.
+    <Providers>
+      <TenantProvider
+        tenantData={{
+          id: tenant.id,
+          slug: tenant.slug,
+          name: tenant.name,
+          plan: tenant.plan,
+          govIQEnabled: tenant.govIqEnabled || false,
+          controlnetEnabled: tenant.controlnetEnabled || true,
+          metadata: tenant.metadata,
+        }}
       >
-        <UserGuideModal></UserGuideModal>
-        {/* Top Header */}
-        <TenantHeader />
-        {/* Layout with conditional sidebar */}
-        <LayoutWithConditionalSidebar isAdminUser={isAdminUser}>
-          {children}
-        </LayoutWithConditionalSidebar>
-      </div>
-    </TenantProvider>
+        <div
+          className="tenant-layout h-screen flex flex-col overflow-hidden relative"
+          data-tenant-id={tenant.id}
+          data-tenant-slug={tenant.slug}
+        >
+          <UserGuideModal></UserGuideModal>
+          {/* Top Header */}
+          <TenantHeader />
+          {/* Layout with conditional sidebar */}
+          <LayoutWithConditionalSidebar isAdminUser={isAdminUser}>
+            {children}
+          </LayoutWithConditionalSidebar>
+        </div>
+      </TenantProvider>
+    </Providers>
   );
 }
 

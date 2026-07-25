@@ -1,0 +1,320 @@
+import "server-only";
+
+import { db, providerModels, tenantModelSettings } from "@db";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
+import {
+  getModelProviderAdapter,
+  isExecutableModelProvider,
+} from "./providers";
+
+export const DEFAULT_GEMINI_MODEL =
+  process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+export const GEMINI_OPENAI_API_BASE_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai";
+
+export async function ensureDefaultGeminiModel(tenantId: string) {
+  const [existing] = await db
+    .select()
+    .from(providerModels)
+    .where(
+      and(
+        eq(providerModels.tenantId, tenantId),
+        eq(providerModels.provider, "gemini"),
+        eq(providerModels.modelId, DEFAULT_GEMINI_MODEL),
+      ),
+    )
+    .limit(1);
+
+  let model = existing;
+  if (!model) {
+    const [created] = await db
+      .insert(providerModels)
+      .values({
+        tenantId,
+        provider: "gemini",
+        modelId: DEFAULT_GEMINI_MODEL,
+        displayName: `Google ${DEFAULT_GEMINI_MODEL}`,
+        family: "Google Gemini",
+        modality: ["text"],
+        supportsStreaming: true,
+        supportsJson: true,
+        availabilityStatus: "available",
+        modelUrl: GEMINI_OPENAI_API_BASE_URL,
+        purposeUseCase: "NORIX policy and guardrail testing",
+        riskLevel: "Medium",
+        category: "llm",
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (created) {
+      model = created;
+    } else {
+      [model] = await db
+        .select()
+        .from(providerModels)
+        .where(
+          and(
+            eq(providerModels.tenantId, tenantId),
+            eq(providerModels.provider, "gemini"),
+            eq(providerModels.modelId, DEFAULT_GEMINI_MODEL),
+          ),
+        )
+        .limit(1);
+    }
+  }
+
+  if (!model) {
+    throw new Error("Unable to initialize the NORIX Gemini test model.");
+  }
+
+  // Retire only NORIX's old seeded OpenAI default. Tenant-created OpenAI
+  // registry entries remain untouched and can still be governed independently.
+  const legacyOpenAIModels = await db
+    .select({ id: providerModels.id })
+    .from(providerModels)
+    .where(
+      and(
+        eq(providerModels.tenantId, tenantId),
+        eq(providerModels.provider, "openai"),
+        eq(
+          providerModels.purposeUseCase,
+          "NORIX policy and guardrail testing",
+        ),
+        eq(providerModels.availabilityStatus, "available"),
+      ),
+    );
+
+  if (legacyOpenAIModels.length > 0) {
+    const now = new Date().toISOString();
+    await db.transaction(async (tx) => {
+      for (const legacyModel of legacyOpenAIModels) {
+        await tx
+          .update(tenantModelSettings)
+          .set({ isSelected: false, updatedAt: now })
+          .where(
+            and(
+              eq(tenantModelSettings.tenantId, tenantId),
+              eq(tenantModelSettings.providerModelId, legacyModel.id),
+            ),
+          );
+        await tx
+          .update(providerModels)
+          .set({ availabilityStatus: "deprecated", updatedAt: now })
+          .where(eq(providerModels.id, legacyModel.id));
+      }
+    });
+  }
+
+  const [selected] = await db
+    .select()
+    .from(tenantModelSettings)
+    .where(
+      and(
+        eq(tenantModelSettings.tenantId, tenantId),
+        eq(tenantModelSettings.isSelected, true),
+      ),
+    )
+    .limit(1);
+
+  if (!selected) {
+    const [modelSetting] = await db
+      .select()
+      .from(tenantModelSettings)
+      .where(
+        and(
+          eq(tenantModelSettings.tenantId, tenantId),
+          eq(tenantModelSettings.providerModelId, model.id),
+        ),
+      )
+      .limit(1);
+
+    try {
+      if (modelSetting) {
+        await db
+          .update(tenantModelSettings)
+          .set({
+            isSelected: true,
+            selectedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(tenantModelSettings.id, modelSetting.id));
+      } else {
+        await db.insert(tenantModelSettings).values({
+          tenantId,
+          providerModelId: model.id,
+          isSelected: true,
+          selectedAt: new Date().toISOString(),
+        });
+      }
+    } catch {
+      // A concurrent request may have selected the same default. The database
+      // constraints are the source of truth, so a duplicate race is harmless.
+    }
+  }
+
+  return model;
+}
+
+export async function getModelRegistryRuntime(tenantId: string) {
+  await ensureDefaultGeminiModel(tenantId);
+
+  return db
+    .select({
+      id: providerModels.id,
+      provider: providerModels.provider,
+      modelId: providerModels.modelId,
+      displayName: providerModels.displayName,
+      family: providerModels.family,
+      modality: providerModels.modality,
+      contextWindowTokens: providerModels.contextWindowTokens,
+      maxOutputTokens: providerModels.maxOutputTokens,
+      inputCostPer1K: providerModels.inputCostPer1K,
+      outputCostPer1K: providerModels.outputCostPer1K,
+      availabilityStatus: providerModels.availabilityStatus,
+      tenantId: providerModels.tenantId,
+      modelUrl: providerModels.modelUrl,
+      purposeUseCase: providerModels.purposeUseCase,
+      riskLevel: providerModels.riskLevel,
+      category: providerModels.category,
+      isSelected: tenantModelSettings.isSelected,
+      connectionStatus: tenantModelSettings.connectionStatus,
+      connectionErrorCode: tenantModelSettings.connectionErrorCode,
+      connectionMessage: tenantModelSettings.connectionMessage,
+      lastTestedAt: tenantModelSettings.lastTestedAt,
+    })
+    .from(providerModels)
+    .leftJoin(
+      tenantModelSettings,
+      and(
+        eq(tenantModelSettings.providerModelId, providerModels.id),
+        eq(tenantModelSettings.tenantId, tenantId),
+      ),
+    )
+    .where(
+      or(
+        eq(providerModels.tenantId, tenantId),
+        isNull(providerModels.tenantId),
+      ),
+    )
+    .orderBy(desc(providerModels.createdAt));
+}
+
+async function getAvailableTenantModel(tenantId: string, modelId: string) {
+  const [model] = await db
+    .select()
+    .from(providerModels)
+    .where(
+      and(
+        eq(providerModels.id, modelId),
+        or(
+          eq(providerModels.tenantId, tenantId),
+          isNull(providerModels.tenantId),
+        ),
+        eq(providerModels.availabilityStatus, "available"),
+      ),
+    )
+    .limit(1);
+
+  if (!model || !model.modelUrl) {
+    throw new Error("The selected model is not available for this tenant.");
+  }
+  if (!isExecutableModelProvider(model.provider)) {
+    throw new Error(
+      `${model.provider} is registered for governance but is not executable in Playground.`,
+    );
+  }
+  return model;
+}
+
+export async function selectTenantModel(
+  tenantId: string,
+  providerModelId: string,
+  userId: string,
+) {
+  const model = await getAvailableTenantModel(tenantId, providerModelId);
+  const now = new Date().toISOString();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tenantModelSettings)
+      .set({ isSelected: false, updatedAt: now })
+      .where(eq(tenantModelSettings.tenantId, tenantId));
+
+    await tx
+      .insert(tenantModelSettings)
+      .values({
+        tenantId,
+        providerModelId,
+        isSelected: true,
+        selectedBy: userId,
+        selectedAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [
+          tenantModelSettings.tenantId,
+          tenantModelSettings.providerModelId,
+        ],
+        set: {
+          isSelected: true,
+          selectedBy: userId,
+          selectedAt: now,
+          updatedAt: now,
+        },
+      });
+  });
+
+  return model;
+}
+
+export async function testTenantModelConnection(
+  tenantId: string,
+  providerModelId: string,
+) {
+  const model = await getAvailableTenantModel(tenantId, providerModelId);
+  const now = new Date().toISOString();
+
+  await db
+    .insert(tenantModelSettings)
+    .values({
+      tenantId,
+      providerModelId,
+      connectionStatus: "testing",
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        tenantModelSettings.tenantId,
+        tenantModelSettings.providerModelId,
+      ],
+      set: {
+        connectionStatus: "testing",
+        connectionErrorCode: null,
+        connectionMessage: null,
+        updatedAt: now,
+      },
+    });
+
+  const adapter = getModelProviderAdapter(model.provider);
+  const result = await adapter.testConnection(model.modelId, model.modelUrl!);
+  const testedAt = new Date().toISOString();
+
+  await db
+    .update(tenantModelSettings)
+    .set({
+      connectionStatus: result.status,
+      connectionErrorCode: result.code,
+      connectionMessage: result.message,
+      lastTestedAt: testedAt,
+      updatedAt: testedAt,
+    })
+    .where(
+      and(
+        eq(tenantModelSettings.tenantId, tenantId),
+        eq(tenantModelSettings.providerModelId, providerModelId),
+      ),
+    );
+
+  return { ...result, lastTestedAt: testedAt };
+}

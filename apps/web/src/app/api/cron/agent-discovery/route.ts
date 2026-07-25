@@ -11,6 +11,7 @@ import { runDiscoveryScan } from "@/lib/server/aws/discovery-orchestrator";
 import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator";
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
+import { runKubernetesDiscoveryScan } from "@/lib/server/kubernetes/discovery-orchestrator";
 
 function authorized(request: NextRequest): boolean {
   const expected =
@@ -24,6 +25,8 @@ function authorized(request: NextRequest): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+let discoveryRunInProgress = false;
+
 async function run(request: NextRequest) {
   if (!process.env.AGENT_DISCOVERY_CRON_SECRET && !process.env.CRON_SECRET) {
     return NextResponse.json(
@@ -34,114 +37,149 @@ async function run(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const enabled = await db
-    .select()
-    .from(integrations)
-    .where(
-      and(
-        eq(integrations.isEnabled, true),
-        eq(integrations.isCredentialsAdded, true),
-      ),
+  if (discoveryRunInProgress) {
+    return NextResponse.json(
+      {
+        status: "already_running",
+        message: "A recurring discovery run is already in progress",
+      },
+      { status: 409 },
     );
-  const results: Array<Record<string, unknown>> = [];
-
-  // Run sequentially to avoid multiplying provider API rate limits and DB
-  // engine work when multiple tenants are scheduled at the same time.
-  for (const integration of enabled) {
-    try {
-      const configuration = (integration.configuration ?? {}) as Record<
-        string,
-        string
-      >;
-      if (integration.name === "AWS" && configuration.awsConnectionId) {
-        const connection = await db.query.awsDiscoveryConnections.findFirst({
-          where: and(
-            eq(awsDiscoveryConnections.id, configuration.awsConnectionId),
-            eq(awsDiscoveryConnections.tenantId, integration.tenantId),
-            eq(awsDiscoveryConnections.isEnabled, true),
-          ),
-        });
-        if (connection) {
-          results.push({
-            integrationId: integration.id,
-            provider: "AWS",
-            ...(await runDiscoveryScan(
-              integration.tenantId,
-              connection.id,
-              connection,
-              null,
-            )),
-          });
-        }
-      } else if (
-        integration.name === "Azure" &&
-        configuration.azureConnectionId
-      ) {
-        const connection = await db.query.azureDiscoveryConnections.findFirst({
-          where: and(
-            eq(azureDiscoveryConnections.id, configuration.azureConnectionId),
-            eq(azureDiscoveryConnections.tenantId, integration.tenantId),
-            eq(azureDiscoveryConnections.isEnabled, true),
-          ),
-        });
-        if (connection) {
-          results.push({
-            integrationId: integration.id,
-            provider: "Azure",
-            ...(await runAzureDiscoveryScan(
-              integration.tenantId,
-              connection.id,
-              connection,
-              null,
-            )),
-          });
-        }
-      } else if (
-        integration.name === "Google Cloud" &&
-        integration.credentialsEncrypted
-      ) {
-        results.push({
-          integrationId: integration.id,
-          provider: "Google Cloud",
-          ...(await runGoogleCloudDiscoveryScan(
-            integration.tenantId,
-            integration.id,
-            integration,
-            null,
-          )),
-        });
-      } else if (
-        integration.name === "Databricks Unity Catalog" &&
-        integration.credentialsEncrypted
-      ) {
-        results.push({
-          integrationId: integration.id,
-          provider: "Databricks Unity Catalog",
-          ...(await runDatabricksDiscoveryScan(
-            integration.tenantId,
-            integration.id,
-            integration,
-            null,
-          )),
-        });
-      }
-    } catch (error) {
-      results.push({
-        integrationId: integration.id,
-        provider: integration.name,
-        status: "failed",
-        errorMessage:
-          error instanceof Error ? error.message : "Scheduled discovery failed",
-      });
-    }
   }
 
-  return NextResponse.json({
-    completedAt: new Date().toISOString(),
-    integrationsScanned: results.length,
-    results,
-  });
+  discoveryRunInProgress = true;
+  try {
+    const enabled = await db
+      .select()
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.isEnabled, true),
+          eq(integrations.isCredentialsAdded, true),
+        ),
+      );
+    const results: Array<Record<string, unknown>> = [];
+
+    // Run sequentially to avoid multiplying provider API rate limits and DB
+    // engine work when multiple tenants are scheduled at the same time.
+    for (const integration of enabled) {
+      try {
+        const configuration = (integration.configuration ?? {}) as Record<
+          string,
+          string
+        >;
+        if (integration.name === "AWS" && configuration.awsConnectionId) {
+          const connection = await db.query.awsDiscoveryConnections.findFirst({
+            where: and(
+              eq(awsDiscoveryConnections.id, configuration.awsConnectionId),
+              eq(awsDiscoveryConnections.tenantId, integration.tenantId),
+              eq(awsDiscoveryConnections.isEnabled, true),
+            ),
+          });
+          if (connection) {
+            results.push({
+              integrationId: integration.id,
+              provider: "AWS",
+              ...(await runDiscoveryScan(
+                integration.tenantId,
+                connection.id,
+                connection,
+                null,
+              )),
+            });
+          }
+        } else if (
+          integration.name === "Azure" &&
+          configuration.azureConnectionId
+        ) {
+          const connection = await db.query.azureDiscoveryConnections.findFirst(
+            {
+              where: and(
+                eq(
+                  azureDiscoveryConnections.id,
+                  configuration.azureConnectionId,
+                ),
+                eq(azureDiscoveryConnections.tenantId, integration.tenantId),
+                eq(azureDiscoveryConnections.isEnabled, true),
+              ),
+            },
+          );
+          if (connection) {
+            results.push({
+              integrationId: integration.id,
+              provider: "Azure",
+              ...(await runAzureDiscoveryScan(
+                integration.tenantId,
+                connection.id,
+                connection,
+                null,
+              )),
+            });
+          }
+        } else if (
+          integration.name === "Google Cloud" &&
+          integration.credentialsEncrypted
+        ) {
+          results.push({
+            integrationId: integration.id,
+            provider: "Google Cloud",
+            ...(await runGoogleCloudDiscoveryScan(
+              integration.tenantId,
+              integration.id,
+              integration,
+              null,
+            )),
+          });
+        } else if (
+          integration.name === "Databricks Unity Catalog" &&
+          integration.credentialsEncrypted
+        ) {
+          results.push({
+            integrationId: integration.id,
+            provider: "Databricks Unity Catalog",
+            ...(await runDatabricksDiscoveryScan(
+              integration.tenantId,
+              integration.id,
+              integration,
+              null,
+            )),
+          });
+        } else if (
+          integration.name === "Kubernetes Cluster" &&
+          integration.credentialsEncrypted
+        ) {
+          results.push({
+            integrationId: integration.id,
+            provider: "Kubernetes Cluster",
+            ...(await runKubernetesDiscoveryScan(
+              integration.tenantId,
+              integration.id,
+              integration,
+              null,
+            )),
+          });
+        }
+      } catch (error) {
+        results.push({
+          integrationId: integration.id,
+          provider: integration.name,
+          status: "failed",
+          errorMessage:
+            error instanceof Error
+              ? error.message
+              : "Scheduled discovery failed",
+        });
+      }
+    }
+
+    return NextResponse.json({
+      completedAt: new Date().toISOString(),
+      integrationsScanned: results.length,
+      results,
+    });
+  } finally {
+    discoveryRunInProgress = false;
+  }
 }
 
 export async function GET(request: NextRequest) {

@@ -16,6 +16,21 @@ export class DatabricksApiError extends Error {
 
 const DATABRICKS_HOST_SUFFIXES = [".databricks.com", ".azuredatabricks.net"];
 
+/** Flattens an undici fetch rejection into something an operator can act on. */
+export function describeFetchFailure(error: unknown): string {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "request timed out after 30s";
+  }
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current instanceof Error && depth < 5; depth += 1) {
+    const code = (current as NodeJS.ErrnoException).code;
+    parts.push(code ? `${current.message} (${code})` : current.message);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return parts.join(" <- ") || String(error);
+}
+
 export function normalizeDatabricksHost(value: string): string {
   let url: URL;
   try {
@@ -66,6 +81,15 @@ export async function databricksApi<T>(
       cache: "no-store",
       signal: controller.signal,
     });
+  } catch (error) {
+    // undici reports every transport-level failure as the bare string
+    // "fetch failed" and hides the real reason (ECONNRESET, UND_ERR_*, TLS,
+    // abort) on `cause`. Unwrap it — a scan that dies with "fetch failed" is
+    // undiagnosable, which is exactly how these rows sat stale.
+    throw new Error(
+      `Databricks request to ${path} failed: ${describeFetchFailure(error)}`,
+      { cause: error },
+    );
   } finally {
     clearTimeout(timeout);
   }

@@ -23,14 +23,16 @@ const DEFAULT_GUARD_KEYS = [
   "jailbreak.detect",
   "profanity.detect",
   "toxicity.detect",
+  "harmful_instructions.detect",
 ];
 
 const LAUNCH_POLICY_NAME = "Launch";
 const LAUNCH_POLICY_VERSION = "v1";
 const LAUNCH_POLICY_DESCRIPTION =
   "Kickstart your AI security with the Launch — a ready-to-deploy protection layer " +
-  "that automatically blocks Jailbreak attempts, PII exposure, Profanity, and Toxic " +
-  "content. Designed for instant activation, it ensures your AI applications stay " +
+  "that automatically blocks Jailbreak attempts, PII exposure, Profanity, Toxic " +
+  "content, and requests for actionable harmful instructions. " +
+  "Designed for instant activation, it ensures your AI applications stay " +
   "compliant, safe, and user-friendly from day one.";
 
 export interface CreateDefaultLaunchPolicyArgs {

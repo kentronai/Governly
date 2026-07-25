@@ -25,11 +25,10 @@ export interface AgentInventorySummary {
   totalAiAgents: number;
   criticalRisk: number;
   highRisk: number;
-  unownedApplications: number;
-  missingControlnetPolicy: number;
-  nonCompliant: number;
-  dormantApplications: number;
-  policyViolations30d: number;
+  unownedAgents: number;
+  l4Agents: number;
+  l3Agents: number;
+  nonCompliantAgents: number;
   agentsWithOpenFindings: number;
   agentsWithoutRuntimeEvidence: number;
   calculatedAt: string;
@@ -48,79 +47,33 @@ export interface AgentApplicationOption {
 }
 
 /**
- * Live inventory KPIs. Application metrics intentionally use application
- * governance records; they are not aliases for agent counts.
+ * Live Agent Registry KPIs. These are agent-scoped counts only; application
+ * governance rollups belong on application/compliance dashboards.
  */
 export const getAgentInventorySummary = async (
   tenantId: string,
 ): Promise<AgentInventorySummary> => {
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  const [[agentMetrics], [applicationMetrics]] = await Promise.all([
+  const [[agentMetrics], [policyMetrics]] = await Promise.all([
     db
       .select({
         totalAiAgents: count(),
         criticalRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
         highRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
+        unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
+        l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
+        l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
       })
       .from(agents)
       .where(eq(agents.tenantId, tenantId)),
     db
       .select({
-        unownedApplications: sql<number>`(
-          select count(*) from applications a
-          where a.tenant_id = ${tenantId}
-            and a.deleted_at is null
-            and not exists (
-              select 1 from stakeholders s
-              where s.tenant_id = ${tenantId}
-                and s.application_id = a.id
-                and lower(s.role) like '%owner%'
-            )
-        )`,
-        missingControlnetPolicy: sql<number>`(
-          select count(*) from applications a
-          where a.tenant_id = ${tenantId}
-            and a.deleted_at is null
-            and not exists (
-              select 1 from application_policies ap
-              where ap.tenant_id = ${tenantId}
-                and ap.application_id = a.id
-                and ap.is_active = true
-                and ap.is_default = true
-            )
-        )`,
-        nonCompliant: sql<number>`(
-          select count(distinct a.id) from applications a
-          join application_policy_center apc
-            on apc.application_id = a.id::text
-           and apc.tenant_id = ${tenantId}
-           and apc."isActive" = true
-          where a.tenant_id = ${tenantId}
-            and a.deleted_at is null
-            and apc.compliance_status = 'non_compliant'
-        )`,
-        dormantApplications: sql<number>`(
-          select count(*) from applications a
-          where a.tenant_id = ${tenantId}
-            and a.deleted_at is null
-            and a.created_at < ${since}::timestamptz
-            and not exists (
-              select 1 from observability_logs ol
-              where ol.tenant_id = ${tenantId}
-                and ol.application_id = a.id
-                and ol.timestamp >= ${since}::timestamptz
-            )
-        )`,
-        policyViolations30d: sql<number>`(
-          select count(*) from observability_logs ol
-          where ol.tenant_id = ${tenantId}
-            and ol.timestamp >= ${since}::timestamptz
-            and (
-              ol.guardrail_results->'_summary'->>'was_blocked' = 'true'
-              or ol.guardrail_results->>'policy_decision' = 'block'
-              or ol.guardrail_results->>'blocked' = 'true'
-            )
+        nonCompliantAgents: sql<number>`(
+          select count(distinct ape.agent_id)
+          from agent_policy_evaluations ape
+          where ape.tenant_id = ${tenantId}
+            and ape.agent_id is not null
+            and ape.is_active = true
+            and ape.compliance_status = 'non_compliant'
         )`,
         agentsWithOpenFindings: sql<number>`(
           select count(distinct pf.agent_id) from policy_findings pf
@@ -148,18 +101,13 @@ export const getAgentInventorySummary = async (
     totalAiAgents: Number(agentMetrics?.totalAiAgents ?? 0),
     criticalRisk: Number(agentMetrics?.criticalRisk ?? 0),
     highRisk: Number(agentMetrics?.highRisk ?? 0),
-    unownedApplications: Number(applicationMetrics?.unownedApplications ?? 0),
-    missingControlnetPolicy: Number(
-      applicationMetrics?.missingControlnetPolicy ?? 0,
-    ),
-    nonCompliant: Number(applicationMetrics?.nonCompliant ?? 0),
-    dormantApplications: Number(applicationMetrics?.dormantApplications ?? 0),
-    policyViolations30d: Number(applicationMetrics?.policyViolations30d ?? 0),
-    agentsWithOpenFindings: Number(
-      applicationMetrics?.agentsWithOpenFindings ?? 0,
-    ),
+    unownedAgents: Number(agentMetrics?.unownedAgents ?? 0),
+    l4Agents: Number(agentMetrics?.l4Agents ?? 0),
+    l3Agents: Number(agentMetrics?.l3Agents ?? 0),
+    nonCompliantAgents: Number(policyMetrics?.nonCompliantAgents ?? 0),
+    agentsWithOpenFindings: Number(policyMetrics?.agentsWithOpenFindings ?? 0),
     agentsWithoutRuntimeEvidence: Number(
-      applicationMetrics?.agentsWithoutRuntimeEvidence ?? 0,
+      policyMetrics?.agentsWithoutRuntimeEvidence ?? 0,
     ),
     calculatedAt: new Date().toISOString(),
   };
@@ -222,6 +170,7 @@ export const getAgents = cache(
           businessFunction: agents.businessFunction,
           status: agents.status,
           lastUsedAt: agents.lastUsedAt,
+          capabilities: agents.capabilities,
           autonomyLevel: agents.autonomyLevel,
           autonomyReason: agents.autonomyReason,
           autonomyConfidence: agents.autonomyConfidence,

@@ -1,41 +1,33 @@
 "use server";
 
-import { getProviderModels } from "@/lib/queries/provider-models";
+import { auth } from "@clerk/nextjs/server";
+import { getModelRegistryRuntime } from "@/lib/server/model-registry/runtime";
+import { isExecutableModelProvider } from "@/lib/server/model-registry/providers";
 
-// Providers the Playground can actually execute end-to-end today.
-// The ControlNet gateway uses a single OpenAI-wire client (Bearer auth +
-// `${base_url}/chat/completions`) and injects OPENAI_API_KEY for every provider
-// (apps/controlnet/cga_core/pipeline_fns.py), so only OpenAI models succeed.
-// Anthropic/Gemini/etc. resolve a URL but fail at the provider call.
-// Expand this set ONLY when provider-aware keys + adapters land — see
-// docs/superpowers/specs/2026-05-28-playground-model-url-rca-design.md §9.
-const PLAYGROUND_SUPPORTED_PROVIDERS = new Set(["openai"]);
-
-export async function getProviderModelsForPlayground(tenantId: string) {
-  if (!tenantId) {
-    return {
-      status: false,
-      message: "Tenant ID is required",
-      models: [],
-    };
+export async function getProviderModelsForPlayground() {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) {
+    return { status: false, message: "Authentication required", models: [] };
   }
 
   try {
-    const models = await getProviderModels(tenantId);
-    
+    const models = await getModelRegistryRuntime(orgId);
+
     const availableModels = models
       .filter(
         (model) =>
           model.availabilityStatus === "available" &&
           model.modelUrl != null &&
           model.modelUrl !== "" &&
-          PLAYGROUND_SUPPORTED_PROVIDERS.has(model.provider)
+          isExecutableModelProvider(model.provider),
       )
       .map((model) => ({
         id: model.id,
         modelId: model.modelId,
         displayName: model.displayName || model.modelId,
         provider: model.provider,
+        isSelected: model.isSelected === true,
+        connectionStatus: model.connectionStatus || "not_tested",
       }))
       .sort((a, b) => {
         if (a.provider !== b.provider) {
@@ -47,6 +39,8 @@ export async function getProviderModelsForPlayground(tenantId: string) {
     return {
       status: true,
       models: availableModels,
+      selectedModelId:
+        availableModels.find((model) => model.isSelected)?.modelId ?? null,
       message: `Found ${availableModels.length} available models`,
     };
   } catch (error) {
@@ -58,4 +52,3 @@ export async function getProviderModelsForPlayground(tenantId: string) {
     };
   }
 }
-

@@ -13,6 +13,7 @@ const INTEGRATION_CATEGORIES = [
   "ai_security",
   "vector_databases",
   "cloud_providers",
+  "runtime_platforms",
 ] as const;
 
 type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];
@@ -62,7 +63,8 @@ export async function fetchIntegrations(
   tenantSlugOrId: string,
 ): Promise<Integration[]> {
   try {
-    const result = await integrationActions.getIntegrations(tenantSlugOrId);
+    const result =
+      await integrationActions.getIntegrationsWithCatalog(tenantSlugOrId);
     return (result.integrations || []).map(toIntegration);
   } catch (error) {
     console.error("Error fetching integrations:", error);
@@ -167,6 +169,7 @@ export async function addIntegrationCredentials(
   return updateIntegration(tenantId, id, {
     configuration: credentials,
     isCredentialsAdded: true,
+    isEnabled: true,
   });
 }
 

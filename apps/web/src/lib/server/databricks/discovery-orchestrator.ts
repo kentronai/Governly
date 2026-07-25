@@ -1,4 +1,5 @@
 import { and, eq, notInArray } from "drizzle-orm";
+import JSZip from "jszip";
 import {
   agentRecommendations,
   agentResources,
@@ -124,6 +125,7 @@ interface ServingEndpoint {
   description?: string;
   endpoint_url?: string;
   permission_level?: string;
+  agent_schema_evidence?: string[];
 }
 
 interface DatabricksAppDeployment {
@@ -155,6 +157,7 @@ interface DatabricksApp {
   resources?: Array<Record<string, unknown>>;
   effective_user_api_scopes?: string[];
   service_principal_name?: string;
+  agent_source_evidence?: AgentSourceEvidence[];
 }
 
 interface DatabricksJobTask {
@@ -200,6 +203,7 @@ interface DatabricksJob {
     };
     run_page_url?: string;
   };
+  agent_source_evidence?: AgentSourceEvidence[];
 }
 
 interface WorkspaceObject {
@@ -222,6 +226,11 @@ interface GenieSpace {
   serialized_space?: string;
 }
 
+interface AgentSourceEvidence {
+  path: string;
+  signals: string[];
+}
+
 export interface DatabricksDiscovery {
   identity: DatabricksIdentity;
   catalogs: Catalog[];
@@ -237,8 +246,32 @@ export interface DatabricksDiscovery {
   counts: Record<string, number>;
 }
 
+type DiscoveryWarning = {
+  surface: string;
+  message: string;
+};
+
 const AI_SIGNAL =
-  /(^|[-_:/.])(ai|agent|llm|genai|copilot|assistant|langchain|crewai|autogen)([-_:/.]|$)/i;
+  /(^|[-_:/.])(ai|agents?|llm|genai|copilot|assistant|langchain|crewai|autogen)([-_:/.]|$)/i;
+const AGENT_SOURCE_SIGNALS: Array<[string, RegExp]> = [
+  ["MLflow ResponsesAgent", /\bResponsesAgent\b/],
+  ["MLflow ChatAgent", /\bChatAgent\b/],
+  ["MLflow agent model", /\bmlflow\.pyfunc\b[\s\S]{0,500}\bagent\b/i],
+  ["Databricks agents SDK", /\bdatabricks\.agents\b/],
+  ["LangGraph", /\blanggraph\b/i],
+  [
+    "LangChain agent",
+    /\blangchain(?:_core)?\.agents?\b|\bcreate_(?:react_)?agent\b/i,
+  ],
+  ["CrewAI", /\bcrewai\b/i],
+  ["AutoGen", /\bautogen\b/i],
+  ["OpenAI Agents SDK", /\bopenai\.agents\b|\bfrom\s+agents\s+import\b/i],
+  ["Semantic Kernel agent", /\bsemantic_kernel\.agents?\b/i],
+];
+const SOURCE_FILE_PATTERN =
+  /\.(?:py|ipynb|js|jsx|ts|tsx|scala|r|sql|ya?ml|toml|txt)$/i;
+const MAX_SOURCE_FILES = 250;
+const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 
 function parseCredentials(
   connection: DatabricksConnection,
@@ -283,6 +316,28 @@ async function mapWithConcurrency<T, R>(
   );
   await Promise.all(workers);
   return results;
+}
+
+function databricksWarning(surface: string, error: unknown): DiscoveryWarning {
+  return {
+    surface,
+    message:
+      error instanceof Error ? error.message : `${surface} discovery failed`,
+  };
+}
+
+async function optionalDatabricksSurface<T>(
+  surface: string,
+  warnings: DiscoveryWarning[],
+  loader: () => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await loader();
+  } catch (error) {
+    warnings.push(databricksWarning(surface, error));
+    return fallback;
+  }
 }
 
 async function getJobDetails(
@@ -489,12 +544,26 @@ function genieDataSourceNames(space: GenieSpace): string[] {
 }
 
 function appHasAgentSignal(app: DatabricksApp): boolean {
+  const activeDeployment = app.active_deployment;
+  const pendingDeployment = app.pending_deployment;
+  const sourcePath =
+    activeDeployment?.source_code_path || app.default_source_code_path;
+  const command = activeDeployment?.command ?? [];
+  const state = (
+    app.app_status?.state ||
+    app.compute_status?.state ||
+    activeDeployment?.status?.state ||
+    pendingDeployment?.status?.state ||
+    ""
+  ).toUpperCase();
+  if (["DELETED", "STOPPED", "DISABLED"].includes(state)) return false;
+  if (app.url || activeDeployment || pendingDeployment) return true;
+  if ((app.agent_source_evidence ?? []).length > 0) return true;
   if (
     hasAgentSignal({
       name: app.name,
       description: app.description,
-      path:
-        app.active_deployment?.source_code_path || app.default_source_code_path,
+      path: sourcePath,
     })
   ) {
     return true;
@@ -506,7 +575,7 @@ function appHasAgentSignal(app: DatabricksApp): boolean {
   ) {
     return true;
   }
-  return (app.active_deployment?.command ?? []).some((item) =>
+  return command.some((item) =>
     /responsesagent|chatagent|agent_framework|langgraph|langchain|crewai|autogen/i.test(
       item,
     ),
@@ -514,6 +583,7 @@ function appHasAgentSignal(app: DatabricksApp): boolean {
 }
 
 function jobHasAgentSignal(job: DatabricksJob): boolean {
+  if ((job.agent_source_evidence ?? []).length > 0) return true;
   const settings = job.settings;
   if (
     hasAgentSignal({
@@ -536,10 +606,116 @@ function jobHasAgentSignal(job: DatabricksJob): boolean {
   );
 }
 
+function detectAgentSourceSignals(source: string): string[] {
+  return AGENT_SOURCE_SIGNALS.flatMap(([name, pattern]) =>
+    pattern.test(source) ? [name] : [],
+  );
+}
+
+async function inspectWorkspaceSource(
+  credentials: DatabricksCredentials,
+  path: string,
+): Promise<AgentSourceEvidence[]> {
+  try {
+    const payload = await databricksApi<{
+      content?: string;
+      file_type?: string;
+    }>(
+      credentials,
+      "/api/2.0/workspace/export",
+      new URLSearchParams({
+        path,
+        format: "AUTO",
+        direct_download: "false",
+      }),
+    );
+    if (!payload.content) return [];
+    const exported = Buffer.from(payload.content, "base64");
+    if (exported[0] !== 0x50 || exported[1] !== 0x4b) {
+      const directSignals = detectAgentSourceSignals(
+        exported.subarray(0, MAX_SOURCE_BYTES).toString("utf8"),
+      );
+      return directSignals.length > 0 ? [{ path, signals: directSignals }] : [];
+    }
+    const archive = await JSZip.loadAsync(exported);
+    const evidence: AgentSourceEvidence[] = [];
+    let bytesInspected = 0;
+    const files = Object.values(archive.files)
+      .filter((file) => !file.dir && SOURCE_FILE_PATTERN.test(file.name))
+      .slice(0, MAX_SOURCE_FILES);
+    for (const file of files) {
+      if (bytesInspected >= MAX_SOURCE_BYTES) break;
+      const source = await file.async("string");
+      const remainingBytes = MAX_SOURCE_BYTES - bytesInspected;
+      const signals = detectAgentSourceSignals(
+        Buffer.from(source).subarray(0, remainingBytes).toString("utf8"),
+      );
+      bytesInspected += Math.min(Buffer.byteLength(source), remainingBytes);
+      if (signals.length > 0) {
+        evidence.push({ path: `${path}/${file.name}`, signals });
+      }
+    }
+    return evidence;
+  } catch {
+    // Source evidence improves classification but is not required to inventory
+    // provider-native resources. A denied or oversized export must not fail the
+    // entire workspace sync.
+    return [];
+  }
+}
+
+async function enrichDeploymentSourceEvidence(
+  credentials: DatabricksCredentials,
+  apps: DatabricksApp[],
+  jobs: DatabricksJob[],
+) {
+  const paths = new Set<string>();
+  for (const app of apps) {
+    const path =
+      app.active_deployment?.source_code_path || app.default_source_code_path;
+    if (path) paths.add(path);
+  }
+  for (const job of jobs) {
+    for (const task of job.settings?.tasks ?? []) {
+      const path =
+        task.notebook_task?.notebook_path ||
+        task.spark_python_task?.python_file;
+      if (path?.startsWith("/")) paths.add(path);
+    }
+  }
+  const inspected = await mapWithConcurrency(
+    [...paths],
+    5,
+    async (path) =>
+      [path, await inspectWorkspaceSource(credentials, path)] as const,
+  );
+  const byPath = new Map(inspected);
+  return {
+    apps: apps.map((app) => {
+      const path =
+        app.active_deployment?.source_code_path || app.default_source_code_path;
+      return {
+        ...app,
+        agent_source_evidence: path ? (byPath.get(path) ?? []) : [],
+      };
+    }),
+    jobs: jobs.map((job) => ({
+      ...job,
+      agent_source_evidence: (job.settings?.tasks ?? []).flatMap((task) => {
+        const path =
+          task.notebook_task?.notebook_path ||
+          task.spark_python_task?.python_file;
+        return path ? (byPath.get(path) ?? []) : [];
+      }),
+    })),
+  };
+}
+
 function endpointHasAgentSignal(
   endpoint: ServingEndpoint,
   models: Map<string, RegisteredModel>,
 ): boolean {
+  if ((endpoint.agent_schema_evidence ?? []).length > 0) return true;
   if (
     hasAgentSignal({
       name: endpoint.name,
@@ -560,6 +736,37 @@ function endpointHasAgentSignal(
   });
 }
 
+function detectAgentSchemaSignals(schema: unknown): string[] {
+  const serialized = JSON.stringify(schema).toLowerCase();
+  const signals: string[] = [];
+  if (serialized.includes("/responses")) {
+    signals.push("OpenAI Responses endpoint");
+  }
+  if (
+    serialized.includes("databricks_options") ||
+    (serialized.includes("custom_inputs") &&
+      (serialized.includes('"messages"') || serialized.includes('"input"')))
+  ) {
+    signals.push("Databricks agent request schema");
+  }
+  return signals;
+}
+
+async function inspectServingEndpointSchema(
+  credentials: DatabricksCredentials,
+  endpointName: string,
+): Promise<string[]> {
+  try {
+    const schema = await databricksApi<Record<string, unknown>>(
+      credentials,
+      `/api/2.0/serving-endpoints/${encodeURIComponent(endpointName)}/openapi`,
+    );
+    return detectAgentSchemaSignals(schema);
+  } catch {
+    return [];
+  }
+}
+
 function hasAgentSignal(value: {
   name?: string;
   full_name?: string;
@@ -569,9 +776,10 @@ function hasAgentSignal(value: {
   properties?: Record<string, string>;
   tags?: Record<string, string>;
 }): boolean {
+  const qualifiedName = value.name ? undefined : value.full_name;
   if (
     [
-      value.full_name,
+      qualifiedName,
       value.name,
       value.comment,
       value.description,
@@ -583,12 +791,14 @@ function hasAgentSignal(value: {
   return Object.entries({
     ...(value.properties ?? {}),
     ...(value.tags ?? {}),
-  }).some(
-    ([key, item]) =>
-      AI_SIGNAL.test(key) ||
-      (["norix.agent", "ai.agent", "agent"].includes(key.toLowerCase()) &&
-        !["false", "disabled", "0"].includes(item.toLowerCase())),
-  );
+  }).some(([key, item]) => {
+    const normalizedKey = key.toLowerCase();
+    const normalizedValue = item.toLowerCase();
+    if (["norix.agent", "ai.agent", "agent"].includes(normalizedKey)) {
+      return !["false", "disabled", "0"].includes(normalizedValue);
+    }
+    return AI_SIGNAL.test(key);
+  });
 }
 
 function isoValue(value?: number | string): string | null {
@@ -640,7 +850,6 @@ function relatedResources(
         owner: model.owner,
         comment: model.comment,
         aliases: model.aliases ?? [],
-        hasWrite: true,
         discoveryQualification:
           "Unity Catalog registered model matched a serving endpoint or explicit AI-agent metadata.",
       },
@@ -751,7 +960,6 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
         etag: space.etag,
         configuration: genieConfiguration(space),
         dataSources: genieDataSourceNames(space),
-        hasWrite: true,
         discoveryQualification:
           "Native Genie Agent returned by the Databricks Genie management API.",
       },
@@ -825,10 +1033,10 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
             }
           : null,
         resources: app.resources ?? [],
-        hasWrite: true,
+        sourceEvidence: app.agent_source_evidence ?? [],
         publicNetworkAccess: app.url ? "Enabled" : "Disabled",
         discoveryQualification:
-          "Databricks App metadata, command, or declared resources identify an AI-agent deployment.",
+          "Databricks App metadata, command, declared resources, or deployed source identify an AI-agent deployment.",
       },
       app.create_time,
       app.update_time,
@@ -899,9 +1107,9 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
           existingClusterId: task.existing_cluster_id,
           jobClusterKey: task.job_cluster_key,
         })),
-        hasWrite: true,
+        sourceEvidence: job.agent_source_evidence ?? [],
         discoveryQualification:
-          "Databricks Job name, description, tags, or task definitions explicitly identify an agent workflow.",
+          "Databricks Job metadata, task definitions, or referenced source identify an agent workflow.",
       },
       job.created_time,
       job.latest_run?.end_time || job.latest_run?.start_time,
@@ -964,8 +1172,8 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
         autoCaptureConfig: endpoint.config?.auto_capture_config,
         aiGateway: endpoint.ai_gateway,
         routeOptimized: endpoint.route_optimized,
+        schemaEvidence: endpoint.agent_schema_evidence ?? [],
         servedEntities: entities.map(sanitizeServedEntity),
-        hasWrite: true,
         publicNetworkAccess: "Enabled",
         discoveryQualification:
           "Native Databricks Model Serving endpoint returned by the workspace API.",
@@ -1035,38 +1243,48 @@ async function listApps(credentials: DatabricksCredentials, detailed = true) {
     throw error;
   }
   return detailed
-    ? mapWithConcurrency(summaries, 5, (app) =>
-        databricksApi<DatabricksApp>(
-          credentials,
-          `/api/2.0/apps/${encodeURIComponent(app.name)}`,
-        ),
-      )
+    ? mapWithConcurrency(summaries, 5, async (app) => {
+        try {
+          return await databricksApi<DatabricksApp>(
+            credentials,
+            `/api/2.0/apps/${encodeURIComponent(app.name)}`,
+          );
+        } catch {
+          return app;
+        }
+      })
     : summaries;
 }
 
 async function listJobs(credentials: DatabricksCredentials, detailed = true) {
-  const summaries = await fetchDatabricksPages<DatabricksJob>(
-    credentials,
-    "/api/2.2/jobs/list",
-    "jobs",
-    { expand_tasks: "true" },
-    { pageSizeParam: "limit", pageSizeValue: "100" },
-  );
+  let summaries: DatabricksJob[];
+  try {
+    summaries = await fetchDatabricksPages<DatabricksJob>(
+      credentials,
+      "/api/2.2/jobs/list",
+      "jobs",
+      { expand_tasks: "true" },
+      { pageSizeParam: "limit", pageSizeValue: "100" },
+    );
+  } catch (error) {
+    if (error instanceof DatabricksApiError && error.status === 404) return [];
+    throw error;
+  }
   return detailed
     ? mapWithConcurrency(summaries, 5, async (job) => {
-        const [details, runResult] = await Promise.all([
-          getJobDetails(credentials, job.job_id),
-          databricksApi<{
-            runs?: DatabricksJob["latest_run"][];
-          }>(
-            credentials,
-            "/api/2.2/jobs/runs/list",
-            new URLSearchParams({
-              job_id: String(job.job_id),
-              limit: "1",
-            }),
-          ),
-        ]);
+        const details = await getJobDetails(credentials, job.job_id).catch(
+          () => job,
+        );
+        const runResult = await databricksApi<{
+          runs?: DatabricksJob["latest_run"][];
+        }>(
+          credentials,
+          "/api/2.2/jobs/runs/list",
+          new URLSearchParams({
+            job_id: String(job.job_id),
+            limit: "1",
+          }),
+        ).catch(() => ({ runs: [] }));
         return { ...details, latest_run: runResult.runs?.[0] };
       })
     : summaries;
@@ -1076,18 +1294,28 @@ async function listServingEndpoints(
   credentials: DatabricksCredentials,
   detailed = true,
 ) {
-  const payload = await databricksApi<{ endpoints?: ServingEndpoint[] }>(
-    credentials,
-    "/api/2.0/serving-endpoints",
-  );
+  let payload: { endpoints?: ServingEndpoint[] };
+  try {
+    payload = await databricksApi<{ endpoints?: ServingEndpoint[] }>(
+      credentials,
+      "/api/2.0/serving-endpoints",
+    );
+  } catch (error) {
+    if (error instanceof DatabricksApiError && error.status === 404) return [];
+    throw error;
+  }
   const endpoints = payload.endpoints ?? [];
   return detailed
-    ? mapWithConcurrency(endpoints, 5, (endpoint) =>
-        databricksApi<ServingEndpoint>(
-          credentials,
-          `/api/2.0/serving-endpoints/${encodeURIComponent(endpoint.name)}`,
-        ),
-      )
+    ? mapWithConcurrency(endpoints, 5, async (endpoint) => {
+        const [details, schemaEvidence] = await Promise.all([
+          databricksApi<ServingEndpoint>(
+            credentials,
+            `/api/2.0/serving-endpoints/${encodeURIComponent(endpoint.name)}`,
+          ).catch(() => endpoint),
+          inspectServingEndpointSchema(credentials, endpoint.name),
+        ]);
+        return { ...details, agent_schema_evidence: schemaEvidence };
+      })
     : endpoints;
 }
 
@@ -1181,61 +1409,109 @@ export async function discoverDatabricks(
   connection: DatabricksConnection,
 ): Promise<DatabricksDiscovery> {
   const credentials = parseCredentials(connection);
-  const [
-    identity,
-    catalogs,
-    models,
-    endpoints,
-    apps,
-    jobs,
-    notebooks,
-    genieSpaces,
-  ] = await Promise.all([
-    databricksApi<DatabricksIdentity>(
-      credentials,
-      "/api/2.0/preview/scim/v2/Me",
-    ),
-    fetchDatabricksPages<Catalog>(
-      credentials,
-      "/api/2.1/unity-catalog/catalogs",
-      "catalogs",
-    ),
-    fetchDatabricksPages<RegisteredModel>(
-      credentials,
-      "/api/2.1/unity-catalog/models",
-      "registered_models",
-    ),
-    listServingEndpoints(credentials),
-    listApps(credentials),
-    listJobs(credentials),
-    discoverWorkspaceNotebooks(credentials),
-    listGenieSpaces(credentials),
-  ]);
+  const warnings: DiscoveryWarning[] = [];
+  const identity = await databricksApi<DatabricksIdentity>(
+    credentials,
+    "/api/2.0/preview/scim/v2/Me",
+  );
+  const [catalogs, models, endpoints, apps, jobs, notebooks, genieSpaces] =
+    await Promise.all([
+      optionalDatabricksSurface(
+        "Unity Catalog catalogs",
+        warnings,
+        () =>
+          fetchDatabricksPages<Catalog>(
+            credentials,
+            "/api/2.1/unity-catalog/catalogs",
+            "catalogs",
+          ),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Unity Catalog models",
+        warnings,
+        () =>
+          fetchDatabricksPages<RegisteredModel>(
+            credentials,
+            "/api/2.1/unity-catalog/models",
+            "registered_models",
+          ),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Model Serving endpoints",
+        warnings,
+        () => listServingEndpoints(credentials),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Databricks Apps",
+        warnings,
+        () => listApps(credentials),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Databricks Jobs",
+        warnings,
+        () => listJobs(credentials),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Workspace notebooks",
+        warnings,
+        () => discoverWorkspaceNotebooks(credentials),
+        [],
+      ),
+      optionalDatabricksSurface(
+        "Genie Agents",
+        warnings,
+        () => listGenieSpaces(credentials),
+        [],
+      ),
+    ]);
   const schemas = (
     await mapWithConcurrency(catalogs, 5, (catalog) =>
-      fetchDatabricksPages<Schema>(
-        credentials,
-        "/api/2.1/unity-catalog/schemas",
-        "schemas",
-        { catalog_name: catalog.name },
+      optionalDatabricksSurface(
+        `Unity Catalog schemas in ${catalog.name}`,
+        warnings,
+        () =>
+          fetchDatabricksPages<Schema>(
+            credentials,
+            "/api/2.1/unity-catalog/schemas",
+            "schemas",
+            { catalog_name: catalog.name },
+          ),
+        [],
       ),
     )
   ).flat();
   const tables = (
     await mapWithConcurrency(schemas, 5, (schema) =>
-      fetchDatabricksPages<Table>(
-        credentials,
-        "/api/2.1/unity-catalog/tables",
-        "tables",
-        {
-          catalog_name: schema.catalog_name,
-          schema_name: schema.name,
-          omit_columns: "true",
-          omit_properties: "false",
-        },
+      optionalDatabricksSurface(
+        `Unity Catalog tables in ${schema.catalog_name}.${schema.name}`,
+        warnings,
+        () =>
+          fetchDatabricksPages<Table>(
+            credentials,
+            "/api/2.1/unity-catalog/tables",
+            "tables",
+            {
+              catalog_name: schema.catalog_name,
+              schema_name: schema.name,
+              omit_columns: "true",
+              omit_properties: "false",
+            },
+          ),
+        [],
       ),
     )
   ).flat();
+  const enriched = await optionalDatabricksSurface(
+    "Deployment source evidence",
+    warnings,
+    () => enrichDeploymentSourceEvidence(credentials, apps, jobs),
+    { apps, jobs },
+  );
   const discovered = {
     identity,
     catalogs,
@@ -1243,26 +1519,30 @@ export async function discoverDatabricks(
     tables,
     models,
     endpoints,
-    apps,
-    jobs,
+    apps: enriched.apps,
+    jobs: enriched.jobs,
     notebooks,
     genieSpaces,
   };
   const foundAgents = correlate(discovered);
+  const counts: Record<string, number> = {
+    databricks_catalog: catalogs.length,
+    databricks_schema: schemas.length,
+    databricks_table: tables.length,
+    databricks_registered_model: models.length,
+    databricks_serving_endpoint: endpoints.length,
+    databricks_app: enriched.apps.length,
+    databricks_job: enriched.jobs.length,
+    databricks_notebook: notebooks.length,
+    databricks_genie_space: genieSpaces.length,
+  };
+  if (warnings.length > 0) {
+    counts.databricks_partial_warnings = warnings.length;
+  }
   return {
     ...discovered,
     agents: foundAgents,
-    counts: {
-      databricks_catalog: catalogs.length,
-      databricks_schema: schemas.length,
-      databricks_table: tables.length,
-      databricks_registered_model: models.length,
-      databricks_serving_endpoint: endpoints.length,
-      databricks_app: apps.length,
-      databricks_job: jobs.length,
-      databricks_notebook: notebooks.length,
-      databricks_genie_space: genieSpaces.length,
-    },
+    counts,
   };
 }
 
@@ -1582,6 +1862,7 @@ export async function runDatabricksDiscoveryScan(
         configuration: {
           ...((connection.configuration as Record<string, unknown>) ?? {}),
           lastDiscoveryCounts: discovery.counts,
+          lastAgentsDiscovered: discovery.agents.length,
           lastPrincipal:
             discovery.identity.userName ||
             discovery.identity.displayName ||
@@ -1622,3 +1903,34 @@ export async function runDatabricksDiscoveryScan(
     };
   }
 }
+
+/**
+ * Pure and boundary helpers exposed for focused unit tests. Keeping this
+ * explicit avoids making production behavior depend on test-only branches.
+ */
+export const databricksDiscoveryTesting = {
+  parseCredentials,
+  mapWithConcurrency,
+  sanitizeServedEntity,
+  sanitizeEndpoint,
+  sanitizeApp,
+  sanitizeJob,
+  genieConfiguration,
+  genieDataSourceNames,
+  appHasAgentSignal,
+  jobHasAgentSignal,
+  endpointHasAgentSignal,
+  hasAgentSignal,
+  isoValue,
+  correlate,
+  listApps,
+  listJobs,
+  listServingEndpoints,
+  listGenieSpaces,
+  discoverWorkspaceNotebooks,
+  detectAgentSourceSignals,
+  inspectWorkspaceSource,
+  enrichDeploymentSourceEvidence,
+  detectAgentSchemaSignals,
+  inspectServingEndpointSchema,
+};

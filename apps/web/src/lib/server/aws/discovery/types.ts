@@ -37,7 +37,8 @@ export type DiscoveredResourceType =
   | "databricks_app"
   | "databricks_job"
   | "databricks_notebook"
-  | "databricks_genie_space";
+  | "databricks_genie_space"
+  | "kubernetes_workload";
 
 export interface RawDiscoveredResource {
   resourceType: DiscoveredResourceType;

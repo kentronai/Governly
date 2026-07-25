@@ -5,7 +5,8 @@
 'use server';
 
 import { db, tenants, auditEvents, users } from '@db';
-import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 
 export interface GetAuditLogsInput {
   tenantSlug: string;
@@ -29,16 +30,15 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
   }
   const tenantId = tenantRow[0].id;
 
-  const conditions = [eq(auditEvents.tenantId, tenantId)];
+  const conditions: SQL[] = [eq(auditEvents.tenantId, tenantId)];
   if (input.search) {
     const term = `%${input.search}%`;
-    conditions.push(
-      or(
-        ilike(auditEvents.action, term),
-        ilike(auditEvents.targetType, term),
-        ilike(auditEvents.targetId, term)
-      )
+    const searchExpr = or(
+      ilike(auditEvents.action, term),
+      ilike(auditEvents.targetType, term),
+      ilike(auditEvents.targetId, term)
     );
+    if (searchExpr) conditions.push(searchExpr);
   }
   if (input.action) conditions.push(ilike(auditEvents.action, `%${input.action}%`));
   if (input.actorUserId) conditions.push(eq(auditEvents.actorUserId, input.actorUserId));

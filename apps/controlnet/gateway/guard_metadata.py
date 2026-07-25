@@ -130,6 +130,7 @@ def _generate_description(guard_id: str) -> str:
         "jailbreak.detect": "Detects prompt injection and jailbreak attempts",
         "toxicity.detect": "Detects toxic, insulting, and threatening content",
         "pii.detect": "Detects and anonymizes Personal Identifiable Information",
+        "harmful_instructions.detect": "Blocks actionable criminal or harmful instructions",
         
         # Formatting Guards
         "formatting.json": "Validates JSON format",
@@ -187,4 +188,3 @@ def get_output_guards_metadata(policy_metadata: Dict[str, Any]) -> List[Dict[str
         output_relevant.append(guard)
     
     return output_relevant
-

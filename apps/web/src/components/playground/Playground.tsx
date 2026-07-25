@@ -42,6 +42,7 @@ import {
   fetchPolicyDetails,
 } from "@/lib/api/policies";
 import { getProviderModelsForPlayground } from "@/lib/actions/provider-models-playground";
+import { selectModelForTenant } from "@/lib/actions/model-registry-runtime";
 
 interface Policy {
   id: string;
@@ -177,12 +178,12 @@ const EXAMPLE_SCENARIOS: ExampleScenario[] = [
 // Fetch policies using server actions
 const fetchPolicies = async (
   tenantSlug: string,
-  applicationId: string
+  applicationId: string,
 ): Promise<Policy[]> => {
   try {
     const policiesData = await fetchApplicationPolicies(
       tenantSlug,
-      applicationId
+      applicationId,
     );
     return (
       policiesData.map((ele) => {
@@ -204,7 +205,7 @@ const fetchPolicies = async (
 // Fetch policy guardrails using server actions
 const fetchPolicyGuardrails = async (
   tenantSlug: string,
-  policyId: string
+  policyId: string,
 ): Promise<PolicyGuardrail[]> => {
   try {
     const policyData = await fetchPolicyDetails(tenantSlug, policyId);
@@ -213,10 +214,11 @@ const fetchPolicyGuardrails = async (
       return [];
     }
 
-    // Extract database guardrails from the policy details
+    // Database bindings are authoritative. YAML guardrails remain a safe
+    // fallback for older policies created before the catalog was installed.
     const databaseGuardrails = policyData.databaseGuardrails || [];
+    const yamlGuardrails = policyData.yamlGuardrails || [];
 
-    // Transform database guardrails to match PolicyGuardrail interface
     const transformedDatabaseGuardrails = databaseGuardrails.map((pg: any) => ({
       id: pg.guardrail?.id || pg.id,
       key: pg.guardrail?.key || pg.key,
@@ -234,7 +236,32 @@ const fetchPolicyGuardrails = async (
       weight: pg.weight,
     }));
 
-    return transformedDatabaseGuardrails;
+    const transformedYamlGuardrails = yamlGuardrails.map((guardrail: any) => ({
+      id: guardrail.id,
+      key: guardrail.key,
+      name: guardrail.name,
+      description: guardrail.description,
+      category: guardrail.category,
+      tier: guardrail.tier,
+      version: guardrail.version,
+      isEnabled: guardrail.isEnabled,
+      defaultParams: guardrail.defaultParams,
+      metadata: guardrail.metadata,
+      phase: "input",
+      orderIndex: Number.MAX_SAFE_INTEGER,
+    }));
+
+    const effectiveByKey = new Map<string, PolicyGuardrail>();
+    for (const guardrail of transformedYamlGuardrails) {
+      effectiveByKey.set(guardrail.key, guardrail);
+    }
+    for (const guardrail of transformedDatabaseGuardrails) {
+      effectiveByKey.set(guardrail.key, guardrail);
+    }
+
+    return [...effectiveByKey.values()].sort(
+      (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
+    );
   } catch (error) {
     console.error("Error fetching policy guardrails:", error);
     throw error;
@@ -270,7 +297,7 @@ export default function Playground() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
   const [policyGuardrails, setPolicyGuardrails] = useState<PolicyGuardrail[]>(
-    []
+    [],
   );
   const [isLoadingGuardrails, setIsLoadingGuardrails] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>("");
@@ -283,6 +310,7 @@ export default function Playground() {
     }>
   >([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [isSelectingModel, setIsSelectingModel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [copied, setCopied] = useState(false);
@@ -308,7 +336,7 @@ export default function Playground() {
       try {
         const guardrailsData = await fetchPolicyGuardrails(
           tenant.slug,
-          selectedPolicy
+          selectedPolicy,
         );
         setPolicyGuardrails(JSON.parse(JSON.stringify(guardrailsData)));
       } catch (error) {
@@ -332,14 +360,14 @@ export default function Playground() {
 
       setIsLoadingModels(true);
       try {
-        const result = await getProviderModelsForPlayground(tenant.id);
+        const result = await getProviderModelsForPlayground();
         if (result.status && result.models.length > 0) {
           setAvailableModels(result.models);
-          // setSelectedModel(result.models[0].modelId);
+          setSelectedModel(result.selectedModelId || result.models[0].modelId);
         } else {
           toast.error(
             result.message ||
-              "No models available. Please add models to the registry."
+              "No models available. Please add models to the registry.",
           );
         }
       } catch (error) {
@@ -353,6 +381,27 @@ export default function Playground() {
     loadModels();
   }, [tenant?.id]);
 
+  const handleModelSelection = async (modelId: string) => {
+    const previousModel = selectedModel;
+    const selected = availableModels.find((model) => model.modelId === modelId);
+    if (!selected) return;
+
+    setSelectedModel(modelId);
+    setIsSelectingModel(true);
+    try {
+      await selectModelForTenant(selected.id);
+    } catch (error) {
+      setSelectedModel(previousModel);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save the selected model.",
+      );
+    } finally {
+      setIsSelectingModel(false);
+    }
+  };
+
   // Load policies when component mounts
   useEffect(() => {
     const loadPolicies = async () => {
@@ -362,7 +411,7 @@ export default function Playground() {
       try {
         const policiesData = await fetchPolicies(
           tenant.slug,
-          applicationId.toString()
+          applicationId.toString(),
         );
         setPolicies(policiesData);
 
@@ -474,18 +523,26 @@ export default function Playground() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        handlePolicyViolation(errorData);
-        return;
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.error?.type === "policy_violation") {
+          handlePolicyViolation(errorData);
+          return;
+        }
+        throw new Error(
+          errorData.error?.message ||
+            errorData.detail ||
+            `Chat request failed (HTTP ${response.status})`,
+        );
       }
 
       // Handle SSE stream
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
-      let assistantMessageId = Date.now().toString();
+      const assistantMessageId = Date.now().toString();
       let fullContent = "";
       let guardrailsData: any = null;
+      let sseBuffer = "";
 
       // Add initial empty assistant message
       const initialMessage: Message = {
@@ -502,8 +559,12 @@ export default function Playground() {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
+            // SSE JSON can be split across arbitrary network chunks. Preserve
+            // an incomplete final line for the next read instead of silently
+            // discarding it as invalid JSON.
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split("\n");
+            sseBuffer = lines.pop() || "";
 
             for (const line of lines) {
               if (line.startsWith("data: ")) {
@@ -537,12 +598,32 @@ export default function Playground() {
                                 ...msg,
                                 redactedContent: lastModifiedMessage.content,
                               }
-                            : msg
-                        )
+                            : msg,
+                        ),
                       );
                     }
 
                     continue;
+                  }
+
+                  if (parsed.error) {
+                    const providerMessage =
+                      parsed.error.message ||
+                      "The model provider could not complete this request.";
+
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              content: `⚠️ ${providerMessage}`,
+                              guardrails: guardrailsData,
+                            }
+                          : msg,
+                      ),
+                    );
+                    toast.error(providerMessage);
+                    return;
                   }
 
                   // Handle content chunks
@@ -559,8 +640,8 @@ export default function Playground() {
                               content: fullContent,
                               guardrails: guardrailsData,
                             }
-                          : msg
-                      )
+                          : msg,
+                      ),
                     );
                   }
 
@@ -583,7 +664,7 @@ export default function Playground() {
                       const cleaned = prev
                         .filter((m) => m.id !== assistantMessageId)
                         .filter(
-                          (m) => !(m.role === "assistant" && !m.content.trim())
+                          (m) => !(m.role === "assistant" && !m.content.trim()),
                         )
                         .slice(0, -1);
                       return [...cleaned, blockedMessage];
@@ -599,7 +680,20 @@ export default function Playground() {
             }
           }
 
-          toast.success("Response streamed successfully");
+          if (!fullContent.trim()) {
+            const emptyResponseMessage =
+              "Gemini completed the request but returned no visible text.";
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: `⚠️ ${emptyResponseMessage}` }
+                  : msg,
+              ),
+            );
+            toast.error(emptyResponseMessage);
+          } else {
+            toast.success("Response streamed successfully");
+          }
         } catch (error: any) {
           if (error.name === "AbortError") {
             console.log("Stream aborted");
@@ -666,8 +760,8 @@ export default function Playground() {
             // Update the user message with redacted content
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === userMessage.id ? updatedUserMessage : msg
-              )
+                msg.id === userMessage.id ? updatedUserMessage : msg,
+              ),
             );
           }
         }
@@ -889,8 +983,8 @@ console.log(response.guardrails);  // ControlNet metadata
             ) : (
               <Select
                 value={selectedModel}
-                onValueChange={setSelectedModel}
-                disabled={isLoadingModels}
+                onValueChange={handleModelSelection}
+                disabled={isLoadingModels || isSelectingModel}
               >
                 <SelectTrigger className="w-full text-left py-4! h-14!">
                   <SelectValue
@@ -942,7 +1036,7 @@ console.log(response.guardrails);  // ControlNet metadata
                     <Button
                       onClick={() =>
                         push(
-                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/create-new-policy`
+                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/create-new-policy`,
                         )
                       }
                       className="bg-amber-600 hover:bg-amber-700 text-white"
@@ -1031,7 +1125,7 @@ console.log(response.guardrails);  // ControlNet metadata
                             <div className="shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                               {React.createElement(
                                 getGuardrailIcon(guardrail.key),
-                                { className: "w-4 h-4" }
+                                { className: "w-4 h-4" },
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -1175,7 +1269,7 @@ console.log(response.guardrails);  // ControlNet metadata
                                   .filter(
                                     (guard, index, arr) =>
                                       index ===
-                                      arr.findIndex((g) => g.id === guard.id)
+                                      arr.findIndex((g) => g.id === guard.id),
                                   )
                                   .map((guard) => (
                                     <Badge

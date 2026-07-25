@@ -264,7 +264,10 @@ export async function getAuditEvents(
   return db.query.auditEvents.findMany({
     where: whereConditions,
     with: {
-      actorUser: true,
+      // Relation is declared as `user` (auditEvents.actorUserId -> users.id)
+      // in drizzle/relations.ts; `actorUser` is not a relation and made this
+      // query throw at runtime.
+      user: true,
     },
     orderBy: (events, { desc }) => [desc(events.createdAt)],
     limit,
