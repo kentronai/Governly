@@ -373,41 +373,51 @@ export function AgentInventory({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <FilterSelect
-          label="Risk"
-          value={riskLevel}
-          onChange={setRiskLevel}
-          options={options.riskLevels}
-        />
-        <FilterSelect
-          label="Autonomy"
-          value={autonomyLevel}
-          onChange={setAutonomyLevel}
-          options={options.autonomyLevels}
-        />
-        <FilterSelect
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={options.statuses}
-        />
-        <FilterSelect
-          label="Platform"
-          value={platform}
-          onChange={setPlatform}
-          options={options.platforms}
-          formatOption={platformLabel}
-        />
-        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
-            <SelectValue placeholder="Owner" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Owner: All</SelectItem>
-            <SelectItem value={UNOWNED}>Unowned</SelectItem>
-          </SelectContent>
-        </Select>
-        {hasActiveFilters && (
+        {/* Radix Select generates its aria-controls id with useId(). Rendering
+            these filters only after mount keeps the server HTML and the first
+            client render identical (a placeholder, no Radix ids on either side),
+            which avoids the hydration id mismatch this page was throwing. */}
+        {mounted ? (
+          <>
+            <FilterSelect
+              label="Risk"
+              value={riskLevel}
+              onChange={setRiskLevel}
+              options={options.riskLevels}
+            />
+            <FilterSelect
+              label="Autonomy"
+              value={autonomyLevel}
+              onChange={setAutonomyLevel}
+              options={options.autonomyLevels}
+            />
+            <FilterSelect
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={options.statuses}
+            />
+            <FilterSelect
+              label="Platform"
+              value={platform}
+              onChange={setPlatform}
+              options={options.platforms}
+              formatOption={platformLabel}
+            />
+            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+              <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+                <SelectValue placeholder="Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Owner: All</SelectItem>
+                <SelectItem value={UNOWNED}>Unowned</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        ) : (
+          <div className="h-8 w-full max-w-[720px] rounded-md border bg-muted/10" />
+        )}
+        {mounted && hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
