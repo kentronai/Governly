@@ -11,6 +11,7 @@ import { runDiscoveryScan } from "@/lib/server/aws/discovery-orchestrator";
 import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator";
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
+import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
 import { runKubernetesDiscoveryScan } from "@/lib/server/kubernetes/discovery-orchestrator";
 
 function authorized(request: NextRequest): boolean {
@@ -152,6 +153,20 @@ async function run(request: NextRequest) {
             integrationId: integration.id,
             provider: "Kubernetes Cluster",
             ...(await runKubernetesDiscoveryScan(
+              integration.tenantId,
+              integration.id,
+              integration,
+              null,
+            )),
+          });
+        } else if (
+          integration.name === "CrewAI" &&
+          integration.credentialsEncrypted
+        ) {
+          results.push({
+            integrationId: integration.id,
+            provider: "CrewAI",
+            ...(await runCrewAIDiscoveryScan(
               integration.tenantId,
               integration.id,
               integration,

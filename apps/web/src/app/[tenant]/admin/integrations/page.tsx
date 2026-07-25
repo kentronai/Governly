@@ -78,6 +78,12 @@ import {
   deleteKubernetesConnection,
   triggerKubernetesDiscovery,
 } from "@/lib/actions/kubernetes-integration";
+import {
+  createCrewAIConnection,
+  deleteCrewAIConnection,
+  testCrewAIIntegrationConnection,
+  triggerCrewAIDiscovery,
+} from "@/lib/actions/crewai-integration";
 
 const CATEGORY_LABELS: Record<string, string> = {
   data_platforms: "Data Platforms",
@@ -87,17 +93,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   vector_databases: "Vector Databases",
   cloud_providers: "Cloud Providers",
   runtime_platforms: "Runtime Platforms",
+  agent_frameworks: "Agent Frameworks",
 };
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const KUBERNETES_CLUSTER = "Kubernetes Cluster";
+const CREWAI = "CrewAI";
 const DISCOVERY_INTEGRATIONS = new Set([
   "AWS",
   "Azure",
   "Google Cloud",
   DATABRICKS_UNITY_CATALOG,
   KUBERNETES_CLUSTER,
+  CREWAI,
 ]);
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
@@ -319,6 +328,9 @@ export default function IntegrationsPage() {
     if (selected.name === DATABRICKS_UNITY_CATALOG) {
       return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
     }
+    if (selected.name === CREWAI) {
+      return Boolean(credentials.apiKey.trim());
+    }
     if (selected.name === KUBERNETES_CLUSTER) {
       return Boolean(
         credentials.kubernetesClusterName.trim() &&
@@ -464,6 +476,27 @@ export default function IntegrationsPage() {
             0,
           )} Unity Catalog resources discovered`,
         );
+      } else if (selected.name === CREWAI) {
+        const connection = await createCrewAIConnection({
+          tenantSlugOrId: tenant.id,
+          accessToken: credentials.apiKey,
+        });
+        const tested = await testCrewAIIntegrationConnection(
+          tenant.id,
+          connection.id,
+        );
+        if (!tested.ok) throw new Error(tested.error);
+        setRunning(selected.id);
+        const scan = await triggerCrewAIDiscovery(tenant.id, connection.id);
+        if (scan.status === "failed") {
+          throw new Error(scan.errorMessage || "CrewAI discovery failed");
+        }
+        successToast(
+          "",
+          "",
+          "",
+          `CrewAI connected — ${scan.agentsDiscovered} deployed crews discovered`,
+        );
       } else if (selected.name === KUBERNETES_CLUSTER) {
         const connection = await createKubernetesConnection({
           tenantSlugOrId: tenant.id,
@@ -537,6 +570,8 @@ export default function IntegrationsPage() {
         await deleteDatabricksConnection(tenant.id, integration.id);
       } else if (integration.name === KUBERNETES_CLUSTER) {
         await deleteKubernetesConnection(tenant.id, integration.id);
+      } else if (integration.name === CREWAI) {
+        await deleteCrewAIConnection(tenant.id, integration.id);
       } else {
         await removeIntegrationCredentials(tenant.id, integration.id);
       }
@@ -574,6 +609,8 @@ export default function IntegrationsPage() {
         result = await triggerDatabricksDiscovery(tenant.id, integration.id);
       } else if (integration.name === KUBERNETES_CLUSTER) {
         result = await triggerKubernetesDiscovery(tenant.id, integration.id);
+      } else if (integration.name === CREWAI) {
+        result = await triggerCrewAIDiscovery(tenant.id, integration.id);
       }
       if (!result) return;
       if (result.status === "failed")
@@ -725,7 +762,8 @@ export default function IntegrationsPage() {
             {filtered.map((integration) => {
               const agentsDiscovered =
                 (integration.name === DATABRICKS_UNITY_CATALOG ||
-                  integration.name === KUBERNETES_CLUSTER) &&
+                  integration.name === KUBERNETES_CLUSTER ||
+                  integration.name === CREWAI) &&
                 integration.configuration.lastAgentsDiscovered !== undefined
                   ? Number(integration.configuration.lastAgentsDiscovered ?? 0)
                   : null;
@@ -1135,6 +1173,35 @@ export default function IntegrationsPage() {
                         setCredential("apiKey", event.target.value)
                       }
                       autoComplete="new-password"
+                    />
+                  </FormField>
+                </>
+              ) : selected?.name === CREWAI ? (
+                <>
+                  <Alert className="py-3">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>CrewAI Enterprise</AlertTitle>
+                    <AlertDescription className="text-xs leading-5">
+                      Paste a CrewAI Enterprise (AMP) access token with
+                      read access to your organization&apos;s deployments. NORIX
+                      lists every deployed crew and governs each as an
+                      autonomous multi-agent workload. Create a token in CrewAI
+                      under Settings → API keys.
+                    </AlertDescription>
+                  </Alert>
+                  <FormField
+                    label="Access Token"
+                    required
+                    help="Encrypted before storage and never returned to the browser."
+                  >
+                    <Input
+                      type="password"
+                      value={credentials.apiKey}
+                      onChange={(event) =>
+                        setCredential("apiKey", event.target.value)
+                      }
+                      autoComplete="new-password"
+                      placeholder="crewai_..."
                     />
                   </FormField>
                 </>

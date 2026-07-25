@@ -38,7 +38,11 @@ export type DiscoveredResourceType =
   | "databricks_job"
   | "databricks_notebook"
   | "databricks_genie_space"
-  | "kubernetes_workload";
+  | "kubernetes_workload"
+  | "crewai_deployment"
+  | "crewai_crew"
+  | "crewai_agent"
+  | "crewai_task";
 
 export interface RawDiscoveredResource {
   resourceType: DiscoveredResourceType;

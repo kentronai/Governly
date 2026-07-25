@@ -70,6 +70,12 @@ const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
     legacyNames: ["Databricks"],
   },
   {
+    name: "CrewAI",
+    category: "agent_frameworks",
+    description:
+      "Discovers crews deployed on the CrewAI Enterprise (AMP) platform and governs each as an autonomous multi-agent workload.",
+  },
+  {
     name: "Kubernetes Cluster",
     category: "runtime_platforms",
     description:
