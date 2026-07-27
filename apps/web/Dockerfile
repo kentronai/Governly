@@ -6,12 +6,23 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* pnpm-lock.yaml* ./
 
-# Install dependencies based on the preferred package manager
+# Install dependencies based on the preferred package manager.
+# NOTE: the committed package-lock.json was generated on macOS, so `npm ci`
+# installs the darwin lightningcss/@tailwindcss/oxide binaries but NOT the
+# linux-x64-musl ones this Alpine image needs (npm/cli#4828) → the Next build
+# fails with "Cannot find module '../lightningcss.linux-x64-musl.node'".
+# After the deterministic `npm ci`, explicitly fetch the musl native binaries
+# for the exact versions npm just installed (derived, so this survives bumps).
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
     corepack enable pnpm && pnpm install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then \
-    npm ci; \
+    npm ci --no-audit --no-fund; \
+    LCV=$(node -p "require('lightningcss/package.json').version"); \
+    TWV=$(node -p "require('@tailwindcss/oxide/package.json').version"); \
+    npm install --no-save --no-audit --no-fund \
+      "lightningcss-linux-x64-musl@${LCV}" \
+      "@tailwindcss/oxide-linux-x64-musl@${TWV}"; \
   else \
     npm install; \
   fi

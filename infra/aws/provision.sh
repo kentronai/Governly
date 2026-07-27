@@ -11,7 +11,7 @@ die()     { echo -e "${RED}[ERR]${NC}   $1"; exit 1; }
 
 REGION="us-east-1"
 INSTANCE_TYPE="t3.2xlarge"
-AMI_ID="ami-0c7217cdde317cfec"   # Ubuntu 22.04 LTS, us-east-1
+AMI_ID_FALLBACK="ami-0c7217cdde317cfec"   # Ubuntu 22.04 LTS, us-east-1 (static fallback)
 KEY_NAME="kentron-deployer"
 KEY_FILE="$(dirname "$0")/${KEY_NAME}.pem"
 SG_NAME="kentron-sg"
@@ -32,6 +32,17 @@ success "Authenticated as account ${ACCOUNT_ID}"
 
 CALLER=$(aws sts get-caller-identity --query 'Arn' --output text)
 info "Caller: ${CALLER}"
+
+# Resolve the current Ubuntu 22.04 AMI from Canonical's public SSM parameter;
+# fall back to the pinned ID if SSM is unreachable.
+AMI_ID=$(aws ssm get-parameter \
+  --name /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id \
+  --region "${REGION}" --query 'Parameter.Value' --output text 2>/dev/null) || AMI_ID=""
+if [ -z "${AMI_ID}" ] || [ "${AMI_ID}" = "None" ]; then
+  warn "SSM AMI lookup failed — using pinned fallback ${AMI_ID_FALLBACK}"
+  AMI_ID="${AMI_ID_FALLBACK}"
+fi
+info "Using AMI: ${AMI_ID}"
 
 # ── Key Pair ────────────────────────────────────────────────────────────────
 info "Creating key pair '${KEY_NAME}'..."

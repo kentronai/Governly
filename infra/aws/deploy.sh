@@ -75,6 +75,7 @@ info "Syncing project files to ${REMOTE_DIR}..."
 rsync -az --delete \
   --exclude '.git' \
   --exclude 'node_modules' \
+  --exclude '.pnpm-store' \
   --exclude '.next' \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
@@ -122,8 +123,18 @@ for i in $(seq 1 30); do
 done
 
 # ── Run Drizzle migrations ───────────────────────────────────────────────────
-info "Running Drizzle database migrations..."
-$SSH "cd ${REMOTE_DIR} && (sudo docker compose exec -T web pnpm db:migrate 2>&1 || docker compose exec -T web pnpm db:migrate 2>&1)"
+# The web runner image is a standalone Next.js build with no pnpm/drizzle-kit,
+# so migrations run in a one-off node container on the compose network.
+# drizzle.config.env.ts honors DB_SSL=false (compose postgres has no TLS).
+info "Running Drizzle database migrations (one-off node container)..."
+$SSH "cd ${REMOTE_DIR} && sudo docker run --rm --network controlnet-network \
+  --env-file ${REMOTE_DIR}/.env -e DB_SSL=false \
+  -v ${REMOTE_DIR}:/repo -w /repo \
+  node:20-bookworm bash -c '\
+    corepack enable && corepack prepare pnpm@9.0.0 --activate && \
+    pnpm install --frozen-lockfile --filter @ai-governance/web... && \
+    cd apps/web && \
+    pnpm exec drizzle-kit migrate --config=src/drizzle.config.env.ts'"
 success "Drizzle migrations complete"
 
 # ── Health check ─────────────────────────────────────────────────────────────

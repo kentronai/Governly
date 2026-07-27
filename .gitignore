@@ -243,3 +243,6 @@ infra/terraform/tfplan
 # AWS EC2 deployment state
 infra/aws/.ec2_ip
 infra/aws/.ec2_instance_id
+
+.claude/
+.claude-flow/

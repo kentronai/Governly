@@ -4,7 +4,7 @@ import ComingSoon from "@/components/red-teaming/ComingSoon";
 import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { getTenantModels } from "@/lib/queries/provider-models";
-import { db, tenants } from "drizzle";
+import { db, tenants } from "@db";
 import { eq } from "drizzle-orm";
 
 export default async function layout({

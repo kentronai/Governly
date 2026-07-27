@@ -10,8 +10,6 @@ services:
     depends_on:
       controlnet:
         condition: service_healthy
-      model-guard:
-        condition: service_healthy
       web:
         condition: service_healthy
       onnx-service:
@@ -23,15 +21,10 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost/healthz",
-        ]
+      # Use the IPv4 loopback explicitly: inside the container `localhost` can
+      # resolve to IPv6 ::1 first, but our nginx.conf only `listen 80;` (IPv4),
+      # so wget to ::1:80 is refused and the check flaps forever.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -109,42 +102,6 @@ services:
       - onnx_model_cache:/app/model_cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ModelGuard Service
-  model-guard:
-    image: ai-governance-model-guard:latest
-    build:
-      context: ./apps/model-guard
-      dockerfile: Dockerfile
-    container_name: controlnet-modelguard
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    expose:
-      - "8001" # Internal only
-    env_file:
-      - .env
-    volumes:
-      - model_cache:/tmp/model-guard-scans
-      # Bind-mount the new Python source over the cached image (S3 adapter etc.)
-      - ./apps/model-guard/gateway:/app/gateway:ro
-      - ./apps/model-guard/services:/app/services:ro
-      - ./apps/model-guard/adapters:/app/adapters:ro
-    healthcheck:
-      # python:3.11-slim does not ship curl; use python's http client instead.
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=5).status==200 else 1)",
-        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -274,8 +231,7 @@ services:
 volumes:
   postgres_data: # Persistent PostgreSQL data
   redis_data:
-  model_cache: # Persistent storage for ModelGuard scans
-  onnx_model_cache: # Persistent storage for ONNX models (survives container restarts)
+  onnx_model_cache:  # Persistent storage for ONNX models (survives container restarts)
 
 networks:
   default:

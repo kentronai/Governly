@@ -103,6 +103,16 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   webpack: (config, { isServer }) => {
+    // This production (webpack) build was not applying the tsconfig `paths`,
+    // so `@/...` and `@db` imports failed to resolve ("Module not found").
+    // Mirror the tsconfig paths explicitly as webpack aliases. The bare "@"
+    // alias only matches "@" or "@/..." segments, so scoped packages like
+    // @clerk/nextjs and @radix-ui/* are unaffected.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@db": path.resolve(__dirname, "src/db/index.ts"),
+      "@": path.resolve(__dirname, "src"),
+    };
     config.resolve.extensionAlias = {
       ".js": [".js", ".ts", ".tsx"],
     };
