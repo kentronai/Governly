@@ -80,12 +80,12 @@ http {
     upstream controlnet_upstream {
         server controlnet:8000;
     }
-    upstream modelguard_upstream {
-        server model-guard:8001;
-    }
     upstream onnx_upstream {
         server onnx-service:8002;
     }
+    # NOTE: model-guard is intentionally NOT deployed in this environment.
+    # Do not add a model-guard upstream — nginx would crash-loop on an
+    # unresolvable host and take the whole site down.
 
     # HTTP → HTTPS redirect
     server {
@@ -135,15 +135,6 @@ http {
             proxy_set_header X-Forwarded-Proto \$scheme;
         }
 
-        # ModelGuard API
-        location /api/model-guard/ {
-            proxy_pass http://modelguard_upstream/;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
-        }
-
         # ONNX Service
         location /api/onnx/ {
             proxy_pass http://onnx_upstream/;
@@ -165,13 +156,10 @@ http {
             client_max_body_size 100M;
         }
 
+        # model-guard is not deployed — fail fast with a clean 503.
         location /modelguard/ {
-            proxy_pass http://modelguard_upstream;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto \$scheme;
-            proxy_read_timeout 120s;
+            default_type application/json;
+            return 503 '{\"error\":\"model-guard service is not deployed in this environment\"}';
         }
 
         location = /docs {

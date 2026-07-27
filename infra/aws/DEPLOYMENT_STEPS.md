@@ -14,7 +14,8 @@ Last verified: **2026-07-26** — full redeploy of a fresh `git pull` succeeded 
 | AWS CLI profile | `kentron-new` (account 942521690682, IAM user `drathi`). **Never** use `default`/`kentron`. |
 | Region | `us-east-1` |
 | EC2 instance | `kentron-production` = `i-048cde14cfd334ca5`, `t3.2xlarge`, Ubuntu 22.04, 60 GB gp3 |
-| Public IP (Elastic) | `98.88.103.48` — app is at `http://98.88.103.48` (IP-only; DNS `app.kentron.ai` still points at the old deployment) |
+| Public IP (Elastic) | `98.88.103.48` |
+| App URL | **`https://app.kentron.ai`** (DNS A record → `98.88.103.48`; Let's Encrypt TLS live, HTTP→HTTPS redirect) |
 | Security group | `kentron-sg` = `sg-03f4bb09a4130626d` (22 from operator IPs, 80/443 public) |
 | SSH | `ssh -i infra/aws/kentron-deployer.pem ubuntu@98.88.103.48` |
 | Remote app dir | `/opt/kentron` (file-copy via rsync, **not** a git repo) |
@@ -160,6 +161,34 @@ re-syncing; they are why the build/deploy succeeds.
    startup. Recreating controlnet/onnx/web gives them new IPs, so nginx returns **502**
    for all proxied routes (and its `/healthz`, which proxies to onnx, goes unhealthy).
    Fix: `sudo docker compose restart nginx`.
+
+---
+
+## 5b. HTTPS / TLS (already live)
+
+`https://app.kentron.ai` is live with a Let's Encrypt cert (auto-renews). How it was set up
+(do **not** run the stock `ssl-setup.sh` blindly — see the warning below):
+
+1. DNS: `app.kentron.ai` A record → `98.88.103.48` (done).
+2. Cert (certbot standalone needs port 80, so stop nginx briefly):
+   ```bash
+   ssh … 'cd /opt/kentron && sudo docker compose stop nginx'
+   ssh … 'sudo certbot certonly --standalone --non-interactive --agree-tos --email satish@kentron.ai -d app.kentron.ai'
+   ```
+3. The repo `nginx.conf` **is** the HTTPS config: HTTP :80 (healthz + ACME + 301→HTTPS) and
+   HTTPS :443 (cert from `/etc/letsencrypt/live/app.kentron.ai/`, same routes as before,
+   ModelGuard still a 503). `docker-compose.yml` already publishes 443 and mounts
+   `/etc/letsencrypt:ro`. Start nginx: `sudo docker compose up -d nginx`.
+4. Auto-renewal: hooks at `/etc/letsencrypt/renewal-hooks/{pre/stop-nginx.sh,post/start-nginx.sh}`
+   stop/start nginx so certbot's standalone renewal can bind :80. Verified with
+   `sudo certbot renew --dry-run`.
+
+> **⚠️ Do NOT run the original `ssl-setup.sh` flow blindly.** Its embedded nginx config
+> historically re-added a `model-guard` upstream (crash-loops nginx) and used a different
+> route table. It has been patched to drop ModelGuard, but the repo `nginx.conf` is now the
+> canonical HTTPS config — prefer editing that. The cert lives in `/etc/letsencrypt` (host
+> path, survives redeploys); a **fresh** instance must obtain the cert (step 2) before nginx
+> can start with the SSL config, or nginx will fail to load a missing certificate.
 
 ---
 
