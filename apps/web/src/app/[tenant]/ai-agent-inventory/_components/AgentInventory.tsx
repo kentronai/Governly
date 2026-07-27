@@ -294,13 +294,11 @@ export function AgentInventory({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Agent Registry
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold">Agent Registry</h1>
+          <p className="text-muted-foreground">
             Every real AI agent discovered from connected providers or ingested
             through NORIX.
           </p>
@@ -362,14 +360,15 @@ export function AgentInventory({
         />
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="relative w-[343px]">
         <Input
+          type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by agent name, function, model, owner…"
-          className="pl-9"
+          className="pl-10"
         />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 stroke-muted-foreground" />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -438,157 +437,155 @@ export function AgentInventory({
         </span>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Agent</TableHead>
+            <TableHead>Platform</TableHead>
+            <TableHead>Owner</TableHead>
+            <TableHead>Function</TableHead>
+            <TableHead>Autonomy</TableHead>
+            <TableHead>Risk</TableHead>
+            <TableHead>Compliance</TableHead>
+            <TableHead>Open Gaps</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Region / Account</TableHead>
+            <TableHead>Last Active</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
             <TableRow>
-              <TableHead>Agent</TableHead>
-              <TableHead>Platform</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Function</TableHead>
-              <TableHead>Autonomy</TableHead>
-              <TableHead>Risk</TableHead>
-              <TableHead>Compliance</TableHead>
-              <TableHead>Open Gaps</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Region / Account</TableHead>
-              <TableHead>Last Active</TableHead>
+              <TableCell
+                colSpan={11}
+                className="text-center py-10 text-muted-foreground"
+              >
+                {isLoading
+                  ? "Loading agents…"
+                  : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or Kubernetes Cluster in Admin → Integrations."}
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={11}
-                  className="text-center py-10 text-muted-foreground"
-                >
-                  {isLoading
-                    ? "Loading agents…"
-                    : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or Kubernetes Cluster in Admin → Integrations."}
+          ) : (
+            rows.map((r) => (
+              <TableRow
+                key={r.id}
+                className="cursor-pointer"
+                onClick={() => setActiveAgentId(r.id)}
+              >
+                <TableCell className="font-medium max-w-[220px] truncate">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
+                    {r.name}
+                  </div>
                 </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow
-                  key={r.id}
-                  className="cursor-pointer"
-                  onClick={() => setActiveAgentId(r.id)}
-                >
-                  <TableCell className="font-medium max-w-[220px] truncate">
-                    <div className="flex items-center gap-2">
-                      <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-                      {r.name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {platformLabel(r.platform)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <div className="space-y-0.5">
-                      <div>{ownerDisplay(r.ownerName)}</div>
-                      {!r.ownerName ? (
-                        <div className="text-[11px] text-muted-foreground">
-                          no provider owner match
-                        </div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {functionDisplay(r.businessFunction)}
-                  </TableCell>
-                  <TableCell>
-                    {autonomyLevelDisplay(r) ? (
-                      <Badge
-                        className={cn(
-                          "border-transparent",
-                          AUTONOMY_STYLES[autonomyLevelDisplay(r)!],
-                        )}
-                      >
-                        {autonomyLevelDisplay(r)}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {r.riskLevel ? (
-                      <Badge
-                        className={cn(
-                          "border-transparent",
-                          RISK_STYLES[r.riskLevel],
-                        )}
-                      >
-                        {r.riskLevel} · {Number(r.riskScore ?? 0)}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {r.complianceStatus ? (
-                      <div className="space-y-1">
-                        <Badge
-                          className={cn(
-                            "border-transparent capitalize",
-                            COMPLIANCE_STYLES[r.complianceStatus] ??
-                              COMPLIANCE_STYLES.not_evaluated,
-                          )}
-                        >
-                          {r.complianceStatus.replaceAll("_", " ")}
-                        </Badge>
-                        <p
-                          className="max-w-[150px] truncate text-[11px] text-muted-foreground"
-                          title={r.compliancePolicyName ?? undefined}
-                        >
-                          {r.compliancePolicyName} ·{" "}
-                          {Number(r.complianceCoverage ?? 0).toFixed(0)}%
-                        </p>
+                <TableCell className="text-muted-foreground">
+                  {platformLabel(r.platform)}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  <div className="space-y-0.5">
+                    <div>{ownerDisplay(r.ownerName)}</div>
+                    {!r.ownerName ? (
+                      <div className="text-[11px] text-muted-foreground">
+                        no provider owner match
                       </div>
-                    ) : (
-                      <Badge
-                        className={cn(
-                          "border-transparent",
-                          COMPLIANCE_STYLES.not_evaluated,
-                        )}
-                      >
-                        Not evaluated
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={cn(
-                        "border-transparent tabular-nums",
-                        Number(r.openFindingCount) > 0
-                          ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                          : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                      )}
-                    >
-                      {Number(r.openFindingCount)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
+                    ) : null}
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {functionDisplay(r.businessFunction)}
+                </TableCell>
+                <TableCell>
+                  {autonomyLevelDisplay(r) ? (
                     <Badge
                       className={cn(
                         "border-transparent",
-                        STATUS_STYLES[r.status],
+                        AUTONOMY_STYLES[autonomyLevelDisplay(r)!],
                       )}
                     >
-                      {r.status}
+                      {autonomyLevelDisplay(r)}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {r.region} · {r.accountId}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {mounted ? relativeFromNow(r.lastSeenAt) : "—"}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell>
+                  {r.riskLevel ? (
+                    <Badge
+                      className={cn(
+                        "border-transparent",
+                        RISK_STYLES[r.riskLevel],
+                      )}
+                    >
+                      {r.riskLevel} · {Number(r.riskScore ?? 0)}
+                    </Badge>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell>
+                  {r.complianceStatus ? (
+                    <div className="space-y-1">
+                      <Badge
+                        className={cn(
+                          "border-transparent capitalize",
+                          COMPLIANCE_STYLES[r.complianceStatus] ??
+                            COMPLIANCE_STYLES.not_evaluated,
+                        )}
+                      >
+                        {r.complianceStatus.replaceAll("_", " ")}
+                      </Badge>
+                      <p
+                        className="max-w-[150px] truncate text-[11px] text-muted-foreground"
+                        title={r.compliancePolicyName ?? undefined}
+                      >
+                        {r.compliancePolicyName} ·{" "}
+                        {Number(r.complianceCoverage ?? 0).toFixed(0)}%
+                      </p>
+                    </div>
+                  ) : (
+                    <Badge
+                      className={cn(
+                        "border-transparent",
+                        COMPLIANCE_STYLES.not_evaluated,
+                      )}
+                    >
+                      Not evaluated
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    className={cn(
+                      "border-transparent tabular-nums",
+                      Number(r.openFindingCount) > 0
+                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                    )}
+                  >
+                    {Number(r.openFindingCount)}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    className={cn(
+                      "border-transparent",
+                      STATUS_STYLES[r.status],
+                    )}
+                  >
+                    {r.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-muted-foreground text-xs">
+                  {r.region} · {r.accountId}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {mounted ? relativeFromNow(r.lastSeenAt) : "—"}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
 
       <Pagination
         page={page}
