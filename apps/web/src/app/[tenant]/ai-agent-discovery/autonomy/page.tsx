@@ -1,6 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
 import {
-  ArrowRight,
   Bot,
   Eye,
   Lightbulb,
@@ -177,10 +176,6 @@ export default async function AutonomyLevelsPage({ params }: { params: Promise<{
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-3 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">
-        <span>Autonomy Increases</span>
-        <ArrowRight className="h-4 w-4" />
-      </div>
     </main>
   );
 }

@@ -634,8 +634,8 @@ export default function IntegrationsPage() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1600px] space-y-4 p-5">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Integrations</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold">Integrations</h1>
+          <p className="text-muted-foreground">
             Connect providers, discover deployed agents, and bring them under
             NORIX policy and compliance evaluation.
           </p>

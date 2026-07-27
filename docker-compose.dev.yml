@@ -206,6 +206,12 @@ services:
       - .env
       - .env.openai.local
       - .env.gemini.local
+      # Loaded LAST so it overrides the production (pk_live/sk_live) Clerk keys
+      # in .env with the test instance. A pk_live instance is locked to
+      # clerk.kentron.ai and rejects https://localhost, which stalls Clerk in an
+      # infinite __clerk_handshake loop (blank sign-in). The test instance
+      # (adjusted-parakeet-8.clerk.accounts.dev) allows localhost.
+      - .env.clerk.local
     environment:
       # Server Actions are internally forwarded back to the request host.
       # Alpine resolves localhost to ::1 first, while Next dev is bound to

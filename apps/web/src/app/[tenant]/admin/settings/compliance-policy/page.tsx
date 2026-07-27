@@ -1,21 +1,8 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
-import { Input, Button, Textarea } from "@nextui-org/react";
-import React, { useState } from "react";
+
+import React from "react";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -25,12 +12,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-}
+type CompliancePolicy = {
+  policy_name: string;
+  policy_description: string[];
+  is_active: boolean;
+};
 
-const financialServicesPolicies = [
+const financialServicesPolicies: CompliancePolicy[] = [
   {
     policy_name:
       "Brokerage, Sales & Trading, and Asset Management Related Detections",
@@ -61,7 +49,7 @@ const financialServicesPolicies = [
   },
 ];
 
-const financialServicesConcernPolicies = [
+const financialServicesConcernPolicies: CompliancePolicy[] = [
   {
     policy_name: "General Compliance Detections",
     policy_description: [
@@ -84,7 +72,7 @@ const financialServicesConcernPolicies = [
   },
 ];
 
-const customPolicies = [
+const customPolicies: CompliancePolicy[] = [
   {
     policy_name: "Custom Detection Rules",
     policy_description: [
@@ -98,222 +86,88 @@ const customPolicies = [
   },
 ];
 
-const OrganizationPolicies = () => {
-  const [open, setOpen] = useState("");
-
-  const Columns: ColumnDef<any>[] = [
-    {
-      accessorKey: "policy_name",
-      header: "POLICY",
-      cell: ({ row }) => {
-        const item = row.original;
-        return <div className="font-medium">{item.policy_name}</div>;
-      },
-    },
-    {
-      accessorKey: "policy_description",
-      header: "DESCRIPTION",
-      cell: ({ row }) => {
-        const item = row.original;
-        if (item.policy_description.length === 0) return null;
-
-        return (
-          <div className="space-y-2">
-            {item.policy_description.map((text: string, index: number) => (
-              <div key={index}>{text}</div>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      id: "status",
-      header: "STATUS",
-      cell: ({ row }) => {
-        const item = row.original;
-        return (
-          <div className="flex justify-center">
-            <Switch
-              checked={item.is_active}
-              // onChange={() => handleUpdatePolicyStatus(item)}
-              aria-label="Toggle policy status"
-              className="data-[state=checked]:bg-black"
-            />
-          </div>
-        );
-      },
-    },
-  ];
-
-  function DataTable<TData, TValue>({
-    columns,
-    data,
-  }: DataTableProps<TData, TValue>) {
-    const table = useReactTable({
-      data,
-      columns,
-      getCoreRowModel: getCoreRowModel(),
-    });
-
-    return (
-      <div className="border border-gray-200 bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50 border-b border-gray-200">
-              {table.getHeaderGroups()[0].headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className="h-8 text-xs font-medium text-gray-700 uppercase"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="border-b border-gray-200 last:border-0"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="py-4 align-baseline text-sm"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="text-center py-12"
-                >
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <p className="text-lg font-medium text-gray-500">
-                      No data available
-                    </p>
+function PolicyTable({ data }: { data: CompliancePolicy[] }) {
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Policy</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead className="text-right">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.length ? (
+            data.map((policy) => (
+              <TableRow key={policy.policy_name}>
+                <TableCell className="align-top font-medium whitespace-normal">
+                  {policy.policy_name}
+                </TableCell>
+                <TableCell className="align-top whitespace-normal text-muted-foreground">
+                  <div className="space-y-1.5">
+                    {policy.policy_description.map((text) => (
+                      <div key={text}>{text}</div>
+                    ))}
                   </div>
                 </TableCell>
+                <TableCell className="align-top text-right">
+                  <Switch
+                    checked={policy.is_active}
+                    aria-label={`Toggle ${policy.policy_name}`}
+                  />
+                </TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="flex text-black flex-col h-screen">
-        <div className="flex flex-1">
-          <div className="flex-1  p-6">
-            <div className="max-w-[1200px]">
-              <div className="flex items-center  mb-4">
-                <h1 className="text-xl font-semibold">Compliance Policies</h1>
-                <span className="text-xs  text-gray-600 px-2 ">
-                  (Coming Soon)
-                </span>
-              </div>
-
-              <div className="space-y-10 mb-20">
-                <section>
-                  <h2 className="text-sm font-medium mb-4">
-                    US Financial Services
-                  </h2>
-                  <DataTable
-                    data={financialServicesPolicies}
-                    columns={Columns}
-                  />
-                </section>
-
-                <section>
-                  <h2 className="text-sm font-medium mb-4">
-                    General Financial Services Concerns
-                  </h2>
-                  <DataTable
-                    data={financialServicesConcernPolicies}
-                    columns={Columns}
-                  />
-                </section>
-
-                <section>
-                  <h2 className="text-sm font-medium mb-4">Custom</h2>
-                  <DataTable data={customPolicies} columns={Columns} />
-                </section>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Dialog open={open !== ""} onOpenChange={() => setOpen("")}>
-        <DialogContent className="text-black">
-          <DialogTitle className="sr-only">Edit Short Text</DialogTitle>
-          <DialogHeader>
-            <span className="flex w-full items-center">
-              <h2 className="flex mx-3 text-black font-semibold text-lg">
-                Edit Short Text
-              </h2>
-            </span>
-          </DialogHeader>
-          {open === "edit" && (
-            <>
-              <Input
-                label="Label*"
-                name="name"
-                type="text"
-                placeholder="Enter Label"
-                variant="bordered"
-                className="text-black"
-                isRequired={false}
-              />
-              <Textarea
-                label="Message*"
-                name="message"
-                type="text"
-                placeholder="Enter user email"
-                variant="bordered"
-                className="text-black"
-                isRequired={false}
-              />
-            </>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell
+                colSpan={3}
+                className="py-10 text-center text-muted-foreground"
+              >
+                No data available
+              </TableCell>
+            </TableRow>
           )}
-          <DialogFooter>
-            <Button
-              color="danger"
-              variant="light"
-              onPress={() => {
-                setOpen("");
-              }}
-            >
-              Close
-            </Button>
-            <Button
-              type="submit"
-              color="primary"
-              onPress={() => {
-                setOpen("");
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+const OrganizationPolicies = () => {
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1200px] space-y-6 p-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Compliance Policies</h1>
+            <Badge variant="secondary">Coming Soon</Badge>
+          </div>
+          <p className="text-muted-foreground">
+            Detection policies applied across your organization&apos;s
+            monitored channels.
+          </p>
+        </div>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium">US Financial Services</h2>
+          <PolicyTable data={financialServicesPolicies} />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium">
+            General Financial Services Concerns
+          </h2>
+          <PolicyTable data={financialServicesConcernPolicies} />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium">Custom</h2>
+          <PolicyTable data={customPolicies} />
+        </section>
+      </div>
+    </div>
   );
 };
 
