@@ -16,7 +16,6 @@ import {
   XCircle,
   AlertTriangle,
   Database,
-  FileText,
   Download,
 } from "lucide-react";
 import { getModelScanResultsByUrl } from "@/lib/actions/model-scans";
@@ -661,7 +660,7 @@ export default function ModelReportPage() {
             <div className=" rounded-lg shadow-sm border  p-6">
               <h3 className="text-lg font-semibold  mb-4">Export Results</h3>
               <div className="flex gap-3">
-                <button
+                <Button
                   onClick={() => {
                     // Mock export functionality
                     const dataStr = JSON.stringify(scanResult, null, 2);
@@ -675,21 +674,10 @@ export default function ModelReportPage() {
                     link.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-500"
                 >
                   <Download className="h-4 w-4" />
                   Download JSON Report
-                </button>
-                {/* <button 
-                  onClick={() => {
-                    // Mock SARIF export
-                    alert('SARIF export functionality would be implemented here');
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-muted-foreground rounded-lg hover:"
-                >
-                  <FileText className="h-4 w-4" />
-                  Download SARIF Report
-                </button> */}
+                </Button>
               </div>
             </div>
           </div>

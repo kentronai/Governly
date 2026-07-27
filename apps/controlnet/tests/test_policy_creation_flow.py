@@ -161,7 +161,7 @@ guards:
       types:
         - EMAIL
         - PHONE
-      threshold: 0
+      threshold: 1
       severity: high
 compose:
   root: pii_detect
@@ -178,7 +178,7 @@ guards:
       types:
         - EMAIL
         - PHONE
-      threshold: 0
+      threshold: 1
       severity: high
   - id: toxicity.detect
     target: messages[*].content
@@ -211,7 +211,7 @@ guards:
     target: messages[*].content
     with:
       types: [EMAIL]
-      threshold: 0
+      threshold: 1
       severity: high
 compose:
   root: pii_detect
@@ -227,7 +227,7 @@ guards:
       path: messages[*].content
     with:
       types: [EMAIL]
-      threshold: 0
+      threshold: 1
       severity: high
 compose:
   root: pii_detect

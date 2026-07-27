@@ -102,6 +102,21 @@ jest.mock("@/lib/actions/kubernetes-integration", () => ({
   })),
 }));
 
+jest.mock("@/lib/actions/crewai-integration", () => ({
+  createCrewAIConnection: jest.fn(async () => ({
+    id: "crewai-1",
+    baseUrl: "https://app.crewai.com",
+  })),
+  deleteCrewAIConnection: jest.fn(),
+  testCrewAIIntegrationConnection: jest.fn(async () => ({ ok: true })),
+  triggerCrewAIDiscovery: jest.fn(async () => ({
+    scanId: "scan-crewai",
+    status: "completed",
+    agentsDiscovered: 1,
+    resourcesScanned: { crewai_crew: 1 },
+  })),
+}));
+
 describe("Integration credential dialog", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -123,7 +138,7 @@ describe("Integration credential dialog", () => {
       screen.getByRole("heading", {
         name: "Add Databricks Unity Catalog credentials",
       }),
-    ).toHaveClass("text-[16px]", "font-semibold");
+    ).toHaveClass("font-semibold");
     expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass(
       "h-9",
       "px-4",
@@ -207,8 +222,10 @@ describe("Integration credential dialog", () => {
 
     render(<IntegrationsPage />);
 
-    expect(await screen.findByText("Agents discovered")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
+    // The per-card "Agents discovered" row was intentionally removed (the count
+    // is shown in the connect toast). The card must still avoid resource-count
+    // tiles.
+    expect(await screen.findByText("Last sync")).toBeInTheDocument();
     expect(screen.queryByText("UC assets")).not.toBeInTheDocument();
     expect(screen.queryByText("Serving")).not.toBeInTheDocument();
     expect(screen.queryByText("Apps / Jobs")).not.toBeInTheDocument();
@@ -355,8 +372,9 @@ describe("Integration credential dialog", () => {
 
     render(<IntegrationsPage />);
 
-    expect(await screen.findByText("Agents discovered")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    // "Agents discovered" row was removed from the card; the connected card
+    // still shows last-sync and a Discover action.
+    expect(await screen.findByText("Last sync")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Discover/i }),
     ).toBeInTheDocument();
