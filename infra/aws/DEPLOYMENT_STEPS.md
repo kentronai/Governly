@@ -3,7 +3,8 @@
 Deploys the Kentron platform (**all services except ModelGuard**) to a single EC2
 instance via Docker Compose, on AWS account **942521690682** (`us-east-1`).
 
-Last verified: **2026-07-26** — full redeploy of a fresh `git pull` succeeded end-to-end.
+Last verified: **2026-07-27** — full redeploy of a fresh `git pull` + HTTPS cutover to
+`https://app.kentron.ai` succeeded end-to-end.
 
 ---
 
@@ -203,8 +204,10 @@ curl -s https://clerk.kentron.ai/.well-known/jwks.json | head -c 120
 # secret-key auth against the Backend API (run from a container that has CLERK_SECRET_KEY)
 ssh … 'cd /opt/kentron && sudo docker compose exec -T web node -e "fetch(\"https://api.clerk.com/v1/jwks\",{headers:{Authorization:\"Bearer \"+process.env.CLERK_SECRET_KEY}}).then(r=>console.log(r.status))"'
 ```
-Both should return 200 with the same instance `kid`. Full browser-based sign-in is only
-verifiable after DNS is cut over to `app.kentron.ai` + HTTPS (`ssl-setup.sh`).
+Both should return 200 with the same instance `kid`. Browser sign-in is live at
+`https://app.kentron.ai/sign-in` (the DNS + HTTPS cutover is done — see §5b). If a Clerk
+origin/redirect error appears, add `app.kentron.ai` to the instance's **allowed origins /
+domains** in the Clerk dashboard.
 
 ---
 
@@ -223,12 +226,16 @@ this bucket; public static assets would need CloudFront+OAC (out of scope).
 ## 8. Validation matrix (run after every deploy)
 
 ```bash
-IP=98.88.103.48
-curl -s -o /dev/null -w 'nginx /healthz: %{http_code}\n'      http://$IP/healthz     # 200
-curl -s -o /dev/null -w 'controlnet /docs: %{http_code}\n'    http://$IP/docs        # 200
-curl -s -o /dev/null -w 'web /: %{http_code}\n'               http://$IP/            # 307
-curl -s -X POST http://$IP/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"x","messages":[]}'   # structured 401 JSON
-curl -s -o /dev/null -w 'modelguard: %{http_code}\n'          http://$IP/modelguard/scan  # 503
+URL=https://app.kentron.ai ; IP=98.88.103.48
+# public (HTTPS, real cert — no -k needed):
+curl -s -o /dev/null -w 'https / (307): %{http_code}, TLS %{ssl_verify_result}(0=ok)\n'  $URL/
+curl -s -o /dev/null -w 'controlnet /docs (200): %{http_code}\n'   $URL/docs
+curl -s -o /dev/null -w 'web /sign-in (200): %{http_code}\n'       $URL/sign-in
+curl -s -X POST $URL/v1/chat/completions -H 'Content-Type: application/json' -d '{"model":"x","messages":[]}'   # structured 401 JSON
+curl -s -o /dev/null -w 'modelguard (503): %{http_code}\n'         $URL/modelguard/scan
+curl -s -o /dev/null -w 'http->https redirect (301): %{http_code} -> %{redirect_url}\n'  http://app.kentron.ai/dashboard
+# cert:
+echo | openssl s_client -connect app.kentron.ai:443 -servername app.kentron.ai 2>/dev/null | openssl x509 -noout -issuer -dates
 # internal + data:
 ssh … 'cd /opt/kentron && sudo docker compose ps'             # 7 services, web/controlnet/onnx/nginx/pg/redis healthy
 ssh … 'cd /opt/kentron && sudo docker compose exec -T web wget -qO- http://controlnet:8000/healthz'   # {"status":"healthy"}
@@ -238,10 +245,10 @@ ssh … 'cd /opt/kentron && SEC=$(grep ^AGENT_DISCOVERY_CRON_SECRET= .env | cut 
 for p in 5432 8000 8002; do nc -z -G3 $IP $p && echo "$p OPEN(BAD)" || echo "$p refused(GOOD)"; done
 ```
 
-**Accepted limitations (by design for this IP-only dev deployment):** full Clerk browser
-login needs DNS+HTTPS; T2 ONNX guards are inert (0 `onnx_models` rows); some `/static/*`
-assets 404 (private bucket / no assets); `NEXT_PUBLIC_BASE_URL*` still point at GCP-era
-hosts as provided in `.env`.
+**Accepted limitations:** T2 ONNX guards are inert (0 `onnx_models` rows — binaries were in
+the deleted bucket); some `/static/*` assets 404 (private bucket / no assets uploaded);
+`NEXT_PUBLIC_BASE_URL*` still point at GCP-era hosts as provided in `.env`. If Clerk
+browser login errors, allow-list `app.kentron.ai` in the Clerk dashboard (see §6).
 
 ---
 
@@ -252,4 +259,11 @@ IP=98.88.103.48 ; K=infra/aws/kentron-deployer.pem
 ssh -i $K ubuntu@$IP 'cd /opt/kentron && sudo docker compose ps'
 ssh -i $K ubuntu@$IP 'cd /opt/kentron && sudo docker compose logs -f web'      # or controlnet / nginx / …
 ssh -i $K ubuntu@$IP 'cd /opt/kentron && sudo docker compose restart nginx'    # after any recreate
+# TLS cert status / force a renewal test:
+ssh -i $K ubuntu@$IP 'sudo certbot certificates'                               # shows expiry
+ssh -i $K ubuntu@$IP 'sudo certbot renew --dry-run'                            # exercises the stop/start-nginx hooks
 ```
+
+> Redeploys keep HTTPS: the repo `nginx.conf` is the SSL config and the cert persists in
+> `/etc/letsencrypt` on the host, so `deploy.sh`'s rsync no longer clobbers TLS. Still run
+> `docker compose restart nginx` after a deploy (§5.7).
