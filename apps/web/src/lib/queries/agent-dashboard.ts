@@ -8,6 +8,7 @@ import {
   observabilityLogs,
   reports,
   tenants,
+  withDbRetry,
 } from "@db";
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { cache } from "react";
@@ -16,17 +17,21 @@ const AUTONOMY_LEVELS = ["L1", "L2", "L3", "L4"] as const;
 const RISK_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
 
 export const resolveAgentDiscoveryTenantId = cache(async (slugOrId: string) => {
-  const [byId] = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(eq(tenants.id, slugOrId))
-    .limit(1);
+  const [byId] = await withDbRetry(() =>
+    db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.id, slugOrId))
+      .limit(1),
+  );
   if (byId) return byId.id;
-  const [bySlug] = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(eq(tenants.slug, slugOrId))
-    .limit(1);
+  const [bySlug] = await withDbRetry(() =>
+    db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.slug, slugOrId))
+      .limit(1),
+  );
   if (!bySlug) throw new Error("Tenant not found");
   return bySlug.id;
 });

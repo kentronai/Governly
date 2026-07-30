@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { ReactNode } from "react";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { db, tenants, users } from "@db";
+import { db, tenants, users, withDbRetry } from "@db";
 import { eq } from "drizzle-orm";
 import { TenantProvider } from "@/contexts/TenantContext";
 import LayoutWithConditionalSidebar from "@/components/app/LayoutWithConditionalSidebar";
@@ -57,22 +57,25 @@ const getClaimEmail = (sessionClaims: unknown): string | null => {
 
 const getLocalUserEmail = async (userId: string): Promise<string | null> => {
   try {
-    const localUser = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      columns: { email: true },
-    });
+    const localUser = await withDbRetry(() =>
+      db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: { email: true },
+      }),
+    );
 
     return localUser?.email ?? null;
-  } catch (error) {
-    console.error("Tenant layout user lookup failed", error);
+  } catch {
     return null;
   }
 };
 
 async function ensureTenantForOrg(orgId: string) {
-  let tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.id, orgId),
-  });
+  let tenant = await withDbRetry(() =>
+    db.query.tenants.findFirst({
+      where: eq(tenants.id, orgId),
+    }),
+  );
 
   if (tenant) {
     return tenant;
@@ -108,9 +111,11 @@ async function ensureTenantForOrg(orgId: string) {
     // harmless unique-constraint race into a failed page render.
     const postgresCode = error?.cause?.code || error?.code;
     if (postgresCode === "23505") {
-      const concurrentlyCreatedTenant = await db.query.tenants.findFirst({
-        where: eq(tenants.id, orgId),
-      });
+      const concurrentlyCreatedTenant = await withDbRetry(() =>
+        db.query.tenants.findFirst({
+          where: eq(tenants.id, orgId),
+        }),
+      );
       if (concurrentlyCreatedTenant) {
         return concurrentlyCreatedTenant;
       }
@@ -118,9 +123,11 @@ async function ensureTenantForOrg(orgId: string) {
     throw error;
   }
 
-  return db.query.tenants.findFirst({
-    where: eq(tenants.id, orgId),
-  });
+  return withDbRetry(() =>
+    db.query.tenants.findFirst({
+      where: eq(tenants.id, orgId),
+    }),
+  );
 }
 
 interface TenantLayoutProps {
@@ -149,9 +156,11 @@ export default async function TenantLayout({
   const isAdminUser = userEmail?.toLowerCase().endsWith("@kentron.ai") ?? false;
 
   // Find tenant by slug
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.slug, tenantSlug),
-  });
+  const tenant = await withDbRetry(() =>
+    db.query.tenants.findFirst({
+      where: eq(tenants.slug, tenantSlug),
+    }),
+  );
 
   // Redirect if tenant not found
   if (!tenant) {
@@ -209,9 +218,11 @@ export async function generateMetadata({
   params: Promise<{ tenant: string }>;
 }) {
   const { tenant: tenantSlug } = await params;
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.slug, tenantSlug),
-  });
+  const tenant = await withDbRetry(() =>
+    db.query.tenants.findFirst({
+      where: eq(tenants.slug, tenantSlug),
+    }),
+  );
 
   return {
     title: tenant ? `${tenant.name} - AI Governance` : "Tenant Not Found",

@@ -48,6 +48,13 @@ export default function Pagination({
   className,
   variant = "inline",
 }: Props) {
+  // Radix Select derives its aria-controls id from useId(); that id differs
+  // between the server HTML and the first client render, which tripped a
+  // hydration mismatch wherever this pagination is used. Render the page-size
+  // Select only after mount so both sides start from identical markup.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
   const handlePageChange = (newPage: number) => {
     if (!isLoading && newPage !== page) {
       setPage(newPage);
@@ -88,22 +95,31 @@ export default function Pagination({
       <div className="w-full">
         <PaginationWrapper className="!justify-between">
           <div className="flex items-center gap-2">
-            <Select
-              value={pageSize.toString()}
-              onValueChange={handlePageSizeChange}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-[90px] h-9">
-                <SelectValue placeholder={pageSize.toString()} />
-              </SelectTrigger>
-              <SelectContent>
-                {[10, 20, 50, 100, 150, 200].map((size) => (
-                  <SelectItem key={size} value={size.toString()}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {mounted ? (
+              <Select
+                value={pageSize.toString()}
+                onValueChange={handlePageSizeChange}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[90px] h-9">
+                  <SelectValue placeholder={pageSize.toString()} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100, 150, 200].map((size) => (
+                    <SelectItem key={size} value={size.toString()}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div
+                aria-hidden
+                className="flex h-9 w-[90px] items-center rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground"
+              >
+                {pageSize.toString()}
+              </div>
+            )}
             <span className="text-sm text-muted-foreground">
               Items per page
             </span>

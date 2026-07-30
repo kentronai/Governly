@@ -13,7 +13,21 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret, maskSecret } from "@/lib/server/crypto";
+import { getConnectionCredentials } from "@/lib/server/nango/client";
 import { testAwsConnection } from "@/lib/server/aws/client-factory";
+
+/** Reads the first non-empty string across credential/connection-config keys. */
+function pickAwsCredential(
+  credentials: Record<string, unknown>,
+  connectionConfig: Record<string, unknown>,
+  ...keys: string[]
+): string {
+  for (const key of keys) {
+    const value = credentials[key] ?? connectionConfig[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
   let tenantRow = await db
@@ -128,6 +142,169 @@ export const createAwsConnection = async (input: CreateAwsConnectionInput) => {
 
   revalidatePath(`/${input.tenantSlug}/admin/integrations`);
   return maskedConnection(row);
+};
+
+/**
+ * Bridge a Nango-authorized AWS account into the discovery model. After the
+ * Nango Connect popup, the webhook records the connection on the integration
+ * row; this reads the AWS auth details back from the Nango vault and upserts the
+ * `awsDiscoveryConnections` row the existing discovery engine runs on, so AWS
+ * joins the uniform Nango popup flow without changing discovery itself.
+ *
+ * Expected Nango `aws` credentials (custom/API-key config): `authMethod`,
+ * `region`, and — per method — `roleArn` / `crossAccountRoleArn` + `externalId`
+ * / `accessKeyId` + `secretAccessKey`. `iam_role` needs no secret (STS
+ * AssumeRole uses NORIX's own identity); Nango stores only the role/region.
+ */
+export const syncAwsConnectionFromNango = async (
+  tenantSlugOrId: string,
+  integrationId: string,
+) => {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Authentication required");
+  const tenantId = await resolveTenantId(tenantSlugOrId);
+  const integration = await db.query.integrations.findFirst({
+    where: and(
+      eq(integrations.id, integrationId),
+      eq(integrations.tenantId, tenantId),
+    ),
+  });
+  if (!integration || integration.name !== "AWS") {
+    throw new Error("AWS integration not found");
+  }
+  if (!integration.nangoConnectionId || !integration.nangoProviderConfigKey) {
+    throw new Error("AWS account is not connected through Nango yet");
+  }
+  const { credentials, connectionConfig } = await getConnectionCredentials(
+    integration.nangoConnectionId,
+    integration.nangoProviderConfigKey,
+  );
+  const rawMethod = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "authMethod",
+    "auth_method",
+  );
+  const region =
+    pickAwsCredential(credentials, connectionConfig, "region") || "us-east-1";
+  const roleArn = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "roleArn",
+    "role_arn",
+  );
+  const crossAccountRoleArn = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "crossAccountRoleArn",
+    "cross_account_role_arn",
+  );
+  const externalId = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "externalId",
+    "external_id",
+  );
+  // Nango's `aws-iam` provider (auth_mode BASIC) stores the key pair as
+  // username/password — the Connect popup's field titles are "AWS Access Key
+  // ID" / "AWS Secret Access Key". Read those shapes in addition to the
+  // explicit key names a custom config might use.
+  const accessKeyId = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "accessKeyId",
+    "access_key_id",
+    "username",
+  );
+  const secretAccessKey = pickAwsCredential(
+    credentials,
+    connectionConfig,
+    "secretAccessKey",
+    "secret_access_key",
+    "apiKey",
+    "password",
+  );
+  // Infer the auth method from the credential fields actually present instead
+  // of defaulting to iam_role: an aws-iam popup connection carries only the
+  // key pair, and assuming iam_role made every such connection fail on a
+  // missing role ARN.
+  const authMethod: "iam_role" | "access_key" | "cross_account" =
+    rawMethod === "access_key" ||
+    rawMethod === "cross_account" ||
+    rawMethod === "iam_role"
+      ? rawMethod
+      : roleArn
+        ? "iam_role"
+        : crossAccountRoleArn
+          ? "cross_account"
+          : accessKeyId && secretAccessKey
+            ? "access_key"
+            : "iam_role";
+  const reconnectHint =
+    "The authorized AWS account is missing the discovery fields NORIX needs (auth method, region, role ARN or access keys). Revoke this integration, click Connect, and enter the AWS credentials in the form.";
+  if (authMethod === "access_key" && (!accessKeyId || !secretAccessKey)) {
+    throw new Error(reconnectHint);
+  }
+  if (authMethod === "iam_role" && !roleArn) {
+    throw new Error(reconnectHint);
+  }
+  if (authMethod === "cross_account" && !crossAccountRoleArn) {
+    throw new Error(reconnectHint);
+  }
+  const values = {
+    name: "AWS",
+    authMethod,
+    region,
+    roleArn: roleArn || null,
+    externalId: externalId ? encryptSecret(externalId) : null,
+    crossAccountRoleArn: crossAccountRoleArn || null,
+    encryptedAccessKeyId: accessKeyId ? encryptSecret(accessKeyId) : null,
+    encryptedSecretAccessKey: secretAccessKey
+      ? encryptSecret(secretAccessKey)
+      : null,
+    updatedBy: userId,
+    updatedAt: new Date().toISOString(),
+  };
+  const existingId = (integration.configuration as { awsConnectionId?: string })
+    ?.awsConnectionId;
+  let row:
+    | typeof awsDiscoveryConnections.$inferSelect
+    | undefined;
+  if (existingId) {
+    [row] = await db
+      .update(awsDiscoveryConnections)
+      .set(values)
+      .where(
+        and(
+          eq(awsDiscoveryConnections.id, existingId),
+          eq(awsDiscoveryConnections.tenantId, tenantId),
+        ),
+      )
+      .returning();
+  }
+  if (!row) {
+    [row] = await db
+      .insert(awsDiscoveryConnections)
+      .values({ tenantId, ...values, createdBy: userId })
+      .returning();
+  }
+  await db
+    .update(integrations)
+    .set({
+      configuration: {
+        ...((integration.configuration as Record<string, unknown>) ?? {}),
+        awsConnectionId: row.id,
+        authMethod,
+        region,
+      },
+      isCredentialsAdded: true,
+      isEnabled: true,
+      errorMessage: null,
+      updatedBy: userId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(integrations.id, integrationId));
+  return { awsConnectionId: row.id };
 };
 
 export const deleteAwsConnection = async (

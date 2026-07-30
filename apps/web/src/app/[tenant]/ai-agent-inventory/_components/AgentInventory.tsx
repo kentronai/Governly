@@ -462,7 +462,7 @@ export function AgentInventory({
               >
                 {isLoading
                   ? "Loading agents…"
-                  : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or Kubernetes Cluster in Admin → Integrations."}
+                  : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or CrewAI in Admin → Integrations."}
               </TableCell>
             </TableRow>
           ) : (
@@ -587,14 +587,22 @@ export function AgentInventory({
         </TableBody>
       </Table>
 
-      <Pagination
-        page={page}
-        setPage={setPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        setPageSize={setPageSize}
-        isLoading={isLoading}
-      />
+      {/* Pagination hosts a Radix Select whose useId-based aria-controls differs
+          between the server HTML and the first client render, tripping a
+          hydration mismatch. Match the filter treatment above: render it only
+          after mount so both sides start from identical markup. */}
+      {mounted ? (
+        <Pagination
+          page={page}
+          setPage={setPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          isLoading={isLoading}
+        />
+      ) : (
+        <div className="h-9" />
+      )}
 
       <AgentDetailModal
         agent={activeAgent}

@@ -246,3 +246,5 @@ infra/aws/.ec2_instance_id
 
 .claude/
 .claude-flow/
+# Vendored clerk-js bundle served same-origin in dev (see clerk.provider.tsx)
+apps/web/public/clerk/

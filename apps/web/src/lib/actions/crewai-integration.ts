@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { agents, db, integrations, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret } from "@/lib/server/crypto";
+import { deleteConnection } from "@/lib/server/nango/client";
 import {
   CREWAI_DEFAULT_BASE_URL,
   normalizeCrewAIBaseUrl,
@@ -173,7 +174,6 @@ export async function triggerCrewAIDiscovery(tenantSlugOrId: string, id: string)
   for (const route of [
     "ai-agent-inventory",
     "ai-agent-discovery/dashboard",
-    "ai-agent-discovery/autonomy",
     "ai-agent-discovery/journey",
     "admin/integrations",
   ]) {
@@ -184,7 +184,15 @@ export async function triggerCrewAIDiscovery(tenantSlugOrId: string, id: string)
 
 export async function deleteCrewAIConnection(tenantSlugOrId: string, id: string) {
   const { tenantId, userId } = await context(tenantSlugOrId);
-  await connection(tenantId, id);
+  const row = await connection(tenantId, id);
+  // Best-effort: remove the credential from the Nango vault too.
+  if (row.nangoConnectionId && row.nangoProviderConfigKey) {
+    try {
+      await deleteConnection(row.nangoConnectionId, row.nangoProviderConfigKey);
+    } catch (error) {
+      console.error("Failed to delete Nango connection for CrewAI:", error);
+    }
+  }
   await db
     .delete(agents)
     .where(and(eq(agents.integrationId, id), eq(agents.tenantId, tenantId)));
@@ -193,6 +201,8 @@ export async function deleteCrewAIConnection(tenantSlugOrId: string, id: string)
     .set({
       configuration: {},
       credentialsEncrypted: null,
+      nangoConnectionId: null,
+      nangoProviderConfigKey: null,
       isCredentialsAdded: false,
       isEnabled: false,
       syncStatus: null,

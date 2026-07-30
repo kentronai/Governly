@@ -5,7 +5,7 @@
  * discovered by the Agent Registry, optionally linked to an Application.
  */
 
-import { db, agents, users, applications, tenants } from "@db";
+import { db, agents, users, applications, tenants, withDbRetry } from "@db";
 import { and, eq, desc, ilike, isNull, or, sql, count } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
@@ -53,21 +53,22 @@ export interface AgentApplicationOption {
 export const getAgentInventorySummary = async (
   tenantId: string,
 ): Promise<AgentInventorySummary> => {
-  const [[agentMetrics], [policyMetrics]] = await Promise.all([
-    db
-      .select({
-        totalAiAgents: count(),
-        criticalRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
-        highRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
-        unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
-        l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
-        l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
-      })
-      .from(agents)
-      .where(eq(agents.tenantId, tenantId)),
-    db
-      .select({
-        nonCompliantAgents: sql<number>`(
+  const [[agentMetrics], [policyMetrics]] = await withDbRetry(() =>
+    Promise.all([
+      db
+        .select({
+          totalAiAgents: count(),
+          criticalRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
+          highRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
+          unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
+          l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
+          l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
+        })
+        .from(agents)
+        .where(eq(agents.tenantId, tenantId)),
+      db
+        .select({
+          nonCompliantAgents: sql<number>`(
           select count(distinct ape.agent_id)
           from agent_policy_evaluations ape
           where ape.tenant_id = ${tenantId}
@@ -75,13 +76,13 @@ export const getAgentInventorySummary = async (
             and ape.is_active = true
             and ape.compliance_status = 'non_compliant'
         )`,
-        agentsWithOpenFindings: sql<number>`(
+          agentsWithOpenFindings: sql<number>`(
           select count(distinct pf.agent_id) from policy_findings pf
           where pf.tenant_id = ${tenantId}
             and pf.agent_id is not null
             and pf.status = 'open'
         )`,
-        agentsWithoutRuntimeEvidence: sql<number>`(
+          agentsWithoutRuntimeEvidence: sql<number>`(
           select count(*) from agents ag
           where ag.tenant_id = ${tenantId}
             and not exists (
@@ -91,11 +92,12 @@ export const getAgentInventorySummary = async (
                 and ol.guardrail_results is not null
             )
         )`,
-      })
-      .from(tenants)
-      .where(eq(tenants.id, tenantId))
-      .limit(1),
-  ]);
+        })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
+        .limit(1),
+    ]),
+  );
 
   return {
     totalAiAgents: Number(agentMetrics?.totalAiAgents ?? 0),
@@ -148,35 +150,36 @@ export const getAgents = cache(
 
     const whereClause = and(...conditions);
 
-    const [rows, [{ total }]] = await Promise.all([
-      db
-        .select({
-          id: agents.id,
-          externalAgentId: agents.externalAgentId,
-          name: agents.name,
-          platform: agents.platform,
-          region: agents.region,
-          accountId: agents.accountId,
-          applicationId: agents.applicationId,
-          applicationName: applications.name,
-          model: agents.model,
-          knowledgeBaseId: agents.knowledgeBaseId,
-          iamRoleArn: agents.iamRoleArn,
-          credentialType: agents.credentialType,
-          ownerUserId: agents.ownerUserId,
-          ownerName: owner.name,
-          ownerEmail: owner.email,
-          ownerConfidence: agents.ownerConfidence,
-          businessFunction: agents.businessFunction,
-          status: agents.status,
-          lastUsedAt: agents.lastUsedAt,
-          capabilities: agents.capabilities,
-          autonomyLevel: agents.autonomyLevel,
-          autonomyReason: agents.autonomyReason,
-          autonomyConfidence: agents.autonomyConfidence,
-          riskScore: agents.riskScore,
-          riskLevel: agents.riskLevel,
-          compliancePolicyName: sql<string | null>`(
+    const [rows, [{ total }]] = await withDbRetry(() =>
+      Promise.all([
+        db
+          .select({
+            id: agents.id,
+            externalAgentId: agents.externalAgentId,
+            name: agents.name,
+            platform: agents.platform,
+            region: agents.region,
+            accountId: agents.accountId,
+            applicationId: agents.applicationId,
+            applicationName: applications.name,
+            model: agents.model,
+            knowledgeBaseId: agents.knowledgeBaseId,
+            iamRoleArn: agents.iamRoleArn,
+            credentialType: agents.credentialType,
+            ownerUserId: agents.ownerUserId,
+            ownerName: owner.name,
+            ownerEmail: owner.email,
+            ownerConfidence: agents.ownerConfidence,
+            businessFunction: agents.businessFunction,
+            status: agents.status,
+            lastUsedAt: agents.lastUsedAt,
+            capabilities: agents.capabilities,
+            autonomyLevel: agents.autonomyLevel,
+            autonomyReason: agents.autonomyReason,
+            autonomyConfidence: agents.autonomyConfidence,
+            riskScore: agents.riskScore,
+            riskLevel: agents.riskLevel,
+            compliancePolicyName: sql<string | null>`(
           select ape.policy_name
           from agent_policy_evaluations ape
           where ape.agent_id = ${agents.id}
@@ -186,7 +189,7 @@ export const getAgents = cache(
           order by ape.evaluated_at desc
           limit 1
         )`,
-          complianceStatus: sql<string | null>`(
+            complianceStatus: sql<string | null>`(
           select ape.compliance_status
           from agent_policy_evaluations ape
           where ape.agent_id = ${agents.id}
@@ -196,7 +199,7 @@ export const getAgents = cache(
           order by ape.evaluated_at desc
           limit 1
         )`,
-          complianceCoverage: sql<number | null>`(
+            complianceCoverage: sql<number | null>`(
           select ape.coverage_score
           from agent_policy_evaluations ape
           where ape.agent_id = ${agents.id}
@@ -206,33 +209,34 @@ export const getAgents = cache(
           order by ape.evaluated_at desc
           limit 1
         )`,
-          openFindingCount: sql<number>`(
+            openFindingCount: sql<number>`(
           select count(*)
           from policy_findings pf
           where pf.agent_id = ${agents.id}
             and pf.tenant_id = ${tenantId}
             and pf.status = 'open'
         )`,
-          discoverySource: agents.discoverySource,
-          firstSeenAt: agents.firstSeenAt,
-          lastSeenAt: agents.lastSeenAt,
-          syncStatus: agents.syncStatus,
-          createdAt: agents.createdAt,
-          updatedAt: agents.updatedAt,
-        })
-        .from(agents)
-        .leftJoin(owner, eq(agents.ownerUserId, owner.id))
-        .leftJoin(applications, eq(agents.applicationId, applications.id))
-        .where(whereClause)
-        .orderBy(desc(agents.riskScore), desc(agents.lastSeenAt))
-        .limit(pageSize)
-        .offset(offset),
-      db
-        .select({ total: count() })
-        .from(agents)
-        .leftJoin(owner, eq(agents.ownerUserId, owner.id))
-        .where(whereClause),
-    ]);
+            discoverySource: agents.discoverySource,
+            firstSeenAt: agents.firstSeenAt,
+            lastSeenAt: agents.lastSeenAt,
+            syncStatus: agents.syncStatus,
+            createdAt: agents.createdAt,
+            updatedAt: agents.updatedAt,
+          })
+          .from(agents)
+          .leftJoin(owner, eq(agents.ownerUserId, owner.id))
+          .leftJoin(applications, eq(agents.applicationId, applications.id))
+          .where(whereClause)
+          .orderBy(desc(agents.riskScore), desc(agents.lastSeenAt))
+          .limit(pageSize)
+          .offset(offset),
+        db
+          .select({ total: count() })
+          .from(agents)
+          .leftJoin(owner, eq(agents.ownerUserId, owner.id))
+          .where(whereClause),
+      ]),
+    );
 
     return {
       rows,
@@ -246,39 +250,43 @@ export const getAgents = cache(
 
 export const getAgentDetail = cache(
   async (tenantId: string, agentId: string) => {
-    const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
-      with: {
-        agentResources: true,
-        agentRecommendations: {
-          orderBy: (t, { desc }) => [desc(t.createdAt)],
+    const agent = await withDbRetry(() =>
+      db.query.agents.findFirst({
+        where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+        with: {
+          agentResources: true,
+          agentRecommendations: {
+            orderBy: (t, { desc }) => [desc(t.createdAt)],
+          },
+          owner: { columns: { id: true, name: true, email: true } },
+          application: { columns: { id: true, name: true } },
+          policyEvaluations: {
+            where: (rows, { eq }) => eq(rows.isActive, true),
+            orderBy: (rows, { desc }) => [desc(rows.evaluatedAt)],
+          },
+          policyFindings: {
+            where: (rows, { eq }) => eq(rows.status, "open"),
+            orderBy: (rows, { desc }) => [desc(rows.lastDetectedAt)],
+          },
         },
-        owner: { columns: { id: true, name: true, email: true } },
-        application: { columns: { id: true, name: true } },
-        policyEvaluations: {
-          where: (rows, { eq }) => eq(rows.isActive, true),
-          orderBy: (rows, { desc }) => [desc(rows.evaluatedAt)],
-        },
-        policyFindings: {
-          where: (rows, { eq }) => eq(rows.status, "open"),
-          orderBy: (rows, { desc }) => [desc(rows.lastDetectedAt)],
-        },
-      },
-    });
+      }),
+    );
     return agent ?? null;
   },
 );
 
 export const getAgentFilterOptions = cache(async (tenantId: string) => {
-  const rows = await db
-    .select({
-      platform: agents.platform,
-      riskLevel: agents.riskLevel,
-      autonomyLevel: agents.autonomyLevel,
-      status: agents.status,
-    })
-    .from(agents)
-    .where(eq(agents.tenantId, tenantId));
+  const rows = await withDbRetry(() =>
+    db
+      .select({
+        platform: agents.platform,
+        riskLevel: agents.riskLevel,
+        autonomyLevel: agents.autonomyLevel,
+        status: agents.status,
+      })
+      .from(agents)
+      .where(eq(agents.tenantId, tenantId)),
+  );
 
   const uniq = <T>(values: (T | null)[]) =>
     Array.from(new Set(values.filter(Boolean) as T[]));
@@ -293,16 +301,18 @@ export const getAgentFilterOptions = cache(async (tenantId: string) => {
 
 export const getAgentApplicationOptions = cache(
   async (tenantId: string): Promise<AgentApplicationOption[]> =>
-    db
-      .select({ id: applications.id, name: applications.name })
-      .from(applications)
-      .where(
-        and(
-          eq(applications.tenantId, tenantId),
-          isNull(applications.deletedAt),
-        ),
-      )
-      .orderBy(applications.name),
+    withDbRetry(() =>
+      db
+        .select({ id: applications.id, name: applications.name })
+        .from(applications)
+        .where(
+          and(
+            eq(applications.tenantId, tenantId),
+            isNull(applications.deletedAt),
+          ),
+        )
+        .orderBy(applications.name),
+    ),
 );
 
 export const getAgentInventoryInitialData = cache(

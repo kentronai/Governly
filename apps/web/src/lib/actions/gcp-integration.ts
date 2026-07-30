@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { agents, db, integrations, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret } from "@/lib/server/crypto";
+import { deleteConnection } from "@/lib/server/nango/client";
 import {
   runGoogleCloudDiscoveryScan,
   testGoogleCloudConnection,
@@ -181,7 +182,6 @@ export async function triggerGoogleCloudDiscovery(
   for (const route of [
     "ai-agent-inventory",
     "ai-agent-discovery/dashboard",
-    "ai-agent-discovery/autonomy",
     "ai-agent-discovery/journey",
     "admin/integrations",
   ]) {
@@ -195,15 +195,26 @@ export async function deleteGoogleCloudConnection(
   id: string,
 ) {
   const { tenantId, userId } = await context(tenantSlugOrId);
-  await connection(tenantId, id);
+  const row = await connection(tenantId, id);
   await db
     .delete(agents)
     .where(and(eq(agents.integrationId, id), eq(agents.tenantId, tenantId)));
+  // If the account was authorized through Nango, remove the vaulted credential
+  // too so nothing is left behind on revoke.
+  if (row.nangoConnectionId && row.nangoProviderConfigKey) {
+    try {
+      await deleteConnection(row.nangoConnectionId, row.nangoProviderConfigKey);
+    } catch (error) {
+      console.error("Failed to delete Nango connection:", error);
+    }
+  }
   await db
     .update(integrations)
     .set({
       configuration: {},
       credentialsEncrypted: null,
+      nangoConnectionId: null,
+      nangoProviderConfigKey: null,
       isCredentialsAdded: false,
       isEnabled: false,
       syncStatus: null,

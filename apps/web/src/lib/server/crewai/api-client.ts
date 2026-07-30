@@ -7,12 +7,32 @@
  * kept overridable for self-hosted installs.
  */
 
-export interface CrewAICredentials {
+import { proxy, NangoError } from "@/lib/server/nango/client";
+
+/**
+ * CrewAI access, resolved two ways:
+ *  - `direct`: NORIX holds the Bearer token (legacy / pre-Nango rows).
+ *  - `nango`:  the token lives in the self-hosted Nango vault; calls go through
+ *    the Nango Proxy which injects it. Both carry the API `baseUrl`.
+ */
+export interface CrewAIDirectCredentials {
+  mode?: "direct";
   /** API base, e.g. https://app.crewai.com. No trailing slash, no path. */
   baseUrl: string;
   /** Bearer access token. */
   accessToken: string;
 }
+
+export interface CrewAINangoCredentials {
+  mode: "nango";
+  baseUrl: string;
+  connectionId: string;
+  providerConfigKey: string;
+}
+
+export type CrewAICredentials =
+  | CrewAIDirectCredentials
+  | CrewAINangoCredentials;
 
 /** Default base for the managed CrewAI Enterprise / AMP cloud. */
 export const CREWAI_DEFAULT_BASE_URL = "https://app.crewai.com";
@@ -88,10 +108,44 @@ export function describeCrewAIFetchFailure(error: unknown): string {
   return parts.join(" <- ") || String(error);
 }
 
+/** CrewAI GET via the Nango Proxy — Nango injects the stored Bearer token. */
+async function crewaiApiViaNango<T>(
+  credentials: CrewAINangoCredentials,
+  path: string,
+): Promise<T> {
+  try {
+    const response = await proxy<T & { error?: string; message?: string }>({
+      connectionId: credentials.connectionId,
+      providerConfigKey: credentials.providerConfigKey,
+      method: "GET",
+      endpoint: path,
+      baseUrlOverride: credentials.baseUrl,
+    });
+    return response.data as T;
+  } catch (error) {
+    if (error instanceof NangoError) {
+      const body = (error.body ?? {}) as { error?: string; message?: string };
+      throw new CrewAIApiError(
+        body.message ||
+          body.error ||
+          `CrewAI API returned HTTP ${error.status}`,
+        error.status,
+      );
+    }
+    throw new Error(
+      `CrewAI request to ${path} failed: ${describeCrewAIFetchFailure(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 export async function crewaiApi<T>(
   credentials: CrewAICredentials,
   path: string,
 ): Promise<T> {
+  if (credentials.mode === "nango") {
+    return crewaiApiViaNango<T>(credentials, path);
+  }
   const url = `${credentials.baseUrl}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);

@@ -43,48 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  addEncryptedIntegrationCredentials,
-  addIntegrationCredentials,
-  fetchIntegrations,
-  removeIntegrationCredentials,
-  type Integration,
-} from "@/lib/api/integrations";
-import {
-  createAwsConnection,
-  deleteAwsConnection,
-  testAwsIntegrationConnection,
-} from "@/lib/actions/aws-integration";
-import { triggerManualScan } from "@/lib/actions/aws-discovery";
-import {
-  createAzureConnection,
-  deleteAzureConnection,
-  testAzureIntegrationConnection,
-  triggerAzureDiscovery,
-} from "@/lib/actions/azure-integration";
-import {
-  createGoogleCloudConnection,
-  deleteGoogleCloudConnection,
-  testGoogleCloudIntegrationConnection,
-  triggerGoogleCloudDiscovery,
-} from "@/lib/actions/gcp-integration";
-import {
-  createDatabricksConnection,
-  deleteDatabricksConnection,
-  testDatabricksIntegrationConnection,
-  triggerDatabricksDiscovery,
-} from "@/lib/actions/databricks-integration";
-import {
-  createKubernetesConnection,
-  deleteKubernetesConnection,
-  triggerKubernetesDiscovery,
-} from "@/lib/actions/kubernetes-integration";
-import {
-  createCrewAIConnection,
-  deleteCrewAIConnection,
-  testCrewAIIntegrationConnection,
-  triggerCrewAIDiscovery,
-} from "@/lib/actions/crewai-integration";
+import type { Integration } from "@/lib/api/integrations";
+import { NangoConnectButton } from "@/components/integrations/NangoConnectButton";
 
 const CATEGORY_LABELS: Record<string, string> = {
   data_platforms: "Data Platforms",
@@ -99,16 +59,34 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
-const KUBERNETES_CLUSTER = "Kubernetes Cluster";
 const CREWAI = "CrewAI";
 const DISCOVERY_INTEGRATIONS = new Set([
   "AWS",
   "Azure",
   "Google Cloud",
   DATABRICKS_UNITY_CATALOG,
-  KUBERNETES_CLUSTER,
   CREWAI,
 ]);
+
+// Discovery providers connect through the self-hosted Nango Connect popup.
+// Each key maps to a provider config that exists on the Nango server and whose
+// popup collects every field discovery needs:
+//   aws        -> aws-iam                 (access key/secret + region)
+//   azure      -> azure-service-principal (client id/secret + tenant/subscription)
+//   google     -> google-service-account  (SA email + private key)
+//   databricks -> databricks-workspace    (instance + OAuth client credentials)
+//   crewai     -> private-api-bearer      (AMP bearer token)
+// After the popup succeeds, NORIX records the connection (webhook-independent,
+// see /api/integrations/action `nangoConnected`), reads the vaulted credential
+// back, and immediately runs its own discovery engine so agents land in the
+// Agent Inventory without any further step.
+const NANGO_PROVIDERS: Record<string, { providerConfigKey: string }> = {
+  AWS: { providerConfigKey: "aws" },
+  Azure: { providerConfigKey: "azure" },
+  "Google Cloud": { providerConfigKey: "google" },
+  [DATABRICKS_UNITY_CATALOG]: { providerConfigKey: "databricks" },
+  [CREWAI]: { providerConfigKey: "crewai" },
+};
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
 
@@ -130,10 +108,6 @@ type CredentialState = {
   azureClientSecret: string;
   gcpProjectId: string;
   gcpServiceAccountJson: string;
-  kubernetesClusterName: string;
-  kubernetesApiServer: string;
-  kubernetesBearerToken: string;
-  kubernetesCaCertificate: string;
 };
 
 const EMPTY_CREDENTIALS: CredentialState = {
@@ -154,10 +128,6 @@ const EMPTY_CREDENTIALS: CredentialState = {
   azureClientSecret: "",
   gcpProjectId: "",
   gcpServiceAccountJson: "",
-  kubernetesClusterName: "",
-  kubernetesApiServer: "",
-  kubernetesBearerToken: "",
-  kubernetesCaCertificate: "",
 };
 
 function formatUtc(value: string): string {
@@ -165,6 +135,39 @@ function formatUtc(value: string): string {
   return Number.isNaN(date.getTime())
     ? value
     : `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+async function fetchIntegrations(tenantSlugOrId: string): Promise<Integration[]> {
+  const response = await fetch(
+    `/api/integrations?tenant=${encodeURIComponent(tenantSlugOrId)}`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(body.error || "Integrations could not be loaded");
+  }
+  const body = (await response.json()) as { integrations?: Integration[] };
+  return body.integrations ?? [];
+}
+
+async function runIntegrationAction<T>(
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  const response = await fetch("/api/integrations/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(body.error || "Integration action failed");
+  }
+  return body as T;
 }
 
 function IntegrationLogo({ integration }: { integration: Integration }) {
@@ -296,6 +299,47 @@ export default function IntegrationsPage() {
     setCredentials(EMPTY_CREDENTIALS);
   };
 
+  // After the Nango popup succeeds: record the connection server-side (pull
+  // from Nango directly — no webhook dependency), then run discovery so agents
+  // appear in the Agent Inventory immediately.
+  const handleNangoConnected = async (
+    integration: Integration,
+    connectionId?: string,
+  ) => {
+    if (!tenant?.id) return;
+    setRunning(integration.id);
+    try {
+      const result = await runIntegrationAction<{
+        status: "completed" | "failed";
+        agentsDiscovered: number;
+        errorMessage?: string;
+      }>("nangoConnected", {
+        tenantSlugOrId: tenant.id,
+        integrationId: integration.id,
+        providerName: integration.name,
+        connectionId,
+      });
+      if (result?.status === "failed") {
+        throw new Error(result.errorMessage || "Discovery failed");
+      }
+      successToast(
+        "",
+        "",
+        "",
+        `${integration.name} connected — ${result?.agentsDiscovered ?? 0} agents discovered`,
+      );
+    } catch (error) {
+      errorToast(
+        error instanceof Error
+          ? error.message
+          : "Connected, but discovery could not be started",
+      );
+    } finally {
+      setRunning(null);
+      await load();
+    }
+  };
+
   const valid = useMemo(() => {
     if (!selected) return false;
     if (selected.name === "AWS") {
@@ -332,14 +376,6 @@ export default function IntegrationsPage() {
     if (selected.name === CREWAI) {
       return Boolean(credentials.apiKey.trim());
     }
-    if (selected.name === KUBERNETES_CLUSTER) {
-      return Boolean(
-        credentials.kubernetesClusterName.trim() &&
-          credentials.kubernetesApiServer.trim() &&
-          credentials.kubernetesBearerToken.trim() &&
-          credentials.kubernetesCaCertificate.trim(),
-      );
-    }
     if (selected.name === "Snowflake") {
       return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
     }
@@ -357,8 +393,14 @@ export default function IntegrationsPage() {
     setSaving(true);
     try {
       if (selected.name === "AWS") {
-        const connection = await createAwsConnection({
+        const scan = await runIntegrationAction<{
+          status: "completed" | "failed";
+          agentsDiscovered: number;
+          errorMessage?: string;
+          optionalNotice?: string;
+        }>("connectAws", {
           tenantSlug: tenant.id,
+          integrationId: selected.id,
           name: "AWS",
           authMethod: credentials.awsMethod,
           region: credentials.awsRegion.trim(),
@@ -369,18 +411,7 @@ export default function IntegrationsPage() {
           accessKeyId: credentials.awsAccessKeyId.trim() || undefined,
           secretAccessKey: credentials.awsSecretAccessKey.trim() || undefined,
         });
-        const tested = await testAwsIntegrationConnection(
-          tenant.id,
-          connection.id,
-        );
-        if (!tested.ok) throw new Error(tested.error);
-        await addIntegrationCredentials(tenant.id, selected.id, {
-          authMethod: credentials.awsMethod,
-          region: credentials.awsRegion.trim(),
-          awsConnectionId: connection.id,
-        });
         setRunning(selected.id);
-        const scan = await triggerManualScan(tenant.id, connection.id);
         if (scan.status === "failed")
           throw new Error(scan.errorMessage || "AWS discovery failed");
         if (scan.optionalNotice) {
@@ -399,25 +430,19 @@ export default function IntegrationsPage() {
           );
         }
       } else if (selected.name === "Azure") {
-        const connection = await createAzureConnection({
+        const scan = await runIntegrationAction<{
+          status: "completed" | "failed";
+          agentsDiscovered: number;
+          errorMessage?: string;
+        }>("connectAzure", {
           tenantSlugOrId: tenant.id,
+          integrationId: selected.id,
           azureTenantId: credentials.azureTenantId.trim(),
           subscriptionId: credentials.azureSubscriptionId.trim(),
           clientId: credentials.azureClientId.trim(),
           clientSecret: credentials.azureClientSecret,
         });
-        const tested = await testAzureIntegrationConnection(
-          tenant.id,
-          connection.id,
-        );
-        if (!tested.ok) throw new Error(tested.error);
-        await addIntegrationCredentials(tenant.id, selected.id, {
-          azureConnectionId: connection.id,
-          subscriptionId: connection.subscriptionId,
-          authentication: "service_principal",
-        });
         setRunning(selected.id);
-        const scan = await triggerAzureDiscovery(tenant.id, connection.id);
         if (scan.status === "failed")
           throw new Error(scan.errorMessage || "Azure discovery failed");
         successToast(
@@ -427,21 +452,17 @@ export default function IntegrationsPage() {
           `Azure connected — ${scan.agentsDiscovered} agents discovered`,
         );
       } else if (selected.name === "Google Cloud") {
-        const connection = await createGoogleCloudConnection({
+        const scan = await runIntegrationAction<{
+          status: "completed" | "failed";
+          agentsDiscovered: number;
+          errorMessage?: string;
+        }>("connectGoogleCloud", {
           tenantSlugOrId: tenant.id,
+          integrationId: selected.id,
           projectId: credentials.gcpProjectId.trim(),
           serviceAccountJson: credentials.gcpServiceAccountJson,
         });
-        const tested = await testGoogleCloudIntegrationConnection(
-          tenant.id,
-          connection.id,
-        );
-        if (!tested.ok) throw new Error(tested.error);
         setRunning(selected.id);
-        const scan = await triggerGoogleCloudDiscovery(
-          tenant.id,
-          connection.id,
-        );
         if (scan.status === "failed")
           throw new Error(scan.errorMessage || "Google Cloud discovery failed");
         successToast(
@@ -451,18 +472,18 @@ export default function IntegrationsPage() {
           `Google Cloud connected — ${scan.agentsDiscovered} agents discovered`,
         );
       } else if (selected.name === DATABRICKS_UNITY_CATALOG) {
-        const connection = await createDatabricksConnection({
+        const scan = await runIntegrationAction<{
+          status: "completed" | "failed";
+          agentsDiscovered: number;
+          errorMessage?: string;
+          resourcesScanned?: Record<string, number>;
+        }>("connectDatabricks", {
           tenantSlugOrId: tenant.id,
+          integrationId: selected.id,
           workspaceUrl: credentials.hostUrl,
           accessToken: credentials.apiKey,
         });
-        const tested = await testDatabricksIntegrationConnection(
-          tenant.id,
-          connection.id,
-        );
-        if (!tested.ok) throw new Error(tested.error);
         setRunning(selected.id);
-        const scan = await triggerDatabricksDiscovery(tenant.id, connection.id);
         if (scan.status === "failed") {
           throw new Error(scan.errorMessage || "Databricks discovery failed");
         }
@@ -471,24 +492,23 @@ export default function IntegrationsPage() {
           "",
           "",
           `Databricks Unity Catalog connected — ${scan.agentsDiscovered} agents and ${Object.values(
-            scan.resourcesScanned,
+            scan.resourcesScanned ?? {},
           ).reduce(
             (sum, count) => sum + Number(count),
             0,
           )} Unity Catalog resources discovered`,
         );
       } else if (selected.name === CREWAI) {
-        const connection = await createCrewAIConnection({
+        const scan = await runIntegrationAction<{
+          status: "completed" | "failed";
+          agentsDiscovered: number;
+          errorMessage?: string;
+        }>("connectCrewAI", {
           tenantSlugOrId: tenant.id,
+          integrationId: selected.id,
           accessToken: credentials.apiKey,
         });
-        const tested = await testCrewAIIntegrationConnection(
-          tenant.id,
-          connection.id,
-        );
-        if (!tested.ok) throw new Error(tested.error);
         setRunning(selected.id);
-        const scan = await triggerCrewAIDiscovery(tenant.id, connection.id);
         if (scan.status === "failed") {
           throw new Error(scan.errorMessage || "CrewAI discovery failed");
         }
@@ -497,26 +517,6 @@ export default function IntegrationsPage() {
           "",
           "",
           `CrewAI connected — ${scan.agentsDiscovered} deployed crews discovered`,
-        );
-      } else if (selected.name === KUBERNETES_CLUSTER) {
-        const connection = await createKubernetesConnection({
-          tenantSlugOrId: tenant.id,
-          integrationId: selected.id,
-          clusterName: credentials.kubernetesClusterName.trim(),
-          apiServer: credentials.kubernetesApiServer.trim(),
-          bearerToken: credentials.kubernetesBearerToken,
-          caCertificate: credentials.kubernetesCaCertificate,
-        });
-        setRunning(selected.id);
-        const scan = await triggerKubernetesDiscovery(tenant.id, connection.id);
-        if (scan.status === "failed") {
-          throw new Error(scan.errorMessage || "Kubernetes discovery failed");
-        }
-        successToast(
-          "",
-          "",
-          "",
-          `Kubernetes Cluster connected — ${scan.agentsDiscovered} agents discovered`,
         );
       } else {
         let secret: Record<string, unknown>;
@@ -530,11 +530,11 @@ export default function IntegrationsPage() {
         } else {
           secret = JSON.parse(credentials.json);
         }
-        await addEncryptedIntegrationCredentials(
-          tenant.id,
-          selected.id,
-          secret,
-        );
+        await runIntegrationAction("saveEncryptedCredentials", {
+          tenantSlugOrId: tenant.id,
+          integrationId: selected.id,
+          credentials: secret,
+        });
         successToast("", "Integration", "connected");
       }
       setDialogOpen(false);
@@ -557,25 +557,12 @@ export default function IntegrationsPage() {
   const revoke = async (integration: Integration) => {
     if (!tenant?.id) return;
     try {
-      if (integration.name === "AWS") {
-        const connectionId = integration.configuration.awsConnectionId;
-        if (connectionId) await deleteAwsConnection(tenant.id, connectionId);
-        await removeIntegrationCredentials(tenant.id, integration.id);
-      } else if (integration.name === "Azure") {
-        const connectionId = integration.configuration.azureConnectionId;
-        if (connectionId) await deleteAzureConnection(tenant.id, connectionId);
-        await removeIntegrationCredentials(tenant.id, integration.id);
-      } else if (integration.name === "Google Cloud") {
-        await deleteGoogleCloudConnection(tenant.id, integration.id);
-      } else if (integration.name === DATABRICKS_UNITY_CATALOG) {
-        await deleteDatabricksConnection(tenant.id, integration.id);
-      } else if (integration.name === KUBERNETES_CLUSTER) {
-        await deleteKubernetesConnection(tenant.id, integration.id);
-      } else if (integration.name === CREWAI) {
-        await deleteCrewAIConnection(tenant.id, integration.id);
-      } else {
-        await removeIntegrationCredentials(tenant.id, integration.id);
-      }
+      await runIntegrationAction("revoke", {
+        tenantSlugOrId: tenant.id,
+        integrationId: integration.id,
+        providerName: integration.name,
+        configuration: integration.configuration,
+      });
       successToast("", "Integration", "connection revoked");
       await load();
     } catch (error) {
@@ -596,23 +583,12 @@ export default function IntegrationsPage() {
             errorMessage?: string;
           }
         | undefined;
-      if (integration.name === "AWS") {
-        const id = integration.configuration.awsConnectionId;
-        if (!id) throw new Error("AWS connection is missing");
-        result = await triggerManualScan(tenant.id, id);
-      } else if (integration.name === "Azure") {
-        const id = integration.configuration.azureConnectionId;
-        if (!id) throw new Error("Azure connection is missing");
-        result = await triggerAzureDiscovery(tenant.id, id);
-      } else if (integration.name === "Google Cloud") {
-        result = await triggerGoogleCloudDiscovery(tenant.id, integration.id);
-      } else if (integration.name === DATABRICKS_UNITY_CATALOG) {
-        result = await triggerDatabricksDiscovery(tenant.id, integration.id);
-      } else if (integration.name === KUBERNETES_CLUSTER) {
-        result = await triggerKubernetesDiscovery(tenant.id, integration.id);
-      } else if (integration.name === CREWAI) {
-        result = await triggerCrewAIDiscovery(tenant.id, integration.id);
-      }
+      result = await runIntegrationAction("runDiscovery", {
+        tenantSlugOrId: tenant.id,
+        integrationId: integration.id,
+        providerName: integration.name,
+        configuration: integration.configuration,
+      });
       if (!result) return;
       if (result.status === "failed")
         throw new Error(result.errorMessage || "Discovery failed");
@@ -764,15 +740,17 @@ export default function IntegrationsPage() {
               const hasDetails =
                 Boolean(integration.lastSyncAt) ||
                 Boolean(integration.errorMessage);
-              const connectionFailed = integration.syncStatus === "failed";
-              const connectionPending = integration.syncStatus === "pending";
+              const hasProviderConnection =
+                integration.isCredentialsAdded ||
+                Boolean(integration.nangoConnectionId);
+              const connectionFailed =
+                !hasProviderConnection && integration.syncStatus === "failed";
+              const connectionPending =
+                !hasProviderConnection && integration.syncStatus === "pending";
               const partialWarning =
                 integration.syncStatus === "success" &&
                 Boolean(integration.errorMessage);
-              const connected =
-                integration.isCredentialsAdded &&
-                !connectionFailed &&
-                !connectionPending;
+              const connected = hasProviderConnection && !connectionFailed;
 
               return (
                 <Card
@@ -845,13 +823,44 @@ export default function IntegrationsPage() {
                   <CardFooter className="justify-start gap-3 px-4 py-3">
                     <div className="flex flex-wrap gap-2">
                       {!connected ? (
-                        <Button
-                          size="sm"
-                          className="h-8"
-                          onClick={() => openCredentials(integration)}
-                        >
-                          {connectionFailed ? "Reconnect" : "Add credentials"}
-                        </Button>
+                        NANGO_PROVIDERS[integration.name] ? (
+                          <NangoConnectButton
+                            tenant={tenant?.id ?? ""}
+                            integrationId={integration.id}
+                            providerConfigKey={
+                              NANGO_PROVIDERS[integration.name]
+                                .providerConfigKey
+                            }
+                            size="sm"
+                            className="h-8"
+                            disabled={running === integration.id}
+                            onConnected={(connectionId) =>
+                              void handleNangoConnected(
+                                integration,
+                                connectionId,
+                              )
+                            }
+                          >
+                            {running === integration.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Discovering…
+                              </>
+                            ) : connectionFailed ? (
+                              "Reconnect"
+                            ) : (
+                              "Connect"
+                            )}
+                          </NangoConnectButton>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-8"
+                            onClick={() => openCredentials(integration)}
+                          >
+                            {connectionFailed ? "Reconnect" : "Connect"}
+                          </Button>
+                        )
                       ) : (
                         <>
                           {DISCOVERY_INTEGRATIONS.has(integration.name) ? (
@@ -899,9 +908,7 @@ export default function IntegrationsPage() {
         <DialogContent className="max-h-[88vh] overflow-hidden p-0 sm:max-w-lg dialog-content">
           <div className="flex max-h-[88vh] flex-col p-6">
             <DialogHeader className="mb-4">
-              <DialogTitle>
-                Add {selected?.name} credentials
-              </DialogTitle>
+              <DialogTitle>Add {selected?.name} credentials</DialogTitle>
               <DialogDescription className="sr-only">
                 Add credentials, verify provider access, and save the
                 integration.
@@ -1067,10 +1074,9 @@ export default function IntegrationsPage() {
                     <Info className="h-4 w-4" />
                     <AlertTitle>Google Cloud service account</AlertTitle>
                     <AlertDescription className="text-xs leading-5">
-                      Grant Cloud Asset Viewer and Project Viewer. NORIX
-                      discovers Vertex AI Agent Engine plus identified agent
-                      workloads on Cloud Run, Compute Engine, GKE, and Cloud
-                      Functions.
+                      Grant Cloud Asset Viewer access. NORIX discovers Vertex
+                      AI Agent Engine plus identified agent workloads on Cloud
+                      Run, Compute Engine, GKE, and Cloud Functions.
                     </AlertDescription>
                   </Alert>
                   <FormField label="Project ID" required>
@@ -1079,13 +1085,13 @@ export default function IntegrationsPage() {
                       onChange={(event) =>
                         setCredential("gcpProjectId", event.target.value)
                       }
-                      placeholder="my-production-project"
+                      placeholder="my-project-id"
                     />
                   </FormField>
                   <FormField
                     label="Service Account JSON"
                     required
-                    help="The complete downloaded JSON key. It is encrypted before storage."
+                    help="Paste the full key JSON. Stored encrypted; never returned to the browser."
                   >
                     <Textarea
                       rows={6}
@@ -1101,6 +1107,51 @@ export default function IntegrationsPage() {
                     />
                   </FormField>
                 </>
+              ) : selected?.name === DATABRICKS_UNITY_CATALOG ? (
+                <>
+                  <FormField
+                    label="Workspace URL"
+                    required
+                    help="Use the workspace root URL. Do not include /api or another path."
+                  >
+                    <Input
+                      value={credentials.hostUrl}
+                      onChange={(event) =>
+                        setCredential("hostUrl", event.target.value)
+                      }
+                      placeholder="https://dbc-12345678-abcd.cloud.databricks.com"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Access Token"
+                    required
+                    help="Personal access token with workspace read access. Stored encrypted."
+                  >
+                    <Input
+                      type="password"
+                      value={credentials.apiKey}
+                      onChange={(event) =>
+                        setCredential("apiKey", event.target.value)
+                      }
+                      autoComplete="new-password"
+                    />
+                  </FormField>
+                </>
+              ) : selected?.name === CREWAI ? (
+                <FormField
+                  label="Access Token"
+                  required
+                  help="CrewAI Enterprise (AMP) personal access token. Stored encrypted."
+                >
+                  <Input
+                    type="password"
+                    value={credentials.apiKey}
+                    onChange={(event) =>
+                      setCredential("apiKey", event.target.value)
+                    }
+                    autoComplete="new-password"
+                  />
+                </FormField>
               ) : selected &&
                 ["OpenAI", "Anthropic", "Cohere"].includes(selected.name) ? (
                 <FormField
@@ -1117,150 +1168,6 @@ export default function IntegrationsPage() {
                     autoComplete="new-password"
                   />
                 </FormField>
-              ) : selected?.name === DATABRICKS_UNITY_CATALOG ? (
-                <>
-                  <Alert className="py-3">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Databricks Unity Catalog</AlertTitle>
-                    <AlertDescription className="text-xs leading-5">
-                      NORIX validates the workspace, then discovers Mosaic AI
-                      and Responses agents on Model Serving, Databricks Apps,
-                      Genie Agents, agent Jobs, referenced notebooks, and their
-                      Unity Catalog models and data. The token needs read access
-                      to Unity Catalog, Model Serving, Apps, Genie, Jobs, and
-                      Workspace.
-                    </AlertDescription>
-                  </Alert>
-                  <FormField
-                    label="Workspace URL"
-                    required
-                    help="Use the workspace root URL. Do not include /api or another path."
-                  >
-                    <Input
-                      value={credentials.hostUrl}
-                      onChange={(event) =>
-                        setCredential("hostUrl", event.target.value)
-                      }
-                      placeholder="https://dbc-12345678-abcd.cloud.databricks.com"
-                    />
-                  </FormField>
-                  <FormField
-                    label="Personal Access Token"
-                    required
-                    help="Encrypted before storage and never returned to the browser."
-                  >
-                    <Input
-                      type="password"
-                      value={credentials.apiKey}
-                      onChange={(event) =>
-                        setCredential("apiKey", event.target.value)
-                      }
-                      autoComplete="new-password"
-                    />
-                  </FormField>
-                </>
-              ) : selected?.name === CREWAI ? (
-                <>
-                  <Alert className="py-3">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>CrewAI Enterprise</AlertTitle>
-                    <AlertDescription className="text-xs leading-5">
-                      Paste a CrewAI Enterprise (AMP) access token with
-                      read access to your organization&apos;s deployments. NORIX
-                      lists every deployed crew and governs each as an
-                      autonomous multi-agent workload. Create a token in CrewAI
-                      under Settings → API keys.
-                    </AlertDescription>
-                  </Alert>
-                  <FormField
-                    label="Access Token"
-                    required
-                    help="Encrypted before storage and never returned to the browser."
-                  >
-                    <Input
-                      type="password"
-                      value={credentials.apiKey}
-                      onChange={(event) =>
-                        setCredential("apiKey", event.target.value)
-                      }
-                      autoComplete="new-password"
-                      placeholder="crewai_..."
-                    />
-                  </FormField>
-                </>
-              ) : selected?.name === KUBERNETES_CLUSTER ? (
-                <>
-                  <Alert className="py-3">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Kubernetes cluster access</AlertTitle>
-                    <AlertDescription className="text-xs leading-5">
-                      Connect a cluster-scoped service account that can read
-                      Deployments, StatefulSets, Jobs, Pods, Services,
-                      Namespaces, and labels. NORIX uses this runtime
-                      integration for Kubernetes-hosted agent workloads.
-                    </AlertDescription>
-                  </Alert>
-                  <FormField label="Cluster Name" required>
-                    <Input
-                      value={credentials.kubernetesClusterName}
-                      onChange={(event) =>
-                        setCredential(
-                          "kubernetesClusterName",
-                          event.target.value,
-                        )
-                      }
-                      placeholder="prod-agents-cluster"
-                    />
-                  </FormField>
-                  <FormField
-                    label="API Server URL"
-                    required
-                    help="Use the Kubernetes API server endpoint for this cluster."
-                  >
-                    <Input
-                      value={credentials.kubernetesApiServer}
-                      onChange={(event) =>
-                        setCredential("kubernetesApiServer", event.target.value)
-                      }
-                      placeholder="https://kubernetes.example.com:6443"
-                    />
-                  </FormField>
-                  <FormField
-                    label="Bearer Token"
-                    required
-                    help="Stored encrypted and never returned to the browser."
-                  >
-                    <Input
-                      type="password"
-                      value={credentials.kubernetesBearerToken}
-                      onChange={(event) =>
-                        setCredential(
-                          "kubernetesBearerToken",
-                          event.target.value,
-                        )
-                      }
-                      autoComplete="new-password"
-                    />
-                  </FormField>
-                  <FormField
-                    label="Cluster CA Certificate"
-                    required
-                    help="Paste the PEM certificate for the Kubernetes API server CA."
-                  >
-                    <Textarea
-                      rows={4}
-                      value={credentials.kubernetesCaCertificate}
-                      onChange={(event) =>
-                        setCredential(
-                          "kubernetesCaCertificate",
-                          event.target.value,
-                        )
-                      }
-                      placeholder="-----BEGIN CERTIFICATE-----"
-                      className="font-mono text-xs"
-                    />
-                  </FormField>
-                </>
               ) : selected?.name === "Snowflake" ? (
                 <>
                   <FormField label="Host URL" required>
@@ -1319,7 +1226,7 @@ export default function IntegrationsPage() {
                 {saving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Save
+                Connect
               </Button>
             </DialogFooter>
           </div>

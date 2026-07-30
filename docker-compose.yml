@@ -47,6 +47,10 @@ services:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Creates the separate `nango` database on first init so self-hosted
+      # Nango can share this postgres server. Runs only on a fresh volume;
+      # for existing volumes run: docker compose exec postgres createdb -U postgres nango
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ai_governance"]
       interval: 10s
@@ -170,6 +174,8 @@ services:
         NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
         NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
         NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-development}
+        NEXT_PUBLIC_NANGO_API_URL: ${NEXT_PUBLIC_NANGO_API_URL:-}
+        NEXT_PUBLIC_NANGO_CONNECT_URL: ${NEXT_PUBLIC_NANGO_CONNECT_URL:-}
         NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     container_name: controlnet-web
     restart: unless-stopped
@@ -228,10 +234,83 @@ services:
           sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
         done
 
+  # ------------------------------------------------------------------
+  # Self-hosted Nango (open-source, free — no Nango cloud account).
+  # Provides the Auth + Proxy layer: OAuth flows, an encrypted credential
+  # vault, automatic token refresh, and authenticated proxy calls. NORIX
+  # reaches it over the internal compose network at http://nango-server:3003.
+  #
+  # DB ownership: Nango uses NORIX's OWN `postgres` service, in a SEPARATE
+  # `nango` database (created by db/init/01-create-nango-db.sql). No dedicated
+  # Nango Postgres container. Redis stays isolated (nango-redis) to avoid key
+  # collisions with the app cache.
+  # ------------------------------------------------------------------
+  nango-redis:
+    image: redis:7-alpine
+    container_name: controlnet-nango-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - nango_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nango-server:
+    image: nangohq/nango-server:hosted
+    container_name: controlnet-nango-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nango-redis:
+        condition: service_healthy
+    expose:
+      - "3003" # Internal only — NORIX web talks to it over the compose network
+    environment:
+      NANGO_ENCRYPTION_KEY: ${NANGO_ENCRYPTION_KEY:?NANGO_ENCRYPTION_KEY must be a base64 32-byte key}
+      # Reuse NORIX's own postgres, but a separate `nango` database.
+      NANGO_DB_HOST: postgres
+      NANGO_DB_PORT: "5432"
+      NANGO_DB_NAME: nango
+      NANGO_DB_USER: postgres
+      NANGO_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      NANGO_DB_SSL: "false"
+      NANGO_REDIS_URL: redis://nango-redis:6379
+      # Public base URL of this Nango server (used in webhook/redirect URLs).
+      NANGO_SERVER_URL: ${NANGO_SERVER_URL:-http://nango-server:3003}
+      # The :hosted image bakes PORT=8080; force both so the server actually
+      # listens on 3003 (matches the healthcheck, port map, and NANGO_HOST).
+      PORT: "3003"
+      SERVER_PORT: "3003"
+      # Pre-set the dev-environment secret key so NORIX (NANGO_SECRET_KEY) and
+      # the server share the same value — no dashboard copy step needed.
+      NANGO_SECRET_KEY_DEV: ${NANGO_SECRET_KEY:?NANGO_SECRET_KEY must be set}
+      # Basic-auth for the self-hosted Nango dashboard (no cloud login).
+      NANGO_DASHBOARD_USERNAME: ${NANGO_DASHBOARD_USERNAME:-admin}
+      NANGO_DASHBOARD_PASSWORD: ${NANGO_DASHBOARD_PASSWORD:-admin}
+      TELEMETRY: "false"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   postgres_data: # Persistent PostgreSQL data
   redis_data:
   onnx_model_cache:  # Persistent storage for ONNX models (survives container restarts)
+  nango_redis_data: # Nango orchestration/queue state (credentials live in the `nango` DB on postgres)
 
 networks:
   default:

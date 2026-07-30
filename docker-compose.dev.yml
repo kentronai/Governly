@@ -39,6 +39,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Creates the separate `nango` database on first init (fresh volume only).
+      # For an existing volume: docker compose exec postgres createdb -U postgres nango
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ai_governance"]
       interval: 30s
@@ -222,21 +225,25 @@ services:
       # Mount source for hot reload
       - ./apps/web:/app
       # Named volumes survive `docker compose down` and prevent a full npm
-      # reinstall / cold Turbopack cache every time the stack is started.
+      # reinstall / cold Next.js cache every time the stack is started.
       - web_node_modules:/app/node_modules
       - web_next_cache:/app/.next
-    # Turbopack reduces the memory and cold-compilation pressure of this large
-    # Next.js app. Its cache persists in web_next_cache across container restarts.
-    command: sh -c "test -x node_modules/.bin/next || npm install; exec npx next dev --turbopack --hostname 0.0.0.0 --port 8080"
+    # Use the stable webpack dev server in Docker. Turbopack has intermittently
+    # panicked under Docker Desktop bind mounts, which made Nginx return 503 for
+    # server actions while the Next process restarted or stopped accepting
+    # upstream connections.
+    command: sh -c "test -x node_modules/.bin/next || npm install; exec npx next dev --hostname 0.0.0.0 --port 8080"
     healthcheck:
-      # A static/sign-in check can pass while PostgreSQL is unreachable. This
-      # endpoint performs a real database round trip before Nginx starts.
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/api/health"]
+      # Keep the dev healthcheck lightweight. Hitting /api/health during a cold
+      # Docker start forces Next to compile the DB/server-action graph and can
+      # block real browser pages behind the probe. /favicon.ico proves the dev
+      # server is accepting requests without occupying the route compiler.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/favicon.ico"]
       interval: 30s
       start_interval: 2s
-      timeout: 60s
+      timeout: 30s
       retries: 12
-      start_period: 2s
+      start_period: 60s
 
   # Continuously refresh every connected cloud account. The first refresh runs
   # as soon as the web service is healthy; later refreshes run at the configured
@@ -271,11 +278,97 @@ services:
           sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
         done
 
+  # ------------------------------------------------------------------
+  # Self-hosted Nango (open-source, free — no Nango cloud account).
+  # Same Auth + Proxy layer as prod; NORIX web reaches it at
+  # http://nango-server:3003 over the internal compose network. The
+  # dashboard is exposed on localhost:3003 in dev for local setup.
+  #
+  # DB: reuses NORIX's own `postgres` service in a separate `nango` database
+  # (created by db/init/01-create-nango-db.sql — the dev postgres already
+  # mounts ./db/init below). Redis stays isolated (nango-redis).
+  # ------------------------------------------------------------------
+  nango-redis:
+    image: redis:7-alpine
+    container_name: controlnet-nango-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - nango_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+  nango-server:
+    image: nangohq/nango-server:hosted
+    container_name: controlnet-nango-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nango-redis:
+        condition: service_healthy
+    expose:
+      - "3003"
+      - "3009"
+    ports:
+      - "3003:3003" # API + dashboard at http://localhost:3003
+      - "3009:3009" # Connect UI (the popup) at http://localhost:3009
+    volumes:
+      # Vendored Nango provider templates + NORIX's custom `azure-service-principal`
+      # provider (labeled tenant/subscription/client/secret fields in the popup).
+      - ./nango/providers.yaml:/app/nango/packages/providers/providers.yaml:ro
+    environment:
+      NANGO_ENCRYPTION_KEY: ${NANGO_ENCRYPTION_KEY:?NANGO_ENCRYPTION_KEY must be a base64 32-byte key}
+      # The single hosted image also serves the Connect UI (the popup) on 3009.
+      # These must be BROWSER-reachable URLs or the popup stays blank (#5432).
+      FLAG_SERVE_CONNECT_UI: "true"
+      NANGO_PUBLIC_SERVER_URL: ${NANGO_PUBLIC_SERVER_URL:-http://localhost:3003}
+      NANGO_PUBLIC_CONNECT_URL: ${NANGO_PUBLIC_CONNECT_URL:-http://localhost:3009}
+      # Reuse NORIX's own postgres, but a separate `nango` database.
+      NANGO_DB_HOST: postgres
+      NANGO_DB_PORT: "5432"
+      NANGO_DB_NAME: nango
+      NANGO_DB_USER: postgres
+      NANGO_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      NANGO_DB_SSL: "false"
+      NANGO_REDIS_URL: redis://nango-redis:6379
+      NANGO_SERVER_URL: ${NANGO_SERVER_URL:-http://localhost:3003}
+      # The :hosted image bakes PORT=8080; force both so the server actually
+      # listens on 3003 (matches the healthcheck, port map, and NANGO_HOST).
+      PORT: "3003"
+      SERVER_PORT: "3003"
+      # Pre-set the dev-environment secret key so NORIX (NANGO_SECRET_KEY) and
+      # the server share the same value — no dashboard copy step needed.
+      NANGO_SECRET_KEY_DEV: ${NANGO_SECRET_KEY:?NANGO_SECRET_KEY must be set}
+      NANGO_DASHBOARD_USERNAME: ${NANGO_DASHBOARD_USERNAME:-admin}
+      NANGO_DASHBOARD_PASSWORD: ${NANGO_DASHBOARD_PASSWORD:-admin}
+      TELEMETRY: "false"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      start_interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
+
 volumes:
   postgres_data: # Persistent PostgreSQL data
   redis_data:
   model_cache: # Persistent storage for ModelGuard scans
   onnx_model_cache: # Persistent storage for ONNX models (survives container restarts)
+  nango_redis_data: # Nango orchestration/queue state (credentials live in the `nango` DB on postgres)
   # Declared external so Compose adopts the existing volumes instead of warning
   # that it did not create them. Both are created idempotently by
   # start_local_dev.sh and `./dev up`; create them by hand with
@@ -285,7 +378,7 @@ volumes:
   web_node_modules: # Persistent web dependencies (avoids npm install on every start)
     external: true
     name: norix-web-node-modules
-  web_next_cache: # Persistent Turbopack compilation cache
+  web_next_cache: # Persistent Next.js compilation cache
     external: true
     name: norix-web-next-cache
 

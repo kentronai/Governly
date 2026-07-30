@@ -88,6 +88,9 @@ export function correlateAgents(
   const ec2Instances = allResources.filter(
     (r) => r.resourceType === "ec2_instance",
   );
+  const eksClusters = allResources.filter(
+    (r) => r.resourceType === "aws_eks_cluster",
+  );
 
   const attachedLambdaArns = new Set<string>();
 
@@ -212,6 +215,17 @@ export function correlateAgents(
       region: instance.region,
       discoverySource: "ec2_instance",
       resources: [instance],
+    });
+  }
+
+  for (const cluster of eksClusters) {
+    agents.push({
+      externalAgentId: `${cluster.region}:${cluster.resourceId}`,
+      name: cluster.resourceName,
+      platform: "aws_eks",
+      region: cluster.region,
+      discoverySource: "aws_eks_cluster",
+      resources: [cluster],
     });
   }
 

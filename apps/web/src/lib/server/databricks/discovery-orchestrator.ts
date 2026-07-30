@@ -27,6 +27,7 @@ import {
   fetchDatabricksPages,
   normalizeDatabricksHost,
   type DatabricksCredentials,
+  type DatabricksDirectCredentials,
 } from "./api-client";
 
 export { normalizeDatabricksHost } from "./api-client";
@@ -35,6 +36,10 @@ export interface DatabricksConnection {
   id: string;
   credentialsEncrypted: string | null;
   configuration: unknown;
+  // Set when the connection is backed by self-hosted Nango instead of a
+  // NORIX-stored PAT. The workspace URL still comes from configuration.hostUrl.
+  nangoConnectionId?: string | null;
+  nangoProviderConfigKey?: string | null;
 }
 
 interface DatabricksIdentity {
@@ -253,6 +258,27 @@ type DiscoveryWarning = {
 
 const AI_SIGNAL =
   /(^|[-_:/.])(ai|agents?|llm|genai|copilot|assistant|langchain|crewai|autogen)([-_:/.]|$)/i;
+
+// Databricks-managed catalogs that every workspace ships with. `system.ai`
+// holds Databricks' own foundation-model catalog (llama, mistral, dbrx, …) —
+// stock models, not anything the customer deployed. Treating them as agents
+// flooded the inventory with dozens of false rows, so they are excluded from
+// both Unity Catalog enumeration and agent promotion.
+const INTERNAL_CATALOG_NAMES = new Set([
+  "system",
+  "samples",
+  "__databricks_internal",
+]);
+
+function isInternalCatalog(catalog: {
+  name?: string;
+  catalog_type?: string;
+}): boolean {
+  if (catalog.name && INTERNAL_CATALOG_NAMES.has(catalog.name.toLowerCase())) {
+    return true;
+  }
+  return /system|internal/i.test(catalog.catalog_type || "");
+}
 const AGENT_SOURCE_SIGNALS: Array<[string, RegExp]> = [
   ["MLflow ResponsesAgent", /\bResponsesAgent\b/],
   ["MLflow ChatAgent", /\bChatAgent\b/],
@@ -276,14 +302,30 @@ const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 function parseCredentials(
   connection: DatabricksConnection,
 ): DatabricksCredentials {
+  const config = (connection.configuration ?? {}) as Record<string, unknown>;
+
+  // Nango-backed: the PAT lives in the Nango vault; Nango injects it. The
+  // workspace URL is optional here — if NORIX doesn't have it, the Nango
+  // databricks provider-config supplies the base URL from its own connection
+  // config, so we leave hostUrl empty and skip the Proxy base-url override.
+  if (connection.nangoConnectionId && connection.nangoProviderConfigKey) {
+    const rawHost = typeof config.hostUrl === "string" ? config.hostUrl : "";
+    return {
+      mode: "nango",
+      hostUrl: rawHost ? normalizeDatabricksHost(rawHost) : "",
+      connectionId: connection.nangoConnectionId,
+      providerConfigKey: connection.nangoProviderConfigKey,
+    };
+  }
+
   if (!connection.credentialsEncrypted) {
     throw new Error("Databricks credentials are missing");
   }
-  let parsed: Partial<DatabricksCredentials>;
+  let parsed: Partial<DatabricksDirectCredentials>;
   try {
     parsed = JSON.parse(
       decryptSecret(connection.credentialsEncrypted),
-    ) as Partial<DatabricksCredentials>;
+    ) as Partial<DatabricksDirectCredentials>;
   } catch {
     throw new Error("Stored Databricks credentials are invalid");
   }
@@ -293,6 +335,7 @@ function parseCredentials(
     );
   }
   return {
+    mode: "direct",
     hostUrl: normalizeDatabricksHost(parsed.hostUrl),
     accessToken: parsed.accessToken,
   };
@@ -541,6 +584,22 @@ function genieDataSourceNames(space: GenieSpace): string[] {
     ...(dataSources?.tables ?? []),
     ...(dataSources?.metric_views ?? []),
   ].flatMap((item) => (item.identifier ? [item.identifier] : []));
+}
+
+/**
+ * True for Databricks' auto-provisioned demo Genie spaces (e.g. "Bakehouse
+ * Sales Starter Space"): every data source they query lives in a
+ * Databricks-managed catalog (`samples`, `system`). A space the customer
+ * built on their own data always references at least one workspace catalog,
+ * so it is kept. Spaces whose configuration could not be read are kept too —
+ * absence of evidence is not evidence of a demo.
+ */
+function isSampleGenieSpace(space: GenieSpace): boolean {
+  const sources = genieDataSourceNames(space);
+  if (sources.length === 0) return false;
+  return sources.every((name) =>
+    isInternalCatalog({ name: name.split(".")[0] ?? "" }),
+  );
 }
 
 function appHasAgentSignal(app: DatabricksApp): boolean {
@@ -947,6 +1006,7 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
   );
 
   for (const space of discovery.genieSpaces) {
+    if (isSampleGenieSpace(space)) continue;
     const genieResource = resource(
       "databricks_genie_space",
       `databricks:genie:${space.space_id}`,
@@ -1210,6 +1270,9 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
     const fullName =
       model.full_name ||
       `${model.catalog_name}.${model.schema_name}.${model.name}`;
+    // Never promote Databricks' own catalogs (system.ai foundation models,
+    // samples) — they are stock models, not deployed agents.
+    if (isInternalCatalog({ name: model.catalog_name })) continue;
     if (servedModelNames.has(fullName) || !hasAgentSignal(model)) continue;
     agentsFound.push({
       externalAgentId: `databricks:model:${fullName}`,
@@ -1387,7 +1450,7 @@ export async function testDatabricksConnection(
     ]);
     return {
       ok: true as const,
-      workspaceHost: new URL(credentials.hostUrl).hostname,
+      workspaceHost: (credentials.hostUrl ? new URL(credentials.hostUrl).hostname : "nango-managed"),
       principal: identity.userName || identity.displayName || identity.id,
       catalogsVisible: catalogResult.length,
       servingEndpointsVisible: endpoints.length,
@@ -1414,7 +1477,7 @@ export async function discoverDatabricks(
     credentials,
     "/api/2.0/preview/scim/v2/Me",
   );
-  const [catalogs, models, endpoints, apps, jobs, notebooks, genieSpaces] =
+  const [catalogs, rawModels, endpoints, apps, jobs, notebooks, genieSpaces] =
     await Promise.all([
       optionalDatabricksSurface(
         "Unity Catalog catalogs",
@@ -1469,8 +1532,16 @@ export async function discoverDatabricks(
         [],
       ),
     ]);
+  // Databricks-managed catalogs (system, samples, …) hold stock assets, not
+  // customer deployments — skip them for models and schema/table enumeration.
+  const models = rawModels.filter(
+    (model) => !isInternalCatalog({ name: model.catalog_name }),
+  );
+  const workspaceCatalogs = catalogs.filter(
+    (catalog) => !isInternalCatalog(catalog),
+  );
   const schemas = (
-    await mapWithConcurrency(catalogs, 5, (catalog) =>
+    await mapWithConcurrency(workspaceCatalogs, 5, (catalog) =>
       optionalDatabricksSurface(
         `Unity Catalog schemas in ${catalog.name}`,
         warnings,
@@ -1693,7 +1764,7 @@ export async function runDatabricksDiscoveryScan(
   try {
     const discovery = await discoverDatabricks(connection);
     const credentials = parseCredentials(connection);
-    const workspaceHost = new URL(credentials.hostUrl).hostname;
+    const workspaceHost = (credentials.hostUrl ? new URL(credentials.hostUrl).hostname : "nango-managed");
     const now = new Date().toISOString();
     const seenExternalIds: string[] = [];
     await persistDatabricksInventory(tenantId, integrationId, discovery, now);
@@ -1832,17 +1903,22 @@ export async function runDatabricksDiscoveryScan(
       await syncAgentPolicyEvaluations(tenantId, agentId);
     }
 
+    // Agents this integration reported before but that no longer exist in the
+    // workspace are removed outright (child rows cascade). Keeping them as
+    // "inactive" rows left permanently stale entries in the inventory — e.g.
+    // the system.ai foundation models that were once wrongly promoted.
     const staleWhere =
       seenExternalIds.length > 0
         ? and(
+            eq(agents.tenantId, tenantId),
             eq(agents.integrationId, integrationId),
             notInArray(agents.externalAgentId, seenExternalIds),
           )
-        : eq(agents.integrationId, integrationId);
-    await db
-      .update(agents)
-      .set({ status: "inactive", syncStatus: "success", updatedAt: now })
-      .where(staleWhere);
+        : and(
+            eq(agents.tenantId, tenantId),
+            eq(agents.integrationId, integrationId),
+          );
+    await db.delete(agents).where(staleWhere);
 
     await db
       .update(discoveryScans)
@@ -1917,6 +1993,7 @@ export const databricksDiscoveryTesting = {
   sanitizeJob,
   genieConfiguration,
   genieDataSourceNames,
+  isSampleGenieSpace,
   appHasAgentSignal,
   jobHasAgentSignal,
   endpointHasAgentSignal,

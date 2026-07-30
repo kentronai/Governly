@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, Gauge, Route } from "lucide-react";
+import { BarChart3, Bot, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AgentDiscoveryNav({ tenant }: { tenant: string }) {
@@ -10,7 +10,6 @@ export function AgentDiscoveryNav({ tenant }: { tenant: string }) {
   const items = [
     { label: "Executive Risk Dashboard", href: `/${tenant}/ai-agent-discovery/dashboard`, icon: BarChart3 },
     { label: "Agent Inventory", href: `/${tenant}/ai-agent-inventory`, icon: Bot },
-    { label: "Agent Autonomy Levels", href: `/${tenant}/ai-agent-discovery/autonomy`, icon: Gauge },
     { label: "Registry Journey", href: `/${tenant}/ai-agent-discovery/journey`, icon: Route },
   ];
   return (

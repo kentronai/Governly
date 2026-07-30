@@ -12,7 +12,6 @@ import {
   LayoutGrid,
   BarChart3,
   Bot,
-  Gauge,
   Route,
   ChevronDown,
   CircleHelp,
@@ -159,16 +158,6 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                     className="py-1.5 text-xs"
                   >
                     Agent Inventory
-                  </NavItem>
-                  <NavItem
-                    href={`/${tenant}/ai-agent-discovery/autonomy`}
-                    icon={<Gauge className="h-3.5 w-3.5" />}
-                    isActive={
-                      pathname === `/${tenant}/ai-agent-discovery/autonomy`
-                    }
-                    className="py-1.5 text-xs"
-                  >
-                    Agent Autonomy Levels
                   </NavItem>
                   <NavItem
                     href={`/${tenant}/ai-agent-discovery/journey`}
