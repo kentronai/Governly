@@ -30,6 +30,7 @@ import { discoverSecretsManagerSecrets } from "./discovery/secretsManager";
 import { discoverApiGateway } from "./discovery/apiGateway";
 import { discoverEventBridgeRules } from "./discovery/eventBridge";
 import { discoverEc2 } from "./discovery/ec2";
+import { discoverEksClusters } from "./discovery/eks";
 import { correlateAgents } from "./correlation";
 import { buildCapabilityFacts } from "../agents/capability-engine";
 import { classifyAutonomy } from "../agents/autonomy-engine";
@@ -144,6 +145,7 @@ export async function runDiscoveryScan(
     const apiGatewayResources: RawDiscoveredResource[] = [];
     const eventBridgeResources: RawDiscoveredResource[] = [];
     const ec2Resources: RawDiscoveredResource[] = [];
+    const eksResources: RawDiscoveredResource[] = [];
 
     let accountId = "unknown";
     const regionErrors: string[] = [];
@@ -170,6 +172,16 @@ export async function runDiscoveryScan(
           ec2RegionsScanned += 1;
         } catch (error) {
           serviceWarnings.push(formatServiceWarning(region, "EC2", error));
+        }
+
+        // EKS clusters (the AWS counterpart to GKE/AKS). Fetched independently
+        // so a denied/unavailable EKS endpoint never fails the rest of the scan.
+        try {
+          eksResources.push(...(await discoverEksClusters(clients)));
+        } catch (error) {
+          if (!isServiceUnavailableInRegion(error)) {
+            serviceWarnings.push(formatServiceWarning(region, "EKS", error));
+          }
         }
 
         const regionBedrock = await discoverBedrock(clients);
@@ -286,6 +298,7 @@ export async function runDiscoveryScan(
       ...apiGatewayResources,
       ...eventBridgeResources,
       ...ec2Resources,
+      ...eksResources,
     ];
 
     const correlated = correlateAgents(allResources);
@@ -467,6 +480,7 @@ export async function runDiscoveryScan(
       api_gateway_api: apiGatewayResources.length,
       eventbridge_rule: eventBridgeResources.length,
       ec2_instance: ec2Resources.length,
+      aws_eks_cluster: eksResources.length,
     };
 
     const warningParts: string[] = [];

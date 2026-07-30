@@ -57,7 +57,6 @@ export const triggerManualScan = async (tenantSlugOrId: string, connectionId: st
 
   revalidatePath(`/${tenantSlugOrId}/ai-agent-inventory`);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/dashboard`);
-  revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/autonomy`);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/journey`);
   revalidatePath(`/${tenantSlugOrId}/admin/integrations`);
   return result;
@@ -133,7 +132,6 @@ export const ensureInitialDiscoveryScan = async (
 
   revalidatePath(`/${tenantSlugOrId}/ai-agent-inventory`);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/dashboard`);
-  revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/autonomy`);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-discovery/journey`);
   revalidatePath(`/${tenantSlugOrId}/admin/integrations`);
   return { started: true as const, ...result };

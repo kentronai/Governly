@@ -9,6 +9,7 @@ import {
   integrations,
 } from "@db";
 import { decryptSecret } from "@/lib/server/crypto";
+import { getConnectionCredentials } from "@/lib/server/nango/client";
 import type {
   DiscoveredResourceType,
   RawDiscoveredResource,
@@ -35,6 +36,11 @@ interface GoogleCloudConnection {
   id: string;
   credentialsEncrypted: string | null;
   configuration: unknown;
+  // Set when the account is authorized through self-hosted Nango instead of a
+  // NORIX-encrypted service-account JSON. The secret then lives in the Nango
+  // vault; discovery reads it back (the Proxy can't run the signed JWT flow).
+  nangoConnectionId?: string | null;
+  nangoProviderConfigKey?: string | null;
 }
 
 interface GoogleAsset {
@@ -68,11 +74,10 @@ function encode(value: string | Buffer): string {
     .replaceAll("=", "");
 }
 
-function parseServiceAccount(encrypted: string | null): GoogleServiceAccount {
-  if (!encrypted) throw new Error("Google Cloud credentials are missing");
+function parseServiceAccountJson(json: string): GoogleServiceAccount {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(decryptSecret(encrypted));
+    parsed = JSON.parse(json);
   } catch {
     throw new Error("Stored Google Cloud service account JSON is invalid");
   }
@@ -83,6 +88,80 @@ function parseServiceAccount(encrypted: string | null): GoogleServiceAccount {
     );
   }
   return value as GoogleServiceAccount;
+}
+
+function parseServiceAccount(encrypted: string | null): GoogleServiceAccount {
+  if (!encrypted) throw new Error("Google Cloud credentials are missing");
+  return parseServiceAccountJson(decryptSecret(encrypted));
+}
+
+function stringField(
+  source: Record<string, unknown>,
+  ...keys: string[]
+): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+/**
+ * Resolve the service account, preferring a Nango-vaulted credential over a
+ * NORIX-encrypted one. Two Nango shapes are supported:
+ *  - `google-service-account` (auth_mode TWO_STEP): separate `privateKey` +
+ *    `serviceAccountEmailAddress` fields — the project id is taken from the
+ *    connection config, an explicit field, or parsed from the SA email
+ *    (`name@PROJECT.iam.gserviceaccount.com`).
+ *  - a custom/API-key config storing the full key JSON as `serviceAccountJson`
+ *    (or `apiKey`).
+ * Legacy connections keep using the credential encrypted on the integration row.
+ */
+async function loadServiceAccount(
+  connection: GoogleCloudConnection,
+): Promise<GoogleServiceAccount> {
+  if (connection.nangoConnectionId && connection.nangoProviderConfigKey) {
+    const { credentials, connectionConfig } = await getConnectionCredentials(
+      connection.nangoConnectionId,
+      connection.nangoProviderConfigKey,
+    );
+
+    // Full key JSON pasted into a single field.
+    const rawJson = stringField(credentials, "serviceAccountJson", "apiKey");
+    if (rawJson.startsWith("{")) return parseServiceAccountJson(rawJson);
+
+    // Nango google-service-account TWO_STEP fields.
+    const privateKey = stringField(credentials, "privateKey", "private_key");
+    const clientEmail = stringField(
+      credentials,
+      "serviceAccountEmailAddress",
+      "clientEmail",
+      "client_email",
+    );
+    if (privateKey && clientEmail) {
+      const configured = (connection.configuration ?? {}) as {
+        projectId?: string;
+      };
+      const projectFromEmail = clientEmail.split("@")[1]?.split(".")[0] ?? "";
+      const project =
+        stringField(connectionConfig, "projectId", "project_id") ||
+        stringField(credentials, "projectId", "project_id") ||
+        configured.projectId ||
+        projectFromEmail;
+      return parseServiceAccountJson(
+        JSON.stringify({
+          type: "service_account",
+          project_id: project,
+          private_key: privateKey.replace(/\\n/g, "\n"),
+          client_email: clientEmail,
+        }),
+      );
+    }
+
+    // Last resort: the whole credentials object may itself be the key JSON.
+    return parseServiceAccountJson(JSON.stringify(credentials));
+  }
+  return parseServiceAccount(connection.credentialsEncrypted);
 }
 
 export async function getGoogleAccessToken(
@@ -141,7 +220,7 @@ export async function testGoogleCloudConnection(
   connection: GoogleCloudConnection,
 ) {
   try {
-    const account = parseServiceAccount(connection.credentialsEncrypted);
+    const account = await loadServiceAccount(connection);
     const token = await getGoogleAccessToken(account);
     const id = projectId(connection, account);
     const response = await fetch(
@@ -218,7 +297,7 @@ function platformFor(
 export async function discoverGoogleCloudResources(
   connection: GoogleCloudConnection,
 ): Promise<RawDiscoveredResource[]> {
-  const account = parseServiceAccount(connection.credentialsEncrypted);
+  const account = await loadServiceAccount(connection);
   const token = await getGoogleAccessToken(account);
   const id = projectId(connection, account);
   const assets: GoogleAsset[] = [];
@@ -324,7 +403,7 @@ export async function runGoogleCloudDiscoveryScan(
     })
     .returning();
   try {
-    const account = parseServiceAccount(connection.credentialsEncrypted);
+    const account = await loadServiceAccount(connection);
     const resources = await discoverGoogleCloudResources(connection);
     const correlated = correlate(resources);
     const now = new Date().toISOString();

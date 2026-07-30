@@ -7,6 +7,13 @@ import { shadcn } from "@clerk/themes";
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
+// Optional same-origin clerk-js bundle (see public/clerk/). Loading the script
+// from our own origin removes the dependency on Clerk's CDN completing within
+// the SDK's 15s window — on a busy dev server the browser is often saturated
+// compiling/downloading dev chunks and the CDN load timer expires with
+// `failed_to_load_clerk_js_timeout` even though the network is fine.
+const clerkJsUrl = process.env.NEXT_PUBLIC_CLERK_JS_URL;
+
 const hasValidClerkPublishableKey =
   typeof clerkPublishableKey === "string" && /^pk_(test|live)_/.test(clerkPublishableKey);
 
@@ -52,6 +59,7 @@ export function ClerkProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProviderWrapper
       publishableKey={clerkPublishableKey}
+      {...(clerkJsUrl ? { clerkJSUrl: clerkJsUrl } : {})}
       appearance={{
         baseTheme: shadcn,
       }}

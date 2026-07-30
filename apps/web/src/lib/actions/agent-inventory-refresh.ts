@@ -21,7 +21,6 @@ import { runDiscoveryScan } from "@/lib/server/aws/discovery-orchestrator";
 import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator";
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
-import { runKubernetesDiscoveryScan } from "@/lib/server/kubernetes/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
 import { assignFallbackOwnership } from "@/lib/server/agents/ownership-fallback";
@@ -100,7 +99,7 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
         }
       } else if (
         integration.name === "Google Cloud" &&
-        integration.credentialsEncrypted
+        (integration.credentialsEncrypted || integration.nangoConnectionId)
       ) {
         result = await runGoogleCloudDiscoveryScan(
           tenantId,
@@ -110,7 +109,7 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
         );
       } else if (
         integration.name === "Databricks Unity Catalog" &&
-        integration.credentialsEncrypted
+        (integration.credentialsEncrypted || integration.nangoConnectionId)
       ) {
         result = await runDatabricksDiscoveryScan(
           tenantId,
@@ -119,16 +118,9 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
           userId,
         );
       } else if (
-        integration.name === "Kubernetes Cluster" &&
-        integration.credentialsEncrypted
+        integration.name === "CrewAI" &&
+        (integration.credentialsEncrypted || integration.nangoConnectionId)
       ) {
-        result = await runKubernetesDiscoveryScan(
-          tenantId,
-          integration.id,
-          integration,
-          userId,
-        );
-      } else if (integration.name === "CrewAI" && integration.credentialsEncrypted) {
         result = await runCrewAIDiscoveryScan(
           tenantId,
           integration.id,
@@ -153,7 +145,6 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
   for (const route of [
     "ai-agent-inventory",
     "ai-agent-discovery/dashboard",
-    "ai-agent-discovery/autonomy",
     "admin/integrations",
   ]) {
     revalidatePath(`/${tenantSlugOrId}/${route}`);

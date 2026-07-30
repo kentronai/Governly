@@ -13,6 +13,7 @@ export type DiscoveredResourceType =
   | "api_gateway_api"
   | "eventbridge_rule"
   | "ec2_instance"
+  | "aws_eks_cluster"
   | "azure_openai_account"
   | "azure_ai_foundry_project"
   | "azure_function"

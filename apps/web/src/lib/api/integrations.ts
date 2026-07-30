@@ -26,6 +26,8 @@ export interface Integration {
   description?: string;
   isEnabled: boolean;
   isCredentialsAdded: boolean;
+  nangoConnectionId?: string;
+  nangoProviderConfigKey?: string;
   configuration: Record<string, any>;
   apiKey?: string;
   logoUrl?: string;
@@ -85,6 +87,8 @@ function toIntegration(integration: any): Integration {
     description: integration.description || undefined,
     isEnabled: integration.isEnabled,
     isCredentialsAdded: integration.isCredentialsAdded,
+    nangoConnectionId: integration.nangoConnectionId || undefined,
+    nangoProviderConfigKey: integration.nangoProviderConfigKey || undefined,
     configuration: (integration.configuration as Record<string, any>) || {},
     apiKey: integration.credentialsEncrypted || undefined,
     logoUrl: integration.logoUrl || integration.metadata?.logoUrl || undefined,

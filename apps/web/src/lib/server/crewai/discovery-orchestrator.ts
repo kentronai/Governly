@@ -29,7 +29,9 @@ import {
   CREWAI_DEFAULT_BASE_URL,
   CREWAI_ENDPOINTS,
   crewaiApi,
+  normalizeCrewAIBaseUrl,
   type CrewAICredentials,
+  type CrewAIDirectCredentials,
 } from "./api-client";
 
 /** The integration row that stores a CrewAI connection. */
@@ -38,6 +40,10 @@ export interface CrewAIConnection {
   name: string;
   configuration: unknown;
   credentialsEncrypted: string | null;
+  // Set when the connection is backed by self-hosted Nango instead of a
+  // NORIX-stored token.
+  nangoConnectionId?: string | null;
+  nangoProviderConfigKey?: string | null;
 }
 
 /**
@@ -64,20 +70,38 @@ interface CrewAICrewRaw {
 export function parseCrewAICredentials(
   connection: CrewAIConnection,
 ): CrewAICredentials {
+  const config = (connection.configuration ?? {}) as Record<string, unknown>;
+
+  // Nango-backed: the token lives in the Nango vault; we only need the API base
+  // (defaults to the managed cloud). The credential is injected by Nango.
+  if (connection.nangoConnectionId && connection.nangoProviderConfigKey) {
+    const rawBase =
+      typeof config.baseUrl === "string" && config.baseUrl.trim()
+        ? normalizeCrewAIBaseUrl(config.baseUrl)
+        : CREWAI_DEFAULT_BASE_URL;
+    return {
+      mode: "nango",
+      baseUrl: rawBase,
+      connectionId: connection.nangoConnectionId,
+      providerConfigKey: connection.nangoProviderConfigKey,
+    };
+  }
+
   if (!connection.credentialsEncrypted) {
     throw new Error("CrewAI connection has no stored credentials");
   }
-  let parsed: Partial<CrewAICredentials>;
+  let parsed: Partial<CrewAIDirectCredentials>;
   try {
     parsed = JSON.parse(
       decryptSecret(connection.credentialsEncrypted),
-    ) as Partial<CrewAICredentials>;
+    ) as Partial<CrewAIDirectCredentials>;
   } catch {
     throw new Error("Stored CrewAI credentials could not be decrypted");
   }
   const accessToken = parsed.accessToken?.trim();
   if (!accessToken) throw new Error("CrewAI access token is missing");
   return {
+    mode: "direct",
     baseUrl: parsed.baseUrl?.trim() || CREWAI_DEFAULT_BASE_URL,
     accessToken,
   };

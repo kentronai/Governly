@@ -47,7 +47,7 @@ const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
     name: "AWS",
     category: "cloud_providers",
     description:
-      "Discovers Bedrock, AgentCore, Lambda, and explicitly identified EC2 agent workloads across enabled AWS regions.",
+      "Discovers Bedrock, AgentCore, Lambda, and explicitly identified EC2 and EKS agent workloads across enabled AWS regions.",
     metadata: { logoUrl: "/logos/AWS.svg" },
   },
   {
@@ -74,18 +74,6 @@ const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
     category: "agent_frameworks",
     description:
       "Discovers crews deployed on the CrewAI Enterprise (AMP) platform and governs each as an autonomous multi-agent workload.",
-  },
-  {
-    name: "Kubernetes Cluster",
-    category: "runtime_platforms",
-    description:
-      "Registers deployed agent workloads from Kubernetes clusters through NORIX's authenticated cluster ingestion endpoint.",
-    configuration: {
-      endpoint: "/api/agent-discovery/ingest",
-      authentication: "x-api-key",
-      provider: "kubernetes",
-    },
-    legacyNames: ["Universal Agent Collector"],
   },
 ];
 
@@ -296,7 +284,10 @@ export const updateIntegration = async (input: UpdateIntegrationInput) => {
   if (input.configuration !== undefined)
     updateData.configuration = input.configuration;
   if (input.apiKey !== undefined)
-    updateData.credentialsEncrypted = input.apiKey;
+    // Always encrypt at rest. This path historically stored the raw key; the
+    // provider-specific actions (and saveEncryptedIntegrationCredentials) all
+    // encrypt, so keep this consistent to avoid plaintext secrets in the DB.
+    updateData.credentialsEncrypted = encryptSecret(input.apiKey);
   if (input.name !== undefined) updateData.name = input.name;
   if (input.description !== undefined)
     updateData.description = input.description;

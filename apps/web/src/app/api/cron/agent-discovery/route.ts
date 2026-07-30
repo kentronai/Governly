@@ -14,7 +14,6 @@ import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-or
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
 import { assignFallbackOwnership } from "@/lib/server/agents/ownership-fallback";
-import { runKubernetesDiscoveryScan } from "@/lib/server/kubernetes/discovery-orchestrator";
 
 function authorized(request: NextRequest): boolean {
   const expected =
@@ -121,7 +120,7 @@ async function run(request: NextRequest) {
           }
         } else if (
           integration.name === "Google Cloud" &&
-          integration.credentialsEncrypted
+          (integration.credentialsEncrypted || integration.nangoConnectionId)
         ) {
           results.push({
             integrationId: integration.id,
@@ -135,7 +134,7 @@ async function run(request: NextRequest) {
           });
         } else if (
           integration.name === "Databricks Unity Catalog" &&
-          integration.credentialsEncrypted
+          (integration.credentialsEncrypted || integration.nangoConnectionId)
         ) {
           results.push({
             integrationId: integration.id,
@@ -148,22 +147,8 @@ async function run(request: NextRequest) {
             )),
           });
         } else if (
-          integration.name === "Kubernetes Cluster" &&
-          integration.credentialsEncrypted
-        ) {
-          results.push({
-            integrationId: integration.id,
-            provider: "Kubernetes Cluster",
-            ...(await runKubernetesDiscoveryScan(
-              integration.tenantId,
-              integration.id,
-              integration,
-              null,
-            )),
-          });
-        } else if (
           integration.name === "CrewAI" &&
-          integration.credentialsEncrypted
+          (integration.credentialsEncrypted || integration.nangoConnectionId)
         ) {
           results.push({
             integrationId: integration.id,

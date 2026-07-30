@@ -235,6 +235,7 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "api_gateway_api",
   "eventbridge_rule",
   "ec2_instance",
+  "aws_eks_cluster",
   "azure_openai_account",
   "azure_ai_foundry_project",
   "azure_function",
@@ -1797,6 +1798,11 @@ export const integrations = pgTable(
     isEnabled: boolean("is_enabled").default(true).notNull(),
     configuration: jsonb().notNull(),
     credentialsEncrypted: text("credentials_encrypted"),
+    // Self-hosted Nango handles auth/credentials for migrated providers instead
+    // of credentialsEncrypted. NORIX stores only the pointer to the Nango
+    // connection; the secret itself lives in the Nango vault.
+    nangoConnectionId: text("nango_connection_id"),
+    nangoProviderConfigKey: text("nango_provider_config_key"),
     webhookUrl: text("webhook_url"),
     lastSyncAt: timestamp("last_sync_at", {
       withTimezone: true,

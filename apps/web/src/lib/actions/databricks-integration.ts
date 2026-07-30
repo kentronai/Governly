@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { agents, db, integrations, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret } from "@/lib/server/crypto";
+import { deleteConnection } from "@/lib/server/nango/client";
 import {
   normalizeDatabricksHost,
   runDatabricksDiscoveryScan,
@@ -189,7 +190,6 @@ export async function triggerDatabricksDiscovery(
   for (const route of [
     "ai-agent-inventory",
     "ai-agent-discovery/dashboard",
-    "ai-agent-discovery/autonomy",
     "ai-agent-discovery/journey",
     "admin/integrations",
   ]) {
@@ -198,12 +198,49 @@ export async function triggerDatabricksDiscovery(
   return result;
 }
 
+/**
+ * Store the Databricks workspace URL (non-secret) on the integration row so a
+ * Nango-backed connection can route Proxy calls. The PAT itself is authorized
+ * separately through the Nango Connect widget. Call this before/with connecting.
+ */
+export async function saveDatabricksWorkspaceUrl(input: {
+  tenantSlugOrId: string;
+  id: string;
+  workspaceUrl: string;
+}) {
+  const { tenantId, userId } = await context(input.tenantSlugOrId);
+  const row = await connection(tenantId, input.id);
+  const hostUrl = normalizeDatabricksHost(input.workspaceUrl);
+  const [updated] = await db
+    .update(integrations)
+    .set({
+      configuration: {
+        ...((row.configuration as Record<string, unknown>) ?? {}),
+        hostUrl,
+        authentication: "nango",
+      },
+      updatedBy: userId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(and(eq(integrations.id, input.id), eq(integrations.tenantId, tenantId)))
+    .returning();
+  return updated;
+}
+
 export async function deleteDatabricksConnection(
   tenantSlugOrId: string,
   id: string,
 ) {
   const { tenantId, userId } = await context(tenantSlugOrId);
-  await connection(tenantId, id);
+  const row = await connection(tenantId, id);
+  // Best-effort: remove the credential from the Nango vault too.
+  if (row.nangoConnectionId && row.nangoProviderConfigKey) {
+    try {
+      await deleteConnection(row.nangoConnectionId, row.nangoProviderConfigKey);
+    } catch (error) {
+      console.error("Failed to delete Nango connection for Databricks:", error);
+    }
+  }
   await db
     .delete(agents)
     .where(and(eq(agents.integrationId, id), eq(agents.tenantId, tenantId)));
@@ -212,6 +249,8 @@ export async function deleteDatabricksConnection(
     .set({
       configuration: {},
       credentialsEncrypted: null,
+      nangoConnectionId: null,
+      nangoProviderConfigKey: null,
       isCredentialsAdded: false,
       isEnabled: false,
       syncStatus: null,

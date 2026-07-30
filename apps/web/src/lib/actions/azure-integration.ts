@@ -6,10 +6,24 @@ import { revalidatePath } from "next/cache";
 import { azureDiscoveryConnections, db, integrations, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret } from "@/lib/server/crypto";
+import { getConnectionCredentials } from "@/lib/server/nango/client";
 import {
   runAzureDiscoveryScan,
   testAzureConnection,
 } from "@/lib/server/azure/discovery-orchestrator";
+
+/** Reads the first non-empty string across credential/connection-config keys. */
+function pickCredential(
+  credentials: Record<string, unknown>,
+  connectionConfig: Record<string, unknown>,
+  ...keys: string[]
+): string {
+  for (const key of keys) {
+    const value = credentials[key] ?? connectionConfig[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
 
 async function context(slugOrId: string) {
   const { userId, orgId } = await auth();
@@ -133,6 +147,116 @@ export async function createAzureConnection(input: {
   };
 }
 
+/**
+ * Bridge a Nango-authorized Azure account into the discovery model. After the
+ * Nango Connect popup, the webhook records the connection on the integration
+ * row; this reads the service-principal back from the Nango vault and upserts
+ * the `azureDiscoveryConnections` row the existing discovery engine runs on, so
+ * Azure joins the uniform Nango popup flow without changing discovery itself.
+ *
+ * Expected Nango `azure` credentials (custom/API-key config, not the OAuth
+ * template): `tenantId`, `subscriptionId`, `clientId`, `clientSecret`.
+ */
+export async function syncAzureConnectionFromNango(
+  tenantSlugOrId: string,
+  integrationId: string,
+) {
+  const { tenantId, userId } = await context(tenantSlugOrId);
+  const integration = await db.query.integrations.findFirst({
+    where: and(
+      eq(integrations.id, integrationId),
+      eq(integrations.tenantId, tenantId),
+    ),
+  });
+  if (!integration || integration.name !== "Azure") {
+    throw new Error("Azure integration not found");
+  }
+  if (!integration.nangoConnectionId || !integration.nangoProviderConfigKey) {
+    throw new Error("Azure account is not connected through Nango yet");
+  }
+  // The Nango `azure-service-principal` provider stores clientId/clientSecret as
+  // credentials and tenantId/subscriptionId as connection config. pickCredential
+  // reads across both.
+  const { credentials, connectionConfig } = await getConnectionCredentials(
+    integration.nangoConnectionId,
+    integration.nangoProviderConfigKey,
+  );
+  const azureTenantId = pickCredential(
+    credentials,
+    connectionConfig,
+    "tenantId",
+    "azureTenantId",
+    "tenant_id",
+  );
+  const subscriptionId = pickCredential(
+    credentials,
+    connectionConfig,
+    "subscriptionId",
+    "subscription_id",
+  );
+  const clientId = pickCredential(
+    credentials,
+    connectionConfig,
+    "clientId",
+    "client_id",
+  );
+  const clientSecret = pickCredential(
+    credentials,
+    connectionConfig,
+    "clientSecret",
+    "client_secret",
+    "secret",
+  );
+  if (!azureTenantId || !subscriptionId || !clientId || !clientSecret) {
+    throw new Error(
+      "Nango is missing the Azure tenant ID, subscription ID, client ID, or client secret",
+    );
+  }
+  const encryptedClientSecret = encryptSecret(clientSecret);
+  const existing = await db.query.azureDiscoveryConnections.findFirst({
+    where: and(
+      eq(azureDiscoveryConnections.tenantId, tenantId),
+      eq(azureDiscoveryConnections.subscriptionId, subscriptionId),
+    ),
+  });
+  const values = {
+    azureTenantId,
+    subscriptionId,
+    clientId,
+    encryptedClientSecret,
+    isEnabled: true,
+    updatedBy: userId,
+    updatedAt: new Date().toISOString(),
+  };
+  const [row] = existing
+    ? await db
+        .update(azureDiscoveryConnections)
+        .set(values)
+        .where(eq(azureDiscoveryConnections.id, existing.id))
+        .returning()
+    : await db
+        .insert(azureDiscoveryConnections)
+        .values({ tenantId, name: "Azure", ...values, createdBy: userId })
+        .returning();
+  await db
+    .update(integrations)
+    .set({
+      configuration: {
+        ...((integration.configuration as Record<string, unknown>) ?? {}),
+        azureConnectionId: row.id,
+        subscriptionId: row.subscriptionId,
+        authentication: "service_principal",
+      },
+      isCredentialsAdded: true,
+      isEnabled: true,
+      errorMessage: null,
+      updatedBy: userId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(integrations.id, integrationId));
+  return { azureConnectionId: row.id };
+}
+
 export async function testAzureIntegrationConnection(
   tenantSlugOrId: string,
   id: string,
@@ -188,7 +312,6 @@ export async function triggerAzureDiscovery(
   for (const route of [
     "ai-agent-inventory",
     "ai-agent-discovery/dashboard",
-    "ai-agent-discovery/autonomy",
     "ai-agent-discovery/journey",
     "admin/integrations",
   ])

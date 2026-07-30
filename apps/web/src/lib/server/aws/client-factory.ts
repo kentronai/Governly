@@ -25,6 +25,7 @@ import { APIGatewayClient } from "@aws-sdk/client-api-gateway";
 import { ApiGatewayV2Client } from "@aws-sdk/client-apigatewayv2";
 import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { EC2Client } from "@aws-sdk/client-ec2";
+import { EKSClient } from "@aws-sdk/client-eks";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { decryptSecret } from "@/lib/server/crypto";
 
@@ -75,6 +76,7 @@ export interface AwsClientBundle {
   apiGatewayV2: ApiGatewayV2Client;
   eventBridge: EventBridgeClient;
   ec2: EC2Client;
+  eks: EKSClient;
 }
 
 export async function resolveAwsCredentials(
@@ -202,6 +204,11 @@ export async function buildAwsClients(
       ...awsDiscoveryClientConfig,
     }),
     ec2: new EC2Client({
+      region,
+      credentials,
+      ...awsDiscoveryClientConfig,
+    }),
+    eks: new EKSClient({
       region,
       credentials,
       ...awsDiscoveryClientConfig,

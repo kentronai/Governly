@@ -1,7 +1,28 @@
-export interface DatabricksCredentials {
+import { proxy, NangoError } from "@/lib/server/nango/client";
+
+/**
+ * Databricks access can be resolved two ways:
+ *  - `direct`: NORIX holds the PAT (legacy / pre-Nango rows).
+ *  - `nango`:  the PAT lives in the self-hosted Nango vault; we call the
+ *    Databricks API through the Nango Proxy, which injects it for us. Both
+ *    variants carry the workspace `hostUrl` (not a secret).
+ */
+export interface DatabricksDirectCredentials {
+  mode?: "direct";
   hostUrl: string;
   accessToken: string;
 }
+
+export interface DatabricksNangoCredentials {
+  mode: "nango";
+  hostUrl: string;
+  connectionId: string;
+  providerConfigKey: string;
+}
+
+export type DatabricksCredentials =
+  | DatabricksDirectCredentials
+  | DatabricksNangoCredentials;
 
 export class DatabricksApiError extends Error {
   constructor(
@@ -60,11 +81,61 @@ export function normalizeDatabricksHost(value: string): string {
   return `https://${hostname}`;
 }
 
+/**
+ * Databricks GET via the Nango Proxy. Nango injects the stored PAT and (if
+ * configured) refreshes it. Errors are re-mapped to DatabricksApiError so all
+ * downstream handling (status/error_code) is identical to the direct path.
+ */
+async function databricksApiViaNango<T>(
+  credentials: DatabricksNangoCredentials,
+  path: string,
+  query?: URLSearchParams,
+): Promise<T> {
+  const params: Record<string, string> = {};
+  if (query) {
+    for (const [key, value] of query.entries()) params[key] = value;
+  }
+  try {
+    const response = await proxy<T & { error_code?: string; message?: string }>({
+      connectionId: credentials.connectionId,
+      providerConfigKey: credentials.providerConfigKey,
+      method: "GET",
+      endpoint: path,
+      // Only override when NORIX knows the workspace URL; otherwise let the
+      // Nango databricks provider-config supply the base URL itself.
+      ...(credentials.hostUrl ? { baseUrlOverride: credentials.hostUrl } : {}),
+      params,
+    });
+    return response.data as T;
+  } catch (error) {
+    if (error instanceof NangoError) {
+      const body = (error.body ?? {}) as {
+        error_code?: string;
+        message?: string;
+      };
+      throw new DatabricksApiError(
+        body.message ||
+          body.error_code ||
+          `Databricks API returned HTTP ${error.status}`,
+        error.status,
+        body.error_code,
+      );
+    }
+    throw new Error(
+      `Databricks request to ${path} failed: ${describeFetchFailure(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 export async function databricksApi<T>(
   credentials: DatabricksCredentials,
   path: string,
   query?: URLSearchParams,
 ): Promise<T> {
+  if (credentials.mode === "nango") {
+    return databricksApiViaNango<T>(credentials, path, query);
+  }
   const queryString = query?.toString();
   const url = `${credentials.hostUrl}${path}${
     queryString ? `?${queryString}` : ""

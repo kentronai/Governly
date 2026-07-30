@@ -308,6 +308,43 @@ describe("Databricks discovery orchestrator", () => {
     ]);
   });
 
+  it("excludes Databricks demo Genie spaces backed only by sample catalogs", () => {
+    const sampleSpace = {
+      space_id: "genie-sample",
+      title: "Bakehouse Sales Starter Space",
+      serialized_space: JSON.stringify({
+        data_sources: {
+          tables: [
+            { identifier: "samples.bakehouse.sales_transactions" },
+            { identifier: "samples.bakehouse.sales_customers" },
+          ],
+        },
+      }),
+    };
+    const userSpace = {
+      space_id: "genie-user",
+      title: "Revenue Genie",
+      serialized_space: JSON.stringify({
+        data_sources: {
+          tables: [
+            { identifier: "samples.bakehouse.sales_transactions" },
+            { identifier: "finance.revenue.transactions" },
+          ],
+        },
+      }),
+    };
+    const unreadableSpace = { space_id: "genie-unknown", title: "Ops Genie" };
+    expect(databricksDiscoveryTesting.isSampleGenieSpace(sampleSpace)).toBe(
+      true,
+    );
+    expect(databricksDiscoveryTesting.isSampleGenieSpace(userSpace)).toBe(
+      false,
+    );
+    expect(
+      databricksDiscoveryTesting.isSampleGenieSpace(unreadableSpace),
+    ).toBe(false);
+  });
+
   it("uses source evidence without failing when source export is unavailable", async () => {
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
