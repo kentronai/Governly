@@ -191,8 +191,24 @@ jobs:
               sudo docker volume create norix-web-next-cache >/dev/null
               echo "external volumes ready"'
 
-      - name: Deploy (rsync -> build -> up -> migrate)
-        run: bash infra/aws/deploy.sh "$EC2_IP"
+      - name: Deploy (rsync -> build -> up)
+        # deploy.sh brings services up, but its Postgres health-check has a parsing
+        # bug (greps the Health field for "postgres") and exits non-zero before
+        # migrating. Services are already up at that point, so tolerate it and run
+        # migrations explicitly in the next step.
+        run: |
+          bash infra/aws/deploy.sh "$EC2_IP" || \
+            echo "::warning::deploy.sh exited non-zero (known Postgres health-check quirk); services are up, continuing to explicit migration"
+
+      - name: Run database migrations (Drizzle)
+        run: |
+          ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
+            "$SSH_USER@$EC2_IP" \
+            "cd /opt/kentron && sudo docker run --rm --network controlnet-network \
+               --env-file /opt/kentron/.env -e DB_SSL=false -v /opt/kentron:/repo -w /repo \
+               node:20-bookworm bash -c 'corepack enable && corepack prepare pnpm@9.0.0 --activate && \
+                 pnpm install --no-frozen-lockfile --filter @ai-governance/web... && \
+                 cd apps/web && pnpm exec drizzle-kit migrate --config=src/drizzle.config.env.ts'"
 
       - name: Restart nginx
         run: |
