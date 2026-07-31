@@ -39,16 +39,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Write deploy key and .env from secrets
+      - name: Write deploy key and env files from secrets
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           PROD_ENV: ${{ secrets.PROD_ENV }}
+          ENV_OPENAI_LOCAL: ${{ secrets.ENV_OPENAI_LOCAL }}
+          ENV_GEMINI_LOCAL: ${{ secrets.ENV_GEMINI_LOCAL }}
+          ENV_CLERK_LOCAL: ${{ secrets.ENV_CLERK_LOCAL }}
         run: |
           mkdir -p infra/aws
           printf '%s\n' "$EC2_SSH_KEY" > infra/aws/kentron-deployer.pem
           chmod 400 infra/aws/kentron-deployer.pem
           ssh-keygen -y -f infra/aws/kentron-deployer.pem > infra/aws/deploy_key.pub
           printf '%s' "$PROD_ENV" > .env
+          # docker-compose.dev.yml (selected via COMPOSE_FILE in .env) pulls these
+          # gitignored provider-key files; they rsync to the box alongside .env.
+          printf '%s' "$ENV_OPENAI_LOCAL" > .env.openai.local
+          printf '%s' "$ENV_GEMINI_LOCAL" > .env.gemini.local
+          printf '%s' "$ENV_CLERK_LOCAL" > .env.clerk.local
 
       - name: Ensure key pair imported
         run: |
