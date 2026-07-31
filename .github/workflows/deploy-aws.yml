@@ -215,6 +215,37 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
             "$SSH_USER@$EC2_IP" 'cd /opt/kentron && sudo docker compose restart nginx'
 
+      - name: Real HTTPS via nip.io (no DNS access needed)
+        run: |
+          NIP="$(echo "$EC2_IP" | tr '.' '-').nip.io"
+          echo "NIP_DOMAIN=$NIP" >> "$GITHUB_ENV"
+          ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
+            "$SSH_USER@$EC2_IP" "bash -s '$NIP'" <<'EOSSH'
+          set -e
+          NIP="$1"
+          export DEBIAN_FRONTEND=noninteractive
+          TARGET="/etc/letsencrypt/live/app.kentron.ai"
+          SRC="/etc/letsencrypt/live/$NIP"
+          # Already have a real (non-self-signed) cert for this nip.io name? then skip.
+          if sudo openssl x509 -in "$TARGET/fullchain.pem" -noout -issuer 2>/dev/null | grep -qi "Let's Encrypt" \
+             && sudo openssl x509 -in "$TARGET/fullchain.pem" -noout -text 2>/dev/null | grep -q "$NIP"; then
+            echo "real cert for $NIP already installed"; exit 0
+          fi
+          command -v certbot >/dev/null 2>&1 || { sudo apt-get update -y -qq; sudo apt-get install -y -qq certbot; }
+          # certbot standalone needs port 80: stop nginx briefly
+          cd /opt/kentron && sudo docker compose stop nginx || true
+          sudo certbot certonly --standalone --non-interactive --agree-tos \
+            -m satish@kentron.ai -d "$NIP" --keep-until-expiring || true
+          if [ -f "$SRC/fullchain.pem" ]; then
+            sudo mkdir -p "$TARGET"
+            sudo cp -L "$SRC/fullchain.pem" "$TARGET/fullchain.pem"
+            sudo cp -L "$SRC/privkey.pem"  "$TARGET/privkey.pem"
+            echo "installed real Let's Encrypt cert for $NIP"
+          else
+            echo "WARNING: certbot did not produce a cert; keeping existing"
+          fi
+          cd /opt/kentron && sudo docker compose start nginx
+
       - name: Smoke test
         run: |
           for i in $(seq 1 18); do
