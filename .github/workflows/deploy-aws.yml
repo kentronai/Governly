@@ -29,6 +29,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -52,8 +53,16 @@ jobs:
           chmod 400 infra/aws/kentron-deployer.pem
           ssh-keygen -y -f infra/aws/kentron-deployer.pem > infra/aws/deploy_key.pub
           printf '%s' "$PROD_ENV" > .env
-          # docker-compose.dev.yml (selected via COMPOSE_FILE in .env) pulls these
-          # gitignored provider-key files; they rsync to the box alongside .env.
+          # Deploy the PRODUCTION compose file (lean, self-contained, healthy on a
+          # server) instead of docker-compose.dev.yml, which runs dev servers that
+          # do runtime npm installs and never settle. Prod compose needs only .env.
+          if grep -q '^COMPOSE_FILE=' .env; then
+            sed -i 's#^COMPOSE_FILE=.*#COMPOSE_FILE=docker-compose.yml#' .env
+          else
+            printf '\nCOMPOSE_FILE=docker-compose.yml\n' >> .env
+          fi
+          # Harmless for prod compose (it ignores them); kept so a future switch
+          # back to dev compose still works.
           printf '%s' "$ENV_OPENAI_LOCAL" > .env.openai.local
           printf '%s' "$ENV_GEMINI_LOCAL" > .env.gemini.local
           printf '%s' "$ENV_CLERK_LOCAL" > .env.clerk.local
