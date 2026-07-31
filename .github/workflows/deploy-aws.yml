@@ -236,7 +236,7 @@ jobs:
           cd /opt/kentron && sudo docker compose stop nginx || true
           sudo certbot certonly --standalone --non-interactive --agree-tos \
             -m satish@kentron.ai -d "$NIP" --keep-until-expiring || true
-          if [ -f "$SRC/fullchain.pem" ]; then
+          if sudo test -f "$SRC/fullchain.pem"; then
             sudo mkdir -p "$TARGET"
             sudo cp -L "$SRC/fullchain.pem" "$TARGET/fullchain.pem"
             sudo cp -L "$SRC/privkey.pem"  "$TARGET/privkey.pem"
