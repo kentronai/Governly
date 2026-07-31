@@ -1,9 +1,10 @@
 name: Deploy to AWS (EC2)
 
-# Deploys the Kentron platform to the existing EC2 instance (kentron-production)
-# via infra/aws/deploy.sh. No permanent SSH key is stored on the box: a dedicated
-# deploy key's public half is (re)planted each run through EC2 Instance Connect,
-# and the runner's SSH ingress is opened just-in-time and revoked afterwards.
+# Provisions (idempotently) and deploys the Kentron platform to a dedicated
+# GitHub-Actions EC2 instance (tag: kentron-gha), separate from the legacy
+# kentron-production box. The instance is launched with our own deploy key, so
+# GitHub Actions SSHes in directly. The runner's SSH ingress is opened just in
+# time and revoked afterwards. Triggers on push to main and via workflow_dispatch.
 
 on:
   push:
@@ -11,16 +12,19 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-aws-prod
+  group: deploy-aws-gha
   cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1
-  INSTANCE_ID: i-048cde14cfd334ca5
-  EC2_IP: 98.88.103.48
+  KEY_NAME: kentron-gha-deployer
+  INSTANCE_TAG: kentron-gha
+  INSTANCE_TYPE: t3.xlarge
+  SUBNET_ID: subnet-0f4341e4904a7c9ff
   SG_ID: sg-03f4bb09a4130626d
-  AZ: us-east-1d
+  EBS_SIZE: "60"
   SSH_USER: ubuntu
+  CERT_DOMAIN: app.kentron.ai
 
 jobs:
   deploy:
@@ -35,18 +39,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Start instance if stopped
-        run: |
-          state=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
-            --region "$AWS_REGION" --query 'Reservations[].Instances[].State.Name' --output text)
-          echo "instance state: $state"
-          if [ "$state" != "running" ]; then
-            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION"
-            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region "$AWS_REGION"
-            echo "instance started; giving the OS/Docker time to boot..."
-            sleep 45
-          fi
-
       - name: Write deploy key and .env from secrets
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -58,6 +50,66 @@ jobs:
           ssh-keygen -y -f infra/aws/kentron-deployer.pem > infra/aws/deploy_key.pub
           printf '%s' "$PROD_ENV" > .env
 
+      - name: Ensure key pair imported
+        run: |
+          if ! aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+            aws ec2 import-key-pair --key-name "$KEY_NAME" \
+              --public-key-material fileb://infra/aws/deploy_key.pub --region "$AWS_REGION"
+            echo "imported key pair $KEY_NAME"
+          else
+            echo "key pair $KEY_NAME already exists"
+          fi
+
+      - name: Ensure instance exists (find or launch)
+        run: |
+          IID=$(aws ec2 describe-instances --region "$AWS_REGION" \
+            --filters "Name=tag:Name,Values=$INSTANCE_TAG" \
+                      "Name=instance-state-name,Values=running,stopped,pending" \
+            --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          if [ "$IID" = "None" ] || [ -z "$IID" ]; then
+            AMI=$(aws ssm get-parameter --region "$AWS_REGION" \
+              --name /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id \
+              --query 'Parameter.Value' --output text)
+            echo "launching new instance from $AMI"
+            IID=$(aws ec2 run-instances --region "$AWS_REGION" \
+              --image-id "$AMI" --instance-type "$INSTANCE_TYPE" --count 1 \
+              --key-name "$KEY_NAME" --security-group-ids "$SG_ID" --subnet-id "$SUBNET_ID" \
+              --block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":$EBS_SIZE,\"VolumeType\":\"gp3\"}}]" \
+              --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_TAG},{Key=Project,Value=kentron}]" \
+              --query 'Instances[0].InstanceId' --output text)
+          fi
+          echo "INSTANCE_ID=$IID" >> "$GITHUB_ENV"
+          echo "instance: $IID"
+          # Make sure it is running (covers a stopped instance too)
+          state=$(aws ec2 describe-instances --instance-ids "$IID" --region "$AWS_REGION" \
+            --query 'Reservations[].Instances[].State.Name' --output text)
+          if [ "$state" != "running" ]; then
+            aws ec2 start-instances --instance-ids "$IID" --region "$AWS_REGION" >/dev/null
+          fi
+          aws ec2 wait instance-running --instance-ids "$IID" --region "$AWS_REGION"
+
+      - name: Ensure Elastic IP attached
+        run: |
+          ALLOC=$(aws ec2 describe-addresses --region "$AWS_REGION" \
+            --filters "Name=tag:Name,Values=$INSTANCE_TAG" \
+            --query 'Addresses[0].AllocationId' --output text)
+          if [ "$ALLOC" = "None" ] || [ -z "$ALLOC" ]; then
+            ALLOC=$(aws ec2 allocate-address --domain vpc --region "$AWS_REGION" \
+              --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=$INSTANCE_TAG}]" \
+              --query 'AllocationId' --output text)
+            echo "allocated EIP $ALLOC"
+          fi
+          CUR=$(aws ec2 describe-addresses --allocation-ids "$ALLOC" --region "$AWS_REGION" \
+            --query 'Addresses[0].InstanceId' --output text)
+          if [ "$CUR" != "$INSTANCE_ID" ]; then
+            aws ec2 associate-address --instance-id "$INSTANCE_ID" --allocation-id "$ALLOC" \
+              --region "$AWS_REGION" >/dev/null
+          fi
+          IP=$(aws ec2 describe-addresses --allocation-ids "$ALLOC" --region "$AWS_REGION" \
+            --query 'Addresses[0].PublicIp' --output text)
+          echo "EC2_IP=$IP" >> "$GITHUB_ENV"
+          echo "public IP: $IP"
+
       - name: Open SSH from this runner
         id: sg
         run: |
@@ -67,24 +119,52 @@ jobs:
             --protocol tcp --port 22 --cidr "${RUNNER_IP}/32" --region "$AWS_REGION" \
             2>/dev/null || echo "ingress rule already present"
 
-      - name: Plant deploy key via EC2 Instance Connect
+      - name: Wait for SSH
         run: |
-          ssh-keygen -t ed25519 -N "" -f /tmp/eic -C eic >/dev/null
-          PUB=$(cat infra/aws/deploy_key.pub)
-          ok=""
-          for attempt in 1 2 3 4 5 6; do
-            if aws ec2-instance-connect send-ssh-public-key \
-                 --instance-id "$INSTANCE_ID" --availability-zone "$AZ" \
-                 --instance-os-user "$SSH_USER" --ssh-public-key file:///tmp/eic.pub \
-                 --region "$AWS_REGION" >/dev/null 2>&1 && \
-               ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i /tmp/eic \
-                 "$SSH_USER@$EC2_IP" \
-                 "install -d -m 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && grep -qF \"$PUB\" ~/.ssh/authorized_keys || echo \"$PUB\" >> ~/.ssh/authorized_keys"; then
-              ok=1; echo "deploy key planted"; break
+          for i in $(seq 1 40); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
+                 -i infra/aws/kentron-deployer.pem "$SSH_USER@$EC2_IP" true 2>/dev/null; then
+              echo "SSH is up"; exit 0
             fi
-            echo "attempt $attempt failed; retrying in 15s"; sleep 15
+            echo "waiting for sshd... ($i)"; sleep 10
           done
-          [ -n "$ok" ] || { echo "could not plant deploy key via EC2 Instance Connect"; exit 1; }
+          echo "SSH did not come up"; exit 1
+
+      - name: Bootstrap (install Docker if missing)
+        run: |
+          ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
+            "$SSH_USER@$EC2_IP" 'bash -s' <<'EOSSH'
+          set -e
+          export DEBIAN_FRONTEND=noninteractive
+          if ! command -v docker >/dev/null 2>&1; then
+            sudo install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            sudo chmod a+r /etc/apt/keyrings/docker.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release; echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+            sudo apt-get update -y -qq
+            sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            sudo systemctl enable --now docker
+          fi
+          sudo mkdir -p /opt/kentron && sudo chown "$USER":"$USER" /opt/kentron
+          docker --version && docker compose version
+          EOSSH
+
+      - name: Self-signed TLS so nginx can start (no domain yet)
+        run: |
+          ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
+            "$SSH_USER@$EC2_IP" "bash -s $CERT_DOMAIN" <<'EOSSH'
+          set -e
+          DOMAIN="$1"
+          D="/etc/letsencrypt/live/$DOMAIN"
+          if [ ! -f "$D/fullchain.pem" ]; then
+            sudo mkdir -p "$D"
+            sudo openssl req -x509 -nodes -days 825 -newkey rsa:2048 \
+              -keyout "$D/privkey.pem" -out "$D/fullchain.pem" -subj "/CN=$DOMAIN"
+            echo "self-signed cert created at $D"
+          else
+            echo "cert already present at $D"
+          fi
+          EOSSH
 
       - name: Deploy (rsync -> build -> up -> migrate)
         run: bash infra/aws/deploy.sh "$EC2_IP"
@@ -97,12 +177,19 @@ jobs:
       - name: Smoke test
         run: |
           for i in $(seq 1 18); do
-            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' https://app.kentron.ai/sign-in || true)
-            echo "attempt $i: /sign-in -> ${code:-timeout}"
-            [ "$code" = "200" ] && { echo "APP IS UP"; exit 0; }
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "http://$EC2_IP/healthz" || true)
+            echo "attempt $i: http://$EC2_IP/healthz -> ${code:-timeout}"
+            [ "$code" = "200" ] && { echo "APP IS UP at http://$EC2_IP"; exit 0; }
             sleep 10
           done
           echo "app did not return 200 after deploy"; exit 1
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "Instance: ${INSTANCE_ID:-?}"
+          echo "Public IP: ${EC2_IP:-?}"
+          echo "App:  http://${EC2_IP:-?}   https://${EC2_IP:-?} (self-signed)"
 
       - name: Revoke SSH ingress (always)
         if: always() && steps.sg.outputs.cidr != ''
