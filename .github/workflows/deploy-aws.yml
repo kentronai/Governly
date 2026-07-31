@@ -1,0 +1,112 @@
+name: Deploy to AWS (EC2)
+
+# Deploys the Kentron platform to the existing EC2 instance (kentron-production)
+# via infra/aws/deploy.sh. No permanent SSH key is stored on the box: a dedicated
+# deploy key's public half is (re)planted each run through EC2 Instance Connect,
+# and the runner's SSH ingress is opened just-in-time and revoked afterwards.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-aws-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  INSTANCE_ID: i-048cde14cfd334ca5
+  EC2_IP: 98.88.103.48
+  SG_ID: sg-03f4bb09a4130626d
+  AZ: us-east-1d
+  SSH_USER: ubuntu
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Start instance if stopped
+        run: |
+          state=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+            --region "$AWS_REGION" --query 'Reservations[].Instances[].State.Name' --output text)
+          echo "instance state: $state"
+          if [ "$state" != "running" ]; then
+            aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION"
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region "$AWS_REGION"
+            echo "instance started; giving the OS/Docker time to boot..."
+            sleep 45
+          fi
+
+      - name: Write deploy key and .env from secrets
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          PROD_ENV: ${{ secrets.PROD_ENV }}
+        run: |
+          mkdir -p infra/aws
+          printf '%s\n' "$EC2_SSH_KEY" > infra/aws/kentron-deployer.pem
+          chmod 400 infra/aws/kentron-deployer.pem
+          ssh-keygen -y -f infra/aws/kentron-deployer.pem > infra/aws/deploy_key.pub
+          printf '%s' "$PROD_ENV" > .env
+
+      - name: Open SSH from this runner
+        id: sg
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "cidr=${RUNNER_IP}/32" >> "$GITHUB_OUTPUT"
+          aws ec2 authorize-security-group-ingress --group-id "$SG_ID" \
+            --protocol tcp --port 22 --cidr "${RUNNER_IP}/32" --region "$AWS_REGION" \
+            2>/dev/null || echo "ingress rule already present"
+
+      - name: Plant deploy key via EC2 Instance Connect
+        run: |
+          ssh-keygen -t ed25519 -N "" -f /tmp/eic -C eic >/dev/null
+          PUB=$(cat infra/aws/deploy_key.pub)
+          ok=""
+          for attempt in 1 2 3 4 5 6; do
+            if aws ec2-instance-connect send-ssh-public-key \
+                 --instance-id "$INSTANCE_ID" --availability-zone "$AZ" \
+                 --instance-os-user "$SSH_USER" --ssh-public-key file:///tmp/eic.pub \
+                 --region "$AWS_REGION" >/dev/null 2>&1 && \
+               ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i /tmp/eic \
+                 "$SSH_USER@$EC2_IP" \
+                 "install -d -m 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && grep -qF \"$PUB\" ~/.ssh/authorized_keys || echo \"$PUB\" >> ~/.ssh/authorized_keys"; then
+              ok=1; echo "deploy key planted"; break
+            fi
+            echo "attempt $attempt failed; retrying in 15s"; sleep 15
+          done
+          [ -n "$ok" ] || { echo "could not plant deploy key via EC2 Instance Connect"; exit 1; }
+
+      - name: Deploy (rsync -> build -> up -> migrate)
+        run: bash infra/aws/deploy.sh "$EC2_IP"
+
+      - name: Restart nginx
+        run: |
+          ssh -o StrictHostKeyChecking=no -i infra/aws/kentron-deployer.pem \
+            "$SSH_USER@$EC2_IP" 'cd /opt/kentron && sudo docker compose restart nginx'
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 18); do
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' https://app.kentron.ai/sign-in || true)
+            echo "attempt $i: /sign-in -> ${code:-timeout}"
+            [ "$code" = "200" ] && { echo "APP IS UP"; exit 0; }
+            sleep 10
+          done
+          echo "app did not return 200 after deploy"; exit 1
+
+      - name: Revoke SSH ingress (always)
+        if: always() && steps.sg.outputs.cidr != ''
+        run: |
+          aws ec2 revoke-security-group-ingress --group-id "$SG_ID" \
+            --protocol tcp --port 22 --cidr "${{ steps.sg.outputs.cidr }}" \
+            --region "$AWS_REGION" 2>/dev/null || true
