@@ -1,7 +1,7 @@
 // src/app/[tenant]/layout.tsx
 import { headers } from "next/headers";
 import { ReactNode } from "react";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db, tenants, users, withDbRetry } from "@db";
 import { eq } from "drizzle-orm";
@@ -130,6 +130,47 @@ async function ensureTenantForOrg(orgId: string) {
   );
 }
 
+// Users are supposed to land in the local `users` table via the Clerk user
+// webhook, but that webhook can be misconfigured or simply not have fired yet
+// on a fresh environment — and it never back-fills people who signed up before
+// it was wired up. Tenants already self-heal on access via ensureTenantForOrg;
+// do the same for the signed-in user so every feature that references `users`
+// (integrations, applications, audit ownership, …) works regardless of webhook
+// delivery. Idempotent: only writes when the row is missing.
+async function ensureUserRow(userId: string) {
+  const existing = await withDbRetry(() =>
+    db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { id: true },
+    }),
+  );
+  if (existing) return;
+
+  const clerkUser = await currentUser();
+  const name =
+    `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() ||
+    clerkUser?.username ||
+    null;
+  const email =
+    clerkUser?.emailAddresses?.find(
+      (address) => address.id === clerkUser.primaryEmailAddressId,
+    )?.emailAddress ||
+    clerkUser?.emailAddresses?.[0]?.emailAddress ||
+    `${userId}@unknown.local`;
+
+  await withDbRetry(() =>
+    db
+      .insert(users)
+      .values({
+        id: userId,
+        email,
+        name,
+        imageUrl: clerkUser?.imageUrl || null,
+      })
+      .onConflictDoNothing({ target: users.id }),
+  );
+}
+
 interface TenantLayoutProps {
   children: ReactNode;
   params: Promise<{ tenant: string }>;
@@ -150,6 +191,11 @@ export default async function TenantLayout({
   if (!userId) {
     redirect("/sign-in");
   }
+
+  // Self-heal the local user row (see ensureUserRow) before rendering any tenant
+  // page, so features that stamp `created_by`/ownership against `users` work
+  // even when the Clerk webhook hasn't synced this user.
+  await ensureUserRow(userId);
 
   const userEmail =
     (await getLocalUserEmail(userId)) ?? getClaimEmail(sessionClaims);
