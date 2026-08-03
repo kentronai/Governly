@@ -28,8 +28,13 @@ export const DEFAULT_APPLICATION_POLICIES: readonly DefaultApplicationPolicyDefi
   [
     {
       profile: "standard",
-      name: "Standard Policy",
-      description: "Default production policy for general AI applications.",
+      name: "Launch",
+      description:
+        "Kickstart your AI security with the Launch — a ready-to-deploy " +
+        "protection layer that automatically blocks Jailbreak attempts, PII " +
+        "exposure, Profanity, and Toxic content. Designed for instant " +
+        "activation, it ensures your AI applications stay compliant, safe, and " +
+        "user-friendly from day one.",
       guards: [
         { key: "pii.detect" },
         { key: "jailbreak.detect" },

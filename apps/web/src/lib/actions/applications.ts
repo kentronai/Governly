@@ -24,7 +24,7 @@ import {
   buildDefaultPolicyYaml,
 } from "@/lib/default-application-policies";
 import { eq, and, sql, isNull, or, ilike, inArray } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   getApplicationsWithSummary,
@@ -83,16 +83,36 @@ export const createApplication = async (input: CreateApplicationInput) => {
     });
 
     if (!user) {
+      // The local users row can be missing when the Clerk user webhook has not
+      // synced yet (or never fired). Resolve the real identity straight from
+      // Clerk instead of persisting an "Unknown user" placeholder that then
+      // surfaces as the owner / last-updated-by / stakeholder on the overview.
+      const clerkUser = await currentUser();
+      const clerkName =
+        `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() ||
+        clerkUser?.username ||
+        null;
+      const clerkEmail =
+        clerkUser?.emailAddresses?.find(
+          (address) => address.id === clerkUser.primaryEmailAddressId
+        )?.emailAddress ||
+        clerkUser?.emailAddresses?.[0]?.emailAddress ||
+        `${userId}@unknown.local`;
+
       const [syncedUser] = await tx
         .insert(users)
         .values({
           id: userId,
-          email: `${userId}@unknown.local`,
-          name: "Unknown user",
+          email: clerkEmail,
+          name: clerkName,
+          imageUrl: clerkUser?.imageUrl || null,
         })
         .onConflictDoUpdate({
           target: users.id,
           set: {
+            email: clerkEmail || users.email,
+            name: clerkName || users.name,
+            imageUrl: clerkUser?.imageUrl || users.imageUrl,
             updatedAt: new Date().toISOString(),
           },
         })
@@ -226,7 +246,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
           policyId: createdPolicyByName.get(definition.name)!,
           policyName: definition.name,
           policyVersion: DEFAULT_APPLICATION_POLICY_VERSION,
-          // The Standard Policy is the application's selected default. Strict
+          // The Launch policy is the application's selected default. Strict
           // and Development remain available but are not selected initially.
           isActive: definition.isDefault,
           isDefault: definition.isDefault,

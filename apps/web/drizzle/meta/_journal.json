@@ -232,6 +232,27 @@
       "when": 1785300000000,
       "tag": "0032_remove_kubernetes_add_eks",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785400000000,
+      "tag": "0033_langsmith_langgraph_observability",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785500000000,
+      "tag": "0034_remove_langgraph_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1785600000000,
+      "tag": "0035_agent_langsmith_project",
+      "breakpoints": true
     }
   ]
 }

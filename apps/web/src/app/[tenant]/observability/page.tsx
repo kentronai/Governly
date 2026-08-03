@@ -1,10 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import Observability from "@/components/observability";
-import {
-  TenantLogsStore,
-  TenantStatsStore,
-  TenantGraphStore,
-} from "@/store/tenantLogs.store";
+import { TenantObservabilityIntegrationsStore } from "@/store/tenantLogs.store";
+
 export default async function page() {
   const { userId, orgId } = await auth();
 
@@ -13,14 +10,8 @@ export default async function page() {
   }
 
   return (
-    <>
-      <TenantStatsStore>
-        <TenantLogsStore>
-          <TenantGraphStore>
-            <Observability />
-          </TenantGraphStore>
-        </TenantLogsStore>
-      </TenantStatsStore>
-    </>
+    <TenantObservabilityIntegrationsStore>
+      <Observability />
+    </TenantObservabilityIntegrationsStore>
   );
 }

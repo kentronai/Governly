@@ -13,6 +13,10 @@ import {
 } from "@/lib/actions/recent";
 import { getObservabilityStats } from "@/lib/queries/observability";
 import { ObservabilityStats } from "@/lib/queries/observability";
+import {
+  getObservabilityIntegrationData,
+  type ObservabilityIntegrationData,
+} from "@/lib/queries/observability-integrations";
 
 interface TenantLogsInterface {
   logs: RecentEndpointsPaginatedResponse | undefined;
@@ -169,5 +173,51 @@ export const useTenantGraph = () => {
   const context = useContext(TenantGraphContext);
   if (!context)
     throw new Error("useTenantGraph must be used inside TenantGraphStore");
+  return context;
+};
+
+interface TenantObservabilityIntegrationsInterface {
+  data: ObservabilityIntegrationData | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  refetch: () => void;
+}
+
+const TenantObservabilityIntegrationsContext =
+  createContext<TenantObservabilityIntegrationsInterface | null>(null);
+
+export function TenantObservabilityIntegrationsStore({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const { orgId } = useAuth();
+  const { isLoading, isFetching, data, refetch } = useQuery({
+    queryKey: ["tenant-observability-integrations", orgId],
+    queryFn: async () => {
+      if (!orgId) return;
+      return await getObservabilityIntegrationData({ tenantId: orgId });
+    },
+    enabled: !!orgId,
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  return (
+    <TenantObservabilityIntegrationsContext.Provider
+      value={{ data, isLoading, isFetching, refetch }}
+    >
+      {children}
+    </TenantObservabilityIntegrationsContext.Provider>
+  );
+}
+
+export const useObservabilityIntegrations = () => {
+  const context = useContext(TenantObservabilityIntegrationsContext);
+  if (!context)
+    throw new Error(
+      "useObservabilityIntegrations must be used inside TenantObservabilityIntegrationsStore",
+    );
   return context;
 };

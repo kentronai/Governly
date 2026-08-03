@@ -7,21 +7,17 @@ describe("default application policies", () => {
   it("defines exactly one copy of the three required policies", () => {
     const names = DEFAULT_APPLICATION_POLICIES.map((policy) => policy.name);
 
-    expect(names).toEqual([
-      "Standard Policy",
-      "Strict Policy",
-      "Development Policy",
-    ]);
+    expect(names).toEqual(["Launch", "Strict Policy", "Development Policy"]);
     expect(new Set(names).size).toBe(3);
   });
 
-  it("marks only Standard Policy as the application default", () => {
+  it("marks only the Launch policy as the application default", () => {
     const defaults = DEFAULT_APPLICATION_POLICIES.filter(
       (policy) => policy.isDefault,
     );
 
     expect(defaults).toHaveLength(1);
-    expect(defaults[0].name).toBe("Standard Policy");
+    expect(defaults[0].name).toBe("Launch");
   });
 
   it.each(DEFAULT_APPLICATION_POLICIES)(

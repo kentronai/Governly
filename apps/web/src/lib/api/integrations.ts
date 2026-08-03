@@ -14,6 +14,8 @@ const INTEGRATION_CATEGORIES = [
   "vector_databases",
   "cloud_providers",
   "runtime_platforms",
+  "agent_frameworks",
+  "observability",
 ] as const;
 
 type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];
