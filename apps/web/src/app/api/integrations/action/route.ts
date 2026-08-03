@@ -39,6 +39,14 @@ import {
   triggerCrewAIDiscovery,
 } from "@/lib/actions/crewai-integration";
 import {
+  createLangSmithConnection,
+  deleteLangSmithConnection,
+  listLangSmithIntegrationProjects,
+  setLangSmithProject,
+  testLangSmithIntegrationConnection,
+  triggerLangSmithSync,
+} from "@/lib/actions/langsmith-integration";
+import {
   clearIntegrationCredentials,
   saveEncryptedIntegrationCredentials,
   updateIntegration,
@@ -47,6 +55,7 @@ import { disconnectNango } from "@/lib/actions/nango-connect";
 
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const CREWAI = "CrewAI";
+const LANGSMITH = "LangSmith";
 
 // Maps the marketplace integration name to the Nango provider-config key so the
 // connection can be reconciled straight from Nango (see ensureNangoConnection).
@@ -56,6 +65,7 @@ const PROVIDER_NAME_TO_CONFIG_KEY: Record<string, string> = {
   "Google Cloud": "google",
   [DATABRICKS_UNITY_CATALOG]: "databricks",
   [CREWAI]: "crewai",
+  [LANGSMITH]: "langsmith",
 };
 
 type Body = {
@@ -364,6 +374,9 @@ async function runDiscovery(body: Body) {
   if (providerName === CREWAI) {
     return triggerCrewAIDiscovery(tenant, integrationId);
   }
+  if (providerName === LANGSMITH) {
+    return triggerLangSmithSync(tenant, integrationId);
+  }
   return undefined;
 }
 
@@ -562,6 +575,8 @@ export async function POST(request: NextRequest) {
         await deleteDatabricksConnection(tenant, integrationId);
       } else if (providerName === CREWAI) {
         await deleteCrewAIConnection(tenant, integrationId);
+      } else if (providerName === LANGSMITH) {
+        await deleteLangSmithConnection(tenant, integrationId);
       } else {
         await clearIntegrationCredentials(tenant, integrationId);
       }
@@ -570,6 +585,54 @@ export async function POST(request: NextRequest) {
 
     if (action === "runDiscovery") {
       return NextResponse.json(await runDiscovery(body));
+    }
+
+    if (action === "testConnection") {
+      const integrationId = requiredString(body, "integrationId");
+      const providerName = requiredString(body, "providerName");
+      if (providerName === LANGSMITH) {
+        return NextResponse.json(
+          await testLangSmithIntegrationConnection(tenant, integrationId),
+        );
+      }
+      if (providerName === CREWAI) {
+        return NextResponse.json(
+          await testCrewAIIntegrationConnection(tenant, integrationId),
+        );
+      }
+      throw new Error(`Test connection is not supported for ${providerName}`);
+    }
+
+    if (action === "listLangSmithProjects") {
+      const integrationId = requiredString(body, "integrationId");
+      return NextResponse.json({
+        projects: await listLangSmithIntegrationProjects(tenant, integrationId),
+      });
+    }
+
+    if (action === "setLangSmithProject") {
+      const integrationId = requiredString(body, "integrationId");
+      const project = requiredString(body, "project");
+      const projectName =
+        typeof body.projectName === "string" ? body.projectName : undefined;
+      return NextResponse.json(
+        await setLangSmithProject(tenant, integrationId, project, projectName),
+      );
+    }
+
+    if (action === "connectLangSmith") {
+      const connection = await createLangSmithConnection({
+        tenantSlugOrId: tenant,
+        apiKey: requiredString(body, "apiKey"),
+        baseUrl:
+          typeof body.baseUrl === "string" ? body.baseUrl : undefined,
+      });
+      const tested = await testLangSmithIntegrationConnection(
+        tenant,
+        connection.id,
+      );
+      if (!tested.ok) throw new Error(tested.error);
+      return NextResponse.json(await triggerLangSmithSync(tenant, connection.id));
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

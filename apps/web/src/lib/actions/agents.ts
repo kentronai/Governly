@@ -17,6 +17,16 @@ import {
   type AgentListFilters,
 } from "@/lib/queries/agents";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
+import {
+  getLangSmithObservabilityMetrics,
+  getLangSmithRuns,
+  getObservabilityIntegrationStatus,
+} from "@/lib/queries/observability-integrations";
+import {
+  computeLangSmithMetrics,
+  type LangSmithMetrics,
+  type LangSmithRunRow,
+} from "@/lib/queries/langsmith-metrics";
 import { revalidatePath } from "next/cache";
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
@@ -104,4 +114,88 @@ export const assignAgentToApplication = async (
   await syncAgentPolicyEvaluations(tenantId, agentId);
   revalidatePath(`/${tenantSlugOrId}/ai-agent-inventory`);
   return getAgentDetail(tenantId, agentId);
+};
+
+/**
+ * Map an agent to a LangSmith tracing project so its Observability tab shows
+ * only that agent's runs. `project` is the LangSmith session/project id used to
+ * filter runs; `projectName` is the human label shown in the UI and matched
+ * against `langsmith_runs.project_name`. Pass a null project to unlink.
+ */
+export const setAgentLangSmithProject = async (
+  tenantSlugOrId: string,
+  agentId: string,
+  project: string | null,
+  projectName?: string | null,
+) => {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) throw new Error("Authentication required");
+  const tenantId = await resolveTenantId(tenantSlugOrId);
+  if (tenantId !== orgId) throw new Error("Tenant access denied");
+  const trimmedProject = project?.trim() || null;
+  const [updated] = await db
+    .update(agents)
+    .set({
+      langsmithProject: trimmedProject,
+      langsmithProjectName: trimmedProject
+        ? (projectName ?? project)?.trim() || null
+        : null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)))
+    .returning({ id: agents.id });
+  if (!updated) throw new Error("Agent not found");
+  revalidatePath(`/${tenantSlugOrId}/ai-agent-inventory`);
+  return { ok: true };
+};
+
+export interface AgentObservability {
+  /** Whether LangSmith is connected for the tenant. */
+  connected: boolean;
+  /** The LangSmith project id/name this agent is mapped to (if any). */
+  project: string | null;
+  projectName: string | null;
+  metrics: LangSmithMetrics;
+  runs: LangSmithRunRow[];
+}
+
+/** Runs + metrics for an agent, filtered to its mapped LangSmith project. */
+export const getAgentObservability = async (
+  tenantSlugOrId: string,
+  agentId: string,
+): Promise<AgentObservability> => {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) throw new Error("Authentication required");
+  const tenantId = await resolveTenantId(tenantSlugOrId);
+  if (tenantId !== orgId) throw new Error("Tenant access denied");
+
+  const status = await getObservabilityIntegrationStatus({ tenantId });
+  const [agent] = await db
+    .select({
+      project: agents.langsmithProject,
+      projectName: agents.langsmithProjectName,
+    })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)))
+    .limit(1);
+  if (!agent) throw new Error("Agent not found");
+
+  const projectName = agent.projectName ?? undefined;
+  const canQuery = Boolean(agent.project) && Boolean(projectName);
+  const [metrics, runs] = await Promise.all([
+    canQuery
+      ? getLangSmithObservabilityMetrics({ tenantId, projectName })
+      : Promise.resolve(computeLangSmithMetrics([])),
+    canQuery
+      ? getLangSmithRuns({ tenantId, projectName, limit: 50 })
+      : Promise.resolve([] as LangSmithRunRow[]),
+  ]);
+
+  return {
+    connected: status.langsmith.connected,
+    project: agent.project ?? null,
+    projectName: agent.projectName ?? null,
+    metrics,
+    runs,
+  };
 };

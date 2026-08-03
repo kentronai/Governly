@@ -75,6 +75,12 @@ const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
     description:
       "Discovers crews deployed on the CrewAI Enterprise (AMP) platform and governs each as an autonomous multi-agent workload.",
   },
+  {
+    name: "LangSmith",
+    category: "observability",
+    description:
+      "Streams LangSmith execution traces, runs, prompts, tool calls, tokens, cost, latency, and errors into the Observability dashboard.",
+  },
 ];
 
 async function resolveTenant(tenantSlugOrId: string) {

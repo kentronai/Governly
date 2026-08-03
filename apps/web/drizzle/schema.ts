@@ -3085,6 +3085,11 @@ export const agents = pgTable(
     model: text(),
     knowledgeBaseId: text("knowledge_base_id"),
     iamRoleArn: text("iam_role_arn"),
+    // LangSmith tracing project this agent maps to (session/project id used to
+    // filter runs) and its human-friendly label, set from the agent's
+    // Observability tab. Links synced `langsmith_runs` to a specific agent.
+    langsmithProject: text("langsmith_project"),
+    langsmithProjectName: text("langsmith_project_name"),
     credentialType: credentialAuthType("credential_type"),
     ownerUserId: text("owner_user_id"),
     ownerSource: text("owner_source"),
@@ -3449,6 +3454,84 @@ export const agentRecommendations = pgTable(
       columns: [table.agentId],
       foreignColumns: [agents.id],
       name: "agent_recommendations_agent_id_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Observability: LangSmith runs/traces, synced from the LangSmith API through
+// self-hosted Nango and consumed by the Observability dashboard. One
+// integrations row (name "LangSmith") owns the rows here via integration_id.
+// LangGraph execution details are derived on the fly from these traces — there
+// is no separate LangGraph table or integration.
+// ---------------------------------------------------------------------------
+
+export const langsmithRuns = pgTable(
+  "langsmith_runs",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    integrationId: uuid("integration_id").notNull(),
+    // The LangSmith run id (a UUID string in LangSmith). Unique per integration.
+    externalRunId: text("external_run_id").notNull(),
+    traceId: text("trace_id"),
+    parentRunId: text("parent_run_id"),
+    name: text(),
+    runType: text("run_type"),
+    status: text(),
+    projectName: text("project_name"),
+    model: text(),
+    systemPrompt: text("system_prompt"),
+    inputs: jsonb().default({}).notNull(),
+    outputs: jsonb().default({}).notNull(),
+    toolCalls: jsonb("tool_calls").default([]).notNull(),
+    memory: jsonb().default({}).notNull(),
+    context: jsonb().default({}).notNull(),
+    metadata: jsonb().default({}).notNull(),
+    promptTokens: integer("prompt_tokens"),
+    completionTokens: integer("completion_tokens"),
+    totalTokens: integer("total_tokens"),
+    totalCost: numeric("total_cost"),
+    latencyMs: integer("latency_ms"),
+    errorMessage: text("error_message"),
+    startTime: timestamp("start_time", { withTimezone: true, mode: "string" }),
+    endTime: timestamp("end_time", { withTimezone: true, mode: "string" }),
+    langsmithUrl: text("langsmith_url"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_langsmith_runs_integration_external").using(
+      "btree",
+      table.integrationId.asc().nullsLast().op("uuid_ops"),
+      table.externalRunId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_langsmith_runs_tenant_start").using(
+      "btree",
+      table.tenantId.asc().nullsLast().op("text_ops"),
+      table.startTime.desc().nullsLast().op("timestamptz_ops"),
+    ),
+    index("idx_langsmith_runs_trace").using(
+      "btree",
+      table.traceId.asc().nullsLast().op("text_ops"),
+    ),
+    index("idx_langsmith_runs_parent").using(
+      "btree",
+      table.parentRunId.asc().nullsLast().op("text_ops"),
+    ),
+    foreignKey({
+      columns: [table.tenantId],
+      foreignColumns: [tenants.id],
+      name: "langsmith_runs_tenant_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.integrationId],
+      foreignColumns: [integrations.id],
+      name: "langsmith_runs_integration_id_fkey",
     }).onDelete("cascade"),
   ],
 );

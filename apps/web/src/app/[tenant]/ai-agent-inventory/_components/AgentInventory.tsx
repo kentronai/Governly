@@ -30,7 +30,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Pagination from "@/components/common/pagination";
+import AgentObservabilityTab from "./AgentObservabilityTab";
 import { CompactMetricCard } from "@/components/agent-discovery/CompactMetricCard";
 import {
   Search,
@@ -606,6 +608,7 @@ export function AgentInventory({
 
       <AgentDetailModal
         agent={activeAgent}
+        tenant={tenant}
         applications={applicationOptions}
         onAssignApplication={async (applicationId) => {
           if (!activeAgent) return;
@@ -723,11 +726,13 @@ function Field({
 
 function AgentDetailModal({
   agent,
+  tenant,
   applications,
   onAssignApplication,
   onOpenChange,
 }: {
   agent: any | null;
+  tenant: string;
   applications: Array<{ id: string; name: string }>;
   onAssignApplication: (applicationId: string | null) => Promise<void>;
   onOpenChange: (open: boolean) => void;
@@ -773,7 +778,18 @@ function AgentDetailModal({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 overflow-y-auto p-5">
+            <Tabs
+              defaultValue="details"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <TabsList className="mx-5 mt-4 w-fit shrink-0">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="observability">Observability</TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value="details"
+                className="space-y-6 overflow-y-auto p-5"
+              >
               <Section title="Ownership">
                 <Field
                   label="Owner"
@@ -1161,7 +1177,14 @@ function AgentDetailModal({
                   {JSON.stringify(agent.rawMetadata ?? {}, null, 2)}
                 </pre>
               </div>
-            </div>
+              </TabsContent>
+              <TabsContent
+                value="observability"
+                className="overflow-y-auto p-5"
+              >
+                <AgentObservabilityTab tenant={tenant} agentId={agent.id} />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </DialogContent>

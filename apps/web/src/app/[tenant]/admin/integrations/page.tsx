@@ -55,17 +55,23 @@ const CATEGORY_LABELS: Record<string, string> = {
   cloud_providers: "Cloud Providers",
   runtime_platforms: "Runtime Platforms",
   agent_frameworks: "Agent Frameworks",
+  observability: "Observability & Tracing",
 };
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const CREWAI = "CrewAI";
+const LANGSMITH = "LangSmith";
+// Observability providers expose a Test Connection control; LangSmith also
+// exposes a Configure control to pick the tracing project it should sync.
+const OBSERVABILITY_INTEGRATIONS = new Set([LANGSMITH]);
 const DISCOVERY_INTEGRATIONS = new Set([
   "AWS",
   "Azure",
   "Google Cloud",
   DATABRICKS_UNITY_CATALOG,
   CREWAI,
+  LANGSMITH,
 ]);
 
 // Discovery providers connect through the self-hosted Nango Connect popup.
@@ -86,6 +92,7 @@ const NANGO_PROVIDERS: Record<string, { providerConfigKey: string }> = {
   "Google Cloud": { providerConfigKey: "google" },
   [DATABRICKS_UNITY_CATALOG]: { providerConfigKey: "databricks" },
   [CREWAI]: { providerConfigKey: "crewai" },
+  [LANGSMITH]: { providerConfigKey: "langsmith" },
 };
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
@@ -223,6 +230,14 @@ export default function IntegrationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [projectConfig, setProjectConfig] = useState<{
+    integration: Integration;
+    projects: { id: string; name: string }[];
+    selected: string;
+    loading: boolean;
+    saving: boolean;
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
@@ -606,6 +621,96 @@ export default function IntegrationsPage() {
     }
   };
 
+  const testConnection = async (integration: Integration) => {
+    if (!tenant?.id) return;
+    setTesting(integration.id);
+    try {
+      const result = await runIntegrationAction<{
+        ok: boolean;
+        error?: string;
+      }>("testConnection", {
+        tenantSlugOrId: tenant.id,
+        integrationId: integration.id,
+        providerName: integration.name,
+      });
+      if (result.ok) {
+        successToast("", "", "", `${integration.name} connection is healthy`);
+      } else {
+        errorToast(result.error || "Connection test failed");
+      }
+    } catch (error) {
+      errorToast(
+        error instanceof Error ? error.message : "Connection test failed",
+      );
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const openProjectConfig = async (integration: Integration) => {
+    if (!tenant?.id) return;
+    const currentProject =
+      typeof integration.configuration?.project === "string"
+        ? integration.configuration.project
+        : "";
+    setProjectConfig({
+      integration,
+      projects: [],
+      selected: currentProject,
+      loading: true,
+      saving: false,
+    });
+    try {
+      const result = await runIntegrationAction<{
+        projects: { id: string; name: string }[];
+      }>("listLangSmithProjects", {
+        tenantSlugOrId: tenant.id,
+        integrationId: integration.id,
+      });
+      setProjectConfig((current) =>
+        current
+          ? { ...current, projects: result.projects ?? [], loading: false }
+          : current,
+      );
+    } catch (error) {
+      errorToast(
+        error instanceof Error ? error.message : "Could not load projects",
+      );
+      setProjectConfig((current) =>
+        current ? { ...current, loading: false } : current,
+      );
+    }
+  };
+
+  const saveProject = async () => {
+    if (!tenant?.id || !projectConfig || !projectConfig.selected) return;
+    setProjectConfig((current) =>
+      current ? { ...current, saving: true } : current,
+    );
+    try {
+      const projectName =
+        projectConfig.projects.find(
+          (project) => project.id === projectConfig.selected,
+        )?.name ?? projectConfig.selected;
+      await runIntegrationAction("setLangSmithProject", {
+        tenantSlugOrId: tenant.id,
+        integrationId: projectConfig.integration.id,
+        project: projectConfig.selected,
+        projectName,
+      });
+      successToast("", "", "", "LangSmith project updated");
+      setProjectConfig(null);
+      await load();
+    } catch (error) {
+      errorToast(
+        error instanceof Error ? error.message : "Could not save project",
+      );
+      setProjectConfig((current) =>
+        current ? { ...current, saving: false } : current,
+      );
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1600px] space-y-4 p-5">
@@ -876,7 +981,33 @@ export default function IntegrationsPage() {
                               ) : (
                                 <PlayCircle className="mr-2 h-4 w-4" />
                               )}
-                              Discover
+                              {integration.name === LANGSMITH
+                                ? "Sync"
+                                : "Discover"}
+                            </Button>
+                          ) : null}
+                          {OBSERVABILITY_INTEGRATIONS.has(integration.name) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8"
+                              disabled={testing === integration.id}
+                              onClick={() => void testConnection(integration)}
+                            >
+                              {testing === integration.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : null}
+                              Test Connection
+                            </Button>
+                          ) : null}
+                          {integration.name === LANGSMITH ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8"
+                              onClick={() => void openProjectConfig(integration)}
+                            >
+                              Configure
                             </Button>
                           ) : null}
                           <Button
@@ -1230,6 +1361,79 @@ export default function IntegrationsPage() {
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(projectConfig)}
+        onOpenChange={(open) => {
+          if (!open && !projectConfig?.saving) setProjectConfig(null);
+        }}
+        modal={true}
+      >
+        <DialogContent className="sm:max-w-md dialog-content">
+          <DialogHeader>
+            <DialogTitle>Configure LangSmith project</DialogTitle>
+            <DialogDescription>
+              Choose the tracing project NORIX syncs runs from into
+              Observability.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label className="text-sm font-medium">Workspace / Project</Label>
+            {projectConfig?.loading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading projects
+              </div>
+            ) : projectConfig && projectConfig.projects.length > 0 ? (
+              <Select
+                value={projectConfig.selected}
+                onValueChange={(value) =>
+                  setProjectConfig((current) =>
+                    current ? { ...current, selected: value } : current,
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectConfig.projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No projects found. Leave unset to sync the default project.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setProjectConfig(null)}
+              disabled={projectConfig?.saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void saveProject()}
+              disabled={
+                !projectConfig?.selected || Boolean(projectConfig?.saving)
+              }
+            >
+              {projectConfig?.saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Save
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
