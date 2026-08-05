@@ -19,12 +19,44 @@ import { successToast, errorToast } from "@/lib/utils/toast";
 // (see NangoHQ/nango#5432). Both must be browser-reachable URLs.
 //  - API_URL:     the self-hosted Nango API (server) — validates the session
 //  - CONNECT_URL: where the Connect UI itself is served
-const API_URL =
-  process.env.NEXT_PUBLIC_NANGO_API_URL ||
-  process.env.NEXT_PUBLIC_NANGO_CONNECT_URL ||
-  "";
-const CONNECT_BASE_URL =
-  process.env.NEXT_PUBLIC_NANGO_CONNECT_URL || API_URL || "";
+// Next.js only substitutes NEXT_PUBLIC_* when the code contains the full,
+// static expression `process.env.NEXT_PUBLIC_X`. Reading the same key off a
+// variable (`env.NEXT_PUBLIC_X`, or spreading `process.env`) is invisible to
+// the compiler, so the browser bundle gets `undefined` and the Nango SDK
+// silently falls back to Nango Cloud. Capture the literals here, at module
+// scope, and let the helper take them as plain values.
+const BUILD_TIME_ENV: Record<string, string | undefined> = {
+  NEXT_PUBLIC_NANGO_API_URL: process.env.NEXT_PUBLIC_NANGO_API_URL,
+  NEXT_PUBLIC_NANGO_CONNECT_URL: process.env.NEXT_PUBLIC_NANGO_CONNECT_URL,
+};
+
+function resolveNangoUrls(
+  env: Record<string, string | undefined> = BUILD_TIME_ENV,
+  currentOrigin = typeof window !== "undefined" ? window.location.origin : "",
+) {
+  const apiUrl = env.NEXT_PUBLIC_NANGO_API_URL?.trim();
+  const connectUrl = env.NEXT_PUBLIC_NANGO_CONNECT_URL?.trim();
+
+  const normalize = (url: string | undefined) => {
+    if (!url) return "";
+    if (/^https?:\/\/localhost(:\d+)?(\/|$)/i.test(url)) {
+      return currentOrigin ? `${currentOrigin}${url.replace(/^https?:\/\/localhost(:\d+)?/i, "")}` : url;
+    }
+    return url;
+  };
+
+  const resolvedApiUrl = normalize(apiUrl || connectUrl);
+  const resolvedConnectBaseUrl = normalize(connectUrl || apiUrl);
+
+  return {
+    apiUrl: resolvedApiUrl,
+    connectBaseUrl: resolvedConnectBaseUrl,
+  };
+}
+
+const { apiUrl: API_URL, connectBaseUrl: CONNECT_BASE_URL } = resolveNangoUrls();
+
+export { resolveNangoUrls };
 
 // The Nango frontend SDK is loaded from a CDN at runtime (browser-side ESM)
 // instead of a bundled dependency, so the app builds even if the npm package
@@ -101,6 +133,17 @@ export function NangoConnectButton({
   const handleClick = useCallback(async () => {
     setLoading(true);
     try {
+      // Fail loudly instead of letting the SDK fall back to Nango Cloud
+      // (api.nango.dev / connect.nango.dev). A self-hosted session token is
+      // meaningless to Cloud, which renders the misleading "Your session has
+      // expired" popup. These are NEXT_PUBLIC_* — baked at image build time, so
+      // an empty value means the build args weren't passed to the Docker build.
+      if (!API_URL || !CONNECT_BASE_URL) {
+        throw new Error(
+          "Nango is not configured for this build: NEXT_PUBLIC_NANGO_API_URL / NEXT_PUBLIC_NANGO_CONNECT_URL were missing when the web image was built.",
+        );
+      }
+
       if (onBeforeConnect) await onBeforeConnect();
 
       const [{ token }, Nango] = await Promise.all([
