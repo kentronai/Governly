@@ -5779,6 +5779,11 @@ databricks-workspace:
     token_url: https://${connectionConfig.databricksInstance}/oidc/v1/token
     token_params:
         grant_type: client_credentials
+        # Databricks rejects a client_credentials request with no scope
+        # ("invalid_scope: Request must specify at least one valid scope").
+        # `all-apis` is the scope Databricks documents for M2M service
+        # principals; the upstream Nango template omits it.
+        scope: all-apis
     proxy:
         base_url: https://${connectionConfig.databricksInstance}/api/2.0/
     docs: https://nango.dev/docs/integrations/all/databricks-workspace

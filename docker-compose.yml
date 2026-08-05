@@ -176,6 +176,7 @@ services:
         NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-development}
         NEXT_PUBLIC_NANGO_API_URL: ${NEXT_PUBLIC_NANGO_API_URL:-}
         NEXT_PUBLIC_NANGO_CONNECT_URL: ${NEXT_PUBLIC_NANGO_CONNECT_URL:-}
+        NEXT_PUBLIC_NANGO_FRONTEND_URL: ${NEXT_PUBLIC_NANGO_FRONTEND_URL:-}
         NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     container_name: controlnet-web
     restart: unless-stopped
@@ -270,8 +271,19 @@ services:
         condition: service_healthy
     expose:
       - "3003" # Internal only — NORIX web talks to it over the compose network
+      - "3009" # Connect UI (the popup) — nginx proxies /nango-connect/ here
+    volumes:
+      # Custom provider templates (aws-iam, azure-service-principal, etc.) the
+      # NORIX Connect popups rely on — mounted so they exist alongside the
+      # built-in catalog (matches the dev compose).
+      - ./nango/providers.yaml:/app/nango/packages/providers/providers.yaml:ro
     environment:
       NANGO_ENCRYPTION_KEY: ${NANGO_ENCRYPTION_KEY:?NANGO_ENCRYPTION_KEY must be a base64 32-byte key}
+      # Serve the Connect UI (the popup) on 3009, as docker-compose.dev.yml does.
+      # Without this the image only serves the API + dashboard on 3003 and the
+      # popup does not exist at all — /nango-connect/ then lands on the
+      # dashboard SPA, which renders as a blank page inside the iframe.
+      FLAG_SERVE_CONNECT_UI: "true"
       # Reuse NORIX's own postgres, but a separate `nango` database.
       NANGO_DB_HOST: postgres
       NANGO_DB_PORT: "5432"
@@ -282,6 +294,10 @@ services:
       NANGO_REDIS_URL: redis://nango-redis:6379
       # Public base URL of this Nango server (used in webhook/redirect URLs).
       NANGO_SERVER_URL: ${NANGO_SERVER_URL:-http://nango-server:3003}
+      # Browser-facing URLs so the Connect popup + SDK talk to this self-hosted
+      # server (not Nango Cloud). Served via nginx sub-paths on the app origin.
+      NANGO_PUBLIC_SERVER_URL: ${NANGO_PUBLIC_SERVER_URL:-http://nango-server:3003}
+      NANGO_PUBLIC_CONNECT_URL: ${NANGO_PUBLIC_CONNECT_URL:-http://localhost:3009}
       # The :hosted image bakes PORT=8080; force both so the server actually
       # listens on 3003 (matches the healthcheck, port map, and NANGO_HOST).
       PORT: "3003"
