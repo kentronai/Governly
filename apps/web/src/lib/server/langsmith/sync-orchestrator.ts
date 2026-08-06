@@ -280,16 +280,13 @@ export interface LangSmithProject {
   name: string;
 }
 
-/** Lists tracing projects for the Workspace/Project selection dropdown. */
-export async function listLangSmithProjects(
-  connection: LangSmithConnection,
+async function fetchLangSmithProjects(
+  credentials: LangSmithCredentials,
 ): Promise<LangSmithProject[]> {
-  const payload = await withAccess(connection, ({ credentials }) =>
-    langsmithApi<unknown>(
-      credentials,
-      "GET",
-      `${LANGSMITH_ENDPOINTS.sessions}?limit=100`,
-    ),
+  const payload = await langsmithApi<unknown>(
+    credentials,
+    "GET",
+    `${LANGSMITH_ENDPOINTS.sessions}?limit=100`,
   );
   const rows = Array.isArray(payload)
     ? (payload as Record<string, unknown>[])
@@ -300,6 +297,15 @@ export async function listLangSmithProjects(
       name: String(row.name ?? row.id ?? ""),
     }))
     .filter((row) => row.id && row.name);
+}
+
+/** Lists tracing projects for the Workspace/Project selection dropdown. */
+export async function listLangSmithProjects(
+  connection: LangSmithConnection,
+): Promise<LangSmithProject[]> {
+  return withAccess(connection, ({ credentials }) =>
+    fetchLangSmithProjects(credentials),
+  );
 }
 
 function num(value: unknown): number | null {
@@ -382,19 +388,46 @@ export async function syncLangSmithRuns(
 ): Promise<LangSmithSyncResult> {
   const now = new Date().toISOString();
   try {
-    const filterId = projectFilterId(connection);
-    const displayName = projectDisplayName(connection);
     // LangSmith caps /runs/query at 100 per page and 422s above it.
     const limit = Math.min(Math.max(options?.limit ?? 100, 1), 100);
 
-    const query: Record<string, unknown> = {
-      limit,
-      order: "desc",
-      ...(filterId ? { session: [filterId] } : {}),
-    };
-    const { runs, credentials, configuration } = await withAccess(
-      connection,
-      async (context) => {
+    const { runs, credentials, configuration, filterId, displayName } =
+      await withAccess(connection, async (context) => {
+        // /runs/query 400s unless at least one of session/id/parent_run/trace
+        // is given — a stored project selection satisfies that, but a fresh
+        // connection has none. Auto-pick when there is exactly one project
+        // (the common case); otherwise this is a real ambiguity the operator
+        // must resolve, so surface it instead of letting LangSmith's opaque
+        // 400 through.
+        let filterId = projectFilterId(connection);
+        let displayName = projectDisplayName(connection);
+        let configuration = context.configuration;
+        if (!filterId) {
+          const projects = await fetchLangSmithProjects(context.credentials);
+          if (projects.length === 1) {
+            filterId = projects[0].id;
+            displayName = projects[0].name;
+            configuration = {
+              ...configuration,
+              project: filterId,
+              projectName: displayName,
+            };
+          } else if (projects.length === 0) {
+            throw new Error(
+              "No LangSmith tracing projects found in this workspace",
+            );
+          } else {
+            throw new Error(
+              `Select a LangSmith project before syncing — ${projects.length} are visible: ${projects.map((p) => p.name).join(", ")}`,
+            );
+          }
+        }
+
+        const query: Record<string, unknown> = {
+          limit,
+          order: "desc",
+          session: [filterId],
+        };
         const payload = await langsmithApi<{ runs?: LangSmithRunRaw[] }>(
           context.credentials,
           "POST",
@@ -404,9 +437,11 @@ export async function syncLangSmithRuns(
         return {
           runs: Array.isArray(payload?.runs) ? payload.runs : [],
           ...context,
+          configuration,
+          filterId,
+          displayName,
         };
-      },
-    );
+      });
 
     for (const run of runs) {
       const externalRunId = String(run.id ?? "");
