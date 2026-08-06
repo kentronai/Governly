@@ -169,58 +169,122 @@ async function langsmithApiViaNango<T>(
   }
 }
 
-/**
- * Resolve the workspace (tenant) id a key belongs to. `/api/v1/workspaces`
- * needs no workspace header itself, so this works before one is known. Returns
- * null when the key can see no workspace, or more than one and none is stored —
- * the caller then has to pick.
- */
-export async function fetchLangSmithWorkspaceId(
+/** Lists the workspaces a key can see. Needs no workspace header itself. */
+export async function fetchLangSmithWorkspaces(
   credentials: LangSmithCredentials,
-): Promise<string | null> {
-  const workspaces = await langsmithApi<
-    Array<{ id?: string; tenant_id?: string }>
+): Promise<Array<{ id: string; name: string }>> {
+  const rows = await langsmithApi<
+    Array<{
+      id?: string;
+      tenant_id?: string;
+      display_name?: string;
+      is_deleted?: boolean;
+    }>
   >(credentials, "GET", LANGSMITH_ENDPOINTS.workspaces);
-  if (!Array.isArray(workspaces) || workspaces.length !== 1) return null;
-  const only = workspaces[0];
-  const id = only?.id ?? only?.tenant_id;
-  return typeof id === "string" && id ? id : null;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((row) => !row?.is_deleted)
+    .map((row) => ({
+      id: String(row?.id ?? row?.tenant_id ?? ""),
+      name: String(row?.display_name ?? row?.id ?? ""),
+    }))
+    .filter((row) => row.id);
+}
+
+/** True when the failure means "these credentials are not accepted here". */
+function isAuthFailure(error: unknown): boolean {
+  return (
+    error instanceof LangSmithApiError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
+
+export interface LangSmithAccess {
+  /** The managed region (or self-hosted base) that accepts the key. */
+  baseUrl: string;
+  /**
+   * Workspace to send as `X-Tenant-Id`, or null when the key is already
+   * workspace-scoped and the header must be omitted.
+   */
+  workspaceId: string | null;
 }
 
 /**
- * Find which managed region a key belongs to, and the workspace within it, by
- * probing `/api/v1/workspaces` on each known base. That endpoint needs the key
- * but no workspace header, so it is the one call that can succeed before either
- * value is known. `preferredBaseUrl` (an explicitly configured or previously
- * detected base) is tried first so the common path is a single request.
+ * Work out how to reach a customer's LangSmith data: which region the key
+ * belongs to, and whether workspace-scoped calls need an `X-Tenant-Id` header
+ * and with what value. Neither is derivable from the key itself, and getting
+ * either wrong returns 403 Forbidden on every data call.
  *
- * Returns null when no region accepts the key — a genuinely invalid key, or a
- * self-hosted install, which must configure `baseUrl` manually.
+ * Per region we walk a ladder against `/sessions`, the cheapest genuinely
+ * workspace-scoped endpoint:
+ *  1. no header — a workspace-scoped service key (`lsv2_sk_…`) is already bound
+ *     to one workspace and 403s if you send a header naming another;
+ *  2. otherwise list `/workspaces` (org-scoped, needs no header) and retry
+ *     `/sessions` per workspace — a personal access token (`lsv2_pt_…`) sees
+ *     every workspace in the org, so "exactly one" is not a safe assumption and
+ *     the only reliable test is which one actually answers.
+ *
+ * `preferredBaseUrl` (explicitly configured, or previously detected) is tried
+ * first so the steady-state path is a single request. Throws when no region
+ * accepts the key, carrying the last error so the operator sees why.
  */
-export async function detectLangSmithRegion(
+export async function resolveLangSmithAccess(
   apiKey: string,
   preferredBaseUrl?: string,
-): Promise<{ baseUrl: string; workspaceId: string | null } | null> {
+): Promise<LangSmithAccess> {
   const candidates = [
     ...(preferredBaseUrl ? [preferredBaseUrl] : []),
     ...LANGSMITH_KNOWN_BASE_URLS.filter((url) => url !== preferredBaseUrl),
   ];
+  const probe = `${LANGSMITH_ENDPOINTS.sessions}?limit=1`;
+  let lastError: unknown;
 
   for (const baseUrl of candidates) {
     try {
-      const workspaceId = await fetchLangSmithWorkspaceId({
+      await langsmithApi({ mode: "direct", baseUrl, apiKey }, "GET", probe);
+      return { baseUrl, workspaceId: null };
+    } catch (error) {
+      lastError = error;
+      // Only 401/403 means "right host, wrong scoping" and is worth the
+      // workspace ladder below. Network errors and 5xx say nothing about the
+      // region, so move straight on to the next one.
+      if (!isAuthFailure(error)) continue;
+    }
+
+    let workspaces: Array<{ id: string; name: string }>;
+    try {
+      workspaces = await fetchLangSmithWorkspaces({
         mode: "direct",
         baseUrl,
         apiKey,
       });
-      // Reaching here means the key authenticated against this region, even if
-      // it sees several workspaces (workspaceId null) and the user must choose.
-      return { baseUrl, workspaceId };
-    } catch {
-      // 403/401 here just means "wrong region" — keep probing.
+    } catch (error) {
+      lastError = error;
+      continue; // Wrong region, or a key with no org-level read — try the next.
+    }
+
+    for (const workspace of workspaces) {
+      try {
+        await langsmithApi(
+          { mode: "direct", baseUrl, apiKey, workspaceId: workspace.id },
+          "GET",
+          probe,
+        );
+        return { baseUrl, workspaceId: workspace.id };
+      } catch (error) {
+        lastError = error;
+      }
     }
   }
-  return null;
+
+  const detail =
+    lastError instanceof Error ? lastError.message : String(lastError ?? "");
+  throw new LangSmithApiError(
+    `LangSmith rejected this API key on every known region (US, EU, AWS)${
+      detail ? `: ${detail}` : ""
+    }. Check the key is valid and, for a self-hosted LangSmith, set the base URL explicitly.`,
+    lastError instanceof LangSmithApiError ? lastError.status : 403,
+  );
 }
 
 export async function langsmithApi<T>(
