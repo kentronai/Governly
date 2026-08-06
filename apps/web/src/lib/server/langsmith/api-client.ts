@@ -20,6 +20,8 @@ export interface LangSmithDirectCredentials {
   baseUrl: string;
   /** LangSmith API key (ls__…). */
   apiKey: string;
+  /** LangSmith workspace (tenant) id — see WORKSPACE_HEADER. */
+  workspaceId?: string;
 }
 
 export interface LangSmithNangoCredentials {
@@ -27,6 +29,8 @@ export interface LangSmithNangoCredentials {
   baseUrl: string;
   connectionId: string;
   providerConfigKey: string;
+  /** LangSmith workspace (tenant) id — see WORKSPACE_HEADER. */
+  workspaceId?: string;
 }
 
 export type LangSmithCredentials =
@@ -35,6 +39,19 @@ export type LangSmithCredentials =
 
 /** Default base for the managed LangSmith US cloud. */
 export const LANGSMITH_DEFAULT_BASE_URL = "https://api.smith.langchain.com";
+
+/**
+ * Managed LangSmith regions. A key issued in one region returns 403 Forbidden
+ * on every other, so the region is not optional — and LangSmith gives no way to
+ * discover it from the key. We probe these in order. Self-hosted or future
+ * regions still work by storing `configuration.baseUrl` explicitly, which always
+ * takes precedence over probing.
+ */
+export const LANGSMITH_KNOWN_BASE_URLS = [
+  "https://api.smith.langchain.com", // US
+  "https://eu.api.smith.langchain.com", // EU
+  "https://aws.api.smith.langchain.com", // AWS (us-east-2)
+] as const;
 /** Web app base used to build human-clickable trace links. */
 export const LANGSMITH_APP_BASE_URL = "https://smith.langchain.com";
 
@@ -45,7 +62,16 @@ export const LANGSMITH_ENDPOINTS = {
   sessions: "/api/v1/sessions",
   /** POST run query — the primary runs/traces source. */
   runsQuery: "/api/v1/runs/query",
+  /** Workspaces the key can see — used to resolve the workspace id. */
+  workspaces: "/api/v1/workspaces",
 } as const;
+
+/**
+ * Workspace-scoped endpoints (/sessions, /runs/query) return 403 Forbidden
+ * unless the request names a workspace. `/info` and `/workspaces` do not need
+ * it, which is why a key can look valid while every data call is refused.
+ */
+const WORKSPACE_HEADER = "X-Tenant-Id";
 
 const LANGSMITH_HOST_SUFFIXES = [".langchain.com"];
 
@@ -120,6 +146,9 @@ async function langsmithApiViaNango<T>(
       method,
       endpoint: path,
       baseUrlOverride: credentials.baseUrl,
+      headers: credentials.workspaceId
+        ? { [WORKSPACE_HEADER]: credentials.workspaceId }
+        : undefined,
       data,
     });
     return response.data as T;
@@ -138,6 +167,60 @@ async function langsmithApiViaNango<T>(
       { cause: error },
     );
   }
+}
+
+/**
+ * Resolve the workspace (tenant) id a key belongs to. `/api/v1/workspaces`
+ * needs no workspace header itself, so this works before one is known. Returns
+ * null when the key can see no workspace, or more than one and none is stored —
+ * the caller then has to pick.
+ */
+export async function fetchLangSmithWorkspaceId(
+  credentials: LangSmithCredentials,
+): Promise<string | null> {
+  const workspaces = await langsmithApi<
+    Array<{ id?: string; tenant_id?: string }>
+  >(credentials, "GET", LANGSMITH_ENDPOINTS.workspaces);
+  if (!Array.isArray(workspaces) || workspaces.length !== 1) return null;
+  const only = workspaces[0];
+  const id = only?.id ?? only?.tenant_id;
+  return typeof id === "string" && id ? id : null;
+}
+
+/**
+ * Find which managed region a key belongs to, and the workspace within it, by
+ * probing `/api/v1/workspaces` on each known base. That endpoint needs the key
+ * but no workspace header, so it is the one call that can succeed before either
+ * value is known. `preferredBaseUrl` (an explicitly configured or previously
+ * detected base) is tried first so the common path is a single request.
+ *
+ * Returns null when no region accepts the key — a genuinely invalid key, or a
+ * self-hosted install, which must configure `baseUrl` manually.
+ */
+export async function detectLangSmithRegion(
+  apiKey: string,
+  preferredBaseUrl?: string,
+): Promise<{ baseUrl: string; workspaceId: string | null } | null> {
+  const candidates = [
+    ...(preferredBaseUrl ? [preferredBaseUrl] : []),
+    ...LANGSMITH_KNOWN_BASE_URLS.filter((url) => url !== preferredBaseUrl),
+  ];
+
+  for (const baseUrl of candidates) {
+    try {
+      const workspaceId = await fetchLangSmithWorkspaceId({
+        mode: "direct",
+        baseUrl,
+        apiKey,
+      });
+      // Reaching here means the key authenticated against this region, even if
+      // it sees several workspaces (workspaceId null) and the user must choose.
+      return { baseUrl, workspaceId };
+    } catch {
+      // 403/401 here just means "wrong region" — keep probing.
+    }
+  }
+  return null;
 }
 
 export async function langsmithApi<T>(
@@ -159,6 +242,9 @@ export async function langsmithApi<T>(
       headers: {
         "x-api-key": credentials.apiKey,
         Accept: "application/json",
+        ...(credentials.workspaceId
+          ? { [WORKSPACE_HEADER]: credentials.workspaceId }
+          : {}),
         ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
       },
       body: method === "POST" && data !== undefined ? JSON.stringify(data) : undefined,

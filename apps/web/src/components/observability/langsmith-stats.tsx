@@ -23,36 +23,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { CompactMetricCard } from "@/components/agent-discovery/CompactMetricCard";
 import type { LangSmithMetrics } from "@/lib/queries/langsmith-metrics";
-
-function StatTile({
-  icon: Icon,
-  title,
-  value,
-  hint,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <Card className="shadow-sm border">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Icon className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg">{title}</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-3xl font-bold">{value}</p>
-        {hint ? (
-          <p className="text-sm text-muted-foreground">{hint}</p>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
 
 const chartConfig = {
   runs: { label: "Runs", color: "#2563eb" },
@@ -90,52 +62,57 @@ export default function LangSmithStats({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile
+      {/* Same compact tiles and grid as the Agent Registry. The former per-tile
+          hint line now rides along as the card's tooltip (`description`). */}
+      <div className="grid grid-cols-[repeat(auto-fill,160px)] gap-2">
+        <CompactMetricCard
           icon={Activity}
-          title="Total Runs"
+          label="Total Runs"
           value={totalRuns.toLocaleString()}
-          hint="Synced from LangSmith"
+          description="Synced from LangSmith"
         />
-        <StatTile
+        <CompactMetricCard
           icon={Gauge}
-          title="Success Rate"
+          label="Success Rate"
           value={`${Math.round(successRate * 100)}%`}
-          hint={`${totalRuns - errorCount} of ${totalRuns} succeeded`}
+          description={`${totalRuns - errorCount} of ${totalRuns} succeeded`}
         />
-        <StatTile
+        <CompactMetricCard
           icon={AlertTriangle}
-          title="Errors"
+          label="Errors"
           value={errorCount.toLocaleString()}
-          hint="Runs with an error"
+          tone={errorCount > 0 ? "text-red-600" : undefined}
+          description="Runs with an error"
         />
-        <StatTile
+        <CompactMetricCard
           icon={Clock}
-          title="Avg Latency"
+          label="Avg Latency"
           value={avgLatencyMs != null ? `${avgLatencyMs} ms` : "—"}
-          hint={p95LatencyMs != null ? `p95 ${p95LatencyMs} ms` : undefined}
+          description={
+            p95LatencyMs != null ? `p95 ${p95LatencyMs} ms` : undefined
+          }
         />
-        <StatTile
+        <CompactMetricCard
           icon={Cpu}
-          title="Total Tokens"
+          label="Total Tokens"
           value={totalTokens.toLocaleString()}
-          hint="Prompt + completion"
+          description="Prompt + completion"
         />
-        <StatTile
+        <CompactMetricCard
           icon={Coins}
-          title="Cost"
+          label="Cost"
           value={totalCost > 0 ? `$${totalCost.toFixed(4)}` : "$0"}
-          hint="Across synced runs"
+          description="Across synced runs"
         />
-        <StatTile
+        <CompactMetricCard
           icon={Wrench}
-          title="Tool Calls"
+          label="Tool Calls"
           value={toolCallCount.toLocaleString()}
-          hint="Recorded in traces"
+          description="Recorded in traces"
         />
       </div>
 
-      <Card className="shadow-sm border">
+      <Card>
         <CardHeader>
           <CardTitle className="text-lg">Runs Over Time</CardTitle>
           <CardDescription>
