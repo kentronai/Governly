@@ -42,7 +42,7 @@ export default function Observability() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Unified Observability Dashboard</h1>
+        <h1 className="text-3xl font-bold">Observability Dashboard</h1>
       </div>
 
       {isLoading || !data ? (

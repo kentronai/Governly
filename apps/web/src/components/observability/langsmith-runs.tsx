@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimestamp } from "@/utils/formatTime";
 import { useObservabilityIntegrations } from "@/store/tenantLogs.store";
-import RunDetailDrawer from "./run-detail-drawer";
+import RunDetailDialog from "./run-detail-dialog";
 
 function EmptyState({ href }: { href: string }) {
   return (
@@ -151,7 +151,7 @@ export default function LangSmithRuns() {
         </CardContent>
       </Card>
 
-      <RunDetailDrawer
+      <RunDetailDialog
         runId={selectedRun?.id ?? null}
         runName={selectedRun?.name}
         onClose={() => setSelectedRun(null)}

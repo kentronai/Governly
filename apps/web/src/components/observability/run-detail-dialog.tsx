@@ -4,12 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { ArrowRight, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -171,7 +173,7 @@ function LangGraphView({ langgraph }: { langgraph: DerivedLangGraph }) {
   );
 }
 
-export default function RunDetailDrawer({
+export default function RunDetailDialog({
   runId,
   runName,
   onClose,
@@ -194,24 +196,24 @@ export default function RunDetailDrawer({
   const langgraph = data?.langgraph ?? null;
 
   return (
-    <Drawer
+    <Dialog
       open={Boolean(runId)}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
-      <DrawerContent className="max-h-[92vh]">
-        <DrawerHeader>
-          <DrawerTitle className="truncate">
+      <DialogContent className="max-w-4xl p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="p-6 pb-4 border-b">
+          <DialogTitle className="truncate">
             {runName || run?.name || "Run details"}
-          </DrawerTitle>
-          <DrawerDescription>
+          </DialogTitle>
+          <DialogDescription>
             {run?.runType ? `${run.runType} run` : "LangSmith run"}
             {run?.model ? ` • ${run.model}` : ""}
-          </DrawerDescription>
-        </DrawerHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <ScrollArea className="px-4 pb-6">
+        <ScrollArea className="flex-1 px-6 py-4">
           {isLoading ? (
             <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading run…
@@ -344,7 +346,13 @@ export default function RunDetailDrawer({
             </Tabs>
           )}
         </ScrollArea>
-      </DrawerContent>
-    </Drawer>
+
+        <DialogFooter className="p-6 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
