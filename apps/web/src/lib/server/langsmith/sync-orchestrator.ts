@@ -14,8 +14,9 @@ import {
   LANGSMITH_APP_BASE_URL,
   LANGSMITH_DEFAULT_BASE_URL,
   LANGSMITH_ENDPOINTS,
+  LangSmithApiError,
   langsmithApi,
-  detectLangSmithRegion,
+  resolveLangSmithAccess,
   normalizeLangSmithBaseUrl,
   type LangSmithCredentials,
   type LangSmithDirectCredentials,
@@ -50,6 +51,8 @@ interface LangSmithRunRaw {
   events?: unknown[];
   session_id?: string;
   session_name?: string;
+  /** Path to this run in the LangSmith web app, e.g. /o/<org>/projects/…/r/<id>. */
+  app_path?: string;
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
@@ -163,47 +166,95 @@ function projectDisplayName(
 }
 
 /**
- * Ensure the connection knows its LangSmith workspace id, discovering and
- * persisting it when the key can see exactly one workspace. Without it every
- * workspace-scoped call returns 403 Forbidden.
+ * A connection's resolved credentials plus the configuration they were resolved
+ * against. Callers that write `configuration` back MUST spread this copy rather
+ * than `connection.configuration`, which is the pre-resolution snapshot — doing
+ * otherwise erases the region/workspace we just discovered and sends the next
+ * sync straight back to 403.
  */
-async function ensureWorkspaceId(
+interface LangSmithAccessContext {
+  credentials: LangSmithCredentials;
+  configuration: Record<string, unknown>;
+}
+
+/**
+ * Ensure the connection knows how to reach its LangSmith data: the region, and
+ * whether workspace-scoped calls need an `X-Tenant-Id` header and with what
+ * value. Both are discovered once and persisted; without them every call to
+ * /sessions and /runs/query returns 403 Forbidden.
+ *
+ * `force` re-runs the probe even when a value is already stored, so a workspace
+ * id that has gone stale (rotated key, key moved workspace) repairs itself
+ * instead of failing forever.
+ */
+async function ensureAccess(
   connection: LangSmithConnection,
   credentials: LangSmithCredentials,
-): Promise<LangSmithCredentials> {
-  if (credentials.workspaceId) return credentials;
-  // Only the direct path carries the key, and every path resolves to it today.
-  if (credentials.mode === "nango" || !credentials.apiKey) return credentials;
-
+  force = false,
+): Promise<LangSmithAccessContext> {
   const config = (connection.configuration ?? {}) as Record<string, unknown>;
+  if (!force && (credentials.workspaceId || config.workspaceProbed === true)) {
+    return { credentials, configuration: config };
+  }
+  // Only the direct path carries the key, and every path resolves to it today.
+  if (credentials.mode === "nango" || !credentials.apiKey) {
+    return { credentials, configuration: config };
+  }
+
   const explicitBaseUrl =
     typeof config.baseUrl === "string" && config.baseUrl.trim()
       ? normalizeLangSmithBaseUrl(config.baseUrl)
       : undefined;
 
-  // Probe the managed regions: a key from one region 403s on all the others,
-  // and LangSmith exposes no way to derive the region from the key itself.
-  const detected = await detectLangSmithRegion(
+  const access = await resolveLangSmithAccess(
     credentials.apiKey,
     explicitBaseUrl ?? credentials.baseUrl,
   );
-  if (!detected) return credentials;
 
-  const next: Record<string, unknown> = { ...config };
+  const configuration: Record<string, unknown> = { ...config };
   // Never overwrite an operator-configured base (e.g. a self-hosted install).
-  if (!explicitBaseUrl) next.baseUrl = detected.baseUrl;
-  if (detected.workspaceId) next.workspaceId = detected.workspaceId;
+  if (!explicitBaseUrl) configuration.baseUrl = access.baseUrl;
+  // Records that the probe ran, so a key that legitimately needs no workspace
+  // header (a workspace-scoped service key) is not re-probed on every sync.
+  configuration.workspaceProbed = true;
+  if (access.workspaceId) configuration.workspaceId = access.workspaceId;
+  else delete configuration.workspaceId;
 
   await db
     .update(integrations)
-    .set({ configuration: next, updatedAt: new Date().toISOString() })
+    .set({ configuration, updatedAt: new Date().toISOString() })
     .where(eq(integrations.id, connection.id));
 
   return {
-    ...credentials,
-    baseUrl: explicitBaseUrl ?? detected.baseUrl,
-    workspaceId: detected.workspaceId ?? credentials.workspaceId,
+    credentials: {
+      ...credentials,
+      baseUrl: explicitBaseUrl ?? access.baseUrl,
+      workspaceId: access.workspaceId ?? undefined,
+    },
+    configuration,
   };
+}
+
+/**
+ * Run a LangSmith call, and on 401/403 re-probe the region/workspace once and
+ * retry. Scoping that was correct at connect time can stop being correct later,
+ * and a stored-but-wrong workspace id is otherwise a permanent Forbidden.
+ */
+async function withAccess<T>(
+  connection: LangSmithConnection,
+  call: (context: LangSmithAccessContext) => Promise<T>,
+): Promise<T> {
+  const credentials = await resolveLangSmithCredentials(connection);
+  const context = await ensureAccess(connection, credentials);
+  try {
+    return await call(context);
+  } catch (error) {
+    const denied =
+      error instanceof LangSmithApiError &&
+      (error.status === 401 || error.status === 403);
+    if (!denied) throw error;
+    return call(await ensureAccess(connection, credentials, true));
+  }
 }
 
 /**
@@ -214,18 +265,9 @@ async function ensureWorkspaceId(
 export async function testLangSmithConnection(
   connection: LangSmithConnection,
 ): Promise<{ ok: boolean; error?: string }> {
-  let credentials: LangSmithCredentials;
   try {
-    credentials = await resolveLangSmithCredentials(connection);
-    credentials = await ensureWorkspaceId(connection, credentials);
-  } catch (error) {
-    return { ok: false, error: (error as Error).message };
-  }
-  try {
-    await langsmithApi(
-      credentials,
-      "GET",
-      `${LANGSMITH_ENDPOINTS.sessions}?limit=1`,
+    await withAccess(connection, ({ credentials }) =>
+      langsmithApi(credentials, "GET", `${LANGSMITH_ENDPOINTS.sessions}?limit=1`),
     );
     return { ok: true };
   } catch (error) {
@@ -242,14 +284,12 @@ export interface LangSmithProject {
 export async function listLangSmithProjects(
   connection: LangSmithConnection,
 ): Promise<LangSmithProject[]> {
-  const credentials = await ensureWorkspaceId(
-    connection,
-    await resolveLangSmithCredentials(connection),
-  );
-  const payload = await langsmithApi<unknown>(
-    credentials,
-    "GET",
-    `${LANGSMITH_ENDPOINTS.sessions}?limit=100`,
+  const payload = await withAccess(connection, ({ credentials }) =>
+    langsmithApi<unknown>(
+      credentials,
+      "GET",
+      `${LANGSMITH_ENDPOINTS.sessions}?limit=100`,
+    ),
   );
   const rows = Array.isArray(payload)
     ? (payload as Record<string, unknown>[])
@@ -342,26 +382,31 @@ export async function syncLangSmithRuns(
 ): Promise<LangSmithSyncResult> {
   const now = new Date().toISOString();
   try {
-    const credentials = await ensureWorkspaceId(
-      connection,
-      await resolveLangSmithCredentials(connection),
-    );
     const filterId = projectFilterId(connection);
     const displayName = projectDisplayName(connection);
-    const limit = Math.min(Math.max(options?.limit ?? 100, 1), 200);
+    // LangSmith caps /runs/query at 100 per page and 422s above it.
+    const limit = Math.min(Math.max(options?.limit ?? 100, 1), 100);
 
     const query: Record<string, unknown> = {
       limit,
       order: "desc",
       ...(filterId ? { session: [filterId] } : {}),
     };
-    const payload = await langsmithApi<{ runs?: LangSmithRunRaw[] }>(
-      credentials,
-      "POST",
-      LANGSMITH_ENDPOINTS.runsQuery,
-      query,
+    const { runs, credentials, configuration } = await withAccess(
+      connection,
+      async (context) => {
+        const payload = await langsmithApi<{ runs?: LangSmithRunRaw[] }>(
+          context.credentials,
+          "POST",
+          LANGSMITH_ENDPOINTS.runsQuery,
+          query,
+        );
+        return {
+          runs: Array.isArray(payload?.runs) ? payload.runs : [],
+          ...context,
+        };
+      },
     );
-    const runs = Array.isArray(payload?.runs) ? payload.runs : [];
 
     for (const run of runs) {
       const externalRunId = String(run.id ?? "");
@@ -395,7 +440,11 @@ export async function syncLangSmithRuns(
         errorMessage: run.error ?? null,
         startTime: run.start_time ?? null,
         endTime: run.end_time ?? null,
-        langsmithUrl: `${LANGSMITH_APP_BASE_URL}/o/-/r/${externalRunId}`,
+        // LangSmith returns the exact web-app path for the run; a hand-built
+        // /o/-/r/<id> link does not resolve without the org and project ids.
+        langsmithUrl: run.app_path
+          ? `${LANGSMITH_APP_BASE_URL}${run.app_path}`
+          : null,
         updatedAt: now,
       };
       await db
@@ -415,8 +464,11 @@ export async function syncLangSmithRuns(
         lastSyncAt: now,
         syncStatus: "success",
         errorMessage: null,
+        // Spread the post-resolution configuration, not connection.configuration
+        // — the latter predates the region/workspace probe and writing it back
+        // would drop the workspace id every sync.
         configuration: {
-          ...((connection.configuration as Record<string, unknown>) ?? {}),
+          ...configuration,
           baseUrl: credentials.baseUrl,
           authentication:
             credentials.mode === "nango" ? "nango" : "api_key",
