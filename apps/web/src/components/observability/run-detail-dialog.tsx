@@ -7,9 +7,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -200,8 +202,8 @@ export default function RunDetailDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="truncate">
             {runName || run?.name || "Run details"}
           </DialogTitle>
@@ -211,7 +213,7 @@ export default function RunDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="-mx-6 flex-1 px-6">
+        <ScrollArea className="flex-1 px-6 py-4">
           {isLoading ? (
             <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading run…
@@ -344,6 +346,12 @@ export default function RunDetailDialog({
             </Tabs>
           )}
         </ScrollArea>
+
+        <DialogFooter className="p-6 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
