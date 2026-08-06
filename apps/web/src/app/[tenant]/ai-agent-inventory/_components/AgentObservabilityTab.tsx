@@ -37,7 +37,7 @@ import {
 } from "@/lib/actions/agents";
 import { listTenantLangSmithProjects } from "@/lib/actions/langsmith-integration";
 import LangSmithStats from "@/components/observability/langsmith-stats";
-import RunDetailDrawer from "@/components/observability/run-detail-drawer";
+import RunDetailDialog from "@/components/observability/run-detail-dialog";
 
 export default function AgentObservabilityTab({
   tenant,
@@ -239,7 +239,7 @@ export default function AgentObservabilityTab({
             </CardContent>
           </Card>
 
-          <RunDetailDrawer
+          <RunDetailDialog
             runId={selectedRun?.id ?? null}
             runName={selectedRun?.name}
             onClose={() => setSelectedRun(null)}
