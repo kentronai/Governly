@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Blocks,
@@ -269,6 +269,22 @@ export default function IntegrationsPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.id]);
+
+  // Surface integration failures as a toast instead of a permanent red banner on
+  // the card. Keyed by integration id + message so a re-render, a refetch, or an
+  // unrelated state change never re-notifies; a *changed* message does.
+  const reportedErrorsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const integration of integrations) {
+      if (!integration.errorMessage) continue;
+      const key = `${integration.id}:${integration.errorMessage}`;
+      if (reportedErrorsRef.current.has(key)) continue;
+      reportedErrorsRef.current.add(key);
+      const partial = integration.syncStatus === "success";
+      const label = partial ? "completed with warnings" : "connection failed";
+      errorToast(`${integration.name} ${label}: ${integration.errorMessage}`);
+    }
+  }, [integrations]);
 
   const categories = useMemo(
     () =>
@@ -852,9 +868,6 @@ export default function IntegrationsPage() {
                 !hasProviderConnection && integration.syncStatus === "failed";
               const connectionPending =
                 !hasProviderConnection && integration.syncStatus === "pending";
-              const partialWarning =
-                integration.syncStatus === "success" &&
-                Boolean(integration.errorMessage);
               const connected = hasProviderConnection && !connectionFailed;
 
               return (
@@ -911,17 +924,9 @@ export default function IntegrationsPage() {
                             </span>
                           </div>
                         ) : null}
-                        {integration.errorMessage ? (
-                          <div
-                            className={
-                              partialWarning
-                                ? "rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-900"
-                                : "rounded-md border border-destructive/30 bg-destructive/5 p-2 text-destructive"
-                            }
-                          >
-                            {integration.errorMessage}
-                          </div>
-                        ) : null}
+                        {/* Failures surface as a one-time toast (see the
+                            reportedErrorsRef effect) rather than a permanent
+                            banner on every card. */}
                       </div>
                     </CardContent>
                   ) : null}

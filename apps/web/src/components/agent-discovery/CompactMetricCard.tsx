@@ -12,7 +12,8 @@ export function CompactMetricCard({
   uppercaseLabel = false,
 }: {
   label: string;
-  value: number | undefined;
+  /** Strings are accepted for pre-formatted values (percentages, currency, "12 ms"). */
+  value: string | number | undefined;
   icon: LucideIcon;
   tone?: string;
   loading?: boolean;

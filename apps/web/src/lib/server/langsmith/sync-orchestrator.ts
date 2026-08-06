@@ -15,6 +15,7 @@ import {
   LANGSMITH_DEFAULT_BASE_URL,
   LANGSMITH_ENDPOINTS,
   langsmithApi,
+  detectLangSmithRegion,
   normalizeLangSmithBaseUrl,
   type LangSmithCredentials,
   type LangSmithDirectCredentials,
@@ -100,6 +101,11 @@ export async function resolveLangSmithCredentials(
     typeof config.baseUrl === "string" && config.baseUrl.trim()
       ? normalizeLangSmithBaseUrl(config.baseUrl)
       : LANGSMITH_DEFAULT_BASE_URL;
+  // Workspace-scoped endpoints 403 without this; see WORKSPACE_HEADER.
+  const workspaceId =
+    typeof config.workspaceId === "string" && config.workspaceId.trim()
+      ? config.workspaceId.trim()
+      : undefined;
 
   if (connection.nangoConnectionId && connection.nangoProviderConfigKey) {
     const { credentials, connectionConfig } = await getConnectionCredentials(
@@ -115,7 +121,7 @@ export async function resolveLangSmithCredentials(
       typeof baseUrlValue === "string" && baseUrlValue.trim()
         ? normalizeLangSmithBaseUrl(baseUrlValue)
         : configuredBaseUrl;
-    return { mode: "direct", baseUrl, apiKey };
+    return { mode: "direct", baseUrl, apiKey, workspaceId };
   }
 
   if (!connection.credentialsEncrypted) {
@@ -135,6 +141,7 @@ export async function resolveLangSmithCredentials(
     mode: "direct",
     baseUrl: parsed.baseUrl?.trim() || LANGSMITH_DEFAULT_BASE_URL,
     apiKey,
+    workspaceId,
   };
 }
 
@@ -155,18 +162,71 @@ function projectDisplayName(
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-/** Verifies the key by hitting the workspace info endpoint. */
+/**
+ * Ensure the connection knows its LangSmith workspace id, discovering and
+ * persisting it when the key can see exactly one workspace. Without it every
+ * workspace-scoped call returns 403 Forbidden.
+ */
+async function ensureWorkspaceId(
+  connection: LangSmithConnection,
+  credentials: LangSmithCredentials,
+): Promise<LangSmithCredentials> {
+  if (credentials.workspaceId) return credentials;
+  // Only the direct path carries the key, and every path resolves to it today.
+  if (credentials.mode === "nango" || !credentials.apiKey) return credentials;
+
+  const config = (connection.configuration ?? {}) as Record<string, unknown>;
+  const explicitBaseUrl =
+    typeof config.baseUrl === "string" && config.baseUrl.trim()
+      ? normalizeLangSmithBaseUrl(config.baseUrl)
+      : undefined;
+
+  // Probe the managed regions: a key from one region 403s on all the others,
+  // and LangSmith exposes no way to derive the region from the key itself.
+  const detected = await detectLangSmithRegion(
+    credentials.apiKey,
+    explicitBaseUrl ?? credentials.baseUrl,
+  );
+  if (!detected) return credentials;
+
+  const next: Record<string, unknown> = { ...config };
+  // Never overwrite an operator-configured base (e.g. a self-hosted install).
+  if (!explicitBaseUrl) next.baseUrl = detected.baseUrl;
+  if (detected.workspaceId) next.workspaceId = detected.workspaceId;
+
+  await db
+    .update(integrations)
+    .set({ configuration: next, updatedAt: new Date().toISOString() })
+    .where(eq(integrations.id, connection.id));
+
+  return {
+    ...credentials,
+    baseUrl: explicitBaseUrl ?? detected.baseUrl,
+    workspaceId: detected.workspaceId ?? credentials.workspaceId,
+  };
+}
+
+/**
+ * Verifies the key really works. Deliberately does NOT use `/api/v1/info` —
+ * that endpoint is public and answers 200 for an invalid or revoked key, which
+ * made connections report healthy while every data call returned 403.
+ */
 export async function testLangSmithConnection(
   connection: LangSmithConnection,
 ): Promise<{ ok: boolean; error?: string }> {
   let credentials: LangSmithCredentials;
   try {
     credentials = await resolveLangSmithCredentials(connection);
+    credentials = await ensureWorkspaceId(connection, credentials);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
   try {
-    await langsmithApi(credentials, "GET", LANGSMITH_ENDPOINTS.info);
+    await langsmithApi(
+      credentials,
+      "GET",
+      `${LANGSMITH_ENDPOINTS.sessions}?limit=1`,
+    );
     return { ok: true };
   } catch (error) {
     return { ok: false, error: (error as Error).message };
@@ -182,7 +242,10 @@ export interface LangSmithProject {
 export async function listLangSmithProjects(
   connection: LangSmithConnection,
 ): Promise<LangSmithProject[]> {
-  const credentials = await resolveLangSmithCredentials(connection);
+  const credentials = await ensureWorkspaceId(
+    connection,
+    await resolveLangSmithCredentials(connection),
+  );
   const payload = await langsmithApi<unknown>(
     credentials,
     "GET",
@@ -279,7 +342,10 @@ export async function syncLangSmithRuns(
 ): Promise<LangSmithSyncResult> {
   const now = new Date().toISOString();
   try {
-    const credentials = await resolveLangSmithCredentials(connection);
+    const credentials = await ensureWorkspaceId(
+      connection,
+      await resolveLangSmithCredentials(connection),
+    );
     const filterId = projectFilterId(connection);
     const displayName = projectDisplayName(connection);
     const limit = Math.min(Math.max(options?.limit ?? 100, 1), 200);
