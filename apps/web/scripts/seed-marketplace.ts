@@ -6,7 +6,7 @@
  */
 
 import { db, guardrails } from "../src/db"
-import { eq, isNull, sql } from "drizzle-orm"
+import { and, eq, isNull, sql } from "drizzle-orm"
 
 // Only include guards that exist in Python registry
 const MARKETPLACE_GUARDRAILS = [
@@ -174,7 +174,13 @@ async function seedMarketplace() {
     // policies could only bind the surviving keys, so Launch policies came up
     // with 2 of their 5 guards. Migration 0037 repairs the catalog.
     //
-    // Seeding is now an additive upsert keyed on (tenant_id, key, version).
+    // Seeding is an additive update-or-insert, matched per key.
+    //
+    // It deliberately does NOT use `ON CONFLICT (tenant_id, key, version)`:
+    // these rows are global, so tenant_id IS NULL, and Postgres treats NULLs as
+    // distinct in a unique constraint. The conflict target therefore never
+    // matches an existing global row and every run inserts a duplicate instead
+    // of updating. Match explicitly with `IS NULL` instead.
     console.log(`📦 Upserting ${MARKETPLACE_GUARDRAILS.length} marketplace guardrails...`)
 
     const values = MARKETPLACE_GUARDRAILS.map(guard => ({
@@ -198,29 +204,36 @@ async function seedMarketplace() {
       isEnabled: true,
     }))
     
-    await db
-      .insert(guardrails)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [guardrails.tenantId, guardrails.key, guardrails.version],
-        set: {
-          name: sql`excluded.name`,
-          description: sql`excluded.description`,
-          category: sql`excluded.category`,
-          tier: sql`excluded.tier`,
-          packName: sql`excluded.pack_name`,
-          functionName: sql`excluded.function_name`,
-          performanceBudgetMs: sql`excluded.performance_budget_ms`,
-          infrastructure: sql`excluded.infrastructure`,
-          isCertified: sql`excluded.is_certified`,
-          requiresOnnx: sql`excluded.requires_onnx`,
-          defaultParams: sql`excluded.default_params`,
-          avgLatencyMs: sql`excluded.avg_latency_ms`,
-          accuracyScore: sql`excluded.accuracy_score`,
-          isEnabled: sql`excluded.is_enabled`,
-          updatedAt: sql`NOW()`,
-        },
-      })
+    let inserted = 0
+    let updated = 0
+
+    for (const value of values) {
+      const existing = await db
+        .select({ id: guardrails.id })
+        .from(guardrails)
+        .where(
+          and(
+            isNull(guardrails.tenantId),
+            eq(guardrails.key, value.key),
+            eq(guardrails.version, value.version),
+          ),
+        )
+        .limit(1)
+
+      if (existing.length > 0) {
+        const { key, version, tenantId, ...mutable } = value
+        await db
+          .update(guardrails)
+          .set({ ...mutable, deletedAt: null, updatedAt: sql`NOW()` })
+          .where(eq(guardrails.id, existing[0].id))
+        updated++
+      } else {
+        await db.insert(guardrails).values(value)
+        inserted++
+      }
+    }
+
+    console.log(`  ↻ ${updated} updated, + ${inserted} inserted`)
 
     console.log(`  ✅ Upserted all ${values.length} guardrails (existing catalog left intact)`)
     
