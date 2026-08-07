@@ -452,7 +452,17 @@ async def update_policy(
             "description": policy_row[3],
             "version": policy_row[4]
         }
-        
+
+        # An empty guardrails list on an update almost always means the caller
+        # failed to resolve its guardrails (e.g. a stale/filtered lookup) rather
+        # than a deliberate request to strip the policy bare. Reject it instead
+        # of silently wiping every guardrail via the delete-then-reinsert below.
+        if policy_data.guardrails is not None and len(policy_data.guardrails) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Policy update must include at least one guardrail; refusing to clear all guardrails."
+            )
+
         # Update policy metadata if provided
         update_fields = []
         update_values = {"policy_id": policy_id, "user_id": tenant.auth.user_id}

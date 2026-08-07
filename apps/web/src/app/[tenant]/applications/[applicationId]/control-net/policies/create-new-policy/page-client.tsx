@@ -186,6 +186,7 @@ export function PolicyCreationClient({
     try {
       // Convert compositions to guardrail links format
       const allGuardrailLinks: any[] = [];
+      const unresolvedKeys: string[] = [];
       let orderIndex = 0;
 
       // Process input composition
@@ -201,6 +202,8 @@ export function PolicyCreationClient({
             params: node.params || {},
             enabled: true,
           });
+        } else {
+          unresolvedKeys.push(node.guardrailKey);
         }
       }
 
@@ -217,7 +220,17 @@ export function PolicyCreationClient({
             params: node.params || {},
             enabled: true,
           });
+        } else {
+          unresolvedKeys.push(node.guardrailKey);
         }
+      }
+
+      if (unresolvedKeys.length > 0) {
+        toast.error(
+          `Could not resolve guardrail(s): ${unresolvedKeys.join(", ")}. Save aborted to avoid losing them.`
+        );
+        setIsSaving(false);
+        return;
       }
 
       // Prepare the request body

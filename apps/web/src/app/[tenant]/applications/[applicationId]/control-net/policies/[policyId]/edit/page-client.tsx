@@ -275,6 +275,7 @@ export function PolicyEditClient({
     try {
       // Build guardrail links from composition nodes (same as create)
       const allGuardrailLinks: any[] = [];
+      const unresolvedKeys: string[] = [];
       let orderIndex = 0;
 
       // Process input composition
@@ -290,6 +291,8 @@ export function PolicyEditClient({
             params: node.params || {},
             enabled: true,
           });
+        } else {
+          unresolvedKeys.push(node.guardrailKey);
         }
       }
 
@@ -306,7 +309,17 @@ export function PolicyEditClient({
             params: node.params || {},
             enabled: true,
           });
+        } else {
+          unresolvedKeys.push(node.guardrailKey);
         }
+      }
+
+      if (unresolvedKeys.length > 0) {
+        toast.error(
+          `Could not resolve guardrail(s): ${unresolvedKeys.join(", ")}. Save aborted to avoid losing them.`
+        );
+        setIsSaving(false);
+        return;
       }
 
       // Map "completed" to "archived" for backend

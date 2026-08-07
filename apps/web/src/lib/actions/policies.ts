@@ -281,7 +281,16 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
     orderBy: (policies, { desc }) => [desc(policies.createdAt)],
   });
 
-  const transformedPolicies = policiesList.map((policy) => {
+  // Hide the retired auto-seeded "Strict"/"Development" profiles. Only the
+  // Launch policy is meant to be surfaced/edited going forward; existing rows
+  // are left in the database untouched rather than deleted.
+  const hiddenProfiles = new Set(["strict", "development"]);
+  const visiblePoliciesList = policiesList.filter((policy) => {
+    const metadata = policy.metadata as { defaultProfile?: string } | null;
+    return !hiddenProfiles.has(metadata?.defaultProfile ?? "");
+  });
+
+  const transformedPolicies = visiblePoliciesList.map((policy) => {
     const rulesCount = policy.yaml?.match(/- id:/g)?.length || 0;
     const assignment = appPolicies.find((item) => item.policyId === policy.id);
     return {

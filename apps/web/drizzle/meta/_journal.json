@@ -253,6 +253,13 @@
       "when": 1785600000000,
       "tag": "0035_agent_langsmith_project",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786100000000,
+      "tag": "0036_formatting_validation_guard_pack",
+      "breakpoints": true
     }
   ]
 }

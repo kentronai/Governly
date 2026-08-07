@@ -1,8 +1,8 @@
-import { db, guardrails } from "@/db"
-import { eq, and, isNull } from "drizzle-orm"
+import { db } from "@/db"
 import { PolicyCreationClient } from "./page-client"
 import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
+import { getAvailableGuardrails } from "@/lib/queries/guardrails"
 
 interface PageProps {
   params: Promise<{ tenant: string }>;
@@ -10,11 +10,11 @@ interface PageProps {
 
 export default async function NewPolicyPage({ params }: PageProps) {
   const { userId } = await auth()
-  
+
   if (!userId) {
     redirect("/sign-in")
   }
-  
+
   const { tenant: tenantSlug } = await params
 
   // Get tenant
@@ -26,32 +26,17 @@ export default async function NewPolicyPage({ params }: PageProps) {
     return <div>Tenant not found</div>
   }
 
-  // Fetch tenant's available guardrails (including installed global ones)
-  const availableGuardrails = await db.query.guardrails.findMany({
-    where: and(
-      eq(guardrails.tenantId, tenant.id),
-      eq(guardrails.isEnabled, true),
-      isNull(guardrails.deletedAt)
-    ),
-    orderBy: (guardrails, { asc }) => [asc(guardrails.tier), asc(guardrails.name)],
-  })
+  // Includes global catalog guardrails; without them the composition builder
+  // renders an empty picker that misleadingly reads "All guardrails have been
+  // added".
+  const availableGuardrails = await getAvailableGuardrails(tenant.id)
 
   return (
     <div className="">
       <PolicyCreationClient
         tenantSlug={tenantSlug}
         userId={userId}
-        availableGuardrails={availableGuardrails.map(g => ({
-          // Project to exactly the shape PolicyCreationClient expects rather
-          // than spreading the whole drizzle row (whose jsonb defaultParams is
-          // typed `unknown` and whose extra columns don't match the prop type).
-          id: g.id,
-          key: g.key,
-          name: g.name || g.key,
-          tier: g.tier,
-          description: g.description || "",
-          defaultParams: (g.defaultParams ?? {}) as Record<string, unknown>,
-        }))}
+        availableGuardrails={availableGuardrails}
       />
     </div>
   )
