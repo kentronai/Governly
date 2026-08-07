@@ -66,7 +66,14 @@ interface PolicyEditClientProps {
   applicationId: string;
   policyId: string;
   policyDetails: PolicyDetails;
+  /** Guardrails the user may ADD: built-ins + whatever this tenant installed. */
   availableGuardrails: Guardrail[];
+  /**
+   * Superset used to resolve the composition on save. Also covers guardrails the
+   * policy already binds that are not installed, so saving an older policy does
+   * not abort.
+   */
+  resolvableGuardrails: Guardrail[];
 }
 
 /**
@@ -118,6 +125,7 @@ export function PolicyEditClient({
   policyId,
   policyDetails,
   availableGuardrails,
+  resolvableGuardrails,
 }: PolicyEditClientProps) {
   const router = useRouter();
   const authAxios = useAuthAxios();
@@ -278,9 +286,12 @@ export function PolicyEditClient({
       const unresolvedKeys: string[] = [];
       let orderIndex = 0;
 
+      // Resolve against the superset, not the "can add" list: a policy may
+      // already bind a guardrail this tenant never installed, and dropping it
+      // here is what wiped policies in the first place.
       // Process input composition
       for (const node of formData.inputComposition) {
-        const guardrail = availableGuardrails.find(
+        const guardrail = resolvableGuardrails.find(
           (g) => g.key === node.guardrailKey
         );
         if (guardrail) {
@@ -298,7 +309,7 @@ export function PolicyEditClient({
 
       // Process output composition
       for (const node of formData.outputComposition) {
-        const guardrail = availableGuardrails.find(
+        const guardrail = resolvableGuardrails.find(
           (g) => g.key === node.guardrailKey
         );
         if (guardrail) {

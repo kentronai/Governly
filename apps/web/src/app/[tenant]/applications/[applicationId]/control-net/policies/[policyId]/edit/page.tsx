@@ -3,7 +3,10 @@ import { PolicyEditClient } from "./page-client"
 import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { getPolicyDetails } from "@/lib/actions/policies"
-import { getAvailableGuardrails } from "@/lib/queries/guardrails"
+import {
+  getAvailableGuardrails,
+  getResolvableGuardrails,
+} from "@/lib/queries/guardrails"
 
 interface PageProps {
   params: Promise<{
@@ -39,10 +42,15 @@ export default async function EditPolicyPage({ params }: PageProps) {
     return <div>Policy not found</div>
   }
 
-  // Includes global catalog guardrails, which every default policy is built
-  // from. handleSave resolves the saved composition against this list, so a
-  // missing entry here silently drops that guardrail from the policy.
-  const availableGuardrails = await getAvailableGuardrails(tenant.id)
+  // Two different lists, deliberately:
+  //   - `availableGuardrails` gates what can be ADDED (built-ins + installed).
+  //   - `resolvableGuardrails` additionally covers what this policy already
+  //     binds, so a policy holding an uninstalled marketplace guardrail still
+  //     resolves on save instead of aborting and becoming uneditable.
+  const [availableGuardrails, resolvableGuardrails] = await Promise.all([
+    getAvailableGuardrails(tenant.id),
+    getResolvableGuardrails(tenant.id, policyId),
+  ])
 
   return (
     <div className="">
@@ -56,6 +64,7 @@ export default async function EditPolicyPage({ params }: PageProps) {
           description: policyDetails.description || "",
         }}
         availableGuardrails={availableGuardrails}
+        resolvableGuardrails={resolvableGuardrails}
       />
     </div>
   )
