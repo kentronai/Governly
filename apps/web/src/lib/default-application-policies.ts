@@ -48,58 +48,6 @@ export const DEFAULT_APPLICATION_POLICIES: readonly DefaultApplicationPolicyDefi
       isDefault: true,
       priority: 100,
     },
-    {
-      profile: "strict",
-      name: "Strict Policy",
-      description:
-        "Enhanced security policy for sensitive or regulated AI applications.",
-      guards: [
-        {
-          key: "pii.detect",
-          params: {
-            threshold: 1,
-            anonymize_mode: "mask",
-            severity: "critical",
-          },
-        },
-        {
-          key: "jailbreak.detect",
-          params: { threshold: 0.25, severity: "critical" },
-        },
-        {
-          key: "profanity.detect",
-          params: {
-            threshold: 1,
-            severity: "critical",
-            categories: ["mild", "moderate", "severe"],
-          },
-        },
-        {
-          key: "toxicity.detect",
-          params: { threshold: 0.3, severity: "critical" },
-        },
-        {
-          key: "harmful_instructions.detect",
-          params: { threshold: 0.45, severity: "critical" },
-        },
-      ],
-      isDefault: false,
-      priority: 50,
-    },
-    {
-      profile: "development",
-      name: "Development Policy",
-      description:
-        "Relaxed policy intended for development, testing, and prompt experimentation.",
-      guards: [
-        {
-          key: "jailbreak.detect",
-          params: { threshold: 0.75, severity: "high" },
-        },
-      ],
-      isDefault: false,
-      priority: 10,
-    },
   ];
 
 /**

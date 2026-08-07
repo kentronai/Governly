@@ -1,9 +1,9 @@
-import { db, guardrails } from "@/db"
-import { eq, and, isNull } from "drizzle-orm"
+import { db } from "@/db"
 import { PolicyEditClient } from "./page-client"
 import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { getPolicyDetails } from "@/lib/actions/policies"
+import { getAvailableGuardrails } from "@/lib/queries/guardrails"
 
 interface PageProps {
   params: Promise<{
@@ -39,15 +39,10 @@ export default async function EditPolicyPage({ params }: PageProps) {
     return <div>Policy not found</div>
   }
 
-  // Fetch tenant's available guardrails (including installed global ones)
-  const availableGuardrails = await db.query.guardrails.findMany({
-    where: and(
-      eq(guardrails.tenantId, tenant.id),
-      eq(guardrails.isEnabled, true),
-      isNull(guardrails.deletedAt)
-    ),
-    orderBy: (guardrails, { asc }) => [asc(guardrails.tier), asc(guardrails.name)],
-  })
+  // Includes global catalog guardrails, which every default policy is built
+  // from. handleSave resolves the saved composition against this list, so a
+  // missing entry here silently drops that guardrail from the policy.
+  const availableGuardrails = await getAvailableGuardrails(tenant.id)
 
   return (
     <div className="">
@@ -60,16 +55,8 @@ export default async function EditPolicyPage({ params }: PageProps) {
           ...policyDetails,
           description: policyDetails.description || "",
         }}
-        availableGuardrails={availableGuardrails.map(g => ({
-          id: g.id,
-          key: g.key,
-          name: g.name || g.key,
-          tier: g.tier || "",
-          description: g.description || "",
-          defaultParams: (g.defaultParams as Record<string, any>) || {},
-        }))}
+        availableGuardrails={availableGuardrails}
       />
     </div>
   )
 }
-
