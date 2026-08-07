@@ -260,6 +260,13 @@
       "when": 1786100000000,
       "tag": "0036_formatting_validation_guard_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1786200000000,
+      "tag": "0037_restore_default_safety_guardrails",
+      "breakpoints": true
     }
   ]
 }
