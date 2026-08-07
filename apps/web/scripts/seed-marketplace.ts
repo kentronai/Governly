@@ -6,7 +6,7 @@
  */
 
 import { db, guardrails } from "../src/db"
-import { eq, isNull } from "drizzle-orm"
+import { eq, isNull, sql } from "drizzle-orm"
 
 // Only include guards that exist in Python registry
 const MARKETPLACE_GUARDRAILS = [
@@ -165,14 +165,18 @@ async function seedMarketplace() {
   console.log("🌱 Seeding marketplace guardrails...")
   
   try {
-    // Delete existing global marketplace guardrails
-    console.log("🧹 Cleaning up old marketplace guardrails...")
-    await db.delete(guardrails)
-      .where(eq(guardrails.isGlobal, true))
-    
-    // Insert new marketplace guardrails
-    console.log(`📦 Inserting ${MARKETPLACE_GUARDRAILS.length} marketplace guardrails...`)
-    
+    // NEVER delete the global catalog here.
+    //
+    // This script used to run `DELETE FROM guardrails WHERE is_global = true`
+    // before inserting. That wiped every guardrail this script does not define —
+    // including jailbreak.detect, profanity.detect and harmful_instructions.detect,
+    // which the default Launch policy is built from. Production ran that way:
+    // policies could only bind the surviving keys, so Launch policies came up
+    // with 2 of their 5 guards. Migration 0037 repairs the catalog.
+    //
+    // Seeding is now an additive upsert keyed on (tenant_id, key, version).
+    console.log(`📦 Upserting ${MARKETPLACE_GUARDRAILS.length} marketplace guardrails...`)
+
     const values = MARKETPLACE_GUARDRAILS.map(guard => ({
       key: guard.key,
       name: guard.name,
@@ -194,9 +198,31 @@ async function seedMarketplace() {
       isEnabled: true,
     }))
     
-    await db.insert(guardrails).values(values)
-    
-    console.log(`  ✅ Inserted all ${values.length} guardrails`)
+    await db
+      .insert(guardrails)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [guardrails.tenantId, guardrails.key, guardrails.version],
+        set: {
+          name: sql`excluded.name`,
+          description: sql`excluded.description`,
+          category: sql`excluded.category`,
+          tier: sql`excluded.tier`,
+          packName: sql`excluded.pack_name`,
+          functionName: sql`excluded.function_name`,
+          performanceBudgetMs: sql`excluded.performance_budget_ms`,
+          infrastructure: sql`excluded.infrastructure`,
+          isCertified: sql`excluded.is_certified`,
+          requiresOnnx: sql`excluded.requires_onnx`,
+          defaultParams: sql`excluded.default_params`,
+          avgLatencyMs: sql`excluded.avg_latency_ms`,
+          accuracyScore: sql`excluded.accuracy_score`,
+          isEnabled: sql`excluded.is_enabled`,
+          updatedAt: sql`NOW()`,
+        },
+      })
+
+    console.log(`  ✅ Upserted all ${values.length} guardrails (existing catalog left intact)`)
     
     
     console.log("✨ Marketplace seeding complete!")
