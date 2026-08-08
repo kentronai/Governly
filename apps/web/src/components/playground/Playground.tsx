@@ -36,6 +36,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuthFetch } from "@/lib/api/auth-fetch";
 import { successToast } from "@/lib/utils/toast";
 import { getGuardrailIcon } from "@/lib/utils/guardrailIcons";
+import { getGatewayBaseUrl } from "@/lib/utils/gatewayUrl";
 import { useParams, useRouter } from "next/navigation";
 import {
   fetchApplicationPolicies,
@@ -315,7 +316,6 @@ export default function Playground() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [requestURL] = useState(process.env.NEXT_PUBLIC_PLAYGROUND_REQUEST_URL);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -858,6 +858,9 @@ export default function Playground() {
 
   const handleCopy = async (type: string, databaseGuardrail: any) => {
     try {
+      // Resolved on click so the snippet always points at the origin the user
+      // is actually on (app.kentron.ai, staging, localhost, …).
+      const requestURL = getGatewayBaseUrl();
       let data = "";
       if (type === "CURL")
         data = `curl ${requestURL}/v1/chat/completions \\
