@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Check, Copy } from "lucide-react";
 import { successToast } from "@/lib/utils/toast";
@@ -6,6 +6,7 @@ import { successToast } from "@/lib/utils/toast";
 import { FaPython, FaNodeJs } from "react-icons/fa";
 import { SiCurl } from "react-icons/si";
 import { useParams } from "next/navigation";
+import { getGatewayBaseUrl } from "@/lib/utils/gatewayUrl";
 export default function PolicyIntegration({
   selectedPolicy,
 }: {
@@ -13,12 +14,16 @@ export default function PolicyIntegration({
 }) {
   const [copied, setCopied] = useState(false);
   const { applicationId } = useParams();
-  const [requestURL] = useState(
-    process.env.NEXT_PUBLIC_PLAYGROUND_REQUEST_URL || "https://demo.kentron.ai"
-  );
+  // Set after mount: the origin is only known in the browser, and rendering it
+  // during SSR would cause a hydration mismatch.
+  const [baseURL, setBaseURL] = useState("");
+  useEffect(() => setBaseURL(getGatewayBaseUrl()), []);
 
   const handleCopy = async (type: string, databaseGuardrail: any) => {
     try {
+      // Resolved on click so the snippet always points at the origin the user
+      // is actually on (app.kentron.ai, staging, localhost, …).
+      const requestURL = getGatewayBaseUrl();
       let data = "";
       if (type === "CURL")
         data = `curl ${requestURL}/v1/chat/completions \\
@@ -111,6 +116,10 @@ const response = await client.chat.completions.create({
             </Button>
           </div>
           <div className="p-4 rounded-lg space-y-2 text-sm font-mono">
+            <div>
+              <span className="text-muted-foreground">Base URL:</span>{" "}
+              <span className="">{baseURL ? `${baseURL}/v1` : "—"}</span>
+            </div>
             <div>
               <span className="text-muted-foreground">X-API-KEY:</span>{" "}
               <span className="">Your ControlNet API Key</span>
