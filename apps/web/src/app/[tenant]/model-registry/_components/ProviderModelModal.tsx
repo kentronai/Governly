@@ -71,6 +71,10 @@ interface Props {
 const providerUrls: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   anthropic: "https://api.anthropic.com/v1",
+  // Gemini's OpenAI-compatible endpoint — must match GEMINI_OPENAI_API_BASE_URL
+  // in @/lib/server/model-registry/runtime, or the connection test is rejected
+  // as an untrusted endpoint.
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
   vertex: "https://vertexai.googleapis.com/v1",
   bedrock: "https://bedrock-runtime.us-east-1.amazonaws.com",
   azure_openai: "https://your-resource.openai.azure.com",
@@ -367,6 +371,7 @@ export function ProviderModelModal({
                   <SelectContent>
                     <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="gemini">Google (Gemini)</SelectItem>
                     <SelectItem value="vertex">Google (Vertex AI)</SelectItem>
                     <SelectItem value="bedrock" disabled>
                       AWS (Bedrock)
