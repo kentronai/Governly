@@ -267,6 +267,13 @@
       "when": 1786200000000,
       "tag": "0037_restore_default_safety_guardrails",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786300000000,
+      "tag": "0038_seed_provider_model_catalog",
+      "breakpoints": true
     }
   ]
 }

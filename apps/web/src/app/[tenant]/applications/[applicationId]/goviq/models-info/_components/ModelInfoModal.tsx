@@ -143,6 +143,7 @@ const PROMPT_REGISTRY_INTEGRATIONS = [
 const PROVIDER_OPTIONS = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
+  { value: "gemini", label: "Google (Gemini)" },
   { value: "vertex", label: "Google (Vertex AI)" },
   { value: "bedrock", label: "AWS (Bedrock)", disabled: true },
   { value: "azure_openai", label: "Azure OpenAI", disabled: true },
