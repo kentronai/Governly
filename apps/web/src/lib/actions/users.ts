@@ -17,6 +17,79 @@ interface GetUsersOptions {
   search?: string;
 }
 
+// Same role set middleware treats as admin (see src/middleware.ts isUserAdmin).
+const ADMIN_ORG_ROLES = ['org:admin', 'admin', 'org:owner'];
+
+/**
+ * Guard for privileged user-management actions.
+ *
+ * Server actions are publicly callable POST endpoints, so a signed-in check
+ * alone is not access control: without this, any authenticated user could pass
+ * an arbitrary Clerk user id and act on a member of a different tenant. This
+ * asserts three things before any Clerk mutation runs:
+ *   1. the caller has an active organization,
+ *   2. the caller is an admin/owner of it, and
+ *   3. the target user is a member of that same organization.
+ *
+ * Returns the caller id and the verified tenant id, so callers audit against
+ * the tenant we actually checked rather than one looked up from the target.
+ */
+const requireOrgAdminOverTarget = async (targetUserId: string) => {
+  const { userId: actorUserId, orgId, orgRole } = await auth();
+
+  if (!actorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  if (!orgId) {
+    throw new Error('No active organization found. Please ensure you are logged into an organization.');
+  }
+
+  if (!orgRole || !ADMIN_ORG_ROLES.includes(orgRole)) {
+    throw new Error('Access denied: organization admin role required');
+  }
+
+  const targetMembership = await db.query.memberships.findFirst({
+    where: and(
+      eq(memberships.userId, targetUserId),
+      eq(memberships.tenantId, orgId)
+    ),
+  });
+
+  if (!targetMembership) {
+    // Deliberately the same message whether the user does not exist or belongs
+    // to another tenant, so this cannot be used to probe for user ids.
+    throw new Error('Access denied: user is not a member of your organization');
+  }
+
+  return { actorUserId, orgId };
+};
+
+/**
+ * Guard for password resets specifically: resetting your OWN password never
+ * requires an admin role — that's ordinary self-service, and requiring admin
+ * here would just lock members out of changing their own password. Resetting
+ * someone ELSE's password still goes through the full admin-over-target check.
+ *
+ * `orgId` in the return value may be null for the self-service path (a user
+ * can act on their own account without an active org selected); callers that
+ * need a tenant for auditing should fall back to a membership lookup.
+ */
+const requireCanResetPassword = async (targetUserId: string) => {
+  const { userId: actorUserId, orgId } = await auth();
+
+  if (!actorUserId) {
+    throw new Error('Authentication required');
+  }
+
+  if (actorUserId === targetUserId) {
+    return { actorUserId, orgId: orgId ?? null };
+  }
+
+  const admin = await requireOrgAdminOverTarget(targetUserId);
+  return { actorUserId: admin.actorUserId, orgId: admin.orgId as string | null };
+};
+
 interface CreateUserInput {
   email: string;
   name?: string;
@@ -223,13 +296,20 @@ export const createUser = async (input: CreateUserInput) => {
 export const updateUser = async (
   userId: string,
   input: UpdateUserInput,
-  tenantId: string
+  _tenantId: string
 ) => {
-  const { userId: actorUserId } = await auth();
-  
-  if (!actorUserId) {
-    throw new Error('Authentication required');
-  }
+  // _tenantId is caller-supplied and untrusted — the original code used it
+  // directly for every Clerk org call and local-DB write below, so any
+  // signed-in user could pass someone else's org id and change that user's
+  // email (an account-takeover path: change the email, then use the normal
+  // forgot-password flow) or their membership/role. Re-deriving the tenant
+  // from the actor's own verified admin membership closes that, matching how
+  // createUser already ignores input.tenant_id in favor of auth()'s orgId.
+  // Only admin/admin-management pages call this action (see
+  // admin/users/active and admin/users/deactivate) — there is no self-service
+  // "edit my own profile" caller, so admin-only gating doesn't remove any
+  // legitimate capability.
+  const { actorUserId, orgId: tenantId } = await requireOrgAdminOverTarget(userId);
 
   try {
     const clerk = await clerkClient();
@@ -585,28 +665,33 @@ export const resetUserPassword = async (
   userId: string,
   newPassword: string
 ) => {
-  const { userId: actorUserId } = await auth();
-  
-  if (!actorUserId) {
-    throw new Error('Authentication required');
-  }
+  // Must run before any Clerk mutation: allows a user to reset their OWN
+  // password freely, but requires org-admin-over-target for anyone else's —
+  // see requireCanResetPassword for why self-service is a separate path.
+  const { actorUserId, orgId } = await requireCanResetPassword(userId);
 
   try {
     const clerk = await clerkClient();
-    
+
     await clerk.users.updateUser(userId, {
       password: newPassword,
     });
 
-    // Optionally create audit event
+    // Optionally create audit event. Self-service resets may not have an
+    // active org in the auth context, so fall back to the target's own
+    // membership row to still attribute the event to a tenant.
     try {
-      const membership = await db.query.memberships.findFirst({
-        where: eq(memberships.userId, userId),
-      });
+      const auditTenantId =
+        orgId ??
+        (
+          await db.query.memberships.findFirst({
+            where: eq(memberships.userId, userId),
+          })
+        )?.tenantId;
 
-      if (membership) {
+      if (auditTenantId) {
         await createAuditEvent({
-          tenantId: membership.tenantId,
+          tenantId: auditTenantId,
           actorUserId: actorUserId,
           action: 'user.password_reset',
           targetType: 'user',
