@@ -52,6 +52,7 @@ from .scheduler import (
 # Pipeline orchestration
 from .pipelines import (
     chat_completions_pipeline,
+    guard_check_pipeline,
 )
 from .pipeline_fns import (
     extract_request_params,
@@ -114,6 +115,7 @@ __all__ = [
     "ExecutionResult",
     # Pipeline Orchestration
     "chat_completions_pipeline",
+    "guard_check_pipeline",
     "extract_request_params",
     "resolve_model_target",
     "resolve_policy",
