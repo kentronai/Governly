@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import axios from "axios";
 import { headers } from "next/headers";
 import { createAuditEvent } from "@/db/tenant";
+import { validateModelId } from "@/lib/model-id";
 
 interface CreateProviderModelInput {
   tenantId?: string; // Optional for global models
@@ -45,6 +46,17 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
       return {
         status: false,
         message: "Authentication required",
+      };
+    }
+
+    // model_id is sent verbatim to the provider as the `model` field. A display
+    // name saved here ("Google Gemini") passes every guardrail and then makes
+    // the provider reject 100% of proxied traffic with an opaque 400.
+    const modelIdError = validateModelId(input.modelId);
+    if (modelIdError) {
+      return {
+        status: false,
+        message: modelIdError,
       };
     }
 
@@ -169,6 +181,15 @@ export const updateProviderModel = async (
 
   if (!userId || !orgId) {
     throw new Error("Authentication required");
+  }
+
+  // Same rule as creation — an edit must not be able to reintroduce a display
+  // name into the field the gateway sends to the provider.
+  if (input.modelId !== undefined) {
+    const modelIdError = validateModelId(input.modelId);
+    if (modelIdError) {
+      throw new Error(modelIdError);
+    }
   }
 
   const [model] = await db

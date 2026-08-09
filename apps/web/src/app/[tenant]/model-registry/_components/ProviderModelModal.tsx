@@ -23,6 +23,7 @@ import { getModelsByProvider } from "@/lib/actions/model-register";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateModelId } from "@/lib/model-id";
 interface ProviderModel {
   id: string;
   provider: string;
@@ -228,12 +229,25 @@ export function ProviderModelModal({
     setSelectedModelId(value);
     const model = availableModels.find((m) => m.id === value);
     if (model) {
-      // modelId = API identifier (e.g., "gpt-4o"), displayName = human readable
-      const modelName = model.modelId || model.displayName;
+      // modelId = API identifier (e.g., "gpt-4o"), displayName = human readable.
+      // These must never be interchanged: modelId is sent verbatim to the
+      // provider, and falling back to the display name here is how a catalog
+      // entry with a missing identifier ends up registered as "Google Gemini",
+      // which the provider rejects on every single request.
+      const apiModelId = model.modelId?.trim();
+      if (!apiModelId) {
+        setSelectedModelId("");
+        setErrors({
+          family:
+            "This catalog entry has no API model identifier. Pick another model or register it manually.",
+        });
+        return;
+      }
+
       setFormData((prev) => ({
         ...prev,
-        family: modelName,
-        displayName: model.displayName || modelName,
+        family: apiModelId,
+        displayName: model.displayName || apiModelId,
       }));
       setErrors({});
     }
@@ -248,8 +262,12 @@ export function ProviderModelModal({
     if (!formData.modelUrl?.trim()) {
       newErrors.modelUrl = "Model URL is required";
     }
-    if (!formData.family?.trim()) {
-      newErrors.family = "Model name is required";
+    // `family` is submitted as model_id — the literal string the gateway puts
+    // in the provider request. Catch a display name here rather than three
+    // screens away as an opaque provider 400.
+    const modelIdError = validateModelId(formData.family);
+    if (modelIdError) {
+      newErrors.family = modelIdError;
     }
 
     setErrors(newErrors);
