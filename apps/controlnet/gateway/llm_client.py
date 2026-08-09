@@ -6,7 +6,8 @@ Uses BYOK (Bring Your Own API Key) - API keys are passed from user requests, not
 """
 
 import json
-from typing import Dict, Any, AsyncIterator
+import re
+from typing import Dict, Any, AsyncIterator, Optional
 
 import httpx
 
@@ -14,24 +15,90 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Providers echo credentials back in some error strings ("Incorrect API key
+# provided: sk-..."). Redact before the text is stored or returned.
+_SECRET_PATTERN = re.compile(r"\b(sk|sk-proj|sk-live|sk_live|sk_test|AIza)[-_A-Za-z0-9]{8,}")
+
+# Provider errors are diagnostics, not payloads.
+_MAX_PROVIDER_MESSAGE = 500
+
+
+def _redact(text: str) -> str:
+    return _SECRET_PATTERN.sub("[redacted]", text)
+
 
 class ProviderAPIError(Exception):
     """Safe provider failure that can be returned without leaking credentials."""
 
-    def __init__(self, status_code: int, code: str, message: str):
+    def __init__(
+        self,
+        status_code: int,
+        code: str,
+        message: str,
+        provider_message: Optional[str] = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
+        # What the provider itself said. Summarising this away left operators
+        # with "the provider rejected the request (HTTP 400)" and no way to tell
+        # a wrong model from a wrong key from a wrong endpoint.
+        self.provider_message = provider_message
+
+
+def _unwrap_payload(payload: Any) -> Any:
+    """Google's OpenAI-compatible endpoint wraps its error in a JSON array.
+
+    Verified live: an invalid key to
+    generativelanguage.googleapis.com/v1beta/openai returns
+    `[{"error": {"code": 400, "message": "Please pass a valid API key", ...}}]`
+    with HTTP 400 — not 401. Without unwrapping, the error object is invisible
+    and every Gemini failure degrades to a bare "provider_request_failed".
+    """
+    if isinstance(payload, list) and len(payload) == 1:
+        return payload[0]
+    return payload
+
+
+def _extract_provider_message(response: httpx.Response) -> Optional[str]:
+    """Pull the provider's own explanation out of whatever shape it used."""
+    try:
+        payload = _unwrap_payload(response.json())
+    except (ValueError, AttributeError):
+        body = (response.text or "").strip()
+        return _redact(body[:_MAX_PROVIDER_MESSAGE]) if body else None
+
+    candidates = []
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            candidates.extend([error.get("message"), error.get("status")])
+        elif isinstance(error, str):
+            candidates.append(error)
+        candidates.append(payload.get("message"))
+
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return _redact(candidate.strip()[:_MAX_PROVIDER_MESSAGE])
+
+    # Unrecognised shape — a truncated body still beats no information at all.
+    try:
+        return _redact(json.dumps(payload)[:_MAX_PROVIDER_MESSAGE])
+    except (TypeError, ValueError):
+        return None
 
 
 def _build_provider_error(response: httpx.Response) -> ProviderAPIError:
     code = "provider_request_failed"
     try:
-        payload = response.json()
+        payload = _unwrap_payload(response.json())
         provider_error = payload.get("error", {})
-        code = provider_error.get("code") or provider_error.get("type") or code
+        if isinstance(provider_error, dict):
+            code = provider_error.get("code") or provider_error.get("type") or code
     except (ValueError, AttributeError):
         pass
+
+    provider_message = _extract_provider_message(response)
 
     if code == "insufficient_quota":
         message = (
@@ -47,7 +114,12 @@ def _build_provider_error(response: httpx.Response) -> ProviderAPIError:
     else:
         message = f"The model provider rejected the request (HTTP {response.status_code})."
 
-    return ProviderAPIError(response.status_code, str(code), message)
+    # `message` stays caller-safe: the provider body can echo credentials and
+    # internal endpoints, so it is carried separately for the gateway log and
+    # the (authenticated) observability row rather than returned to the caller.
+    return ProviderAPIError(
+        response.status_code, str(code), message, provider_message
+    )
 
 
 class OpenAIClient:
@@ -101,10 +173,15 @@ class OpenAIClient:
             
             if response.status_code != 200:
                 error = _build_provider_error(response)
+                # base_url and model are what actually determine which provider
+                # was called; without them a 400 here is undiagnosable.
                 logger.error(
-                    "Provider API request failed: status=%s code=%s",
+                    "Provider API request failed: status=%s code=%s base_url=%s model=%s provider_message=%s",
                     error.status_code,
                     error.code,
+                    self.base_url,
+                    request_body.get("model"),
+                    error.provider_message,
                 )
                 raise error
             
@@ -140,9 +217,12 @@ class OpenAIClient:
                     await response.aread()
                     error = _build_provider_error(response)
                     logger.error(
-                        "Provider streaming request failed: status=%s code=%s",
+                        "Provider streaming request failed: status=%s code=%s base_url=%s model=%s provider_message=%s",
                         error.status_code,
                         error.code,
+                        self.base_url,
+                        request_body.get("model"),
+                        error.provider_message,
                     )
                     raise error
                 

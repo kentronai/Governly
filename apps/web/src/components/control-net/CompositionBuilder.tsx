@@ -32,6 +32,7 @@ import {
   Settings,
 } from "lucide-react";
 import { getGuardrailIcon } from "@/lib/utils/guardrailIcons";
+import { getNumericParamConfig } from "@/lib/guardrail-params";
 
 // Simplified: Just guards with params, no complex composition types
 export interface CompositionNode {
@@ -488,14 +489,12 @@ export function CompositionBuilder({
 
                                 // Number input
                                 if (typeof paramValue === "number") {
-                                  const isThreshold =
-                                    paramKey.includes("threshold");
-                                  const min = isThreshold
-                                    ? 0
-                                    : paramKey === "threshold" &&
-                                        node.guardrailKey?.includes("pii")
-                                      ? 1
-                                      : undefined;
+                                  const { min, max, step, hint } =
+                                    getNumericParamConfig(
+                                      node.guardrailKey,
+                                      paramKey,
+                                      paramValue
+                                    );
                                   return (
                                     <div key={paramKey} className="space-y-2">
                                       <Label
@@ -507,25 +506,32 @@ export function CompositionBuilder({
                                       <Input
                                         id={`${node.id}-${paramKey}`}
                                         type="number"
-                                        step={isThreshold ? "0.01" : "1"}
+                                        step={step}
                                         min={min}
-                                        max={isThreshold ? "1" : undefined}
+                                        max={max}
                                         value={currentValue}
-                                        onChange={(e) =>
-                                          !readOnly &&
+                                        onChange={(e) => {
+                                          if (readOnly) return;
+                                          // An empty/partial field parses to
+                                          // NaN, which serialises to null and
+                                          // fails guard validation - keep the
+                                          // last valid number instead.
+                                          const parsed = parseFloat(
+                                            e.target.value
+                                          );
                                           updateNodeParam(
                                             node.id,
                                             paramKey,
-                                            parseFloat(e.target.value)
-                                          )
-                                        }
+                                            Number.isNaN(parsed)
+                                              ? paramValue
+                                              : parsed
+                                          );
+                                        }}
                                         className="font-mono"
                                         readOnly={readOnly}
                                       />
                                       <p className="text-xs text-muted-foreground">
-                                        {isThreshold
-                                          ? "0.0 to 1.0 (higher = stricter)"
-                                          : `Default: ${paramValue}`}
+                                        {hint}
                                       </p>
                                     </div>
                                   );

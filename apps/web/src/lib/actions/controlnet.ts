@@ -7,16 +7,24 @@ import {
   observabilityLogs,
   policyGuardrails,
 } from "@/db";
-import { and, eq, inArray, notInArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
-const ALLOWED_CODES = [200, 201];
+import {
+  isAllowedSql,
+  isBlockedSql,
+  isErrorSql,
+  isInferenceTrafficSql,
+} from "@/lib/server/observability-filters";
 export interface ControlnetStats {
   models: number;
   policies: number;
   guardrails: number;
   requestCount: number;
+  /** Requests a guardrail actually blocked. */
   blockCount: number;
   allowCount: number;
+  /** Requests that failed without reaching a policy decision. */
+  errorCount: number;
   averageLatency: number;
 
   logs: {
@@ -79,14 +87,16 @@ export const getControlnetStats = async ({
     db
       .select({
         requestCount: sql<number>`count(*)`,
-        allowCount: sql<number>`count(*) filter (where ${observabilityLogs.statusCode} in (200, 201))`,
+        allowCount: sql<number>`count(*) filter (where ${isAllowedSql})`,
+        blockCount: sql<number>`count(*) filter (where ${isBlockedSql})`,
+        errorCount: sql<number>`count(*) filter (where ${isErrorSql})`,
         averageLatency: sql<number>`coalesce(avg(${observabilityLogs.latencyMs}) filter (where ${observabilityLogs.latencyMs} > 0), 0)`,
       })
       .from(observabilityLogs)
       .where(
         and(
           isNotNull(observabilityLogs.statusCode),
-          notInArray(observabilityLogs.statusCode, [500]),
+          isInferenceTrafficSql,
           eq(observabilityLogs.tenantId, tenantId),
           eq(observabilityLogs.applicationId, applicationId)
         )
@@ -109,7 +119,8 @@ export const getControlnetStats = async ({
 
   const requestCount = Number(logStats?.requestCount ?? 0);
   const allowCount = Number(logStats?.allowCount ?? 0);
-  const blockCount = requestCount - allowCount;
+  const blockCount = Number(logStats?.blockCount ?? 0);
+  const errorCount = Number(logStats?.errorCount ?? 0);
   const averageLatency = Math.round(Number(logStats?.averageLatency ?? 0));
 
   return {
@@ -118,6 +129,7 @@ export const getControlnetStats = async ({
     guardrails: guardrailCount,
     requestCount,
     blockCount,
+    errorCount,
     allowCount,
     averageLatency,
     logs,

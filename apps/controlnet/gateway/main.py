@@ -325,8 +325,11 @@ async def model_status():
 
 # Import and include routers
 try:
-    from .routes import chat, debug, policies, router_config, model_download, observability
+    from .routes import chat, debug, guard, policies, router_config, model_download, observability
     app.include_router(chat.router, prefix="/v1")
+    # Policy check without inference — the integration NORIX hands to customers
+    # who run their own LLM. See routes/guard.py.
+    app.include_router(guard.router, prefix="/v1")
     app.include_router(debug.router, prefix="/debug")
     app.include_router(guardrails.router, prefix="/v1")
     app.include_router(policies.router, prefix="/v1")

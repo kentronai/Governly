@@ -26,7 +26,11 @@ const MARKETPLACE_GUARDRAILS = [
     requiresOnnx: false,
     defaultParams: {
       types: ["EMAIL", "PHONE"],
-      threshold: 0,
+      // pii.detect's threshold is a MATCH COUNT, not a 0-1 score: it is the
+      // minimum number of PII instances that trigger a violation. The gateway
+      // validator (PIIDetectParams, ge=1.0) rejects anything below 1, so a
+      // seeded 0 made every policy using this guard fail validation.
+      threshold: 1,
       severity: "high"
     },
     avgLatencyMs: "5",

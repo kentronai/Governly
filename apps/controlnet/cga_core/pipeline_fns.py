@@ -63,11 +63,21 @@ async def extract_request_params(ctx: Ctx) -> Either:
     request = ctx["request"]
     body = ctx["body"]
     context = ctx["tenant_context"]
-    
+
+    # Guard-only callers ask NORIX a single question — "does this message break
+    # my policy?" — and then call their own LLM with their own key. There is no
+    # provider in that flow, so demanding a model id and an Authorization header
+    # would reject every legitimate policy check.
+    guard_only = bool(ctx.get("guard_only"))
+
     try:
-        model_id = extract_model_id_from_request(request, body)
-        user_api_key = extract_user_api_key_from_request(request, context)
-        
+        if guard_only:
+            model_id = request.headers.get("x-model-id") or body.get("model")
+            user_api_key = None
+        else:
+            model_id = extract_model_id_from_request(request, body)
+            user_api_key = extract_user_api_key_from_request(request, context)
+
         # Resolve an application-scoped policy first. X-Application-ID (or the
         # body application_id) makes the application's active default binding
         # and prevents cross-application policy selection.

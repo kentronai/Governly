@@ -274,6 +274,13 @@
       "when": 1786300000000,
       "tag": "0038_seed_provider_model_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1786400000000,
+      "tag": "0039_repair_count_threshold_params",
+      "breakpoints": true
     }
   ]
 }

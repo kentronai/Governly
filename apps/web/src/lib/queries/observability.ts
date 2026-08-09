@@ -19,6 +19,12 @@ import {
   ne,
 } from "drizzle-orm";
 import { ControlnetStats } from "../actions/controlnet";
+import {
+  isAllowedSql,
+  isBlockedSql,
+  isErrorSql,
+  isInferenceTrafficSql,
+} from "@/lib/server/observability-filters";
 import { cache } from "react";
 export interface ObservabilityStats extends ControlnetStats {
   applications: number;
@@ -65,7 +71,9 @@ export const getObservabilityStats = cache(
       db
         .select({
           requestCount: sql<number>`count(*)`,
-          allowCount: sql<number>`count(*) filter (where ${observabilityLogs.statusCode} in (200, 201))`,
+          allowCount: sql<number>`count(*) filter (where ${isAllowedSql})`,
+          blockCount: sql<number>`count(*) filter (where ${isBlockedSql})`,
+          errorCount: sql<number>`count(*) filter (where ${isErrorSql})`,
           averageLatency: sql<number>`coalesce(avg(${observabilityLogs.latencyMs}) filter (where ${observabilityLogs.latencyMs} > 0), 0)`,
         })
         .from(observabilityLogs)
@@ -73,7 +81,7 @@ export const getObservabilityStats = cache(
           and(
             eq(observabilityLogs.tenantId, tenantId),
             isNotNull(observabilityLogs.statusCode),
-            notInArray(observabilityLogs.statusCode, [500])
+            isInferenceTrafficSql
           )
         )
         .then((rows) => rows[0]),
@@ -94,7 +102,8 @@ export const getObservabilityStats = cache(
 
     const requestCount = Number(logStats?.requestCount ?? 0);
     const allowCount = Number(logStats?.allowCount ?? 0);
-    const blockCount = requestCount - allowCount;
+    const blockCount = Number(logStats?.blockCount ?? 0);
+    const errorCount = Number(logStats?.errorCount ?? 0);
     const averageLatency = Math.round(Number(logStats?.averageLatency ?? 0));
 
     return {
@@ -105,6 +114,7 @@ export const getObservabilityStats = cache(
       requestCount,
       blockCount,
       allowCount,
+      errorCount,
       averageLatency,
       logs: [],
     };

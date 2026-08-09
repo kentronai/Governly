@@ -50,3 +50,25 @@ def chat_completions_pipeline() -> Guard:
         execute_input_guards_tiered,
         resolve_model_target,
     )
+
+
+def guard_check_pipeline() -> Guard:
+    """
+    Policy evaluation only — NORIX never calls a model.
+
+    This is the pipeline behind `POST /v1/guard/check`, which exists because
+    NORIX's product is the policy checkpoint, not the inference. A customer
+    keeps their own LLM and their own provider key; they ask NORIX whether a
+    message is allowed, and on "allow" they call their model themselves.
+
+    It is `chat_completions_pipeline()` with the final `resolve_model_target`
+    step removed — deliberately identical up to that point, so a guard check and
+    a proxied completion can never disagree about the same message.
+    """
+    return seq(
+        extract_request_params,
+        resolve_policy,
+        apply_prompt_routing,
+        run_onnx_detection,
+        execute_input_guards_tiered,
+    )

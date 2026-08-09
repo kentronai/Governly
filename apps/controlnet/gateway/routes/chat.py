@@ -122,6 +122,26 @@ async def chat_completions(request: Request):
         request.state.application_id = ctx.get("application_id")
         request.state.agent_id = ctx.get("agent_id")
         request.state.policy_resolution_source = ctx.get("policy_resolution_source")
+
+        # Record where the request was actually routed. The tenant's Model
+        # Registry selection overrides the requested model, so "requested
+        # gpt-4o-mini" can leave for a different provider entirely — and when
+        # that provider rejects the caller's BYOK key the only symptom was an
+        # opaque 400. Log the routing so the mismatch is visible.
+        model_target = ctx.get("model_target")
+        if model_target is not None:
+            request.state.routed_model = getattr(model_target, "model_id", None)
+            request.state.routed_provider = getattr(model_target, "provider", None)
+            request.state.routed_base_url = getattr(model_target, "base_url", None)
+            requested_model = (body or {}).get("model")
+            if requested_model and requested_model != request.state.routed_model:
+                logger.warning(
+                    "model_registry_override: requested=%s routed=%s provider=%s base_url=%s",
+                    requested_model,
+                    request.state.routed_model,
+                    request.state.routed_provider,
+                    request.state.routed_base_url,
+                )
         
         # Get guard metadata
         input_guards_executed = get_input_guards_metadata(ctx["policy_metadata"])
@@ -167,6 +187,13 @@ async def chat_completions(request: Request):
         raise
     except Exception as e:
         logger.error(f"Chat completions error: {e}", exc_info=True)
+        request.state.response_payload = {
+            "error": {
+                "type": "internal_error",
+                "message": str(e),
+                "error_type": type(e).__name__,
+            }
+        }
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -504,7 +531,20 @@ async def _handle_non_streaming(
     except Exception as e:
         from ..llm_client import ProviderAPIError
 
+        # An HTTPException raised here is turned into a response before it
+        # reaches ObservabilityMiddleware, so the failure reason is only in the
+        # log row if we put it on request.state first. Without this the
+        # dashboard showed a failed request with no explanation at all.
         if isinstance(e, ProviderAPIError):
+            request.state.response_payload = {
+                "error": {
+                    "type": "provider_error",
+                    "code": e.code,
+                    "message": str(e),
+                    "provider_message": e.provider_message,
+                    "provider_status_code": e.status_code,
+                }
+            }
             raise HTTPException(
                 status_code=e.status_code,
                 detail={
@@ -514,6 +554,13 @@ async def _handle_non_streaming(
                 },
             )
         logger.error(f"Completion error: {e}", exc_info=True)
+        request.state.response_payload = {
+            "error": {
+                "type": "internal_error",
+                "message": "The model provider request failed unexpectedly.",
+                "error_type": type(e).__name__,
+            }
+        }
         raise HTTPException(
             status_code=500,
             detail="The model provider request failed unexpectedly.",
