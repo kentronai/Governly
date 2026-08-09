@@ -55,6 +55,7 @@ export default function ObservabilityChart(props: {
             ...ele,
             passed: Number(ele.passed || "0"),
             blocked: Number(ele.blocked || "0"),
+            errored: Number(ele.errored || "0"),
             formattedDay: formatDateLabel(ele.day),
           };
         })
@@ -63,6 +64,7 @@ export default function ObservabilityChart(props: {
   const chartConfig = {
     passed: { label: "Passed Requests", color: "#16a34a" },
     blocked: { label: "Blocked Requests", color: "#dc2626" },
+    errored: { label: "Failed Requests", color: "#d97706" },
   } satisfies ChartConfig;
   
   const categoryColors: Record<string, string> = {
@@ -80,7 +82,12 @@ export default function ObservabilityChart(props: {
 
   const isZeroData =
     data.length > 0 &&
-    data.every((d) => Number(d.passed) === 0 && Number(d.blocked) === 0);
+    data.every(
+      (d) =>
+        Number(d.passed) === 0 &&
+        Number(d.blocked) === 0 &&
+        Number(d.errored) === 0
+    );
 
   return (
     <div className="space-y-4">
@@ -90,7 +97,7 @@ export default function ObservabilityChart(props: {
         <CardHeader>
           <CardTitle>Daily Request Trends</CardTitle>
           <CardDescription>
-            Passed vs Blocked requests over the past 30 days
+            Passed vs blocked vs failed requests over the past 30 days
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -144,6 +151,17 @@ export default function ObservabilityChart(props: {
                       fill="rgba(220, 38, 38, 0.05)"
                       strokeWidth={2}
                       name="Blocked Requests"
+                    />
+                    {/* Requests that never reached a policy decision (provider
+                        errors, auth failures). Previously counted as blocked,
+                        which overstated guardrail activity. */}
+                    <Area
+                      type="monotone"
+                      dataKey="errored"
+                      stroke="#d97706"
+                      fill="rgba(217, 119, 6, 0.05)"
+                      strokeWidth={2}
+                      name="Failed Requests"
                     />
                   </AreaChart>
                 </ChartContainer>

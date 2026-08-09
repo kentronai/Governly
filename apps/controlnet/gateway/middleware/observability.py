@@ -234,6 +234,13 @@ async def _log_request_to_database(
             "stream": body.get("stream", False) if body and isinstance(body, dict) else False,
             "user_agent": request.headers.get("user-agent"),
             "policy_resolution_source": getattr(request.state, "policy_resolution_source", None),
+            # Where the request was actually sent. "model" above is what the
+            # caller asked for; the tenant's Model Registry selection can send
+            # it somewhere else entirely, and without this the dashboard cannot
+            # explain a provider rejection.
+            "routed_model": getattr(request.state, "routed_model", None),
+            "routed_provider": getattr(request.state, "routed_provider", None),
+            "routed_base_url": getattr(request.state, "routed_base_url", None),
         }
         
         if response_status_code >= 400:
@@ -327,9 +334,34 @@ def _build_guardrail_results(
     """Build standardized guardrail_results structure for database"""
     if not (violations or input_guards or output_guards):
         return None
-    
+
     if violations and len(violations) > 0:
         violation = violations[0]
+        # Only a guard firing on request/response content is a policy block.
+        # Pipeline failures (missing provider key, unresolvable model) also
+        # travel as violations, and recording them as "block" made the
+        # dashboard count broken requests as guardrail activity.
+        if violation.get("phase") not in ("input", "output", "tool_args"):
+            return {
+                "input_guards": input_guards,
+                "output_guards": output_guards,
+                "policy_decision": "error",
+                "blocked": False,
+                "violated_guard": None,
+                "_summary": {
+                    "decision": "error",
+                    "was_blocked": False,
+                    "total_guards": len(input_guards) + len(output_guards),
+                    "error": {
+                        "phase": violation.get("phase", "pipeline"),
+                        "message": violation.get("message"),
+                        "rule_id": violation.get("rule_id"),
+                    },
+                },
+                "all_violations": violations,
+                "total_execution_time_ms": total_guard_time,
+            }
+
         return {
             "input_guards": input_guards,
             "output_guards": output_guards,

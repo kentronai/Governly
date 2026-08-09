@@ -5,8 +5,6 @@ import {
   and,
   eq,
   desc,
-  inArray,
-  notInArray,
   isNotNull,
   sql,
   ilike,
@@ -14,7 +12,12 @@ import {
   or,
 } from "drizzle-orm";
 
-const ALLOWED_CODES = [200, 201];
+import {
+  isAllowedSql,
+  isBlockedSql,
+  isErrorSql,
+  isInferenceTrafficSql,
+} from "@/lib/server/observability-filters";
 
 // Application observability logs are filtered by application_id
 // ControlNet auto-resolves application_id from policy via application_policies table
@@ -52,14 +55,17 @@ export const getApplicationRecentEndpoints = async ({
     eq(observabilityLogs.tenantId, tenantId),
     eq(observabilityLogs.applicationId, applicationId),
     isNotNull(observabilityLogs.statusCode),
-    notInArray(observabilityLogs.statusCode, [500]),
+    isInferenceTrafficSql,
   ];
 
-  // Apply show filter
+  // Apply show filter — "blocked" means a guardrail blocked it, not merely
+  // that the request failed.
   if (show === "blocked") {
-    filters.push(notInArray(observabilityLogs.statusCode, ALLOWED_CODES));
+    filters.push(isBlockedSql);
   } else if (show === "allowed") {
-    filters.push(inArray(observabilityLogs.statusCode, ALLOWED_CODES));
+    filters.push(isAllowedSql);
+  } else if (show === "error") {
+    filters.push(isErrorSql);
   }
   // If show === "all", don't filter by status code
   
@@ -124,14 +130,17 @@ export const getTenantRecentEndpoints = async ({
   const filters: any[] = [
     eq(observabilityLogs.tenantId, tenantId),
     isNotNull(observabilityLogs.statusCode),
-    notInArray(observabilityLogs.statusCode, [500]),
+    isInferenceTrafficSql,
   ];
 
-  // Apply show filter
+  // Apply show filter — "blocked" means a guardrail blocked it, not merely
+  // that the request failed.
   if (show === "blocked") {
-    filters.push(notInArray(observabilityLogs.statusCode, ALLOWED_CODES));
+    filters.push(isBlockedSql);
   } else if (show === "allowed") {
-    filters.push(inArray(observabilityLogs.statusCode, ALLOWED_CODES));
+    filters.push(isAllowedSql);
+  } else if (show === "error") {
+    filters.push(isErrorSql);
   }
   // If show === "all", don't filter by status code
 
@@ -180,12 +189,16 @@ export const getTenantRecentEndpoints = async ({
 };
 export interface RequestStatsGraphResponse {
   totalAccepted: number;
+  /** Requests a guardrail actually blocked. */
   totalBlocked: number;
+  /** Requests that failed without reaching a policy decision. */
+  totalErrored: number;
   totalRequests: number;
   daily: {
     day: string;
     passed: number;
     blocked: number;
+    errored: number;
   }[];
   categoryBreakdown: {
     category: string;
@@ -208,7 +221,7 @@ export const getApplicationGraphStats = async ({
     eq(observabilityLogs.tenantId, tenantId),
     eq(observabilityLogs.applicationId, applicationId),
     isNotNull(observabilityLogs.statusCode),
-    notInArray(observabilityLogs.statusCode, [500]),
+    isInferenceTrafficSql,
     gte(observabilityLogs.createdAt, startDateStr), // ✅ Use string instead of Date
   ];
 
@@ -219,19 +232,15 @@ export const getApplicationGraphStats = async ({
     db
       .select({ accepted: sql<number>`count(*)` })
       .from(observabilityLogs)
-      .where(
-        and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
-      ),
-    // ----- TOTAL BLOCKED -----
+      .where(and(...baseFilters, isAllowedSql)),
+    // ----- TOTAL BLOCKED (guardrail decision, not "any failure") -----
     db
-      .select({ blocked: sql<number>`count(*)` })
+      .select({
+        blocked: sql<number>`count(*) filter (where ${isBlockedSql})`,
+        errored: sql<number>`count(*) filter (where ${isErrorSql})`,
+      })
       .from(observabilityLogs)
-      .where(
-        and(
-          ...baseFilters,
-          notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
-        )
-      ),
+      .where(and(...baseFilters)),
     // Category breakdown for blocked requests
     db.query.observabilityLogs.findMany({
       columns: {
@@ -239,7 +248,7 @@ export const getApplicationGraphStats = async ({
       },
       where: and(
         ...baseFilters,
-        notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
+        isBlockedSql,
         isNotNull(observabilityLogs.guardrailResults)
       ),
     }),
@@ -247,20 +256,9 @@ export const getApplicationGraphStats = async ({
     db
       .select({
         day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
-        passed: sql<number>`
-          count(
-            CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
-              ALLOWED_CODES.join(",")
-            )}]::int[]) THEN 1 END
-          )
-        `,
-        blocked: sql<number>`
-          count(
-            CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
-              ALLOWED_CODES.join(",")
-            )}]::int[]) THEN 1 END
-          )
-        `,
+        passed: sql<number>`count(*) filter (where ${isAllowedSql})`,
+        blocked: sql<number>`count(*) filter (where ${isBlockedSql})`,
+        errored: sql<number>`count(*) filter (where ${isErrorSql})`,
       })
       .from(observabilityLogs)
       .where(and(...baseFilters))
@@ -268,9 +266,10 @@ export const getApplicationGraphStats = async ({
       .orderBy(sql`1`),
   ]);
 
-  const accepted = acceptedResult[0]?.accepted ?? 0;
-  const blocked = blockedResult[0]?.blocked ?? 0;
-  const totalRequests = accepted + blocked;
+  const accepted = Number(acceptedResult[0]?.accepted ?? 0);
+  const blocked = Number(blockedResult[0]?.blocked ?? 0);
+  const errored = Number(blockedResult[0]?.errored ?? 0);
+  const totalRequests = accepted + blocked + errored;
 
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
@@ -308,14 +307,16 @@ export const getApplicationGraphStats = async ({
 
     daily.push({
       day: dayKey,
-      passed: row?.passed ?? 0,
-      blocked: row?.blocked ?? 0,
+      passed: Number(row?.passed ?? 0),
+      blocked: Number(row?.blocked ?? 0),
+      errored: Number(row?.errored ?? 0),
     });
   }
 
   return {
     totalAccepted: accepted,
     totalBlocked: blocked,
+    totalErrored: errored,
     totalRequests,
     daily,
     categoryBreakdown,
@@ -334,7 +335,7 @@ export const getTenantGraphStats = async ({
   const baseFilters: any[] = [
     eq(observabilityLogs.tenantId, tenantId),
     isNotNull(observabilityLogs.statusCode),
-    notInArray(observabilityLogs.statusCode, [500]),
+    isInferenceTrafficSql,
     gte(observabilityLogs.createdAt, startDateStr), // ✅ Use string instead of Date
   ];
 
@@ -345,19 +346,15 @@ export const getTenantGraphStats = async ({
     db
       .select({ accepted: sql<number>`count(*)` })
       .from(observabilityLogs)
-      .where(
-        and(...baseFilters, inArray(observabilityLogs.statusCode, ALLOWED_CODES))
-      ),
-    // ----- TOTAL BLOCKED -----
+      .where(and(...baseFilters, isAllowedSql)),
+    // ----- TOTAL BLOCKED (guardrail decision, not "any failure") -----
     db
-      .select({ blocked: sql<number>`count(*)` })
+      .select({
+        blocked: sql<number>`count(*) filter (where ${isBlockedSql})`,
+        errored: sql<number>`count(*) filter (where ${isErrorSql})`,
+      })
       .from(observabilityLogs)
-      .where(
-        and(
-          ...baseFilters,
-          notInArray(observabilityLogs.statusCode, ALLOWED_CODES)
-        )
-      ),
+      .where(and(...baseFilters)),
     // Category breakdown for blocked requests
     db.query.observabilityLogs.findMany({
       columns: {
@@ -365,7 +362,7 @@ export const getTenantGraphStats = async ({
       },
       where: and(
         ...baseFilters,
-        notInArray(observabilityLogs.statusCode, ALLOWED_CODES),
+        isBlockedSql,
         isNotNull(observabilityLogs.guardrailResults)
       ),
     }),
@@ -373,20 +370,9 @@ export const getTenantGraphStats = async ({
     db
       .select({
         day: sql<string>`to_char(${observabilityLogs.createdAt}, 'YYYY-MM-DD')`,
-        passed: sql<number>`
-          count(
-            CASE WHEN ${observabilityLogs.statusCode} = ANY(ARRAY[${sql.raw(
-              ALLOWED_CODES.join(",")
-            )}]::int[]) THEN 1 END
-          )
-        `,
-        blocked: sql<number>`
-          count(
-            CASE WHEN ${observabilityLogs.statusCode} <> ALL(ARRAY[${sql.raw(
-              ALLOWED_CODES.join(",")
-            )}]::int[]) THEN 1 END
-          )
-        `,
+        passed: sql<number>`count(*) filter (where ${isAllowedSql})`,
+        blocked: sql<number>`count(*) filter (where ${isBlockedSql})`,
+        errored: sql<number>`count(*) filter (where ${isErrorSql})`,
       })
       .from(observabilityLogs)
       .where(and(...baseFilters))
@@ -394,9 +380,10 @@ export const getTenantGraphStats = async ({
       .orderBy(sql`1`),
   ]);
 
-  const accepted = acceptedResult[0]?.accepted ?? 0;
-  const blocked = blockedResult[0]?.blocked ?? 0;
-  const totalRequests = accepted + blocked;
+  const accepted = Number(acceptedResult[0]?.accepted ?? 0);
+  const blocked = Number(blockedResult[0]?.blocked ?? 0);
+  const errored = Number(blockedResult[0]?.errored ?? 0);
+  const totalRequests = accepted + blocked + errored;
 
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
@@ -434,14 +421,16 @@ export const getTenantGraphStats = async ({
 
     daily.push({
       day: dayKey,
-      passed: row?.passed ?? 0,
-      blocked: row?.blocked ?? 0,
+      passed: Number(row?.passed ?? 0),
+      blocked: Number(row?.blocked ?? 0),
+      errored: Number(row?.errored ?? 0),
     });
   }
 
   return {
     totalAccepted: accepted,
     totalBlocked: blocked,
+    totalErrored: errored,
     totalRequests,
     daily,
     categoryBreakdown,

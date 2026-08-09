@@ -81,6 +81,7 @@ export const FilterSection = ({
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="allowed">Allowed</SelectItem>
             <SelectItem value="blocked">Blocked</SelectItem>
+            <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
       </div>

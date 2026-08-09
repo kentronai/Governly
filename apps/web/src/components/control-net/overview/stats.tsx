@@ -9,6 +9,7 @@ import {
   Clock,
   GitPullRequestArrow,
   Package,
+  TriangleAlert,
 } from "lucide-react";
 import { useApplicationStats } from "@/store/applicationLogs.store";
 import Loading from "./loading";
@@ -111,6 +112,13 @@ export default function Stats() {
                 <p className="">Blocked</p>
               </div>
               <p className="">{data.blockCount}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2 items-center text-amber-600">
+                <TriangleAlert className="h-5 w-5 "></TriangleAlert>
+                <p className="">Failed</p>
+              </div>
+              <p className="">{data.errorCount}</p>
             </div>
           </CardContent>
         </Card>

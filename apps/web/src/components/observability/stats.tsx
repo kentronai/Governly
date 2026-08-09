@@ -6,6 +6,7 @@ import {
   Network,
   ShieldCheck,
   ShieldBan,
+  TriangleAlert,
   GitPullRequestArrow,
   Package,
   AppWindow,
@@ -73,6 +74,13 @@ export default function Stats() {
           icon={ShieldBan}
           tone="text-red-600"
           description="Requests blocked by guardrails"
+        />
+        <CompactMetricCard
+          label="Failed"
+          value={data.errorCount}
+          icon={TriangleAlert}
+          tone="text-amber-600"
+          description="Requests that failed before a policy decision"
         />
       </div>
 
