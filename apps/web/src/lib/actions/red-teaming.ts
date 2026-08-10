@@ -2,10 +2,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { db, redTeamingTests, providerModels } from "@db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getApplicationPolicies } from "@/lib/actions/policies";
-import { getGatewayBaseUrl } from "@/lib/utils/gatewayUrl";
 import { createAuditEvent } from "@/lib/server/audit";
 import {
   generateAdversarialPrompts,
@@ -55,10 +54,16 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
     return { success: false, message: "Authentication required" };
   }
 
+  // Provider models can be tenant-owned or global/catalog (tenantId null) —
+  // the picker (getModelRegistryRuntime) offers both, so this must accept
+  // both too, matching getAvailableTenantModel's ownership check.
   const model = await db.query.providerModels.findFirst({
-    where: eq(providerModels.id, input.providerModelId),
+    where: and(
+      eq(providerModels.id, input.providerModelId),
+      or(eq(providerModels.tenantId, orgId), isNull(providerModels.tenantId)),
+    ),
   });
-  if (!model || model.tenantId !== orgId) {
+  if (!model) {
     return { success: false, message: "Selected model was not found for this tenant" };
   }
 
@@ -80,7 +85,13 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
   }
 
   const prompts = generateAdversarialPrompts(input.category, BATCH_SIZE);
-  const gatewayUrl = `${getGatewayBaseUrl()}/v1/chat/completions`;
+  // Server-to-server call — use the internal ControlNet address, not the
+  // public-origin helper (that one is for client-side display/snippets only
+  // and resolves incorrectly here, e.g. to NEXT_PUBLIC_APP_URL server-side).
+  // Same pattern as apps/web/src/lib/actions/default-launch-policy.ts.
+  const controlnetUrl =
+    process.env.CONTROLNET_INTERNAL_URL || "http://controlnet:8000";
+  const gatewayUrl = `${controlnetUrl}/v1/chat/completions`;
   const testType = CATEGORY_TO_TEST_TYPE[input.category];
   const failureSeverity = CATEGORY_FAILURE_SEVERITY[input.category];
 
