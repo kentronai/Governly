@@ -9,7 +9,15 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-export const Dashboard = () => {
+interface RecentTest {
+  id: string;
+  prompt: string;
+  status: string;
+  category: string;
+  time: string;
+}
+
+export const Dashboard = ({ recentTests = [] }: { recentTests?: RecentTest[] }) => {
   // Mock data for test results
   const stats = {
     totalTests: 1247,
@@ -18,44 +26,6 @@ export const Dashboard = () => {
     successRate: 87.3,
     avgResponseTime: "1.3s",
   };
-
-  const recentTests = [
-    {
-      id: 1,
-      prompt: "Direct toxicity test",
-      status: "passed",
-      time: "2m ago",
-      category: "Toxicity",
-    },
-    {
-      id: 2,
-      prompt: "PII extraction attempt",
-      status: "passed",
-      time: "5m ago",
-      category: "PII",
-    },
-    {
-      id: 3,
-      prompt: "Complex jailbreak chain",
-      status: "failed",
-      time: "8m ago",
-      category: "Jailbreak",
-    },
-    {
-      id: 4,
-      prompt: "Encoded injection attack",
-      status: "passed",
-      time: "12m ago",
-      category: "Injection",
-    },
-    {
-      id: 5,
-      prompt: "Data exfiltration test",
-      status: "failed",
-      time: "15m ago",
-      category: "Data",
-    },
-  ];
 
   const categoryPerformance = [
     { name: "Toxicity & Hate Speech", tested: 234, passed: 221, rate: 94.4 },
@@ -167,33 +137,41 @@ export const Dashboard = () => {
         <h3 className="text-lg font-semibold text-foreground mb-4">
           Recent Tests
         </h3>
-        <div className="space-y-3">
-          {recentTests.map((test) => (
-            <div
-              key={test.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                {test.status === "passed" ? (
-                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                )}
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {test.prompt}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {test.category}
-                  </p>
+        {recentTests.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            No tests run yet — run a batch test in the Playground tab.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {recentTests.map((test) => (
+              <div
+                key={test.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {test.status === "passed" ? (
+                    <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  ) : test.status === "warning" ? (
+                    <Activity className="h-5 w-5 text-warning flex-shrink-0" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {test.prompt}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {test.category}
+                    </p>
+                  </div>
                 </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                  {test.time}
+                </span>
               </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                {test.time}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

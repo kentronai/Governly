@@ -24,6 +24,12 @@ class PIIDetectParams(BaseModel):
     severity: Literal["low", "med", "high", "critical"] = Field(default="high", description="Severity level")
 
 
+class PIIRedactParams(BaseModel):
+    """Parameters for PII redaction guard (never blocks; rewrites text in place)"""
+    types: Optional[List[str]] = Field(default=None, description="PII types to redact (None = all)")
+    mode: Literal["mask", "remove"] = Field(default="mask", description="How to redact PII")
+
+
 class ToxicityDetectParams(BaseModel):
     """Parameters for toxicity detection guard"""
     categories: Optional[List[str]] = Field(default=None, description="Toxicity categories (None = all)")
@@ -235,6 +241,7 @@ class ONNXConfigurableParams(BaseModel):
 GUARD_SCHEMAS: Dict[str, type[BaseModel]] = {
     # Default guardrails with new naming convention
     "pii.detect": PIIDetectParams,
+    "pii.redact": PIIRedactParams,
     "toxicity.detect": ToxicityDetectParams,
     "jailbreak.detect": JailbreakDetectParams,
     "profanity.detect": ProfanityDetectParams,

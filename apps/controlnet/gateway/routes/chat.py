@@ -501,12 +501,22 @@ async def _handle_non_streaming(
                     "x-tenant-id": tenant_id,
                 }
             )
-        
+
+        # A guard may pass the request through while rewriting ctx["output"]
+        # (e.g. pii.redact silently scrubbing PII instead of blocking).
+        # Write that back into the response before returning it, otherwise
+        # the rewrite is computed and discarded. Only applies to non-streaming
+        # responses - streamed chunks are already sent to the client by the
+        # time later output guards would run, so this cannot redact a stream.
+        redacted_output = get_context(output_result).get("output", content)
+        if redacted_output != content and "choices" in response and response["choices"]:
+            response["choices"][0].setdefault("message", {})["content"] = redacted_output
+
         # Success - populate request.state for observability
         request.state.output_guards_executed = output_guards_executed
         request.state.total_guard_time_ms = input_guard_time + output_guard_time
         request.state.response_payload = response
-        
+
         # Add guardrails info to response
         if "choices" in response:
             response["guardrails"] = {
