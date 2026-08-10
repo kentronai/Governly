@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Shield, Zap, Bug, Lock, Database, Globe } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,12 +17,34 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { ActivateDialog } from "@/components/common/FeatureActivation";
+import { runRedTeamBatchTest } from "@/lib/actions/red-teaming";
+import { infoToast, errorToast } from "@/lib/utils/toast";
 
-const RedTeamingView = ({ models, isEnabled }: { models: any[]; isEnabled: boolean }) => {
+interface RecentTest {
+  id: string;
+  prompt: string;
+  status: string;
+  category: string;
+  time: string;
+}
+
+const RedTeamingView = ({
+  models,
+  isEnabled,
+  applicationId,
+  recentTests,
+}: {
+  models: any[];
+  isEnabled: boolean;
+  applicationId: string;
+  recentTests: RecentTest[];
+}) => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"dashboard" | "playground">(
     "dashboard"
   );
+  const [isRunning, setIsRunning] = useState(false);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -101,7 +124,7 @@ const RedTeamingView = ({ models, isEnabled }: { models: any[]; isEnabled: boole
             </TabsList>
 
             <TabsContent value="dashboard" className="mt-6">
-              <Dashboard />
+              <Dashboard recentTests={recentTests} />
             </TabsContent>
 
             <TabsContent value="playground" className="mt-6 space-y-6">
@@ -128,7 +151,6 @@ const RedTeamingView = ({ models, isEnabled }: { models: any[]; isEnabled: boole
                     const model = models.filter(
                       (model: any) => ele == model.id
                     );
-                    console.log(model);
                     setModel(model.length > 0 ? model[0] : null);
                   }}
                 >
@@ -198,10 +220,40 @@ const RedTeamingView = ({ models, isEnabled }: { models: any[]; isEnabled: boole
               </div>
               <Button
                 className=""
-                disabled={selectedModel === null || selectedCategory === null}
+                disabled={
+                  selectedModel === null || selectedCategory === null || isRunning
+                }
+                onClick={async () => {
+                  if (!selectedModel || !selectedCategory) return;
+                  setIsRunning(true);
+                  try {
+                    const result = await runRedTeamBatchTest({
+                      applicationId,
+                      providerModelId: selectedModel.id,
+                      category: selectedCategory as any,
+                    });
+
+                    if (!result.success) {
+                      errorToast(result.message ?? "Failed to run batch test");
+                      return;
+                    }
+
+                    infoToast(
+                      `Ran ${result.total} tests: ${result.passed} passed, ${result.failed} failed${
+                        result.warning ? `, ${result.warning} warning` : ""
+                      }`
+                    );
+                    router.refresh();
+                  } catch (error) {
+                    errorToast(
+                      error instanceof Error ? error.message : "Failed to run batch test"
+                    );
+                  } finally {
+                    setIsRunning(false);
+                  }
+                }}
               >
-                {" "}
-                Run Batch Test
+                {isRunning ? "Running..." : "Run Batch Test"}
               </Button>
             </TabsContent>
           </Tabs>
