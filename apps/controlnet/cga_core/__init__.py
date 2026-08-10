@@ -64,9 +64,11 @@ from .pipeline_fns import (
 
 # Import all guard packs to populate REGISTRY
 # These imports trigger @guard decorators which register guards
-import guard_packs.default_guardrails  # Core production-ready guardrails (profanity, jailbreak, toxicity, PII)
+import guard_packs.default_guardrails  # Core production-ready guardrails (profanity, jailbreak, toxicity, PII, PII redaction)
 import guard_packs.formatting  # Data formatting and validation (JSON, XML, CSV, URLs, email)
 import guard_packs.validation  # String validation (contains, required patterns, etc.)
+import guard_packs.business  # Competitor protection, brand tone
+import guard_packs.tools  # Tool call allowlist/denylist
 
 # Database-driven guards are generated at runtime in the gateway cache initialization
 

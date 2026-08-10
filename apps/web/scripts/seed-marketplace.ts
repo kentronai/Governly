@@ -105,10 +105,13 @@ const MARKETPLACE_GUARDRAILS = [
     name: "Brand Tone Enforcement",
     description: "Ensures responses match your brand's tone and voice",
     category: "business",
-    tier: "T0",
+    // T1, not T0: beyond unprofessional_patterns (regex), this guard also
+    // runs a sentence-embedding tone check when required_tone="professional"
+    // (guard_packs/business/guards.py) - no longer pure-regex speed.
+    tier: "T1",
     packName: "business",
     functionName: "brand_tone",
-    performanceBudgetMs: "10",
+    performanceBudgetMs: "100",
     infrastructure: "rule",
     isGlobal: true,
     isCertified: true,

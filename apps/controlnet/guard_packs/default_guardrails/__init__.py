@@ -10,6 +10,7 @@ Guardrails:
 - toxicity.detect: Detects toxic, harmful, and abusive content (T1)
 - harmful_instructions.detect: Blocks actionable wrongdoing instructions (T0)
 - pii.detect: Detects and anonymizes Personal Identifiable Information (T0)
+- pii.redact: Silently redacts PII without blocking the request (T0)
 
 All guards follow the Composable Guard Algebra (CGA) architecture and use
 functional programming principles with Either monads for error handling.

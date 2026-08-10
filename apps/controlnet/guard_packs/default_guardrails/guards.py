@@ -737,7 +737,82 @@ def pii_detect(
                 }
             )]
             return Left_(violations)
-        
+
         return Right_(ctx)
-    
+
+    return run
+
+
+# ============================================================================
+# PII REDACTION (T0)
+# ============================================================================
+
+
+@guard("pii.redact", tier="T0", description="Silently redacts Personal Identifiable Information without blocking", performance_budget_ms=5.0)
+def pii_redact(
+    types: Optional[List[str]] = None,
+    mode: Literal["mask", "remove"] = "mask"
+) -> Guard:
+    """
+    Redacts Personal Identifiable Information (PII) in place.
+
+    Unlike pii.detect, this guard never blocks the request: it rewrites
+    ctx["output"] with PII replaced and always returns Right_. It exists for
+    policies that want to scrub PII from a response rather than reject it.
+
+    On /v1/guard/check the redacted text comes back in the response body for
+    the caller to use. On /v1/chat/completions (non-streaming) the gateway
+    substitutes it into the returned message content before responding to
+    the caller. Streaming responses are not redacted — chunks are already
+    sent to the client by the time later PII would be recognized, and this
+    guard does not buffer the stream.
+
+    Args:
+        types: List of PII types to redact. If None, redacts all types.
+        mode: "mask" replaces each match with [TYPE], "remove" deletes it.
+
+    Returns:
+        Guard that redacts PII and passes the request through unmodified.
+    """
+    if isinstance(types, str):
+        types = [types]
+
+    if types is None:
+        types = list(PII_PATTERNS.keys())
+
+    invalid_types = [t for t in types if t not in PII_PATTERNS]
+    if invalid_types:
+        raise ValueError(f"Invalid PII types: {invalid_types}. Valid types: {list(PII_PATTERNS.keys())}")
+
+    async def run(ctx: Ctx) -> Either:
+        """Redact PII from context text, always passing through."""
+        text = ctx.get("output", "")
+
+        if not text and "messages" in ctx:
+            messages = ctx.get("messages", [])
+            if isinstance(messages, list) and messages:
+                last_msg = messages[-1]
+                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+
+        if not isinstance(text, str) or not text.strip():
+            return Right_(ctx)
+
+        all_spans = []
+        for pii_type in types:
+            pattern = PII_PATTERNS[pii_type]
+            for match in pattern.finditer(text):
+                all_spans.append({"start": match.start(), "end": match.end(), "type": pii_type})
+
+        if not all_spans:
+            return Right_(ctx)
+
+        redacted_text = text
+        for span in sorted(all_spans, key=lambda s: s["start"], reverse=True):
+            replacement = f"[{span['type']}]" if mode == "mask" else ""
+            redacted_text = redacted_text[:span["start"]] + replacement + redacted_text[span["end"]:]
+
+        new_ctx = dict(ctx)
+        new_ctx["output"] = redacted_text
+        return Right_(new_ctx)
+
     return run
