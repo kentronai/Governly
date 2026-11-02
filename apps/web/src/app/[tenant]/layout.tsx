@@ -235,7 +235,7 @@ export default async function TenantLayout({
           name: tenant.name,
           plan: tenant.plan,
           govIQEnabled: tenant.govIqEnabled || false,
-          controlnetEnabled: tenant.controlnetEnabled || true,
+          controlnetEnabled: isAdminUser,
           metadata: tenant.metadata,
         }}
       >

@@ -135,7 +135,8 @@ const ApplicationSidebar = ({
   const router = useRouter();
   const { applicationId, tenant } = useParams();
   const pathname = usePathname();
-  const { isEUEnabled } = useTenant();
+  const { isEUEnabled, tenant: tenantInfo } = useTenant();
+  const canSeeControlNet = tenantInfo?.controlnetEnabled ?? false;
   const getCurrentComponent = () => {
     const pathSegments = pathname.split("/");
     const lastSegment = pathSegments[pathSegments.length - 1];
@@ -214,8 +215,8 @@ const ApplicationSidebar = ({
     [applicationMetadata]
   );
   const hasControlNet = useMemo(
-    () => applicationMetadata.controlnetEnabled,
-    [applicationMetadata]
+    () => canSeeControlNet && applicationMetadata.controlnetEnabled,
+    [canSeeControlNet, applicationMetadata]
   );
 
   // State for expanded sections - Open both sections by default if modules are enabled

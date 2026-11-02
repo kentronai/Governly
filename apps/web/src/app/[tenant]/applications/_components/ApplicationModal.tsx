@@ -29,6 +29,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { useTenant } from "@/contexts/TenantContext";
 import { useUserRole } from "@/hooks/useUserRole";
 
 interface Props {
@@ -79,6 +80,7 @@ export function ApplicationModal({
   isPending,
 }: Props) {
   const { isAdmin } = useUserRole();
+  const canSeeControlNet = useTenant().tenant?.controlnetEnabled ?? false;
   const isViewMode = mode === "view";
   const isEditMode = mode === "edit";
 
@@ -97,7 +99,7 @@ export function ApplicationModal({
       name: "",
       description: "",
       goviqEnabled: true,
-      controlnetEnabled: true,
+      controlnetEnabled: canSeeControlNet,
       status: "Not Started",
     },
   });
@@ -120,7 +122,7 @@ export function ApplicationModal({
         name: "",
         description: "",
         goviqEnabled: true,
-        controlnetEnabled: true,
+        controlnetEnabled: canSeeControlNet,
         status: "Not Started",
       });
     }
@@ -220,7 +222,8 @@ export function ApplicationModal({
                     )}
                   />
 
-                  {/* ControlNet */}
+                  {/* ControlNet (Kentron staff only) */}
+                  {canSeeControlNet && (
                   <FormField
                     control={form.control}
                     name="controlnetEnabled"
@@ -239,6 +242,7 @@ export function ApplicationModal({
                       </FormItem>
                     )}
                   />
+                  )}
                 </div>
 
                 <FormMessage>

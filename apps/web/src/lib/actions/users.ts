@@ -281,12 +281,14 @@ export const createUser = async (input: CreateUserInput) => {
     
     // Add more context for common issues
     if (error.status === 422) {
-      errorMessage = `Invalid user data: ${errorMessage}. Please check email format and ensure all required fields are valid.`;
+      errorMessage = `Invalid user data: ${errorMessage}`;
     } else if (error.status === 404) {
       errorMessage = `Organization not found: ${errorMessage}. Please ensure you are logged into a valid organization.`;
     }
     
-    throw new Error(errorMessage);
+    // Return instead of throw: production builds strip thrown server-action
+    // messages, so the user would only see a generic "Server Components" error.
+    return { error: errorMessage };
   }
 };
 

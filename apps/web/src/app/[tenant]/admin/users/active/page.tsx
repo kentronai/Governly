@@ -120,7 +120,8 @@ const ActiveUsers = () => {
       try {
         setIsLoading(true);
         const { createUser } = await import("@/lib/actions/users");
-        await createUser(data);
+        const result = await createUser(data);
+        if ("error" in result) throw new Error(result.error);
         successToast(
           "User added successfully",
           "User",

@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
+import { useTenant } from "@/contexts/TenantContext";
 import { formatTimestamp } from "@/utils/formatTime";
 import {
   Search,
@@ -101,6 +102,7 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
    * @param applicationId - Application ID
    * @returns The full path to the appropriate overview page
    */
+  const canSeeControlNet = useTenant().tenant?.controlnetEnabled ?? false;
   const getApplicationOverviewPath = useCallback(
     (
       app: Pick<Application, "goviqEnabled" | "controlnetEnabled">,
@@ -109,14 +111,14 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
     ): string => {
       if (app.goviqEnabled === true) {
         return `/${tenant}/applications/${applicationId}/goviq/overview`;
-      } else if (app.controlnetEnabled === true) {
+      } else if (app.controlnetEnabled === true && canSeeControlNet) {
         return `/${tenant}/applications/${applicationId}/control-net/overview`;
       } else {
         // Neither module is enabled, default to GovIQ overview as fallback
         return `/${tenant}/applications/${applicationId}/goviq/overview`;
       }
     },
-    []
+    [canSeeControlNet]
   );
 
   // Fetch applications from server action
