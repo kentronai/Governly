@@ -326,12 +326,12 @@ export default function GovIQOverviewPage() {
           ></ApplicationStatus>
         </div>
 
-        {/* Project info: one grid so every card edge lines up */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Project info: five equal cards in one row on wide screens */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <InfoCard icon={User} label="Owner" value={projectData.owner} />
           <InfoCard icon={Calendar} label="Last Updated" value={projectData.lastUpdated} />
           <InfoCard icon={Users} label="Last Updated By" value={projectData.lastUpdatedBy} />
-          <InfoCard icon={Target} label="Goal" value={projectData.goal} className="md:col-span-2" />
+          <InfoCard icon={Target} label="Goal" value={projectData.goal} />
           <InfoCard icon={Users} label="Team Members" value={projectData.teamMembers} />
         </div>
 

@@ -313,7 +313,10 @@ export default function IntegrationsPage() {
       const detail = permissions.length
         ? `missing permission ${permissions.slice(0, 2).join(", ")}${permissions.length > 2 ? "…" : ""}`
         : headline;
-      errorToast(`${integration.name} ${label} — ${detail}. See ⋯ → View details.`);
+      const text = `${integration.name} ${label}: ${detail}. Open ⋯ → View details.`;
+      // A partial scan is a warning, not a failure.
+      if (partial) infoToast(text);
+      else errorToast(text);
     }
   }, [integrations]);
 
@@ -942,9 +945,7 @@ export default function IntegrationsPage() {
                       {hasWarnings ? (
                         <>
                           <span aria-hidden>·</span>
-                          <span className="truncate text-amber-600 dark:text-amber-400">
-                            {summarizeIssue(integration.errorMessage ?? "").headline}
-                          </span>
+                          <span className="text-amber-600 dark:text-amber-400">Needs attention</span>
                         </>
                       ) : connected && integration.lastSyncAt ? (
                         <>
