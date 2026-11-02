@@ -491,7 +491,7 @@ export function AgentInventory({
                   <div className="space-y-0.5">
                     <div>{ownerDisplay(r.ownerName)}</div>
                     {!r.ownerName ? (
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         no provider owner match
                       </div>
                     ) : null}
@@ -541,7 +541,7 @@ export function AgentInventory({
                         {toLabel(r.complianceStatus)}
                       </Badge>
                       <p
-                        className="max-w-[150px] truncate text-[11px] text-muted-foreground"
+                        className="max-w-[150px] truncate text-xs text-muted-foreground"
                         title={r.compliancePolicyName ?? undefined}
                       >
                         {r.compliancePolicyName} ·{" "}
@@ -959,7 +959,7 @@ function AgentDetailModal({
                                   </span>
                                   <Badge
                                     variant="outline"
-                                    className="text-[10px] capitalize"
+                                    className="text-xs capitalize"
                                   >
                                     {gap.priority ?? "medium"}
                                   </Badge>
@@ -1011,7 +1011,7 @@ function AgentDetailModal({
                       <p className="text-xs text-muted-foreground">
                         {finding.description}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {finding.source.replaceAll("_", " ")} · seen{" "}
                         {finding.occurrenceCount} time(s) ·{" "}
                         {formatTimestamp(finding.lastDetectedAt)}
@@ -1094,7 +1094,7 @@ function AgentDetailModal({
                         </span>
                       </div>
                       {r.resourceArn && (
-                        <p className="mt-1 break-all text-[11px] text-muted-foreground">
+                        <p className="mt-1 break-all text-xs text-muted-foreground">
                           {r.resourceArn}
                         </p>
                       )}
@@ -1103,7 +1103,7 @@ function AgentDetailModal({
                           <summary className="cursor-pointer text-xs font-medium text-primary">
                             View collected provider metadata
                           </summary>
-                          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed">
+                          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs leading-relaxed">
                             {JSON.stringify(r.rawData, null, 2)}
                           </pre>
                         </details>

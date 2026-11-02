@@ -10,8 +10,9 @@ export function ThemeProvider({
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      // Light by default; users can switch to dark from the theme toggle.
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange
     >
       {children}

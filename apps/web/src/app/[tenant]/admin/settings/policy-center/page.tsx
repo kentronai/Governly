@@ -144,7 +144,7 @@ export default function CompliancePolicyCenterPage() {
       : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{policies.map((policy) =>
         <article key={policy.id} role="button" tabIndex={0} onClick={() => setSelected(policy)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelected(policy); }}
           className="group flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-3 transition-colors hover:border-primary/40 hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary">
-          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold tracking-tight text-white", policy.color)}>{policy.icon}</div>
+          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-xs font-bold tracking-tight text-white", policy.color)}>{policy.icon}</div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-sm font-semibold group-hover:text-primary">{policy.name}</h2>
             <p className="truncate text-xs text-muted-foreground">{policy.country}{policy.state ? ` · ${policy.state}` : ""} · {policy.type || "Voluntary"}</p>

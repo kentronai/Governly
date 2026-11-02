@@ -52,6 +52,26 @@ import { cn } from "@/lib/utils";
 import type { Integration } from "@/lib/api/integrations";
 import { NangoConnectButton } from "@/components/integrations/NangoConnectButton";
 
+// Provider errors can be long (AWS repeats one IAM error per region). Reduce
+// them to a headline, the distinct missing permissions and affected regions.
+function summarizeIssue(message: string) {
+  const scanned = message.match(/Scanned \d+\/\d+ regions/i)?.[0];
+  const permissions = [
+    ...new Set(
+      [...message.matchAll(/perform: ([A-Za-z0-9-]+:[A-Za-z0-9*]+)/g)].map((m) => m[1]),
+    ),
+  ];
+  const regions = [
+    ...new Set(
+      [...message.matchAll(/(?:Skipped: |; )([a-z]{2}-[a-z]+-\d)(?=:)/g)].map((m) => m[1]),
+    ),
+  ];
+  const headline =
+    scanned ??
+    (permissions.length ? `Missing permission ${permissions[0]}` : message.split(/[.;]/)[0]);
+  return { headline, permissions, regions };
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   data_platforms: "Data Platforms",
   ml_platforms: "ML Platforms",
@@ -280,6 +300,7 @@ export default function IntegrationsPage() {
   // the card. Keyed by integration id + message so a re-render, a refetch, or an
   // unrelated state change never re-notifies; a *changed* message does.
   const reportedErrorsRef = useRef<Set<string>>(new Set());
+  const [issueFor, setIssueFor] = useState<Integration | null>(null);
   useEffect(() => {
     for (const integration of integrations) {
       if (!integration.errorMessage) continue;
@@ -288,7 +309,11 @@ export default function IntegrationsPage() {
       reportedErrorsRef.current.add(key);
       const partial = integration.syncStatus === "success";
       const label = partial ? "completed with warnings" : "connection failed";
-      errorToast(`${integration.name} ${label}: ${integration.errorMessage}`);
+      const { headline, permissions } = summarizeIssue(integration.errorMessage);
+      const detail = permissions.length
+        ? `missing permission ${permissions.slice(0, 2).join(", ")}${permissions.length > 2 ? "…" : ""}`
+        : headline;
+      errorToast(`${integration.name} ${label} — ${detail}. See ⋯ → View details.`);
     }
   }, [integrations]);
 
@@ -873,6 +898,7 @@ export default function IntegrationsPage() {
                 !hasProviderConnection && integration.syncStatus === "pending";
               const connected = hasProviderConnection && !connectionFailed;
 
+              const hasWarnings = connected && Boolean(integration.errorMessage);
               const statusText = connectionFailed
                 ? "Connection failed"
                 : connectionPending
@@ -905,13 +931,22 @@ export default function IntegrationsPage() {
                           "h-1.5 w-1.5 shrink-0 rounded-full",
                           connectionFailed
                             ? "bg-destructive"
-                            : connected
+                            : hasWarnings
+                              ? "bg-amber-500"
+                              : connected
                               ? "bg-emerald-500"
                               : "bg-muted-foreground/40",
                         )}
                       />
                       <span>{statusText}</span>
-                      {connected && integration.lastSyncAt ? (
+                      {hasWarnings ? (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="truncate text-amber-600 dark:text-amber-400">
+                            {summarizeIssue(integration.errorMessage ?? "").headline}
+                          </span>
+                        </>
+                      ) : connected && integration.lastSyncAt ? (
                         <>
                           <span aria-hidden>·</span>
                           <span>Last sync</span>
@@ -988,6 +1023,11 @@ export default function IntegrationsPage() {
                               Test Connection
                             </DropdownMenuItem>
                           ) : null}
+                          {integration.errorMessage ? (
+                            <DropdownMenuItem onSelect={() => setIssueFor(integration)}>
+                              View details
+                            </DropdownMenuItem>
+                          ) : null}
                           {integration.name === LANGSMITH ? (
                             <DropdownMenuItem
                               onSelect={() => void openProjectConfig(integration)}
@@ -1012,6 +1052,55 @@ export default function IntegrationsPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!issueFor} onOpenChange={(open) => !open && setIssueFor(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{issueFor?.name} sync details</DialogTitle>
+            <DialogDescription>
+              {issueFor?.errorMessage ? summarizeIssue(issueFor.errorMessage).headline : null}
+            </DialogDescription>
+          </DialogHeader>
+          {issueFor?.errorMessage ? (() => {
+            const { permissions, regions } = summarizeIssue(issueFor.errorMessage);
+            return (
+              <div className="space-y-4 text-sm">
+                {permissions.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium">Missing IAM permissions</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {permissions.map((permission) => (
+                        <Badge key={permission} variant="outline" className="font-mono">
+                          {permission}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground">
+                      Grant these to the connected IAM user or role, then run Discover again.
+                    </p>
+                  </div>
+                )}
+                {regions.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-medium">Affected regions ({regions.length})</p>
+                    <p className="text-muted-foreground">{regions.join(", ")}</p>
+                  </div>
+                )}
+                {permissions.length === 0 && regions.length === 0 && (
+                  <p className="max-h-60 overflow-y-auto break-words text-muted-foreground">
+                    {issueFor.errorMessage}
+                  </p>
+                )}
+              </div>
+            );
+          })() : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIssueFor(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={dialogOpen}

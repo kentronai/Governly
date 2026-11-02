@@ -13,7 +13,6 @@ import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestr
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
-import { assignFallbackOwnership } from "@/lib/server/agents/ownership-fallback";
 
 function authorized(request: NextRequest): boolean {
   const expected =
@@ -179,7 +178,6 @@ async function run(request: NextRequest) {
     for (const tenantId of new Set(enabled.map((i) => i.tenantId))) {
       try {
         await alignAutonomyByIdentity(tenantId);
-        await assignFallbackOwnership(tenantId);
       } catch {
         // Non-fatal: normalization is a display refinement, not core discovery.
       }

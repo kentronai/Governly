@@ -32,7 +32,7 @@ export function CompactMetricCard({
         <div className="min-w-0 pr-8">
           <p
             className={cn(
-              "truncate text-[11px] font-medium leading-4 text-muted-foreground",
+              "truncate text-xs font-medium leading-4 text-muted-foreground",
               uppercaseLabel && "uppercase tracking-wide",
             )}
           >

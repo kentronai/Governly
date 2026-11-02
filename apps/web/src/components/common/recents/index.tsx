@@ -501,7 +501,7 @@ export default function RecentEndpointsTable({
                                                       <Badge
                                                         key={category}
                                                         variant="destructive"
-                                                        className="text-[10px]"
+                                                        className="text-xs"
                                                       >
                                                         {category}
                                                       </Badge>
@@ -567,7 +567,7 @@ export default function RecentEndpointsTable({
                                                 <div className="text-xs font-medium truncate">
                                                   {guard.name ?? guard.id}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground truncate">
+                                                <div className="text-xs text-muted-foreground truncate">
                                                   {guard.description ?? guard.id}
                                                 </div>
                                               </div>
@@ -575,7 +575,7 @@ export default function RecentEndpointsTable({
                                                 {guard.tier ? (
                                                   <Badge
                                                     variant="outline"
-                                                    className="text-[10px]"
+                                                    className="text-xs"
                                                   >
                                                     {guard.tier}
                                                   </Badge>
@@ -586,7 +586,7 @@ export default function RecentEndpointsTable({
                                                       ? "destructive"
                                                       : "secondary"
                                                   }
-                                                  className="text-[10px] capitalize"
+                                                  className="text-xs capitalize"
                                                 >
                                                   {isViolated
                                                     ? "violated"

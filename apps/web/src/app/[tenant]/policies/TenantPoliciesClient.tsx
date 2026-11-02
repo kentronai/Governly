@@ -92,14 +92,14 @@ export function TenantPoliciesClient({
                     {policy.name}
                   </CardTitle>
                   {policy.isTenantDefault ? (
-                    <Badge className="shrink-0 gap-1 text-[11px]">
+                    <Badge className="shrink-0 gap-1 text-xs">
                       <ShieldCheck className="h-3 w-3" />
                       Global default
                     </Badge>
                   ) : (
                     <Badge
                       variant={policy.isActive ? "secondary" : "outline"}
-                      className="shrink-0 text-[11px]"
+                      className="shrink-0 text-xs"
                     >
                       {policy.isActive ? "Active" : "Inactive"}
                     </Badge>

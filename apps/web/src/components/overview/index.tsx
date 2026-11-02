@@ -379,7 +379,7 @@ export default function OverviewPage() {
             <><div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-9">{[
               ["Overall", complianceMetrics.average, "%"], ["ISO 42001", complianceMetrics.iso, "%"], ["EU AI Act", complianceMetrics.eu, "%"], ["NIST", complianceMetrics.nist, "%"],
               ["Missing Controls", complianceMetrics.missingControls, ""], ["Missing Evidence", complianceMetrics.missingEvidence, ""], ["High Priority", complianceMetrics.highPriority, ""], ["Completed", complianceMetrics.completed, ""], ["Remaining", complianceMetrics.remaining, ""],
-            ].map(([label, value, suffix]) => <div key={String(label)} className="rounded-lg border bg-card p-3"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{Number(value).toFixed(suffix ? 0 : 0)}{suffix}</p></div>)}</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ].map(([label, value, suffix]) => <div key={String(label)} className="rounded-lg border bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{Number(value).toFixed(suffix ? 0 : 0)}{suffix}</p></div>)}</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {assignedPolicies.map((policy) => {
                 const status = policy.complianceStatus ?? "not_evaluated";
                 const score = Number(policy.coverageScore ?? 0);

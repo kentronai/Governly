@@ -7,10 +7,16 @@
  * the caller react (the connection is persisted server-side by the Nango
  * webhook). Reuses the shadcn Button — no new UI primitives.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { successToast, errorToast } from "@/lib/utils/toast";
 
 // Self-hosted Nango URLs the browser widget must use. Without these the SDK
@@ -58,35 +64,6 @@ const { apiUrl: API_URL, connectBaseUrl: CONNECT_BASE_URL } = resolveNangoUrls()
 
 export { resolveNangoUrls };
 
-// The Nango frontend SDK is loaded from a CDN at runtime (browser-side ESM)
-// instead of a bundled dependency, so the app builds even if the npm package
-// isn't installed. Override the source with NEXT_PUBLIC_NANGO_FRONTEND_URL to
-// self-host the SDK. Loaded lazily on first Connect click and cached.
-const NANGO_FRONTEND_URL =
-  process.env.NEXT_PUBLIC_NANGO_FRONTEND_URL ||
-  "https://cdn.jsdelivr.net/npm/@nangohq/frontend@0.68.0/+esm";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let nangoModulePromise: Promise<any> | null = null;
-
-// A native browser dynamic import created via Function so neither webpack nor
-// turbopack tries to resolve @nangohq/frontend at build time — it is fetched
-// from the CDN in the browser on first use.
-const dynamicImport = new Function(
-  "specifier",
-  "return import(specifier);",
-) as (specifier: string) => Promise<Record<string, unknown>>;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadNango(): Promise<any> {
-  if (!nangoModulePromise) {
-    nangoModulePromise = dynamicImport(NANGO_FRONTEND_URL).then(
-      (mod) => mod.default ?? mod.Nango ?? mod,
-    );
-  }
-  return nangoModulePromise;
-}
-
 export interface NangoConnectButtonProps {
   /** Tenant slug or id — scopes the session to this tenant. */
   tenant: string;
@@ -125,19 +102,61 @@ export function NangoConnectButton({
   onConnected,
 }: NangoConnectButtonProps) {
   const [loading, setLoading] = useState(false);
-  // NORIX's theme is user-driven (next-themes, defaultTheme="system"), so the
-  // app can be light or dark. Read the *resolved* value so the Nango popup
-  // opens in the same appearance as the page behind it instead of a fixed one.
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // NORIX's theme is user-driven (next-themes, light by default), so the
+  // app can be light or dark. Match the Connect UI to the resolved theme.
   const { resolvedTheme } = useTheme();
+
+  // Nango's SDK (openConnectUI) mounts the Connect UI as a full-screen iframe
+  // over the whole page, which reads as a separate page. We host the same
+  // Connect UI inside a shadcn Dialog instead and speak its small postMessage
+  // protocol directly: it posts "ready" -> we send the session token; it posts
+  // "connect" on success and "close" when the user dismisses it.
+  const iframeSrc = useMemo(() => {
+    if (!sessionToken || !CONNECT_BASE_URL) return "";
+    const url = new URL(CONNECT_BASE_URL);
+    if (API_URL) url.searchParams.set("apiURL", API_URL);
+    url.searchParams.set("theme", resolvedTheme === "light" ? "light" : "dark");
+    return url.href;
+  }, [sessionToken, resolvedTheme]);
+
+  useEffect(() => {
+    if (!sessionToken || !CONNECT_BASE_URL) return;
+    const connectOrigin = new URL(CONNECT_BASE_URL).origin;
+    const listener = (event: MessageEvent) => {
+      if (event.origin !== connectOrigin) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const data = event.data as {
+        type?: string;
+        payload?: { connectionId?: string; connection_id?: string };
+      };
+      if (!data || typeof data !== "object" || !data.type) return;
+
+      if (data.type === "ready") {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "session_token", sessionToken },
+          connectOrigin,
+        );
+      } else if (data.type === "connect") {
+        setSessionToken(null);
+        successToast("", "", "", "Account connected");
+        const connectionId = data.payload?.connectionId ?? data.payload?.connection_id;
+        onConnected?.(typeof connectionId === "string" ? connectionId : undefined);
+      } else if (data.type === "close") {
+        setSessionToken(null);
+      }
+    };
+    window.addEventListener("message", listener);
+    return () => window.removeEventListener("message", listener);
+  }, [sessionToken, onConnected]);
 
   const handleClick = useCallback(async () => {
     setLoading(true);
     try {
-      // Fail loudly instead of letting the SDK fall back to Nango Cloud
-      // (api.nango.dev / connect.nango.dev). A self-hosted session token is
-      // meaningless to Cloud, which renders the misleading "Your session has
-      // expired" popup. These are NEXT_PUBLIC_* — baked at image build time, so
-      // an empty value means the build args weren't passed to the Docker build.
+      // Fail loudly instead of silently pointing at Nango Cloud. These are
+      // NEXT_PUBLIC_* — baked at image build time, so an empty value means the
+      // build args weren't passed to the Docker build.
       if (!API_URL || !CONNECT_BASE_URL) {
         throw new Error(
           "Nango is not configured for this build: NEXT_PUBLIC_NANGO_API_URL / NEXT_PUBLIC_NANGO_CONNECT_URL were missing when the web image was built.",
@@ -146,93 +165,65 @@ export function NangoConnectButton({
 
       if (onBeforeConnect) await onBeforeConnect();
 
-      const [{ token }, Nango] = await Promise.all([
-        fetch("/api/integrations/nango/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tenant, integrationId, providerConfigKey }),
-        }).then(async (res) => {
-          const body = (await res.json().catch(() => ({}))) as {
-            error?: string;
-            token?: string;
-          };
-          if (!res.ok || !body.token) {
-            throw new Error(
-              body?.error ||
-                "Couldn't start the connection. Check that this provider is configured in Nango.",
-            );
-          }
-          return { token: body.token };
-        }),
-        loadNango(),
-      ]);
-
-      // Point the SDK at the self-hosted server (not Nango Cloud).
-      const nangoOptions: Record<string, unknown> = {
-        connectSessionToken: token,
+      const res = await fetch("/api/integrations/nango/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant, integrationId, providerConfigKey }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        token?: string;
       };
-      if (API_URL) nangoOptions.host = API_URL;
-      const nango = new Nango(nangoOptions);
-
-      // apiURL + baseURL are the #5432 fix: without them the Connect UI popup
-      // talks to Nango Cloud and never renders for a self-hosted session.
-      const connectOptions: Record<string, unknown> = {
-        sessionToken: token,
-        // Match the Connect popup to NORIX's current appearance so the popup and
-        // the page behind it read as one UI. light/dark/system is the only
-        // appearance control Nango's Connect UI exposes — the colours *inside*
-        // the popup are Nango's own (it renders in a cross-origin iframe, so we
-        // can't restyle it further); we default to dark until the theme resolves.
-        themeOverride: resolvedTheme === "light" ? "light" : "dark",
-        onEvent: (event: {
-          type: string;
-          payload?: { connectionId?: string; connection_id?: string };
-        }) => {
-          if (event.type === "connect") {
-            successToast("", "", "", "Account connected");
-            const connectionId =
-              event.payload?.connectionId ?? event.payload?.connection_id;
-            onConnected?.(
-              typeof connectionId === "string" ? connectionId : undefined,
-            );
-          }
-        },
-      };
-      if (API_URL) connectOptions.apiURL = API_URL;
-      if (CONNECT_BASE_URL) connectOptions.baseURL = CONNECT_BASE_URL;
-      nango.openConnectUI(connectOptions);
+      if (!res.ok || !body.token) {
+        throw new Error(
+          body?.error ||
+            "Couldn't start the connection. Check that this provider is configured in Nango.",
+        );
+      }
+      setSessionToken(body.token);
     } catch (error) {
       errorToast(error instanceof Error ? error : "Failed to connect");
     } finally {
       setLoading(false);
     }
-  }, [
-    tenant,
-    integrationId,
-    providerConfigKey,
-    resolvedTheme,
-    onBeforeConnect,
-    onConnected,
-  ]);
+  }, [tenant, integrationId, providerConfigKey, onBeforeConnect]);
 
   return (
-    <Button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled || loading}
-      variant={variant}
-      size={size}
-      className={className}
-    >
-      {loading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Connecting…
-        </>
-      ) : (
-        (children ?? "Connect with Nango")
-      )}
-    </Button>
+    <>
+      <Button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled || loading}
+        variant={variant}
+        size={size}
+        className={className}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Connecting…
+          </>
+        ) : (
+          (children ?? "Connect with Nango")
+        )}
+      </Button>
+      <Dialog open={!!sessionToken} onOpenChange={(open) => !open && setSessionToken(null)}>
+        <DialogContent className="h-[640px] max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogTitle className="sr-only">Connect account</DialogTitle>
+          <DialogDescription className="sr-only">
+            Enter the credentials for this provider.
+          </DialogDescription>
+          {iframeSrc && (
+            <iframe
+              ref={iframeRef}
+              src={iframeSrc}
+              title="Connect account"
+              className="h-full w-full border-0 bg-transparent"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

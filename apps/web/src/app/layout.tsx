@@ -22,7 +22,7 @@ if (process.env.NEXT_PUBLIC_VERCEL === "1") {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans" suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <PostHogProvider>
             <ClerkProvider>

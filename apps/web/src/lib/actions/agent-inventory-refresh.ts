@@ -23,7 +23,6 @@ import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestr
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
-import { assignFallbackOwnership } from "@/lib/server/agents/ownership-fallback";
 
 export async function refreshAgentInventory(tenantSlugOrId: string) {
   const { userId, orgId } = await auth();
@@ -138,9 +137,10 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
     }
   }
 
-  // Post-discovery normalization: consistent autonomy + real owner fallback.
+  // Post-discovery normalization: consistent autonomy. Owners come only from
+  // provider evidence (Owner/Email/Team tags); the user who connected an
+  // integration is not assumed to own the resources it discovers.
   await alignAutonomyByIdentity(tenantId);
-  await assignFallbackOwnership(tenantId);
 
   for (const route of [
     "ai-agent-inventory",
