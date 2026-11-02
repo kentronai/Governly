@@ -8,7 +8,7 @@ import {
   Filter,
   Info,
   Loader2,
-  PlayCircle,
+  MoreHorizontal,
   Search,
   X,
 } from "lucide-react";
@@ -23,7 +23,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -43,6 +42,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import type { Integration } from "@/lib/api/integrations";
 import { NangoConnectButton } from "@/components/integrations/NangoConnectButton";
 
@@ -856,11 +862,8 @@ export default function IntegrationsPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((integration) => {
-              const hasDetails =
-                Boolean(integration.lastSyncAt) ||
-                Boolean(integration.errorMessage);
               const hasProviderConnection =
                 integration.isCredentialsAdded ||
                 Boolean(integration.nangoConnectionId);
@@ -870,163 +873,139 @@ export default function IntegrationsPage() {
                 !hasProviderConnection && integration.syncStatus === "pending";
               const connected = hasProviderConnection && !connectionFailed;
 
+              const statusText = connectionFailed
+                ? "Connection failed"
+                : connectionPending
+                  ? "Checking connection…"
+                  : connected
+                    ? "Connected"
+                    : "Not connected";
+
               return (
                 <Card
                   key={integration.id}
-                  className="gap-0 overflow-hidden py-0 shadow-none"
+                  title={integration.description || undefined}
+                  className="flex-row items-center gap-3 px-3 py-3 shadow-none"
                 >
-                  <CardHeader className="border-b p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-                        <IntegrationLogo integration={integration} />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <CardTitle className="truncate text-sm font-semibold">
-                            {integration.name}
-                          </CardTitle>
-                          <Badge
-                            className="shrink-0 text-[11px]"
-                            variant={
-                              connectionFailed
-                                ? "destructive"
-                                : connected
-                                  ? "default"
-                                  : "secondary"
-                            }
-                          >
-                            {connectionFailed
-                              ? "Failed"
-                              : connectionPending
-                                ? "Checking"
-                                : connected
-                                  ? "Connected"
-                                  : "Not connected"}
-                          </Badge>
-                        </div>
-                        <CardDescription className="line-clamp-2 text-xs leading-5">
-                          {integration.description ||
-                            "Connect this provider to NORIX."}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {hasDetails ? (
-                    <CardContent className="border-b px-4 py-3">
-                      <div className="space-y-1.5 text-xs">
-                        {integration.lastSyncAt ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">
-                              Last sync
-                            </span>
-                            <span className="text-right font-medium">
-                              {formatUtc(integration.lastSyncAt)}
-                            </span>
-                          </div>
-                        ) : null}
-                        {/* Failures surface as a one-time toast (see the
-                            reportedErrorsRef effect) rather than a permanent
-                            banner on every card. */}
-                      </div>
-                    </CardContent>
-                  ) : null}
-                  <CardFooter className="justify-start gap-3 px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      {!connected ? (
-                        NANGO_PROVIDERS[integration.name] ? (
-                          <NangoConnectButton
-                            tenant={tenant?.id ?? ""}
-                            integrationId={integration.id}
-                            providerConfigKey={
-                              NANGO_PROVIDERS[integration.name]
-                                .providerConfigKey
-                            }
-                            size="sm"
-                            className="h-8"
-                            disabled={running === integration.id}
-                            onConnected={(connectionId) =>
-                              void handleNangoConnected(
-                                integration,
-                                connectionId,
-                              )
-                            }
-                          >
-                            {running === integration.id ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Discovering…
-                              </>
-                            ) : connectionFailed ? (
-                              "Reconnect"
-                            ) : (
-                              "Connect"
-                            )}
-                          </NangoConnectButton>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="h-8"
-                            onClick={() => openCredentials(integration)}
-                          >
-                            {connectionFailed ? "Reconnect" : "Connect"}
-                          </Button>
-                        )
-                      ) : (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                    <IntegrationLogo integration={integration} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="truncate text-sm font-semibold">
+                      {integration.name}
+                    </CardTitle>
+                    <p
+                      className={cn(
+                        "mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground",
+                        connectionFailed && "text-destructive",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full",
+                          connectionFailed
+                            ? "bg-destructive"
+                            : connected
+                              ? "bg-emerald-500"
+                              : "bg-muted-foreground/40",
+                        )}
+                      />
+                      <span>{statusText}</span>
+                      {connected && integration.lastSyncAt ? (
                         <>
-                          {DISCOVERY_INTEGRATIONS.has(integration.name) ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8"
-                              disabled={running === integration.id}
-                              onClick={() => void runDiscovery(integration)}
-                            >
-                              {running === integration.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <PlayCircle className="mr-2 h-4 w-4" />
-                              )}
-                              {integration.name === LANGSMITH
-                                ? "Sync"
-                                : "Discover"}
-                            </Button>
-                          ) : null}
+                          <span aria-hidden>·</span>
+                          <span>Last sync</span>
+                          <span className="truncate">
+                            {formatUtc(integration.lastSyncAt)}
+                          </span>
+                        </>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {running === integration.id || testing === integration.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : null}
+                    {!connected ? (
+                      NANGO_PROVIDERS[integration.name] ? (
+                        <NangoConnectButton
+                          tenant={tenant?.id ?? ""}
+                          integrationId={integration.id}
+                          providerConfigKey={
+                            NANGO_PROVIDERS[integration.name].providerConfigKey
+                          }
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          disabled={running === integration.id}
+                          onConnected={(connectionId) =>
+                            void handleNangoConnected(integration, connectionId)
+                          }
+                        >
+                          {connectionFailed ? "Reconnect" : "Connect"}
+                        </NangoConnectButton>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          onClick={() => openCredentials(integration)}
+                        >
+                          {connectionFailed ? "Reconnect" : "Connect"}
+                        </Button>
+                      )
+                    ) : (
+                      <>
+                      {DISCOVERY_INTEGRATIONS.has(integration.name) ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          disabled={running === integration.id}
+                          onClick={() => void runDiscovery(integration)}
+                        >
+                          {integration.name === LANGSMITH ? "Sync" : "Discover"}
+                        </Button>
+                      ) : null}
+                      {/* modal={false}: menu items open dialogs; a modal menu leaves pointer-events locked on body */}
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`${integration.name} actions`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
                           {OBSERVABILITY_INTEGRATIONS.has(integration.name) ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8"
+                            <DropdownMenuItem
                               disabled={testing === integration.id}
-                              onClick={() => void testConnection(integration)}
+                              onSelect={() => void testConnection(integration)}
                             >
-                              {testing === integration.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : null}
                               Test Connection
-                            </Button>
+                            </DropdownMenuItem>
                           ) : null}
                           {integration.name === LANGSMITH ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8"
-                              onClick={() => void openProjectConfig(integration)}
+                            <DropdownMenuItem
+                              onSelect={() => void openProjectConfig(integration)}
                             >
                               Configure
-                            </Button>
+                            </DropdownMenuItem>
                           ) : null}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-destructive hover:text-destructive"
-                            onClick={() => void revoke(integration)}
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => void revoke(integration)}
                           >
                             Revoke
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardFooter>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      </>
+                    )}
+                  </div>
                 </Card>
               );
             })}
