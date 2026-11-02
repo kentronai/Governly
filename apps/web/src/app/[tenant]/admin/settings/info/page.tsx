@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Static data for organization info
 const staticOrganizationInfo = {
   sTenantName: "Kentron",
-  sTenantURL: "https://app.kentron.ai",
+  sTenantURL: "https://aigov.kentron.ai",
   sDataLocation: "United States",
   sDisplayName: "Kentron Admin",
   sEmail: "admin@kentron.ai",

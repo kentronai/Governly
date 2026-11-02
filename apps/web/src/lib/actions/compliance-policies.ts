@@ -14,6 +14,8 @@ import { evaluateApplicationCompliancePolicy } from '@/lib/server/compliance/eva
 /**
  * Get compliance policies for an application
  */
+const ADMIN_ORG_ROLES = ['org:admin', 'admin', 'org:owner'];
+
 export const getApplicationCompliancePolicies = async (
   tenantSlugOrId: string,
   applicationId: string
@@ -128,9 +130,9 @@ export const updateApplicationCompliancePolicy = async (
   policyId: string,
   isActive: boolean
 ) => {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
   if (!userId || !orgId) {
-    throw new Error('Authentication required');
+    return { success: false as const, error: 'Authentication required' };
   }
 
   // Try to find tenant by ID first, then by slug
@@ -138,12 +140,12 @@ export const updateApplicationCompliancePolicy = async (
   if (!tenantRow.length) {
     tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) return { success: false as const, error: 'Tenant not found' };
   const tenantId = tenantRow[0].id;
 
   // Verify tenant matches orgId
   if (tenantId !== orgId) {
-    throw new Error('Access denied');
+    return { success: false as const, error: 'Access denied' };
   }
 
   try {
@@ -167,8 +169,13 @@ export const updateApplicationCompliancePolicy = async (
     if (!isEnabled) {
       throw new Error('Policy is not enabled by admin');
     }
-    if (!isActive && isEnabled.isActive) {
-      throw new Error('This policy is enforced organization-wide. Disable it in Admin → Policy Center instead.');
+    // Organization-enabled policies apply to every application; only an
+    // organization admin may opt a single application out.
+    if (!isActive && isEnabled.isActive && !ADMIN_ORG_ROLES.includes(orgRole ?? '')) {
+      return {
+        success: false as const,
+        error: 'Only organization admins can turn off this policy for an application. Ask an admin to do it.',
+      };
     }
 
     const evaluation = isActive
@@ -262,13 +269,17 @@ export const updateApplicationCompliancePolicy = async (
     revalidatePath(`/${tenantRow[0].slug}/applications/${applicationId}`);
 
     return {
-      success: true,
+      success: true as const,
       message: `Status updated for policy ${policyId}`,
       evaluation,
     };
   } catch (error) {
     console.error('Error updating compliance policy:', error);
-    throw error;
+    // Returned, not thrown: production builds strip thrown server-action messages.
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : 'Failed to update policy status',
+    };
   }
 };
 

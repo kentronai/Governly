@@ -5,6 +5,10 @@ import { IoCloseCircleSharp } from "react-icons/io5";
 import { MdPersonAddAlt } from "react-icons/md";
 import "@/components/admin/admin.css";
 import { errorToast, successToast } from "@/lib/utils/toast";
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 // Removed API imports - using static data instead
 import { UserProfile } from "@/types";
 import { validateEmail } from "@/lib/utils/validateEmail";
@@ -641,12 +645,10 @@ const ActiveUsers = () => {
   const renderUserRole = (role: string) => {
     return (
       <div className="flex flex-col">
-        <p className="text-bold text-sm capitalize">
-          {role === "globaladmin" ? (
-            "Global Admin"
-          ) : (
-            <span className="capitalize">{role?.split(":")?.length > 1 ? role?.split(":")[1] : role}</span>
-          )}
+        <p>
+          {role === "globaladmin"
+            ? "Global Admin"
+            : toLabel(role?.split(":")?.length > 1 ? role?.split(":")[1] : role)}
         </p>
       </div>
     );
@@ -708,16 +710,16 @@ const ActiveUsers = () => {
           <Table>
             <TableHeader>
               <TableRow className="h-10">
-                <TableHead className="text-muted-foreground font-medium">
+                <TableHead>
                   Full name
                 </TableHead>
-                <TableHead className="text-muted-foreground font-medium">
+                <TableHead>
                   Email
                 </TableHead>
-                <TableHead className="text-muted-foreground font-medium">
+                <TableHead>
                   Role
                 </TableHead>
-                <TableHead className="text-muted-foreground font-medium">
+                <TableHead>
                   Actions
                 </TableHead>
               </TableRow>
@@ -740,16 +742,16 @@ const ActiveUsers = () => {
                       : (user as any).firstName || (user as any).lastName || "--");
                   return (
                     <TableRow key={user.id} className="h-10 last:border-b-0">
-                      <TableCell className="text-sm  font-normal">
+                      <TableCell>
                         {displayName}
                       </TableCell>
-                      <TableCell className="text-sm  font-normal">
+                      <TableCell>
                         {user.email}
                       </TableCell>
-                      <TableCell className="text-sm  font-normal">
+                      <TableCell>
                         {renderUserRole((user as any)?.role || "--")}
                       </TableCell>
-                      <TableCell className="text-sm  font-normal">
+                      <TableCell>
                         {renderUserActions(user)}
                       </TableCell>
                     </TableRow>

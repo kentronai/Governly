@@ -2,7 +2,6 @@
 import { type FC, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -26,11 +25,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Pagination from "@/components/common/pagination";
 
 // Icons
 import { IoShareSocial } from "react-icons/io5";
-import { MoreHorizontal, Search, Loader2, Pencil, Trash2, RefreshCw, AlertTriangle, ShieldCheck } from "lucide-react";
+import { MoreHorizontal, Search, Loader2, Pencil, Trash2, RefreshCw, AlertTriangle, ShieldCheck, Power, Plus, Eye } from "lucide-react";
 
 // API & Utilities
 import { useDebounce } from "@/hooks/useDebounce";
@@ -313,6 +320,7 @@ const Settings: FC<SettingsProps> = ({
   const { slug } = useParams();
   const [selectedPolicies, setSelectedPolicies] = useState<PolicyPack[]>([]);
   const [evaluatingPolicyId, setEvaluatingPolicyId] = useState<string | null>(null);
+  const [evidenceDialog, setEvidenceDialog] = useState<{ mode: "add" | "view"; policyId: string } | null>(null);
   const { refreshApplicationPolicyStatus, applicationPolicy: policiesData } =
     useTenant();
 
@@ -373,7 +381,7 @@ const Settings: FC<SettingsProps> = ({
             p.id === policyId ? { ...p, isActive: isCurrentlyActive } : p
           )
         );
-        errorToast("Failed to update policy status");
+        errorToast("error" in result && result.error ? result.error : "Failed to update policy status");
         return;
       }
       refreshApplicationPolicyStatus();
@@ -409,7 +417,7 @@ const Settings: FC<SettingsProps> = ({
     }
   };
 
-  const handleEvaluate = async (policy: PolicyPack) => {
+  const handleEvaluate = async (policy: PolicyPack, { silent = false } = {}) => {
     if (!tenant || !applicationId || Array.isArray(tenant) || Array.isArray(applicationId) || !policy.parentPolicyId) {
       errorToast("Invalid application or policy");
       return;
@@ -432,7 +440,7 @@ const Settings: FC<SettingsProps> = ({
           : item
       ));
       refreshApplicationPolicyStatus();
-      successToast("Compliance evidence re-evaluated", "Policy", "checked");
+      if (!silent) successToast("Compliance evidence re-evaluated", "Policy", "checked");
     } catch (error) {
       errorToast(error instanceof Error ? error.message : "Compliance evaluation failed");
     } finally {
@@ -440,143 +448,144 @@ const Settings: FC<SettingsProps> = ({
     }
   };
 
-  const renderPolicyCard = (policy: PolicyPack) => {
-    const status = policy.complianceStatus ?? "not_evaluated";
-    const score = Number(policy.coverageScore ?? 0);
-    const statusClasses: Record<string, string> = {
-      compliant: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-      partially_compliant: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-      non_compliant: "bg-red-500/10 text-red-600 border-red-500/20",
-      not_applicable: "bg-slate-500/10 text-slate-500 border-slate-500/20",
-      not_evaluated: "bg-muted text-muted-foreground border-border",
-    };
+  const statusClasses: Record<string, string> = {
+    compliant: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    partially_compliant: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    non_compliant: "bg-red-500/10 text-red-600 border-red-500/20",
+    not_applicable: "bg-slate-500/10 text-slate-500 border-slate-500/20",
+    not_evaluated: "bg-muted text-muted-foreground border-border",
+  };
 
+  // "non_compliant" -> "Non compliant", "high" -> "High"
+  const toLabel = (value: string) => {
+    const text = value.replaceAll("_", " ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+
+  const renderGaps = (policy: PolicyPack) => {
+    const status = policy.complianceStatus ?? "not_evaluated";
+    if (status === "compliant") {
+      return (
+        <p className="flex items-start gap-1.5 text-sm text-emerald-600">
+          <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" />
+          All mapped controls currently have verifiable evidence.
+        </p>
+      );
+    }
+    if (!policy.gaps?.length) {
+      return <p className="text-sm text-muted-foreground">Enable the policy and run a check to calculate compliance.</p>;
+    }
     return (
-      <Card key={policy.id} className="hover:shadow-md transition-shadow">
-        <CardContent className="min-h-48">
-          <div className="flex items-start justify-between  ">
-            <div className="flex items-start gap-3 flex-1">
-              <div
-                className={`w-8 h-8 rounded-full ${policy.color} flex items-center justify-center  text-sm font-semibold shrink-0`}
-              >
-                {policy.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold  text-sm leading-tight mb-1 line-clamp-2">
-                  {policy.name}
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed line-clamp-3 mb-2">
-                  {policy.description}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Open control gaps ({policy.gaps.length})</p>
+        <div className="divide-y rounded-lg border">
+          {policy.gaps.map((gap) => (
+            <div key={gap.key} className="flex items-start justify-between gap-3 p-3">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
+                  {gap.title}
                 </p>
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <Badge
-                    variant="secondary"
-                    className="text-xs px-2 py-0.5 bg-muted text-muted-foreground"
-                  >
-                    {policy.category}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-xs px-2 py-0.5 border text-muted-foreground"
-                  >
-                    {policy.country}
-                    {policy.state ? `, ${policy.state}` : ""}
-                  </Badge>
-                  {policy.type && (
-                    <Badge
-                      className={cn(
-                        "text-xs px-2 py-0.5 font-medium border",
-                        policy.type === "Mandatory"
-                          ? "bg-red-500/10 text-red-500"
-                          : "bg-blue-500/10 text-blue-500 "
-                      )}
-                    >
-                      {policy.type}
-                    </Badge>
-                  )}
-                </div>
-                {policy.isActive && (
-                  <div className="mt-3 rounded-md border bg-muted/20 p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge className={cn("border text-[11px] capitalize", statusClasses[status])}>
-                        {status.replaceAll("_", " ")}
-                      </Badge>
-                      {status !== "not_applicable" && (
-                        <span className="text-xs font-semibold">{score.toFixed(0)}% evidence coverage</span>
-                      )}
-                    </div>
-                    {status === "compliant" ? (
-                      <p className="flex items-start gap-1.5 text-xs text-emerald-600">
-                        <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        All mapped controls currently have verifiable evidence.
-                      </p>
-                    ) : policy.gaps?.length ? (
-                      <div className="space-y-1">
-                        {policy.gaps.slice(0, 2).map((gap) => (
-                          <p key={gap.key} className="flex items-start gap-1.5 text-xs text-red-600">
-                            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                            <span>{gap.title}: {gap.reason}</span>
-                          </p>
-                        ))}
-                        {policy.gaps.length > 2 && (
-                          <p className="text-xs text-muted-foreground">+{policy.gaps.length - 2} more control gap(s)</p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Enable and run an evidence check to calculate compliance.</p>
-                    )}
-                    {policy.evaluatedAt && (
-                      <p className="text-[11px] text-muted-foreground">Last checked {new Date(policy.evaluatedAt).toLocaleString()}</p>
-                    )}
-                    {policy.gaps?.length ? <div className="space-y-2 border-t pt-2">
-                      <p className="text-xs font-semibold">Generated compliance tasks</p>
-                      {policy.gaps.slice(0, 4).map((gap) => <div key={`task-${gap.key}`} className="rounded border bg-background p-2">
-                        <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium">{gap.title}</span><Badge variant="outline" className="text-[10px] capitalize">{gap.priority ?? "medium"}</Badge></div>
-                        {gap.mappedField && <a href={`/${String(tenant)}/applications/${String(applicationId)}/${gap.mappedRoute || "settings"}`} className="mt-1 block text-[11px] text-primary hover:underline">Complete {gap.mappedField}</a>}
-                        {gap.requiredEvidence?.length ? <p className="mt-1 text-[11px] text-muted-foreground">Evidence needed: {gap.requiredEvidence.join("; ")}</p> : null}
-                        {gap.guidance && <p className="mt-1 text-[11px] text-muted-foreground">{gap.guidance}</p>}
-                      </div>)}
-                    </div> : null}
-                    {policy.parentPolicyId && policy.evaluation?.controls?.length && typeof tenant === "string" && typeof applicationId === "string" ? <div className="border-t pt-3">
-                      <ComplianceEvidenceManager tenant={tenant} applicationId={applicationId} policyId={policy.parentPolicyId} controls={policy.evaluation.controls.map((control) => ({ key: control.key, title: control.title }))} onChanged={() => handleEvaluate(policy)} />
-                    </div> : null}
-                  </div>
-                )}
+                <p className="mt-1 text-xs text-muted-foreground">{gap.reason}</p>
               </div>
+              <Badge variant="outline" className="shrink-0">{toLabel(gap.priority ?? "medium")}</Badge>
             </div>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <div className="flex w-full items-center justify-between gap-3 pt-2 border-t mt-auto">
-            <span className="text-xs font-medium text-muted-foreground">
-              Policy Status
-            </span>
-            <div className="flex items-center gap-2">
-              {policy.isActive && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => handleEvaluate(policy)}
-                  disabled={evaluatingPolicyId === policy.id || !hasWorkspaceDetailsWritePermission}
-                >
-                  <RefreshCw className={cn("h-3 w-3 mr-1", evaluatingPolicyId === policy.id && "animate-spin")} />
-                  Re-check
-                </Button>
-              )}
-            <Switch
-              checked={policy.isActive}
-              onCheckedChange={() => handleTogglePolicyStatus(policy.id)}
-              disabled={!hasWorkspaceDetailsWritePermission}
-              className=""
-            />
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
+          ))}
+        </div>
+      </div>
     );
   };
+
+  // Open gaps first, so the add form preselects a control that still needs evidence.
+  const evidenceControls = (policy: PolicyPack) => {
+    const all = [...(policy.gaps ?? []), ...(policy.evaluation?.controls ?? [])];
+    const seen = new Set<string>();
+    return all
+      .filter((control) => !seen.has(control.key) && seen.add(control.key))
+      .map((control) => ({ key: control.key, title: control.title }));
+  };
+
+  const renderPolicyRow = (policy: PolicyPack) => {
+    const status = policy.complianceStatus ?? "not_evaluated";
+    const score = Number(policy.coverageScore ?? 0);
+
+    return (
+      <TableRow key={policy.id}>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-full ${policy.color} flex items-center justify-center text-xs font-semibold shrink-0`}>
+              {policy.icon}
+            </div>
+            <span className="font-medium">{policy.name}</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          {policy.country}
+          {policy.state ? `, ${policy.state}` : ""}
+        </TableCell>
+        <TableCell>
+          {policy.type && (
+            <Badge className={cn("border", policy.type === "Mandatory" ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500")}>
+              {policy.type}
+            </Badge>
+          )}
+        </TableCell>
+        <TableCell>
+          {policy.isActive ? (
+            <Badge className={cn("border", statusClasses[status])}>
+              {toLabel(status)}
+            </Badge>
+          ) : (
+            "Disabled"
+          )}
+        </TableCell>
+        <TableCell>{policy.isActive && status !== "not_applicable" ? `${score.toFixed(0)}%` : "—"}</TableCell>
+        <TableCell>{policy.isActive ? policy.gaps?.length ?? 0 : "—"}</TableCell>
+        <TableCell>
+          {policy.evaluatedAt ? new Date(policy.evaluatedAt).toLocaleString() : "—"}
+        </TableCell>
+        <TableCell className="text-right">
+          {/* modal={false}: the menu opens Dialogs; a modal menu leaves pointer-events locked on body */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${policy.name}`}>
+                {evaluatingPolicyId === policy.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                disabled={!hasWorkspaceDetailsWritePermission}
+                onSelect={() => handleTogglePolicyStatus(policy.id)}
+              >
+                <Power className="h-4 w-4 mr-2" />
+                {policy.isActive ? "Disable" : "Enable"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!policy.isActive || !hasWorkspaceDetailsWritePermission}
+                onSelect={() => setEvidenceDialog({ mode: "add", policyId: policy.id })}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add evidence
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!policy.isActive}
+                onSelect={() => setEvidenceDialog({ mode: "view", policyId: policy.id })}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View evidence
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
+  const dialogPolicy = evidenceDialog
+    ? selectedPolicies.find((p) => p.id === evidenceDialog.policyId)
+    : undefined;
+  const canManageEvidence =
+    !!dialogPolicy?.parentPolicyId && typeof tenant === "string" && typeof applicationId === "string";
 
   // Early return if no read permission
   if (!hasWorkspaceDetailsReadPermission) return null;
@@ -592,9 +601,73 @@ const Settings: FC<SettingsProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {selectedPolicies.map(renderPolicyCard)}
-        </div>
+        {selectedPolicies.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Policy</TableHead>
+                <TableHead>Jurisdiction</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Evidence Coverage</TableHead>
+                <TableHead>Gaps</TableHead>
+                <TableHead>Last Checked</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>{selectedPolicies.map(renderPolicyRow)}</TableBody>
+          </Table>
+        )}
+        {canManageEvidence && evidenceDialog?.mode === "add" && (
+          <ComplianceEvidenceManager
+            mode="add"
+            addOpen
+            onAddOpenChange={(open) => !open && setEvidenceDialog(null)}
+            tenant={tenant as string}
+            applicationId={applicationId as string}
+            policyId={dialogPolicy!.parentPolicyId!}
+            controls={evidenceControls(dialogPolicy!)}
+            onChanged={() => handleEvaluate(dialogPolicy!, { silent: true })}
+          />
+        )}
+
+        <Dialog
+          open={evidenceDialog?.mode === "view"}
+          onOpenChange={(open) => !open && setEvidenceDialog(null)}
+        >
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{dialogPolicy?.name}</DialogTitle>
+              <DialogDescription>{dialogPolicy?.description}</DialogDescription>
+            </DialogHeader>
+            {dialogPolicy && (
+              <div className="space-y-6">
+                {renderGaps(dialogPolicy)}
+                {canManageEvidence && (
+                  <ComplianceEvidenceManager
+                    mode="list"
+                    tenant={tenant as string}
+                    applicationId={applicationId as string}
+                    policyId={dialogPolicy.parentPolicyId!}
+                    controls={evidenceControls(dialogPolicy)}
+                    onChanged={() => handleEvaluate(dialogPolicy, { silent: true })}
+                  />
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => dialogPolicy && handleEvaluate(dialogPolicy)}
+                disabled={!dialogPolicy || evaluatingPolicyId === dialogPolicy.id || !hasWorkspaceDetailsWritePermission}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", evaluatingPolicyId === dialogPolicy?.id && "animate-spin")} />
+                Re-check
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {!selectedPolicies.length && (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             No organization policies are enabled. Enable them in Admin → Compliance → Compliance Policies first.

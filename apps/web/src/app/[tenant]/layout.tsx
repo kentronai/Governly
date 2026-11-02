@@ -1,7 +1,13 @@
 // src/app/[tenant]/layout.tsx
 import { headers } from "next/headers";
 import { ReactNode } from "react";
-import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import {
+  fetchClerkIdentity,
+  healPlaceholderEmails,
+  isPlaceholderEmail,
+  PLACEHOLDER_EMAIL_SUFFIX,
+} from "@/lib/server/user-identity";
 import { redirect } from "next/navigation";
 import { db, tenants, users, withDbRetry } from "@db";
 import { eq } from "drizzle-orm";
@@ -141,31 +147,24 @@ async function ensureUserRow(userId: string) {
   const existing = await withDbRetry(() =>
     db.query.users.findFirst({
       where: eq(users.id, userId),
-      columns: { id: true },
+      columns: { id: true, email: true },
     }),
   );
-  if (existing) return;
+  if (existing && !isPlaceholderEmail(existing.email)) return;
+  if (existing) {
+    await healPlaceholderEmails([existing]);
+    return;
+  }
 
-  const clerkUser = await currentUser();
-  const name =
-    `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() ||
-    clerkUser?.username ||
-    null;
-  const email =
-    clerkUser?.emailAddresses?.find(
-      (address) => address.id === clerkUser.primaryEmailAddressId,
-    )?.emailAddress ||
-    clerkUser?.emailAddresses?.[0]?.emailAddress ||
-    `${userId}@unknown.local`;
-
+  const identity = await fetchClerkIdentity(userId);
   await withDbRetry(() =>
     db
       .insert(users)
       .values({
         id: userId,
-        email,
-        name,
-        imageUrl: clerkUser?.imageUrl || null,
+        email: identity?.email || `${userId}${PLACEHOLDER_EMAIL_SUFFIX}`,
+        name: identity?.name ?? null,
+        imageUrl: identity?.imageUrl ?? null,
       })
       .onConflictDoNothing({ target: users.id }),
   );

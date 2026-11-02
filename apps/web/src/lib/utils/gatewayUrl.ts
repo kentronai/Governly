@@ -12,7 +12,7 @@
  * the gateway is deliberately hosted on a different host than the dashboard.
  */
 
-const FALLBACK_GATEWAY_URL = "https://app.kentron.ai";
+const FALLBACK_GATEWAY_URL = "https://aigov.kentron.ai";
 
 /** Trims whitespace, trailing slashes and a trailing `/v1` path segment. */
 function normalizeOrigin(url: string): string {

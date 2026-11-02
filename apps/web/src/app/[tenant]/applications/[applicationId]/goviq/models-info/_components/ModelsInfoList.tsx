@@ -263,16 +263,16 @@ export function ModelsInfoList({
                 <TableRow className="h-10 border-b border-muted">
                   <TableHead>Model</TableHead>
                   <TableHead>Vendor</TableHead>
-                  <TableHead className="text-muted-foreground font-medium">
+                  <TableHead>
                     Objectives
                   </TableHead>
-                  <TableHead className="text-muted-foreground font-medium">
+                  <TableHead>
                     Model Size
                   </TableHead>
-                  <TableHead className="text-muted-foreground font-medium">
+                  <TableHead>
                     Hosting Location
                   </TableHead>
-                  <TableHead className="text-muted-foreground font-medium">
+                  <TableHead>
                     Actions
                   </TableHead>
                 </TableRow>
@@ -300,22 +300,22 @@ export function ModelsInfoList({
                         {model.model || "-"}
                       </TableCell>
                       <TableCell>{model.vendor || "-"}</TableCell>
-                      <TableCell className="font-sm font-normal font-sans  max-w-xs">
+                      <TableCell className="max-w-xs">
                         <div className="truncate" title={model.objectives}>
                           {model.objectives}
                         </div>
                       </TableCell>
-                      <TableCell className="font-sm font-normal font-sans  max-w-xs">
+                      <TableCell className="max-w-xs">
                         <div className="truncate" title={model.modelSize}>
                           {model.modelSize}
                         </div>
                       </TableCell>
-                      <TableCell className="font-sm font-normal font-sans  max-w-xs">
+                      <TableCell className="max-w-xs">
                         <div className="truncate" title={model.hostingLocation}>
                           {model.hostingLocation}
                         </div>
                       </TableCell>
-                      <TableCell className="font-sm font-normal font-sans ">
+                      <TableCell>
                         {renderActions(model)}
                       </TableCell>
                     </TableRow>

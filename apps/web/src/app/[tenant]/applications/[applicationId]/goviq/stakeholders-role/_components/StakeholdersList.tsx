@@ -59,6 +59,12 @@ interface Props {
   userId: string;
 }
 
+// "org:admin" / "member" -> "Admin" / "Member"
+const formatRole = (role?: string | null) => {
+  const value = (role ?? "").replace(/^org:/, "");
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "-";
+};
+
 export function StakeholdersList({
   initialStakeholders,
   applicationId,
@@ -201,7 +207,7 @@ export function StakeholdersList({
                   <TableCell className="font-medium">
                     {stakeholder.userName}
                   </TableCell>
-                  <TableCell>{stakeholder.role}</TableCell>
+                  <TableCell>{formatRole(stakeholder.role)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {stakeholder.email || "-"}
                   </TableCell>

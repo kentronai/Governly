@@ -55,6 +55,10 @@ import type {
   AgentInventorySummary,
 } from "@/lib/queries/agents";
 
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 const ALL = "__all__";
 const UNOWNED = "__unowned__";
 
@@ -480,10 +484,10 @@ export function AgentInventory({
                     {r.name}
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell>
                   {platformLabel(r.platform)}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell>
                   <div className="space-y-0.5">
                     <div>{ownerDisplay(r.ownerName)}</div>
                     {!r.ownerName ? (
@@ -493,7 +497,7 @@ export function AgentInventory({
                     ) : null}
                   </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell>
                   {functionDisplay(r.businessFunction)}
                 </TableCell>
                 <TableCell>
@@ -504,7 +508,7 @@ export function AgentInventory({
                         AUTONOMY_STYLES[autonomyLevelDisplay(r)!],
                       )}
                     >
-                      {autonomyLevelDisplay(r)}
+                      {toLabel(autonomyLevelDisplay(r))}
                     </Badge>
                   ) : (
                     "—"
@@ -518,7 +522,7 @@ export function AgentInventory({
                         RISK_STYLES[r.riskLevel],
                       )}
                     >
-                      {r.riskLevel} · {Number(r.riskScore ?? 0)}
+                      {toLabel(r.riskLevel)} · {Number(r.riskScore ?? 0)}
                     </Badge>
                   ) : (
                     "—"
@@ -529,12 +533,12 @@ export function AgentInventory({
                     <div className="space-y-1">
                       <Badge
                         className={cn(
-                          "border-transparent capitalize",
+                          "border-transparent",
                           COMPLIANCE_STYLES[r.complianceStatus] ??
                             COMPLIANCE_STYLES.not_evaluated,
                         )}
                       >
-                        {r.complianceStatus.replaceAll("_", " ")}
+                        {toLabel(r.complianceStatus)}
                       </Badge>
                       <p
                         className="max-w-[150px] truncate text-[11px] text-muted-foreground"
@@ -574,13 +578,13 @@ export function AgentInventory({
                       STATUS_STYLES[r.status],
                     )}
                   >
-                    {r.status}
+                    {toLabel(r.status)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell>
                   {r.region} · {r.accountId}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell>
                   {mounted ? relativeFromNow(r.lastSeenAt) : "—"}
                 </TableCell>
               </TableRow>

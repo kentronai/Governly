@@ -141,15 +141,15 @@ export default function CompliancePolicyCenterPage() {
 
       {loading ? <div className="flex min-h-64 items-center justify-center rounded-xl border"><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span className="text-sm text-muted-foreground">Loading policies</span></div>
       : policies.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border bg-card text-center"><FileSearch className="mb-3 h-9 w-9 text-muted-foreground" /><h2 className="font-semibold">No policies found</h2><p className="mt-1 text-sm text-muted-foreground">Adjust the filters or search terms.</p><Button variant="outline" className="mt-4" onClick={resetFilters}>Clear filters</Button></div>
-      : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{policies.map((policy) =>
+      : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{policies.map((policy) =>
         <article key={policy.id} role="button" tabIndex={0} onClick={() => setSelected(policy)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelected(policy); }}
-          className="group flex min-h-[270px] cursor-pointer flex-col rounded-xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary">
-          <div className="flex items-start gap-4"><div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xs font-bold tracking-tight text-white shadow-sm", policy.color)}>{policy.icon}</div>
-            <div className="min-w-0 flex-1"><h2 className="line-clamp-2 text-base font-semibold leading-snug group-hover:text-primary">{policy.name}</h2><p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Landmark className="h-3 w-3" />{policy.governingAuthority || "Authority unavailable"}</p></div>
+          className="group flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-3 py-3 transition-colors hover:border-primary/40 hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary">
+          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold tracking-tight text-white", policy.color)}>{policy.icon}</div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold group-hover:text-primary">{policy.name}</h2>
+            <p className="truncate text-xs text-muted-foreground">{policy.country}{policy.state ? ` · ${policy.state}` : ""} · {policy.type || "Voluntary"}</p>
           </div>
-          <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{policy.description}</p>
-          <div className="mt-4 flex flex-wrap gap-2"><Badge variant="outline" className={categoryTone[policy.category] ?? categoryTone.Guideline}>{policy.category}</Badge><Badge variant="outline"><MapPin className="mr-1 h-3 w-3" />{policy.country}{policy.state ? ` · ${policy.state}` : ""}</Badge><Badge className={policy.type === "Mandatory" ? "bg-red-500/10 text-red-600 hover:bg-red-500/10 dark:text-red-300" : "bg-blue-500/10 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300"}>{policy.type || "Voluntary"}</Badge></div>
-          <div className="mt-auto flex items-center justify-between border-t pt-4" onClick={(event) => event.stopPropagation()}><div><p className="text-sm font-medium">{policy.isActive ? "Enabled" : "Disabled"}</p><p className="text-xs text-muted-foreground">{policy.isActive ? "Available for assignment" : "Hidden from assignment"}</p></div><div className="flex items-center gap-2">{toggling === policy.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}<Switch checked={policy.isActive} disabled={policy.disable || toggling === policy.id} onCheckedChange={(enabled) => togglePolicy(policy, enabled)} aria-label={`${policy.isActive ? "Disable" : "Enable"} ${policy.name}`} /></div></div>
+          <div className="flex shrink-0 items-center gap-2" onClick={(event) => event.stopPropagation()}>{toggling === policy.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}<Switch checked={policy.isActive} disabled={policy.disable || toggling === policy.id} onCheckedChange={(enabled) => togglePolicy(policy, enabled)} aria-label={`${policy.isActive ? "Disable" : "Enable"} ${policy.name}`} /></div>
         </article>)}</div>}
     </div>
 

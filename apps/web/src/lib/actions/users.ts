@@ -10,6 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { clerkClient } from '@clerk/nextjs/server';
 import { createAuditEvent } from '@/lib/server/audit';
+import { healPlaceholderEmails, isPlaceholderEmail } from '@/lib/server/user-identity';
 
 interface GetUsersOptions {
   page?: number;
@@ -769,6 +770,11 @@ export const getActiveUsers = async (options?: GetUsersOptions) => {
 
   const total = Number(countResult[0]?.count || 0);
 
+  const healedEmails = await healPlaceholderEmails(results);
+  for (const user of results) {
+    user.email = healedEmails.get(user.id) ?? user.email;
+  }
+
   return {
     success: true,
     users: results.map((user) => ({
@@ -811,15 +817,35 @@ export const getOrganizationMembers = async (tenantId: string) => {
   // Fetch organization members
   const orgMembers = await getOrgMembers(orgId);
 
+  // Clerk's `identifier` is the sign-in identifier, which is a username or an
+  // opaque id for SSO/username accounts — not necessarily an email. Prefer the
+  // real email from our users table.
+  const memberIds = orgMembers
+    .map((member) => member.publicUserData?.userId)
+    .filter((id): id is string => !!id);
+  const localUsers = memberIds.length
+    ? await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(inArray(users.id, memberIds))
+    : [];
+  const healedEmails = await healPlaceholderEmails(localUsers);
+  const emailById = new Map(
+    localUsers
+      .map((u) => [u.id, healedEmails.get(u.id) ?? u.email] as const)
+      .filter(([, email]) => !isPlaceholderEmail(email)),
+  );
+
   // Transform Clerk members to simple format
   const availableUsers = orgMembers.map(member => {
     const user = member.publicUserData;
+    const identifier = user?.identifier ?? '';
     return {
       id: user?.userId ?? '',
       name: user?.firstName && user?.lastName
         ? `${user.firstName} ${user.lastName}`
-        : user?.identifier || 'Unknown',
-      email: user?.identifier ?? '',
+        : identifier || 'Unknown',
+      email: emailById.get(user?.userId ?? '') ?? (identifier.includes('@') ? identifier : ''),
       imageUrl: user?.imageUrl ?? '',
     };
   });

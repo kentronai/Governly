@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { formatDate } from "@/lib/utils/date";
+import { cn } from "@/lib/utils";
 import ApplicationStatus from "@/components/applications/ApplicationStatus";
 import { useTenant } from "@/contexts/TenantContext";
 import { getApplicationDetails } from "@/lib/actions/applications";
@@ -28,6 +29,28 @@ const Progress = ({ value, className = "" }: any) => {
     </div>
   );
 };
+
+const InfoCard = ({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}) => (
+  <Card className={cn("py-4", className)}>
+    <CardContent className="flex items-start gap-3 px-4">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-medium">{value}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 interface PolicyPack {
   id: string;
@@ -138,6 +161,11 @@ export default function GovIQOverviewPage() {
   }, [params.tenant, params.applicationId]);
 
   // Format team members for display
+  const formatRole = (role?: string | null) => {
+    const value = (role ?? "").replace(/^org:/, "");
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
   const formatTeamMembers = (
     stakeholders: ApplicationDetails["stakeholders"]
   ) => {
@@ -146,11 +174,11 @@ export default function GovIQOverviewPage() {
     }
 
     if (stakeholders.length === 1) {
-      return `${stakeholders[0].name} (${stakeholders[0].role})`;
+      return `${stakeholders[0].name} (${formatRole(stakeholders[0].role)})`;
     }
 
     if (stakeholders.length <= 3) {
-      return stakeholders.map((s) => `${s.name} (${s.role})`).join(", ");
+      return stakeholders.map((s) => `${s.name} (${formatRole(s.role)})`).join(", ");
     }
 
     return `${stakeholders
@@ -298,79 +326,16 @@ export default function GovIQOverviewPage() {
           ></ApplicationStatus>
         </div>
 
-        {/* Project Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardContent className="">
-              <div className="flex items-center space-x-3">
-                <User className="w-5 h-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Owner</p>
-                  <p className="font-semibold ">{projectData.owner}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="">
-              <div className="flex items-center space-x-3">
-                <Calendar className="w-5 h-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Last updated</p>
-                  <p className="font-semibold ">{projectData.lastUpdated}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="">
-              <div className="flex items-center space-x-3">
-                <Users className="w-5 h-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Last updated by
-                  </p>
-                  <p className="font-semibold ">{projectData.lastUpdatedBy}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Project info: one grid so every card edge lines up */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <InfoCard icon={User} label="Owner" value={projectData.owner} />
+          <InfoCard icon={Calendar} label="Last Updated" value={projectData.lastUpdated} />
+          <InfoCard icon={Users} label="Last Updated By" value={projectData.lastUpdatedBy} />
+          <InfoCard icon={Target} label="Goal" value={projectData.goal} className="md:col-span-2" />
+          <InfoCard icon={Users} label="Team Members" value={projectData.teamMembers} />
         </div>
 
-        {/* Goal and Team Members */}
-        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardContent className="">
-              <div className="flex items-start space-x-3">
-                <Target className="w-5 h-5 text-muted-foreground mt-1" />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Goal</p>
-                  <p className="">{projectData.goal}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="">
-              <div className="flex items-start space-x-3">
-                <Users className="w-5 h-5 text-muted-foreground mt-1" />
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    Team members
-                  </p>
-                  <p className="text-muted-foreground">
-                    {projectData.teamMembers}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {isEUEnabled && complianceData.euAiAct && (
             <Card>
               <CardHeader>

@@ -310,7 +310,7 @@ const ApplicationSidebar = ({
                   icon={<ClipboardCheck size={16} strokeWidth={1.5} />}
                   active={component === "risk"}
                 >
-                  <SubNavItem active={component === "risk"}>Risk</SubNavItem>
+                  <SubNavItem active={component === "risk"}>Risks</SubNavItem>
                 </NavItem>
                 <NavItem
                   onClick={() => navigateToRoute("goviq/technology-details")}

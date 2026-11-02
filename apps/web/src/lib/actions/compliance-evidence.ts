@@ -147,3 +147,37 @@ export async function deleteComplianceEvidence(tenantSlugOrId: string, evidenceI
   await createAuditEvent({ tenantId, actorUserId: userId, action: "compliance_evidence.deleted", targetType: "compliance_evidence", targetId: evidenceId });
   return { success: true };
 }
+
+export interface UpdateComplianceEvidenceInput {
+  name: string;
+  evidenceType: string;
+  controlKey: string;
+  externalUrl?: string;
+}
+
+export async function updateComplianceEvidence(
+  tenantSlugOrId: string,
+  evidenceId: string,
+  input: UpdateComplianceEvidenceInput,
+) {
+  const { tenantId, userId } = await resolveAuthorizedTenant(tenantSlugOrId);
+  if (!input.controlKey.trim() || !input.name.trim()) throw new Error("Control and evidence name are required");
+  if (!EVIDENCE_TYPES.has(input.evidenceType)) throw new Error("Unsupported evidence type");
+  if (input.externalUrl) {
+    const url = new URL(input.externalUrl);
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("Evidence URL must use HTTP or HTTPS");
+  }
+
+  const [updated] = await db.update(complianceEvidence).set({
+    name: input.name.trim(),
+    evidenceType: input.evidenceType,
+    controlKey: input.controlKey,
+    externalUrl: input.externalUrl?.trim() || null,
+    updatedAt: new Date().toISOString(),
+  }).where(and(
+    eq(complianceEvidence.id, evidenceId), eq(complianceEvidence.tenantId, tenantId)
+  )).returning({ id: complianceEvidence.id });
+  if (!updated) throw new Error("Evidence not found");
+  await createAuditEvent({ tenantId, actorUserId: userId, action: "compliance_evidence.updated", targetType: "compliance_evidence", targetId: evidenceId });
+  return { success: true };
+}

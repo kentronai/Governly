@@ -125,13 +125,13 @@ const UsersIdentityMapping = () => {
                         key={`${item.email}-${item.workspace_id}-${index}`}
                         className="h-10 border-b border-[#E4E4E7] last:border-b-0 hover:bg-gray-50"
                       >
-                        <TableCell className="font-sm font-normal font-sans text-[#18181B]">
+                        <TableCell>
                           {item.name || "N/A"}
                         </TableCell>
-                        <TableCell className="font-sm font-normal font-sans text-[#18181B]">
+                        <TableCell>
                           {item.email}
                         </TableCell>
-                        <TableCell className="text-[#18181B] font-sm font-normal leading-[20px] font-sans">
+                        <TableCell>
                           {getFormattedDateString(
                             item.updated_timestamp,
                             true,

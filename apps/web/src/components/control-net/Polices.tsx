@@ -1429,14 +1429,14 @@ const PoliciesTab = () => {
         <Table>
           <TableHeader>
             <TableRow className="">
-              <TableHead className="font-semibold ">Name</TableHead>
-              <TableHead className="font-semibold ">Description</TableHead>
-              {/* <TableHead className="font-semibold ">
+              <TableHead>Name</TableHead>
+              <TableHead>Description</TableHead>
+              {/* <TableHead>
                 Version
               </TableHead> */}
-              {/* <TableHead className="font-semibold ">Status</TableHead> */}
-              <TableHead className="font-semibold ">Created</TableHead>
-              <TableHead className="font-semibold  w-[100px]">
+              {/* <TableHead>Status</TableHead> */}
+              <TableHead>Created</TableHead>
+              <TableHead className="w-[100px]">
                 Actions
               </TableHead>
             </TableRow>
@@ -1478,7 +1478,7 @@ const PoliciesTab = () => {
                       )}
                     </button>
                   </TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">
+                  <TableCell className="max-w-xs truncate">
                     {policy.description || "No description"}
                   </TableCell>
                   {/* <TableCell>
@@ -1492,7 +1492,7 @@ const PoliciesTab = () => {
                       (policy as any).isActive
                     )}
                   </TableCell> */}
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell>
                     {formatTimestamp(policy.createdAt)}
                   </TableCell>
                   <TableCell>

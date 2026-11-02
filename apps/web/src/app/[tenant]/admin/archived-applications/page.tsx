@@ -203,15 +203,15 @@ function ArchivedApplications() {
               return (
                 <TableRow key={app.id} className="">
                   <TableCell className="font-medium">{app.name}</TableCell>
-                  <TableCell className="text-sm pl-4  font-normal">
+                  <TableCell>
                     {new Date(
                       app?.archivedAt || app?.updatedAt
                     ).toLocaleDateString("en-US")}
                   </TableCell>
-                  <TableCell className="text-sm pl-4 font-normal">
+                  <TableCell>
                     {app.archivedBy || "Unknown"}
                   </TableCell>
-                  <TableCell className="">
+                  <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

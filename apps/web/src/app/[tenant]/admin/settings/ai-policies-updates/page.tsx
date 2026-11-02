@@ -29,6 +29,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Pagination from "@/components/common/pagination";
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 // Removed Navbar import - using static layout instead
 import { PolicyDetailsModal } from "@/components/global-ai-policies/PolicyDetailsModal";
 import {
@@ -232,25 +236,25 @@ const AIPolicyUpdate = () => {
       <Table>
         <TableHeader className="">
           <TableRow className="">
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Policy Name
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Country
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               State/Region
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Status
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Effective Date
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Impact Summary
             </TableHead>
-            <TableHead className=" font-medium h-10">
+            <TableHead>
               Action
             </TableHead>
           </TableRow>
@@ -262,7 +266,7 @@ const AIPolicyUpdate = () => {
               className="h-10"
             >
               {/* Policy Name */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 <div className="flex flex-col">
                   <span className="font-medium">{policy.policyName}</span>
                   {policy.shortName && (
@@ -274,12 +278,12 @@ const AIPolicyUpdate = () => {
               </TableCell>
 
               {/* Country */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 {policy.country || "N/A"}
               </TableCell>
 
               {/* State/Region */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 <div className="flex flex-col">
                   {policy.state && <span>{policy.state}</span>}
                   {policy.region && (
@@ -292,10 +296,10 @@ const AIPolicyUpdate = () => {
               </TableCell>
 
               {/* Status */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 {policy.status ? (
                   <Badge className={getStatusColor(policy.status)}>
-                    {policy.status}
+                    {toLabel(policy.status)}
                   </Badge>
                 ) : (
                   "N/A"
@@ -303,12 +307,12 @@ const AIPolicyUpdate = () => {
               </TableCell>
 
               {/* Effective Date */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 {formatDate(policy.effectiveDate)}
               </TableCell>
 
               {/* Summary */}
-              <TableCell className="text-sm  font-normal max-w-[300px]">
+              <TableCell className="max-w-[300px]">
                 {policy.summary ? (
                   <div className="truncate">
                     {policy.summary.substring(0, 100)}...
@@ -319,7 +323,7 @@ const AIPolicyUpdate = () => {
               </TableCell>
 
               {/* Actions */}
-              <TableCell className="text-sm  font-normal">
+              <TableCell>
                 {renderPolicyActions(policy)}
               </TableCell>
             </TableRow>

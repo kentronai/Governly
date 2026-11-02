@@ -3,6 +3,10 @@ import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { memo, useEffect, useRef, useState } from "react";
 import "@/components/admin/admin.css";
 import { successToast, errorToast } from "@/lib/utils/toast";
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 // Removed Navbar import - using static layout instead
 // Removed React Query imports - using static data instead
 import {
@@ -282,12 +286,10 @@ const DeactivatedUsers = () => {
   const renderUserRole = (role: string) => {
     return (
       <div className="flex flex-col">
-        <p className="text-bold text-sm capitalize">
-          {role === "globaladmin" ? (
-            "Global Admin"
-          ) : (
-            <span className="capitalize">{role?.split(":")?.length > 1 ? role?.split(":")[1] : role}</span>
-          )}
+        <p>
+          {role === "globaladmin"
+            ? "Global Admin"
+            : toLabel(role?.split(":")?.length > 1 ? role?.split(":")[1] : role)}
         </p>
       </div>
     );
@@ -339,10 +341,10 @@ const DeactivatedUsers = () => {
           <Table>
             <TableHeader>
               <TableRow className="h-10 border-b ">
-                <TableHead className=" font-medium">Full name</TableHead>
-                <TableHead className=" font-medium">Email</TableHead>
-                <TableHead className=" font-medium">Role</TableHead>
-                <TableHead className=" font-medium">Actions</TableHead>
+                <TableHead>Full name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,16 +363,16 @@ const DeactivatedUsers = () => {
                     key={user.id}
                     className="h-10 border-b last:border-b-0 "
                   >
-                    <TableCell className="text-sm   font-normal">
+                    <TableCell>
                       {user.name || "--"}
                     </TableCell>
-                    <TableCell className="text-sm   font-normal">
+                    <TableCell>
                       {user.email}
                     </TableCell>
-                    <TableCell className="text-sm   font-normal">
+                    <TableCell>
                       {renderUserRole((user as any)?.role || "--")}
                     </TableCell>
-                    <TableCell className="text-sm   font-normal">
+                    <TableCell>
                       {renderUserActions(user)}
                     </TableCell>
                   </TableRow>

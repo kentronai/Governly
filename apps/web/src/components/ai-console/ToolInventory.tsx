@@ -26,6 +26,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 const approvalColors: Record<ApprovalStatus, string> = {
   approved: "bg-risk-low/15 text-risk-low",
   pending: "bg-risk-medium/15 text-risk-medium",
@@ -136,7 +140,7 @@ export function ToolInventory() {
                   </TableCell>
 
                   {/* Usage */}
-                  <TableCell className="text-muted-foreground">
+                  <TableCell>
                     {tool.usageWeekly} / {tool.usageMonthly}
                   </TableCell>
 
@@ -145,11 +149,11 @@ export function ToolInventory() {
                     <Badge
                       variant="secondary"
                       className={cn(
-                        "rounded-md capitalize px-2 py-1",
+                        "rounded-md px-2 py-1",
                         approvalColors[tool.approvalStatus]
                       )}
                     >
-                      {tool.approvalStatus}
+                      {toLabel(tool.approvalStatus)}
                     </Badge>
                   </TableCell>
 
@@ -162,14 +166,14 @@ export function ToolInventory() {
                           riskColors[tool.riskRating]
                         )}
                       />
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {tool.riskRating}
+                      <span>
+                        {toLabel(tool.riskRating)}
                       </span>
                     </div>
                   </TableCell>
 
                   {/* Last Used */}
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell>
                     {tool.lastUsed}
                   </TableCell>
                 </TableRow>

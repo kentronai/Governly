@@ -26,6 +26,10 @@ import { formatTimestamp } from "@/utils/formatTime";
 import { useObservabilityIntegrations } from "@/store/tenantLogs.store";
 import RunDetailDialog from "./run-detail-dialog";
 
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 function EmptyState({ href }: { href: string }) {
   return (
     <Card className="shadow-sm border">
@@ -106,30 +110,30 @@ export default function LangSmithRuns() {
               ) : (
                 runs.map((run) => (
                   <TableRow key={run.id}>
-                    <TableCell className="max-w-[220px] truncate text-sm font-medium">
+                    <TableCell className="max-w-[220px] truncate font-medium">
                       {run.name ?? run.externalRunId}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {run.runType ?? "—"}
+                    <TableCell>
+                      {run.runType ? toLabel(run.runType) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">{run.model ?? "—"}</TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell>{run.model ?? "—"}</TableCell>
+                    <TableCell>
                       {run.totalTokens ?? "—"}
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell>
                       {run.totalCost != null ? `$${run.totalCost}` : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell>
                       {run.latencyMs != null ? `${run.latencyMs}ms` : "—"}
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant={run.errorMessage ? "destructive" : "secondary"}
                       >
-                        {run.errorMessage ? "error" : (run.status ?? "ok")}
+                        {run.errorMessage ? "Error" : toLabel(run.status ?? "ok")}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell>
                       {run.startTime ? formatTimestamp(run.startTime) : "—"}
                     </TableCell>
                     <TableCell>

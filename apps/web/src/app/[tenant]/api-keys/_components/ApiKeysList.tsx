@@ -191,7 +191,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
 
               return (
                 <TableRow key={key.id} className="">
-                  <TableCell className="font-medium ">{key.name}</TableCell>
+                  <TableCell className="font-medium">{key.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 ">
                       <code className="text-sm bg-muted px-2 py-1 rounded">
@@ -210,7 +210,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
                             : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground ">
+                  <TableCell>
                     {formatDate(key.lastUsedAt) || "Never"}
                   </TableCell>
 

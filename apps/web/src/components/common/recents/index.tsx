@@ -35,6 +35,10 @@ import {
   isPolicyCheck,
 } from "@/lib/observability-outcome";
 
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 // Type definitions for observability log data
 interface GuardInfo {
   id: string;
@@ -222,7 +226,7 @@ export default function RecentEndpointsTable({
                           </span>
                         </TableCell>
 
-                        <TableCell className="text-sm">
+                        <TableCell>
                           <Badge
                             variant={
                               isAllowed
@@ -241,9 +245,8 @@ export default function RecentEndpointsTable({
                               variant={
                                 decision === "block" ? "destructive" : "secondary"
                               }
-                              className="capitalize"
                             >
-                              {decision}
+                              {toLabel(decision)}
                             </Badge>
                           ) : (
                             <span className="text-sm text-muted-foreground">
@@ -251,7 +254,7 @@ export default function RecentEndpointsTable({
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell>
                           {/* Policy checks carry no model — the customer's own
                               LLM answered, and NORIX never saw it. Showing
                               "Unknown" there implied data was missing. */}
@@ -263,11 +266,11 @@ export default function RecentEndpointsTable({
                         {hideApplicationName === true ? (
                           <></>
                         ) : (
-                          <TableCell className="text-sm">
+                          <TableCell>
                             {ele.applicationName}
                           </TableCell>
                         )}
-                        <TableCell className="text-sm">
+                        <TableCell>
                           {ele.agentName ?? "Application traffic"}
                         </TableCell>
                         <TableCell>

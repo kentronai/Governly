@@ -434,18 +434,18 @@ const BiasAndFairnessPage: React.FC<BiasAndFairnessPageProps> = ({
 
     return data?.fairnessChecks?.map((fairnessCheck: FairnessCheck) => (
       <TableRow key={fairnessCheck._id} className="h-10">
-        <TableCell className="font-sm font-normal font-sans ">
+        <TableCell>
           {fairnessCheck.sCheckId}
         </TableCell>
-        <TableCell className="font-sm font-normal font-sans  max-w-md">
+        <TableCell className="max-w-md">
           <div className="truncate" title={fairnessCheck.sModel}>
             {fairnessCheck.sModel}
           </div>
         </TableCell>
-        <TableCell className="font-sm font-normal font-sans ">
+        <TableCell>
           <StatusBadge status={fairnessCheck.sStatus} />
         </TableCell>
-        <TableCell className="font-sm font-normal font-sans ">
+        <TableCell>
           {renderActions(fairnessCheck)}
         </TableCell>
       </TableRow>
@@ -510,16 +510,16 @@ const BiasAndFairnessPage: React.FC<BiasAndFairnessPageProps> = ({
               <Table>
                 <TableHeader>
                   <TableRow className="">
-                    <TableHead className="text-muted-foreground font-medium">
+                    <TableHead>
                       Check ID
                     </TableHead>
-                    <TableHead className="text-muted-foreground font-medium">
+                    <TableHead>
                       Model
                     </TableHead>
-                    <TableHead className="text-muted-foreground font-medium">
+                    <TableHead>
                       Status
                     </TableHead>
-                    <TableHead className="text-muted-foreground font-medium">
+                    <TableHead>
                       Actions
                     </TableHead>
                   </TableRow>

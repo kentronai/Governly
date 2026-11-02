@@ -39,6 +39,10 @@ import { getUserNamesFromIds } from "@/lib/utils/userUtils";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import { usePathname, useRouter } from "next/navigation";
 
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 interface RiskListItem {
   id: string;
   riskName: string;
@@ -362,7 +366,7 @@ export default function RisksModule({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-start">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Risk</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-6">Risks</h1>
         <Button onClick={() => setIsCreateModalOpen(true)} disabled={isPending}>
           <Plus className="h-4 w-4 mr-2" />
           Create Risk
@@ -432,7 +436,7 @@ export default function RisksModule({
                   <div
                     className={`inline-flex items-center rounded-full border  px-2.5 py-0.5 text-xs font-semibold ${getRiskLevelStyle(risk.riskLevel)}`}
                   >
-                    {risk.riskLevel}
+                    {toLabel(risk.riskLevel)}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -440,7 +444,7 @@ export default function RisksModule({
                     variant="secondary"
                     className="bg-orange-500/10 text-orange-500"
                   >
-                    {risk.severity}
+                    {toLabel(risk.severity)}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -448,25 +452,25 @@ export default function RisksModule({
                     variant="secondary"
                     className="bg-blue-500/10 text-blue-500"
                   >
-                    {risk.likelihood}
+                    {toLabel(risk.likelihood)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div
                     className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getStatusStyle(risk.mitigationStatus)}`}
                   >
-                    {risk.mitigationStatus}
+                    {toLabel(risk.mitigationStatus)}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell>
                   {userNames[risk.owner] || risk.owner}
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell>
                   {risk.controlOwner
                     ? userNames[risk.controlOwner] || risk.controlOwner
                     : "—"}
                 </TableCell>
-                <TableCell className="">
+                <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">

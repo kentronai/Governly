@@ -192,10 +192,10 @@ const OrganizationPolicies = () => {
         <TableBody className="border-b border-[#E4E4E7] p-0">
           {data.map((policy: any, index: number) => (
             <TableRow key={index} className="p-0">
-              <TableCell className="p-0 font-normal leading-5 font-sans text-sm text-[#18181B]">
+              <TableCell>
                 {policy.policy_name}
               </TableCell>
-              <TableCell className="p-0 font-normal leading-5 font-sans text-sm text-[#18181B]">
+              <TableCell>
                 {policy.policy_description.slice(0, 71)}
                 {policy.policy_description.length > 71 && "..."}
               </TableCell>
@@ -235,16 +235,16 @@ const OrganizationPolicies = () => {
         <Table>
           <TableHeader>
             <TableRow className="border-b border-[#E4E4E7]">
-              <TableHead className="w-[200px] h-[30px] p-0 font-medium leading-5 font-sans text-sm text-[#71717A]">
+              <TableHead className="w-[200px]">
                 Policy
               </TableHead>
-              <TableHead className="p-0 font-medium h-[30px] leading-5 font-sans text-sm text-[#71717A]">
+              <TableHead>
                 Description
               </TableHead>
-              <TableHead className="w-[100px] text-center h-[30px] font-medium leading-5 font-sans text-sm text-[#71717A]">
+              <TableHead className="w-[100px] text-center">
                 Status
               </TableHead>
-              <TableHead className="w-[60px] text-center h-[30px] font-medium leading-5 font-sans text-sm text-[#71717A]">
+              <TableHead className="w-[60px] text-center">
                 Edit
               </TableHead>
             </TableRow>

@@ -1,6 +1,10 @@
 "use client";
 import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { useEffect, useState } from "react";
+
+// Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
+const toLabel = (v?: string | null) =>
+  v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
 // Removed API imports - using static data instead
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 // Removed Navbar import - using static layout instead
@@ -313,25 +317,25 @@ const AuditLogs = () => {
               key={log.id || index}
               className="h-10 border-b  last:border-b-0 "
             >
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {formatDateTime(log.created_at)}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {log?.actor?.user?.name || "-"}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {log?.actor?.user?.email || "-"}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
-                {log?.entity || "-"}
+              <TableCell>
+                {log?.entity ? toLabel(log.entity) : "-"}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {log?.action || "-"}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {log?.context?.message || log?.action || "-"}
               </TableCell>
-              <TableCell className="text-sm pl-4  font-normal">
+              <TableCell>
                 {renderLogActions(log)}
               </TableCell>
             </TableRow>
@@ -386,13 +390,13 @@ const AuditLogs = () => {
           <Table>
             <TableHeader className="">
               <TableRow className="border-b ">
-                <TableHead className=" font-medium h-10">Date</TableHead>
-                <TableHead className=" font-medium h-10">Name</TableHead>
-                <TableHead className=" font-medium h-10">Email</TableHead>
-                <TableHead className=" font-medium h-10">Entity</TableHead>
-                <TableHead className=" font-medium h-10">Type</TableHead>
-                <TableHead className=" font-medium h-10">Message</TableHead>
-                <TableHead className=" font-medium h-10">Action</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Entity</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Message</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             {renderTableBody()}
