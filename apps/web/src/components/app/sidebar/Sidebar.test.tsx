@@ -50,7 +50,7 @@ const ADMIN_LINKS: [string, string][] = [
   ["Deactivated Users", "/acme/admin/users/deactivate"],
   ["Archived Applications", "/acme/admin/archived-applications"],
   ["Audit Logs", "/acme/admin/settings/audit-logs"],
-  ["Regulations", "/acme/admin/settings/policy-center"],
+  ["AI Frameworks", "/acme/admin/settings/policy-center"],
   ["ISO 42001", "/acme/admin/settings/iso-42001"],
   ["Integrations", "/acme/admin/integrations"],
   ["AI Radar", "/acme/admin/settings/ai-policies-updates"],
@@ -95,7 +95,7 @@ describe("Sidebar — Admin Center section", () => {
       ).toEqual(ADMIN_LINKS);
     });
 
-    it("groups options under Users, Settings and Compliance headings", () => {
+    it("groups options under Users, Settings and Frameworks headings", () => {
       setup();
       expandAdminCenter();
       const group = (name: string) => screen.getByRole("group", { name });
@@ -110,11 +110,11 @@ describe("Sidebar — Admin Center section", () => {
           .map((l) => l.textContent),
       ).toEqual(["Archived Applications", "Audit Logs"]);
       expect(
-        within(group("Compliance"))
+        within(group("Frameworks"))
           .getAllByRole("link")
           .map((l) => l.textContent),
       ).toEqual([
-        "Regulations",
+        "AI Frameworks",
         "ISO 42001",
         "Integrations",
         "AI Radar",
@@ -130,11 +130,11 @@ describe("Sidebar — Admin Center section", () => {
   });
 
   describe("feature gating", () => {
-    it("hides Compliance options when GovIQ is disabled", () => {
+    it("hides Frameworks options when GovIQ is disabled", () => {
       setup({ govIQEnabled: false });
       expandAdminCenter();
       for (const label of [
-        "Regulations",
+        "AI Frameworks",
         "ISO 42001",
         "Integrations",
         "AI Radar",
@@ -144,7 +144,7 @@ describe("Sidebar — Admin Center section", () => {
         ).not.toBeInTheDocument();
       }
       expect(
-        screen.queryByRole("group", { name: "Compliance" }),
+        screen.queryByRole("group", { name: "Frameworks" }),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: "Active Users" }),
@@ -158,7 +158,7 @@ describe("Sidebar — Admin Center section", () => {
         screen.queryByRole("link", { name: "ISO 42001" }),
       ).not.toBeInTheDocument();
       expect(
-        screen.getByRole("link", { name: "Regulations" }),
+        screen.getByRole("link", { name: "AI Frameworks" }),
       ).toBeInTheDocument();
     });
   });
@@ -196,7 +196,7 @@ describe("Sidebar — Admin Center section", () => {
     it("keeps the parent option current on nested admin routes", () => {
       setup({ pathname: "/acme/admin/settings/policy-center/eu-ai-act" });
       expect(
-        screen.getByRole("link", { name: "Regulations" }),
+        screen.getByRole("link", { name: "AI Frameworks" }),
       ).toHaveAttribute("aria-current", "page");
     });
 

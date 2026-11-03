@@ -32,7 +32,7 @@ export default async function layout({ children, params }: LayoutProps) {
   return (
     <div className="flex flex-col h-screen w-full">
       <ApplicationSidebar applicationMetadata={application} />
-      <div className="flex-1 p-6">{children}</div>
+      <div className="min-w-0 flex-1 p-6">{children}</div>
     </div>
   );
 }

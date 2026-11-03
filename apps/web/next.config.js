@@ -40,6 +40,18 @@ if (process.env.NODE_ENV !== "production") {
   }
 }
 
+// dev-local.sh runs Next on the host, where Docker service hostnames don't
+// resolve; point them at the ports Docker publishes on localhost.
+if (process.env.NORIX_NATIVE === "1") {
+  for (const key of ["DATABASE_URL", "NANGO_HOST", "NANGO_SERVER_URL"]) {
+    if (process.env[key]) {
+      process.env[key] = process.env[key]
+        .replace("@postgres:", "@localhost:")
+        .replace("//nango-server:", "//localhost:");
+    }
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -58,8 +70,10 @@ const nextConfig = {
   // root makes the dev server watch tens of thousands of unrelated cache,
   // Python, model, and infrastructure files, which causes very slow cold
   // route compilation on Docker Desktop bind mounts.
+  // Native runs (dev-local.sh) resolve pnpm's hoisted packages from the
+  // repo-root node_modules, so Turbopack's root must include it there.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.env.NORIX_NATIVE === "1" ? path.resolve(__dirname, "../..") : path.resolve(__dirname),
   },
   images: {
     remotePatterns: [

@@ -118,10 +118,10 @@ export default function CompliancePolicyCenterPage() {
   const hasFilters = Boolean(search) || [country, category, status, requirementType].some((value) => value !== ALL);
 
   return <div className="min-h-full w-full bg-background p-5 lg:p-7">
-    <div className="mx-auto max-w-[1500px] space-y-6">
+    <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><ShieldCheck className="h-4 w-4" />Compliance library</div>
-          <PageTitle>Regulations</PageTitle>
+        <div><div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><ShieldCheck className="h-4 w-4" />Frameworks</div>
+          <PageTitle>AI Frameworks</PageTitle>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore, understand and enable authoritative AI regulations, standards, frameworks and guidelines for application governance.</p>
         </div>
         <div className="rounded-lg border bg-card px-4 py-2 text-right"><p className="text-2xl font-semibold tabular-nums">{catalog.length}</p><p className="text-xs text-muted-foreground">Policies in library</p></div>

@@ -184,7 +184,16 @@ export async function runDiscoveryScan(
           }
         }
 
-        const regionBedrock = await discoverBedrock(clients);
+        // A denied Bedrock call (e.g. missing bedrock:ListAgents) must not
+        // drop the region — Lambda/Step Functions/etc. still get scanned.
+        let regionBedrock: Awaited<ReturnType<typeof discoverBedrock>> = [];
+        try {
+          regionBedrock = await discoverBedrock(clients);
+        } catch (error) {
+          if (!isServiceUnavailableInRegion(error)) {
+            serviceWarnings.push(formatServiceWarning(region, "Bedrock", error));
+          }
+        }
         try {
           agentCoreResources.push(
             ...(await discoverAgentCoreRuntimes(

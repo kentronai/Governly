@@ -64,7 +64,7 @@ function summarizeIssue(message: string) {
   ];
   const regions = [
     ...new Set(
-      [...message.matchAll(/(?:Skipped: |; )([a-z]{2}-[a-z]+-\d)(?=:)/g)].map((m) => m[1]),
+      [...message.matchAll(/(?:Skipped: |; |^)([a-z]{2}-[a-z]+-\d)(?=[: ])/g)].map((m) => m[1]),
     ),
   ];
   const headline =
@@ -72,6 +72,15 @@ function summarizeIssue(message: string) {
     (permissions.length ? `Missing permission ${permissions[0]}` : message.split(/[.;]/)[0]);
   return { headline, permissions, regions };
 }
+
+// Read-tag permissions the ownership engine needs to resolve Owner/Team tags.
+const AWS_OWNER_TAG_PERMISSIONS = [
+  "lambda:ListTags",
+  "bedrock:ListTagsForResource",
+  "bedrock-agentcore:ListTagsForResource",
+  "eks:DescribeCluster",
+  "ec2:DescribeInstances",
+];
 
 const CATEGORY_LABELS: Record<string, string> = {
   data_platforms: "Data Platforms",
@@ -943,12 +952,7 @@ export default function IntegrationsPage() {
                         )}
                       />
                       <span>{statusText}</span>
-                      {hasWarnings ? (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span className="text-amber-600 dark:text-amber-400">Needs attention</span>
-                        </>
-                      ) : connected && integration.lastSyncAt ? (
+                      {connected && integration.lastSyncAt ? (
                         <>
                           <span aria-hidden>·</span>
                           <span>Last sync</span>
@@ -1058,7 +1062,14 @@ export default function IntegrationsPage() {
       <Dialog open={!!issueFor} onOpenChange={(open) => !open && setIssueFor(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{issueFor?.name} sync details</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {issueFor?.name} sync details
+              {issueFor?.errorMessage ? (
+                <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-400">
+                  Needs attention
+                </Badge>
+              ) : null}
+            </DialogTitle>
             <DialogDescription>
               {issueFor?.errorMessage ? summarizeIssue(issueFor.errorMessage).headline : null}
             </DialogDescription>
@@ -1079,6 +1090,23 @@ export default function IntegrationsPage() {
                     </div>
                     <p className="text-muted-foreground">
                       Grant these to the connected IAM user or role, then run Discover again.
+                    </p>
+                  </div>
+                )}
+                {issueFor.name === "AWS" && (
+                  <div className="space-y-2">
+                    <p className="font-medium">Show agent owner names</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {AWS_OWNER_TAG_PERMISSIONS.map((permission) => (
+                        <Badge key={permission} variant="outline" className="font-mono">
+                          {permission}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground">
+                      Owners are read from each resource&apos;s <span className="font-mono">Owner</span> (or{" "}
+                      <span className="font-mono">Team</span>) tag. Grant these permissions and tag agents with the
+                      owner&apos;s email, then run Discover again.
                     </p>
                   </div>
                 )}

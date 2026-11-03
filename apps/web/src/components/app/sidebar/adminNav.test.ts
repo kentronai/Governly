@@ -21,7 +21,8 @@ describe("Admin Center navigation config", () => {
       ["Deactivated Users", "admin/users/deactivate"],
       ["Archived Applications", "admin/archived-applications"],
       ["Audit Logs", "admin/settings/audit-logs"],
-      ["Regulations", "admin/settings/policy-center"],
+      ["AI Frameworks", "admin/settings/policy-center"],
+      ["EU AI Act", "admin/settings/eu-ai-act"],
       ["ISO 42001", "admin/settings/iso-42001"],
       ["Integrations", "admin/integrations"],
       ["AI Radar", "admin/settings/ai-policies-updates"],
@@ -62,18 +63,24 @@ describe("Admin Center navigation config", () => {
 });
 
 describe("getVisibleAdminNav", () => {
-  const labels = (ctx: { govIQEnabled: boolean; iso42001: boolean }) =>
-    getVisibleAdminNav(ctx).flatMap((group) =>
+  const labels = (ctx: { govIQEnabled: boolean; euAiAct?: boolean; iso42001: boolean }) =>
+    getVisibleAdminNav({ euAiAct: false, ...ctx }).flatMap((group) =>
       group.items.map((item) => item.label),
     );
 
-  it("shows every option when GovIQ and ISO 42001 are enabled", () => {
-    expect(labels({ govIQEnabled: true, iso42001: true })).toHaveLength(10);
+  it("shows every option when GovIQ, EU AI Act and ISO 42001 are enabled", () => {
+    expect(labels({ govIQEnabled: true, euAiAct: true, iso42001: true })).toHaveLength(11);
   });
 
-  it("hides the whole Compliance group without GovIQ", () => {
-    const visible = getVisibleAdminNav({ govIQEnabled: false, iso42001: true });
-    expect(visible.map((group) => group.title)).not.toContain("Compliance");
+  it("shows EU AI Act right below AI Frameworks only when enabled", () => {
+    expect(labels({ govIQEnabled: true, iso42001: true })).not.toContain("EU AI Act");
+    const visible = labels({ govIQEnabled: true, euAiAct: true, iso42001: true });
+    expect(visible[visible.indexOf("AI Frameworks") + 1]).toBe("EU AI Act");
+  });
+
+  it("hides the whole Frameworks group without GovIQ", () => {
+    const visible = getVisibleAdminNav({ govIQEnabled: false, euAiAct: true, iso42001: true });
+    expect(visible.map((group) => group.title)).not.toContain("Frameworks");
     expect(labels({ govIQEnabled: false, iso42001: true })).toEqual([
       "Admin Home",
       "Active Users",
@@ -89,7 +96,7 @@ describe("getVisibleAdminNav", () => {
     expect(visible).not.toContain("ISO 42001");
     expect(visible).toEqual(
       expect.arrayContaining([
-        "Regulations",
+        "AI Frameworks",
         "Integrations",
         "AI Radar",
       ]),

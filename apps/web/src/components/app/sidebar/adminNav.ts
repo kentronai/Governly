@@ -22,6 +22,7 @@ import {
 
 export interface AdminNavVisibility {
   govIQEnabled: boolean;
+  euAiAct: boolean;
   iso42001: boolean;
 }
 
@@ -71,13 +72,19 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "Compliance",
+    title: "Frameworks",
     isVisible: ({ govIQEnabled }) => govIQEnabled,
     items: [
       {
-        label: "Regulations",
+        label: "AI Frameworks",
         path: "admin/settings/policy-center",
         icon: FileText,
+      },
+      {
+        label: "EU AI Act",
+        path: "admin/settings/eu-ai-act",
+        icon: Scale,
+        isVisible: ({ euAiAct }) => euAiAct,
       },
       {
         label: "ISO 42001",

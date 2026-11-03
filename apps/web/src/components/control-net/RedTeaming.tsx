@@ -262,7 +262,7 @@ const CreateRedTeamingTaskModal = ({
                       onClick={() => setShowCustomTestDetails(false)}
                       className="bg-black hover:bg-gray-800 text-white"
                     >
-                      Save Details
+                      Save
                     </Button>
                   </div>
                 </div>

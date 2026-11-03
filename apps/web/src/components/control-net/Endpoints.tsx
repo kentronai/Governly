@@ -416,7 +416,7 @@ const CreateEndpointModal: React.FC<{
                     onClick={handleSave}
                     className="bg-black hover:bg-gray-800 text-white px-6 py-2 rounded-md transition-colors"
                   >
-                    Save Configuration
+                    Save
                   </Button>
                 </div>
               </div>

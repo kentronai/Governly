@@ -212,8 +212,8 @@ describe("Integrations page", () => {
 
     expect(await screen.findByText("Connected")).toBeInTheDocument();
     expect(screen.queryByText("Failed")).not.toBeInTheDocument();
-    // The region detail lives in "View details"; the tile only flags it.
-    expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    // The warning and region detail live only in "View details".
+    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
     expect(screen.queryByText(/Scanned 16\/17 regions/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Discover/i }),
