@@ -1,6 +1,5 @@
 "use client";
 
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import HomeMain from "@/components/admin/home";
 import "./admin.css";
 

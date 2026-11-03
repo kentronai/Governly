@@ -35,6 +35,7 @@ import {
 } from "@/lib/actions/applications";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ArchivedApplication {
   id: string;
   name: string;
@@ -160,7 +161,7 @@ function ArchivedApplications() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold ">Archived Applications</h1>
+          <PageTitle>Archived Applications</PageTitle>
         </div>
       </div>
 

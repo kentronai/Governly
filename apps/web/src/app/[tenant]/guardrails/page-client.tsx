@@ -19,6 +19,7 @@ import { MarketplaceBrowser } from "@/components/control-net/MarketplaceBrowser"
 import { installMarketplaceGuardrail } from "./actions";
 import { getGuardrailIcon } from "@/lib/utils/guardrailIcons";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface Guardrail {
   id: string;
   key: string;
@@ -88,7 +89,7 @@ export function GuardrailsPageClient({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold ">Guardrails</h1>
+          <PageTitle>Guardrails</PageTitle>
           <p className="text-sm text-muted-foreground mt-1">
             Install pre-built guardrails from the marketplace or view your
             installed guardrails

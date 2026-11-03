@@ -1,6 +1,5 @@
 "use client";
 
-import SideBar from "@/components/admin/sidebar/Sidebar";
 // Removed API imports - using static data instead
 // Removed Navbar import - using static layout instead
 import { Building2 } from "lucide-react";

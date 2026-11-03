@@ -7,6 +7,7 @@ import {
   useApplicationLogs,
 } from "@/store/applicationLogs.store";
 import ObservabilityChart from "@/components/common/observability-chart";
+import { PageTitle } from "@/components/common/PageHeader";
 export default function ControlNetOverview() {
   const props = useApplicationLogs();
   const chartProps = useApplicationGraph();
@@ -15,7 +16,7 @@ export default function ControlNetOverview() {
     <div className=" space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold ">Control Overview</h1>
+        <PageTitle>Control Overview</PageTitle>
       </div>
       <Stats></Stats>
       <ObservabilityChart {...chartProps}></ObservabilityChart>

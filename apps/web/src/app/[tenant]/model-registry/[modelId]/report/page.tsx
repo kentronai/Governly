@@ -22,6 +22,7 @@ import { getModelScanResultsByUrl } from "@/lib/actions/model-scans";
 import { getProviderModelById } from "@/lib/actions/provider-models";
 import { LocalTime } from "@/components/common/LocalTime";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface SecurityFinding {
   id: string;
   type: string;
@@ -269,7 +270,7 @@ export default function ModelReportPage() {
               Back
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold ">Loading Model Report...</h1>
+              <PageTitle>Loading Model Report...</PageTitle>
             </div>
           </div>
           <div className=" rounded-lg shadow-sm border  p-8 text-center">
@@ -299,7 +300,7 @@ export default function ModelReportPage() {
               Back
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold ">Error Loading Report</h1>
+              <PageTitle>Error Loading Report</PageTitle>
             </div>
           </div>
           <div className=" p-6">
@@ -329,9 +330,9 @@ export default function ModelReportPage() {
           </Button>
 
           <div className="flex-1">
-            <h1 className="text-2xl font-bold ">
+            <PageTitle>
               {model?.displayName || model?.modelId || "Model Report"}
-            </h1>
+            </PageTitle>
             <p className="text-muted-foreground">
               Security scan results and model information
             </p>

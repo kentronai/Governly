@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth, UserButton } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import { OrganizationSwitcher } from "@/components/common/OrganizationSwitcher";
 import Image from "next/image";
 import Link from "next/link";
@@ -44,8 +44,6 @@ export function TenantHeader() {
   const [applicationName, setApplicationName] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  const { orgRole } = useAuth();
-
   // Extract applicationId from URL when on application pages
   const applicationId = params.applicationId as string | undefined;
 
@@ -72,10 +70,6 @@ export function TenantHeader() {
 
   const shouldHideLogo = /^\/[^\/]+\/applications\/[^\/]+(\/.*)?$/.test(
     pathname
-  );
-  const isAdminPage = React.useMemo(
-    () => pathname.includes("/admin"),
-    [pathname]
   );
 
   // Clerk, next-themes, and navigation hooks can resolve to browser-specific
@@ -128,20 +122,7 @@ export function TenantHeader() {
         <Theme />
 
         <OrganizationSwitcher />
-        {isMounted && !isAdminPage && orgRole === "org:admin" && (
-          <Link
-            target="_blank"
-            href={`/${tenant}/admin/home`}
-            className="flex items-center"
-          >
-            <Button
-              variant="outline"
-              className="h-9 px-3 text-sm font-medium rounded-md transition-colors font-sans"
-            >
-              ADMIN
-            </Button>
-          </Link>
-        )}
+        {/* Admin pages are reached via the sidebar's "Admin Center" section. */}
         {isMounted ? (
           <UserButton
             afterSignOutUrl="/sign-in"

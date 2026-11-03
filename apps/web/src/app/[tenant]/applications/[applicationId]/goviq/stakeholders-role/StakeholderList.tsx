@@ -40,6 +40,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import StakeholderRoleModals, { getRoleLabel, getUserLabel } from './Modal';
 import DynamicDetailsViewModal from '@/components/modal/DynamicDetailsViewModal';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface StakeholderRoleProps {
   hasQAReadPermission?: boolean;
   hasQAWritePermission?: boolean;
@@ -460,7 +461,7 @@ const StakeholdersRolePage: React.FC<StakeholderRoleProps> = ({
       <div className="h-screen overflow-y-auto scrollbar-hide scroll-smooth w-full">
         <div className="mx-auto space-y-4">
           <div className="mb-6 flex justify-between items-start">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Stakeholders & Role</h1>
+            <PageTitle className="mb-2">Stakeholders & Role</PageTitle>
           </div>
           {/* Search Input */}
           <div className="flex items-center justify-between">

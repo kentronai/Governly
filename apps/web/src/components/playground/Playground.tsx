@@ -45,6 +45,7 @@ import {
 import { getProviderModelsForPlayground } from "@/lib/actions/provider-models-playground";
 import { selectModelForTenant } from "@/lib/actions/model-registry-runtime";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface Policy {
   id: string;
   name: string;
@@ -941,7 +942,7 @@ console.log(response.guardrails);  // ControlNet metadata
       <div className=" mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">AI Guardrails Playground</h1>
+          <PageTitle className="mb-2">AI Guardrails Playground</PageTitle>
           <p className="text-muted-foreground">
             Experiment with guardrail policies and watch real-time protection
             unfold

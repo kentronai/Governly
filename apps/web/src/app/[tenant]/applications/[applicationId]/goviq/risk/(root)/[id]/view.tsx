@@ -4,6 +4,7 @@ import { Risk } from "./type";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageTitle } from "@/components/common/PageHeader";
 export default function View({ risk }: { risk: Risk }) {
   const router = useRouter();
   return (
@@ -13,7 +14,7 @@ export default function View({ risk }: { risk: Risk }) {
         Back
       </Button>
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold">{risk.riskName}</h1>
+        <PageTitle>{risk.riskName}</PageTitle>
         <p className="text-muted-foreground">{risk.description}</p>
       </div>
     </>

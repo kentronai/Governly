@@ -670,7 +670,7 @@ const Settings: FC<SettingsProps> = ({
 
         {!selectedPolicies.length && (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No organization policies are enabled. Enable them in Admin → Compliance → Compliance Policies first.
+            No organization policies are enabled. Enable them in Admin Center → Compliance → Regulations first.
           </div>
         )}
       </div>

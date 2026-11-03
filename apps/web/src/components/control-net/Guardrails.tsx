@@ -1,4 +1,5 @@
 "use client"
+import { PageTitle } from "@/components/common/PageHeader";
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -135,7 +136,7 @@ function GuardrailsComponent() {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-[#18181B] mb-2">Guardrails</h1>
+          <PageTitle className="mb-2">Guardrails</PageTitle>
           <p className="text-gray-600">
             Manage and monitor your AI guardrail configurations
           </p>

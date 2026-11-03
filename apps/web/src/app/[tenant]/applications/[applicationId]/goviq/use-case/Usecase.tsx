@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import UseCaseModule from "./use-case-module";
 
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface UseCaseAppProps {
   initialUseCases?: any[];
   applicationId: string;
@@ -21,7 +22,7 @@ export default function UseCaseApp({
   const tenantSlug = params.tenant as string;
   return (
     <div className="min-h-screen w-full">
-      <h1 className="text-3xl font-bold text-foreground mb-6">Use Case</h1>
+      <PageTitle className="mb-6">Use Case</PageTitle>
       <UseCaseModule
         initialUseCases={initialUseCases}
         applicationId={applicationId}

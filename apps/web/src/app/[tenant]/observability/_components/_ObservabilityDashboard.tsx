@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Search, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ObservabilityLog {
   id: string;
   requestId: string;
@@ -70,7 +71,7 @@ export function ObservabilityDashboard({ initialLogs, stats, tenant, tenantId, s
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Observability</h1>
+        <PageTitle>Observability</PageTitle>
         <p className="text-gray-600">Monitor AI requests with full governance → security traceability</p>
       </div>
 

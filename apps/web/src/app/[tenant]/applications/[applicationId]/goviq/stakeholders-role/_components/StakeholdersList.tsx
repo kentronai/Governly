@@ -36,6 +36,7 @@ import DynamicDetailsViewModal, {
   createFieldConfig,
 } from "@/components/modal/DynamicDetailsViewModal";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface Stakeholder {
   id: string;
   userName: string;
@@ -144,7 +145,7 @@ export function StakeholdersList({
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold ">Stakeholders</h1>
+          <PageTitle>Stakeholders</PageTitle>
           <p className="text-muted-foreground">
             Manage stakeholders in this application
           </p>

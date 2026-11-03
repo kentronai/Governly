@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FolderPlus } from "lucide-react";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export default function Page() {
   const router = useRouter();
   const { tenant, applicationId } = useParams();
@@ -16,7 +17,7 @@ export default function Page() {
           <FolderPlus className="h-24 w-24 text-muted-foreground" />
         </div>
 
-        <h1 className="text-2xl font-semibold">Add Use Case to Assign Risk</h1>
+        <PageTitle>Add Use Case to Assign Risk</PageTitle>
 
         <p className="text-sm text-muted-foreground">
           To begin assigning risk details, {`you’ll`} need to create a use case

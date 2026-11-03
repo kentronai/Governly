@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 // Icons
 import { Settings } from 'lucide-react';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface AIRiskCenterPageProps {
   params: Promise<{ tenant: string }>;
 }
@@ -44,7 +45,7 @@ export default function AIRiskCenterPage({ params }: AIRiskCenterPageProps) {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold mb-2 text-black">AI Risk Center</h1>
+          <PageTitle className="mb-2">AI Risk Center</PageTitle>
           <p className="text-gray-600 mb-6">Comprehensive overview of risks</p>
         </div>
 

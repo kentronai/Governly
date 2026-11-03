@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { PageTitle } from "@/components/common/PageHeader";
 type CompliancePolicy = {
   policy_name: string;
   policy_description: string[];
@@ -141,7 +142,7 @@ const OrganizationPolicies = () => {
       <div className="mx-auto w-full max-w-[1200px] space-y-6 p-5">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Compliance Policies</h1>
+            <PageTitle>Compliance Policies</PageTitle>
             <Badge variant="secondary">Coming Soon</Badge>
           </div>
           <p className="text-muted-foreground">

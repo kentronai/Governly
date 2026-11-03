@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FormFieldComponent } from "@/components/common/FormFieldComponent";
 import { useDocumentation } from "@/hooks/use-documentation";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const formSchema = z.object({
   supervisionDesign: z.string().optional(),
   oversightEffectiveness: z.string().optional(),
@@ -52,7 +53,7 @@ export default function GovIQHumanOversightPage({ params }: PageProps) {
   return (
     <>
       <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-bold my-2">Human Oversight</h1>
+        <PageTitle className="my-2">Human Oversight</PageTitle>
       </div>
       <Form {...(form as any)}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 !">

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useDocumentation } from "@/hooks/use-documentation";
 import { Separator } from "@/components/ui/separator";
+import { PageTitle } from "@/components/common/PageHeader";
 // 🧩 Zod Schema
 const formSchema = z.object({
   identifiedRisks: z.string().optional(),
@@ -88,9 +89,9 @@ export default function GovIQInformationProtectionPage({ params }: PageProps) {
 
   return (
     <div className="!text-black space-y-8">
-      <h1 className="text-2xl font-semibold">
+      <PageTitle>
         Fundamental Rights Impact Assessment
-      </h1>
+      </PageTitle>
       <div
         onKeyDown={(e) => {
           if (e.key === "Enter") {

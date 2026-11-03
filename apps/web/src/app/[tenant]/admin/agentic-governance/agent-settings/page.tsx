@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import Sidebar from "@/components/admin/sidebar/Sidebar";
 // Removed Navbar import - using static layout instead
 import {
   Settings,
@@ -12,6 +11,7 @@ import {
   TestTube,
 } from "lucide-react";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const AgentSettings = () => {
   const [activeTab, setActiveTab] = useState("project");
   const [showKeys, setShowKeys] = useState<any>({});
@@ -426,7 +426,7 @@ const AgentSettings = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+            <PageTitle>Settings</PageTitle>
             <p className="text-gray-600 mt-1">
               Manage your project configuration, API keys, and preferences.
             </p>

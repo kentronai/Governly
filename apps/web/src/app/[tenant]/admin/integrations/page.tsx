@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import type { Integration } from "@/lib/api/integrations";
 import { NangoConnectButton } from "@/components/integrations/NangoConnectButton";
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Provider errors can be long (AWS repeats one IAM error per region). Reduce
 // them to a headline, the distinct missing permissions and affected regions.
 function summarizeIssue(message: string) {
@@ -765,7 +766,7 @@ export default function IntegrationsPage() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1600px] space-y-4 p-5">
         <div>
-          <h1 className="text-2xl font-bold">Integrations</h1>
+          <PageTitle>Integrations</PageTitle>
           <p className="text-muted-foreground">
             Connect providers, discover deployed agents, and bring them under
             NORIX policy and compliance evaluation.

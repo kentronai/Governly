@@ -3,6 +3,7 @@ import { Shield } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Lock } from "lucide-react";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export default function ComingSoon() {
   return (
     <>
@@ -17,7 +18,7 @@ export default function ComingSoon() {
           </div>
 
           {/* Header */}
-          <h1 className="text-4xl font-bold  tracking-tight">Red Teaming</h1>
+          <PageTitle>Red Teaming</PageTitle>
 
           {/* Description */}
           <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">

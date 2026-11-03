@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { getRiskCategories } from "@/actions/router-ops";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ModelInfo {
   id: string;
   name: string;
@@ -351,7 +352,7 @@ export default function DownloadModelsPage() {
       {/* <OpsTabs /> */}
       <div className="p-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold ">Download Models</h1>
+          <PageTitle>Download Models</PageTitle>
           <p className="text-muted-foreground mt-2">
             Download ONNX models from HuggingFace or any URL
           </p>

@@ -360,7 +360,7 @@ const AIPolicyUpdate = () => {
       <div className="flex flex-col p-5">
         <div className="flex w-full justify-between items-center">
           <div className="text-xl font-semibold font-sans  leading-[100%] mt-4">
-            Global AI Policies Updates
+            AI Radar
           </div>
         </div>
 

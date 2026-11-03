@@ -1,16 +1,16 @@
 "use client";
 
-import SideBar from "@/components/admin/sidebar/Sidebar";
 // Removed Navbar import - using static layout instead
 import Link from "next/link";
 import { MessagesSquare } from "lucide-react";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const Support = () => {
   return (
     <div className="flex-1 overflow-auto p-6">
-      <h1 className="text-lg leading-[100%] font-semibold ">
+      <PageTitle>
         Contact Us
-      </h1>
+      </PageTitle>
       <p className="text-[14px] font-inter leading-[22px]  mt-[23px] max-w-[650px]">
         We&lsquo;re here to help! Whether you have questions or need support,
         we&apos;re always happy to hear from you. Our team is dedicated to
@@ -35,9 +35,9 @@ const Support = () => {
       </div>
 
       <div className="mt-[38px]">
-        <h1 className="text-lg  leading-[100%] font-semibold">
+        <h2 className="text-lg  leading-[100%] font-semibold">
           Frequently Asked Questions
-        </h1>
+        </h2>
         <p className="text-[14px] leading-[22px]  mt-[38px]">
           Check out our comprehensive{" "}
           <Link

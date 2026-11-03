@@ -42,6 +42,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import DynamicDetailsViewModal from "@/components/modal/DynamicDetailsViewModal";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface BiasAndFairnessPageProps {
   hasBiasReadPermission?: boolean;
   hasBiasWritePermission?: boolean;
@@ -465,7 +466,7 @@ const BiasAndFairnessPage: React.FC<BiasAndFairnessPageProps> = ({
         <div className="mx-auto space-y-4">
           <div className="mb-6 flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold  mb-2">Bias & fairness</h1>
+              <PageTitle className="mb-2">Bias & fairness</PageTitle>
               <p className="text-sm text-muted-foreground">
                 This data shows bias and fairness assessment metrics for your
                 models

@@ -20,6 +20,7 @@ import { ActivateDialog } from "@/components/common/FeatureActivation";
 import { runRedTeamBatchTest } from "@/lib/actions/red-teaming";
 import { infoToast, errorToast } from "@/lib/utils/toast";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface RecentTest {
   id: string;
   prompt: string;
@@ -103,9 +104,9 @@ const RedTeamingView = ({
           {/* Header */}
           <header className="mb-6 flex items-start justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-foreground mb-2">
+              <PageTitle className="mb-2">
                 Red Teaming
-              </h1>
+              </PageTitle>
               <p className="text-muted-foreground text-lg">
                 Test your AI guardrails with millions of pre-built adversarial
                 prompts

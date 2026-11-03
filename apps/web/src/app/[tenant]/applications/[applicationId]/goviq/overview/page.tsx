@@ -17,7 +17,9 @@ import { cn } from "@/lib/utils";
 import ApplicationStatus from "@/components/applications/ApplicationStatus";
 import { useTenant } from "@/contexts/TenantContext";
 import { getApplicationDetails } from "@/lib/actions/applications";
+import { isEuAiActPolicyName } from "@/lib/policy-names";
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Custom Progress component to replace the imported one
 const Progress = ({ value, className = "" }: any) => {
   return (
@@ -121,8 +123,7 @@ export default function GovIQOverviewPage() {
 
   const isEUEnabled = useMemo(() => {
     return (
-      activePolicy.find((ele) => ele === "EU AI Act (Regulation 2024/1689)") !=
-      null
+      activePolicy.find((ele) => isEuAiActPolicyName(ele)) != null
     );
   }, [activePolicy]);
 
@@ -311,9 +312,9 @@ export default function GovIQOverviewPage() {
         {/* Header Section */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold  mb-2">
+            <PageTitle className="mb-2">
               {applicationDetails?.application.name || "AI Compliance Checker"}
-            </h1>
+            </PageTitle>
             <p className="text-muted-foreground">
               {applicationDetails?.application.description}
             </p>

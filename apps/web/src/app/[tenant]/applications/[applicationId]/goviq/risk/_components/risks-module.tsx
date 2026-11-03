@@ -40,6 +40,7 @@ import { successToast, errorToast } from "@/lib/utils/toast";
 import { usePathname, useRouter } from "next/navigation";
 
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -366,7 +367,7 @@ export default function RisksModule({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-start">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Risks</h1>
+        <PageTitle className="mb-6">Risks</PageTitle>
         <Button onClick={() => setIsCreateModalOpen(true)} disabled={isPending}>
           <Plus className="h-4 w-4 mr-2" />
           Create Risk

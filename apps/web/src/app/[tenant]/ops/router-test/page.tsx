@@ -20,6 +20,7 @@ import { TestTube2, Loader2 } from "lucide-react";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import { processModelResult } from "@/lib/guardrail-utils";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface FamilyScore {
   risk_category: string;
   similarity: number;
@@ -115,7 +116,7 @@ export default function RouterTestPage() {
 
       <div className="p-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Router Testing</h1>
+          <PageTitle>Router Testing</PageTitle>
           <p className="text-muted-foreground mt-2">
             Test risk detection (LanceDB) and ONNX model inference
           </p>

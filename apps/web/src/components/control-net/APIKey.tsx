@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Copy, Trash2, Plus } from 'lucide-react';
 
+import { PageTitle } from "@/components/common/PageHeader";
 const ApiKeysPage = () => {
   const [apiKey] = useState("DMnFcXXXXXXXXXXXXXXXXXXXX7vmi");
   const [copied, setCopied] = useState(false);
@@ -36,7 +37,7 @@ const ApiKeysPage = () => {
       {/* API Keys Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-black">API Keys</h1>
+          <PageTitle>API Keys</PageTitle>
           <Button
             onClick={handleGenerateNew}
             className="bg-black hover:bg-gray-900 text-white px-4 py-2 rounded-md font-medium transition-all duration-200"

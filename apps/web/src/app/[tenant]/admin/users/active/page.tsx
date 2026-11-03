@@ -1,5 +1,4 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { useEffect, useState, useRef, memo } from "react";
 import { IoCloseCircleSharp } from "react-icons/io5";
 import { MdPersonAddAlt } from "react-icons/md";

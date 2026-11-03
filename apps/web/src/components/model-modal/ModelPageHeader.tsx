@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface WorkspacePageHeaderProps {
   userProfile?: {
     username?: string;
@@ -15,9 +16,9 @@ const WorkspacePageHeader: React.FC<WorkspacePageHeaderProps> = ({ userProfile, 
 
   return (
     <div className="gap-3 mb-[14px]">
-      <h1 className="text-2xl leading-7 font-[700] mt-[20px] font-sf-pro">
+      <PageTitle className="mt-[20px]">
         Hello, {displayName}!
-      </h1>
+      </PageTitle>
       <p className="text-muted-foreground font-normal leading-5 font-sf-pro mt-1 text-[#71717A] text-[14px]">
         {text}
       </p>

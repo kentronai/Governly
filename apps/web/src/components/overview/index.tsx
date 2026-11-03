@@ -12,6 +12,7 @@ import ApplicationStatus from "@/components/applications/ApplicationStatus"
 import { useTenant } from "@/contexts/TenantContext";
 import { getApplicationDetails } from "@/lib/actions/applications";
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Custom Progress component to replace the imported one
 const Progress = ({ value, className = "" }: any) => {
   return (
@@ -261,9 +262,9 @@ export default function OverviewPage() {
         {/* Header Section */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-black mb-2">
+            <PageTitle className="mb-2">
               {applicationDetails?.application.name || "AI Compliance Checker"}
-            </h1>
+            </PageTitle>
             <p className="text-gray-600">
               {applicationDetails?.application.description || "No description available"}
             </p>

@@ -12,6 +12,7 @@ import IntegrationStatusSection from "./integration-status";
 import LangSmithStats from "./langsmith-stats";
 import LangSmithRuns from "./langsmith-runs";
 
+import { PageTitle } from "@/components/common/PageHeader";
 function EmptyState({ href }: { href: string }) {
   return (
     <Card className="shadow-sm border">
@@ -42,7 +43,7 @@ export default function Observability() {
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Observability Dashboard</h1>
+        <PageTitle>Observability Dashboard</PageTitle>
       </div>
 
       {isLoading || !data ? (

@@ -1,5 +1,4 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { memo, useEffect, useRef, useState } from "react";
 import "@/components/admin/admin.css";
 import { successToast, errorToast } from "@/lib/utils/toast";

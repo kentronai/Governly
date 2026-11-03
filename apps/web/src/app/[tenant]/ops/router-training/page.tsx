@@ -19,6 +19,7 @@ import CreateCentroidDialog from "./_components/CreateCentroidDialog";
 import BulkUploadDialog from "@/components/ops/BulkUploadDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export default function SeedExamplesPage() {
   const { tenant } = useTenant();
   const router = useRouter();
@@ -152,7 +153,7 @@ export default function SeedExamplesPage() {
       <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Router Training</h1>
+            <PageTitle>Router Training</PageTitle>
             <p className="text-muted-foreground mt-2">
               Manage centroids and seed prompts for router training.
               <br />

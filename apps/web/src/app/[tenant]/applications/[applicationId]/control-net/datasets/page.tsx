@@ -1,5 +1,6 @@
 import { Database } from "lucide-react";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export default function ControlNetDatasetsPage() {
   return (
     <div className="flex items-center justify-center min-h-[60vh] p-6">
@@ -10,9 +11,9 @@ export default function ControlNetDatasetsPage() {
           </div>
         </div>
 
-        <h1 className="text-4xl font-bold  tracking-tight">
+        <PageTitle>
           Datasets Coming Soon
-        </h1>
+        </PageTitle>
 
         <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">
           We're building advanced dataset management tools with version control,
