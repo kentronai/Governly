@@ -129,6 +129,7 @@ interface BackendPolicy {
 }
 import { formatTimestamp } from "@/lib/utils/dateTime";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const fetchPolicies = async (
   tenantSlug: string,
   applicationId: string
@@ -1399,7 +1400,7 @@ const PoliciesTab = () => {
     <>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold ">Policies</h1>
+          <PageTitle>Policies</PageTitle>
           <p className="text-muted-foreground mt-2">
             Policy is code of conduct or guidelines for an AI Application.
           </p>

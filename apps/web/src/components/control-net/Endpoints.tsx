@@ -12,6 +12,7 @@ import { Label } from "../ui/label";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Checkbox } from "../ui/checkbox";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface Endpoint {
   id: string;
   name: string;
@@ -514,7 +515,7 @@ const EndpointsTab: React.FC<{
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-black">Endpoints</h1>
+        <PageTitle>Endpoints</PageTitle>
         <Button
           onClick={() => setShowCreateModal(true)}
           className="bg-black hover:bg-gray-900 text-white px-4 py-2 rounded-md flex items-center gap-2 transition-colors"

@@ -1,5 +1,6 @@
 import { getPolicyWithDetails } from "@/lib/queries/policies";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface PageProps {
   params: Promise<{ policyId: string }>;
 }
@@ -13,7 +14,7 @@ export default async function PolicyDetails({ params }: PageProps) {
     <div className="space-y-6">
       {/* Policy Basic Information */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h1 className="text-2xl font-bold text-gray-900">{policy.name}</h1>
+        <PageTitle>{policy.name}</PageTitle>
         <p className="text-gray-600 mt-2">{policy.description}</p>
 
         <div className="grid grid-cols-2 gap-4 mt-4">

@@ -40,6 +40,7 @@ import {
 import { successToast, errorToast } from "@/lib/utils/toast";
 import ApplicationLoader from "./ApplicationLoader";
 import Pagination from "@/components/common/pagination";
+import { PageHeader } from "@/components/common/PageHeader";
 
 // These dialogs are not needed until the user opens them. Keeping them out of
 // the initial applications bundle materially reduces cold dev compilation.
@@ -261,22 +262,19 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold ">Applications</h1>
-          <p className="text-muted-foreground">
-            Centrally manage and govern every AI application with confidence.
-          </p>
-        </div>
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          className=""
-          disabled={isPending}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Application
-        </Button>
-      </div>
+      <PageHeader
+        title="Applications"
+        description="Centrally manage and govern every AI application with confidence."
+        actions={
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            disabled={isPending}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Application
+          </Button>
+        }
+      />
 
       {/* Search */}
       <div className="relative w-[343px]">

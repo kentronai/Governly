@@ -16,6 +16,7 @@ import { createUseCaseWithRisks, updateUseCase, deleteUseCase } from '@/lib/acti
 import { createRisk, updateRisk, deleteRisk } from '@/lib/actions/risks';
 import { UseCaseModal } from './UseCaseModal';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface UseCase {
   id: string;
   function: string;
@@ -141,7 +142,7 @@ export function UseCasesList({ initialUseCases, applicationId, tenantId, userId 
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-[#18181B]">Use Cases</h1>
+          <PageTitle>Use Cases</PageTitle>
           <p className="text-gray-600 text-sm font-normal">Document AI use cases and their associated risks</p>
         </div>
         <Button

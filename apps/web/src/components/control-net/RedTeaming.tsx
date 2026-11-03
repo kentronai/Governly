@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export interface RedTeamingTask {
   id: string;
   name: string;
@@ -714,7 +715,7 @@ const RedTeamingTab = ({ redTeamingTasks = [], onAddRedTeamingTask }: any) => {
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-black">Red Teaming</h1>
+        <PageTitle>Red Teaming</PageTitle>
         <Button
           onClick={() => setShowCreateModal(true)}
           className="bg-black hover:bg-gray-900 text-white flex items-center gap-2"

@@ -4,6 +4,7 @@
 import { ClerkProvider as ClerkProviderWrapper } from "@clerk/nextjs";
 import { ReactNode } from "react";
 import { shadcn } from "@clerk/themes";
+import { PageTitle } from "@/components/common/PageHeader";
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -24,9 +25,9 @@ function ClerkConfigurationError() {
         <p className="text-sm font-medium text-destructive">
           Clerk is not configured
         </p>
-        <h1 className="mt-3 text-2xl font-semibold">
+        <PageTitle className="mt-3">
           Add a valid Clerk publishable key
-        </h1>
+        </PageTitle>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
           The app is currently using an empty or placeholder value for{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">

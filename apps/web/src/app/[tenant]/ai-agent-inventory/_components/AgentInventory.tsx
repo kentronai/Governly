@@ -56,6 +56,7 @@ import type {
 } from "@/lib/queries/agents";
 
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -303,7 +304,7 @@ export function AgentInventory({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Agent Registry</h1>
+          <PageTitle>Agent Registry</PageTitle>
           <p className="text-muted-foreground">
             Every real AI agent discovered from connected providers or ingested
             through NORIX.

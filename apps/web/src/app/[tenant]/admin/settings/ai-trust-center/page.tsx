@@ -3,10 +3,10 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, FileText } from "lucide-react";
 // Removed Navbar import - using static layout instead
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const AIComplianceDashboard = () => {
   const [previewMode, setPreviewMode] = useState(false);
 
@@ -41,7 +41,7 @@ const AIComplianceDashboard = () => {
         <div className="flex justify-between items-center">
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-bold text-black">AI trust center</h1>
+              <PageTitle>AI trust center</PageTitle>
             </div>
             <p className="text-gray-600 mt-1">
               AI Trust Center centralizes your AI policies, certifications, and

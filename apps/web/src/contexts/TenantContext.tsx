@@ -3,6 +3,10 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
+import {
+  ISO_42001_POLICY_NAME,
+  isEuAiActPolicyName,
+} from "@/lib/policy-names";
 
 export interface TenantInfo {
   slug: string;
@@ -101,9 +105,8 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
   const isEUEnabled = useMemo(() => {
     if (!applicationPolicy) return false;
     return (
-      applicationPolicy.find(
-        (ele) => ele.name === "EU AI Act (Regulation 2024/1689)"
-      )?.isActive || false
+      applicationPolicy.find((ele) => isEuAiActPolicyName(ele.name))
+        ?.isActive || false
     );
   }, [applicationPolicy]);
   const update = (policies: string[]) => setActivePolicy(policies);
@@ -115,11 +118,13 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
       const activePolicy = active.map(
         (ele: any) => ele.parentPolicyId as string
       );
-      const activePolicyNames = new Set(active.map((ele: any) => ele.name as string));
+      const activePolicyNames: string[] = active.map(
+        (ele: any) => ele.name as string
+      );
 
       setPolicyStatus({
-        euAiAct: activePolicyNames.has("EU AI Act (Regulation 2024/1689)"),
-        iso42001: activePolicyNames.has("ISO/IEC 42001"),
+        euAiAct: activePolicyNames.some(isEuAiActPolicyName),
+        iso42001: activePolicyNames.includes(ISO_42001_POLICY_NAME),
         allActivePolicies: activePolicy,
       });
       setActivePolicy(activePolicy);

@@ -29,6 +29,7 @@ import {
   reviewerOptions,
 } from "@/components/eu-ai-act/constants";
 import Tracking from "@/components/iso-42001/tracking";
+import { PageTitle } from "@/components/common/PageHeader";
 const ComplianceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedControl, setSelectedControl] = useState<any>(null);
@@ -68,9 +69,9 @@ const ComplianceDashboard = () => {
   return (
     <div className="flex flex-col flex-1  p-5  overflow-y-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <PageTitle className="mb-2">
           Compliance Overview
-        </h1>
+        </PageTitle>
         <p className="text-gray-600">
           Track your organization's progress toward AI compliance goals
         </p>
@@ -118,9 +119,9 @@ const ComplianceDashboard = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto text-[#18181B] bg-white">
           <DialogTitle className="sr-only">{selectedControl?.title}</DialogTitle>
           <DialogHeader className="text-[#18181B]">
-            <h1 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-gray-900">
               {selectedControl?.title}
-            </h1>
+            </h2>
           </DialogHeader>
 
           <div className="space-y-6">

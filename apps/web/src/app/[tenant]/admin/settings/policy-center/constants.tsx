@@ -2,7 +2,7 @@ import { PolicyPack } from "./type";
 export const policies: PolicyPack[] = [
   {
     id: "1",
-    name: "EU AI Act (Regulation 2024/1689)",
+    name: "EU AI Act",
     description:
       "Comprehensive AI regulation establishing harmonized rules for AI systems across the European Union with risk-based approach",
     category: "AI Regulation",

@@ -14,6 +14,7 @@ import { Router, Upload, TestTube2, Database } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export default function OpsPage() {
   const params = useParams();
   const tenant = params.tenant as string;
@@ -24,7 +25,7 @@ export default function OpsPage() {
       {/* <OpsTabs /> */}
       <div className="p-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold ">Operations</h1>
+          <PageTitle>Operations</PageTitle>
           <p className="text-muted-foreground mt-2">
             Manage router configuration and test prompts
           </p>

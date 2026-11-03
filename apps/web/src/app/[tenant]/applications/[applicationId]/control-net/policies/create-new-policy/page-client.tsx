@@ -53,6 +53,7 @@ interface PolicyCreationClientProps {
   availableGuardrails: Guardrail[];
 }
 import { useTenant } from "@/contexts/TenantContext";
+import { PageTitle } from "@/components/common/PageHeader";
 export function PolicyCreationClient({
   tenantSlug,
   userId,
@@ -348,7 +349,7 @@ export function PolicyCreationClient({
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold ">Create New Policy</h1>
+            <PageTitle>Create New Policy</PageTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Compose guardrails into a comprehensive policy
             </p>

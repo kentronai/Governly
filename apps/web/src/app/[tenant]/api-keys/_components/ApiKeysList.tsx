@@ -22,6 +22,7 @@ import { ApiKeyModal } from "./ApiKeyModal";
 import { ApiKeyDisplayModal } from "./ApiKeyDisplayModal";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ApiKey {
   id: string;
   name: string;
@@ -134,7 +135,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold">API Keys</h1>
+          <PageTitle>API Keys</PageTitle>
           <p className="text-muted-foreground">
             Manage API keys for programmatic access to ControlNet
           </p>

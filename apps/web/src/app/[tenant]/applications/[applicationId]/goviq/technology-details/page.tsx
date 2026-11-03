@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormFieldComponent } from "@/components/common/FormFieldComponent";
 import { useDocumentation } from "@/hooks/use-documentation";
 import { Separator } from "@/components/ui/separator";
+import { PageTitle } from "@/components/common/PageHeader";
 const formSchema = z.object({
   aiTechnology: z.string().optional(),
   ongoingMonitoring: z.string().optional(),
@@ -49,7 +50,7 @@ export default function GovIQTechnologyDetailsPage({ params }: PageProps) {
   return (
     <>
       <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-bold my-2">Technology Details</h1>
+        <PageTitle className="my-2">Technology Details</PageTitle>
       </div>
       <div
         onKeyDown={(e) => {

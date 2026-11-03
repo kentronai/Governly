@@ -34,6 +34,7 @@ import { fetchApplicationPolicies } from "@/lib/api/policies";
 import { useAuthAxios } from "@/lib/api/auth-axios";
 import { useTenant } from "@/contexts/TenantContext";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface Guardrail {
   id: string;
   key: string;
@@ -419,7 +420,7 @@ export function PolicyEditClient({
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Edit Policy</h1>
+            <PageTitle>Edit Policy</PageTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Update policy details and guardrail composition
             </p>

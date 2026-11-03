@@ -1,4 +1,5 @@
 "use client"
+import { PageTitle } from "@/components/common/PageHeader";
 
 import type React from "react"
 import { useState } from "react"
@@ -73,7 +74,7 @@ const UnifiedBiasFairnessDashboard: React.FC<UnifiedBiasFairnessDashboardProps> 
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Bias & Fairness Management</h1>
+          <PageTitle className="mb-2">Bias & Fairness Management</PageTitle>
           <p className="text-slate-600">Comprehensive bias detection, fairness validation, and monitoring dashboard</p>
         </div>
 

@@ -1,5 +1,6 @@
 import EndpointsContent from '@/components/control-net/EndpointsContent';
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface PageProps {
   params: Promise<{ tenant: string }>;
 }
@@ -20,7 +21,7 @@ export default async function ControlNetPage({ params }: PageProps) {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold mb-2 text-black">ControlNet</h1>
+          <PageTitle className="mb-2">ControlNet</PageTitle>
         </div>
 
         {/* Endpoints Section */}

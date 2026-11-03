@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormFieldComponent } from "@/components/common/FormFieldComponent";
 import { useDocumentation } from "@/hooks/use-documentation";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const formSchema = z.object({
   biasAddressing: z.string().optional(),
   groupAnalysis: z.string().optional(),
@@ -50,9 +51,9 @@ export const BiasMonitoringTab: React.FC<BiasMonitoringTabProps> = ({
     <div className="m-4">
       <div className="h-screen overflow-y-auto scrollbar-hide scroll-smooth w-full">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold my-2">
+          <PageTitle className="my-2">
             Bias Monitoring and Mitigation
-          </h1>
+          </PageTitle>
         </div>
 
         <Form {...(form as any)}>

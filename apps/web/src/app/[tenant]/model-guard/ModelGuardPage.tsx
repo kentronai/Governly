@@ -15,6 +15,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { scanModel, ScanResponse } from "@/lib/api/model-guard";
 import ScanResults from "./ScanResults";
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Use the ScanResponse type from the API module
 type ScanResult = ScanResponse;
 
@@ -148,7 +149,7 @@ export default function ModelGuardPage({ tenant }: ModelGuardPageProps) {
               <Shield className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Model Guard</h1>
+              <PageTitle>Model Guard</PageTitle>
               <p className="text-gray-600">
                 Scan and validate ML models for security vulnerabilities
               </p>

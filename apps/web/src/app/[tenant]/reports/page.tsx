@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, RefreshCw } from "lucide-react";
 import { fetchSummaryMetrics, fetchUseCasesByRisk } from "@/lib/api/reports";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ReportsPageProps {
   params: Promise<{ tenant: string }>;
 }
@@ -163,7 +164,7 @@ export default function ReportsPage({ params }: ReportsPageProps) {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold mb-2 ">AI Governance Reports</h1>
+          <PageTitle className="mb-2">AI Governance Reports</PageTitle>
           <p className="text-muted-foreground mb-6">
             Comprehensive overview of AI use cases and compliance status
           </p>

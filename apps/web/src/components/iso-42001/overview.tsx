@@ -2,6 +2,7 @@ import React from "react";
 import { complianceData } from "./constants";
 import { Button } from "@nextui-org/react";
 import { BarChart3, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { PageTitle } from "@/components/common/PageHeader";
 export default function Overview() {
   const overviewStats = {
     totalControls: Object.keys(complianceData).length,
@@ -17,9 +18,9 @@ export default function Overview() {
     <>
       {/* Overview Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <PageTitle className="mb-2">
           Compliance Overview
-        </h1>
+        </PageTitle>
         <p className="text-gray-600">
           Track your organization's progress toward AI compliance goals
         </p>

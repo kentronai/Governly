@@ -18,6 +18,7 @@ import {
 } from "../ui/select";
 import { Textarea } from "../ui/textarea";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export interface Dataset {
   id: string;
   name: string;
@@ -111,7 +112,7 @@ const DatasetsTab: React.FC<DatasetsTabProps> = ({ datasets }) => {
     <>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Datasets</h1>
+          <PageTitle>Datasets</PageTitle>
           <p className="text-gray-600 mt-1">
             Manage your training and validation datasets
           </p>

@@ -32,6 +32,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { errorToast } from "@/lib/utils/toast";
 import { useParams, useRouter } from "next/navigation";
 import { fetchPolicyDetails } from "@/lib/api/policies";
+import { PageTitle } from "@/components/common/PageHeader";
 // YAML Viewer Component
 const YAMLViewer: React.FC<{ yaml: string }> = ({ yaml }) => {
   const [copied, setCopied] = useState(false);
@@ -261,7 +262,7 @@ export const PolicyDetail = () => {
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Policy Details</h1>
+            <PageTitle>Policy Details</PageTitle>
           </div>
         </div>
       </div>

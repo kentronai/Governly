@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { ClientOnboardingForm } from "@/components/admin/ClientOnboardingForm";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export const metadata: Metadata = {
   title: "Create Organization | Kentron AI",
   description: "Create new organizations for AI governance platform",
@@ -31,9 +32,9 @@ export default async function ClientOnboardingPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <PageTitle>
             Create Organization
-          </h1>
+          </PageTitle>
           <p className="text-gray-600 mt-2">
             Create new organizations and send invitations to users
           </p>

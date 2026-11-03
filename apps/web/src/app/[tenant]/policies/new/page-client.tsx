@@ -1,4 +1,5 @@
 "use client"
+import { PageTitle } from "@/components/common/PageHeader";
 
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -170,7 +171,7 @@ export function PolicyCreationClient({
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-[#18181B]">Create New Policy</h1>
+            <PageTitle>Create New Policy</PageTitle>
             <p className="text-sm text-gray-600 mt-1">
               Compose guardrails into a comprehensive policy
             </p>

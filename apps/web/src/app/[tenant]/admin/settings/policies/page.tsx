@@ -1,5 +1,4 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { useEffect, useState } from "react";
 // Removed Navbar import - using static layout instead
 // Removed API imports - using static data instead

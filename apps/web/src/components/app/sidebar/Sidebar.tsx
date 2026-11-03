@@ -1,5 +1,5 @@
 "use client";
-import React, { ReactNode, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Key,
   Activity,
@@ -7,7 +7,7 @@ import {
   FolderOpen,
   Database,
   Search,
-  FileText,
+  LayoutDashboard,
   AlertTriangle,
   LayoutGrid,
   BarChart3,
@@ -16,41 +16,17 @@ import {
   ChevronDown,
   CircleHelp,
 } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTenant } from "@/contexts/TenantContext";
-
-interface NavItemProps {
-  href: string;
-  children: ReactNode;
-  icon: ReactNode;
-  isActive?: boolean;
-  className?: string;
-  target?: string;
-}
-
-const NavItem = (props: NavItemProps) => {
-  const { href, children, icon, isActive, className, target } = props;
-  return (
-    <Link
-      target={target}
-      href={href}
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        isActive ? " bg-muted" : "text-muted-foreground hover:text-inherit"
-      } ${className}`}
-    >
-      {icon}
-      {children}
-    </Link>
-  );
-};
+import { NavItem } from "./NavItem";
+import { AdminCenterNav } from "./AdminCenterNav";
 
 export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
   const pathname = usePathname();
   const { tenant } = useParams();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, orgRole } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const isAgentDiscoveryRoute =
     pathname.startsWith(`/${tenant}/ai-agent-discovery`) ||
@@ -98,9 +74,18 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
   return (
     <div className="flex w-64 flex-col border-r shadow-sm">
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
         {/* New Feature Pages - At the Top */}
         <div className="space-y-1">
+          {tenantInfo?.govIQEnabled && (
+            <NavItem
+              href={`/${tenant}/reports`}
+              icon={<LayoutDashboard className="h-4 w-4" />}
+              isActive={isActive(`/${tenant}/reports`)}
+            >
+              Dashboard
+            </NavItem>
+          )}
           <NavItem
             href={`/${tenant}/applications`}
             icon={<FolderOpen className="h-4 w-4" />}
@@ -189,13 +174,6 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
               >
                 AI Catalog
               </NavItem>
-              <NavItem
-                href={`/${tenant}/reports`}
-                icon={<FileText className="h-4 w-4" />}
-                isActive={isActive(`/${tenant}/reports`)}
-              >
-                Reports
-              </NavItem>
             </>
           )}
           <NavItem
@@ -233,6 +211,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
         >
           Observability
         </NavItem>
+        {orgRole === "org:admin" && (
+          <AdminCenterNav tenant={tenant as string} pathname={pathname} />
+        )}
       </nav>
       <nav className=" mt-auto p-4 pb-6">
         <NavItem

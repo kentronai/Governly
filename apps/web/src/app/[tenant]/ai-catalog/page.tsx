@@ -6,6 +6,7 @@ import ComparisonModal from "./ComparisonModal";
 import MultiComparisonModal from "./MultiComparisonModal";
 import ToolCard from "./ToolsCard";
 
+import { PageTitle } from "@/components/common/PageHeader";
 // Helper functions
 export const getRiskColor = (level: string) => {
   switch (level.toLowerCase()) {
@@ -149,9 +150,9 @@ const AIToolsDashboard: React.FC = () => {
               {/* Main Content */}
               <div className="flex-1">
                 <div className="mb-6">
-                  <h1 className="text-2xl font-bold  mb-2">
+                  <PageTitle className="mb-2">
                     AI Models Analysis
-                  </h1>
+                  </PageTitle>
                   <p className="text-muted-fore">
                     Compare security, compliance, and trust scores across AI
                     Models

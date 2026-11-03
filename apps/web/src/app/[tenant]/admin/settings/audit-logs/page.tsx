@@ -1,5 +1,4 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import React, { useEffect, useState } from "react";
 
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.

@@ -1,5 +1,4 @@
 "use client";
-import SideBar from "@/components/admin/sidebar/Sidebar";
 import {
   Table,
   TableHeader,

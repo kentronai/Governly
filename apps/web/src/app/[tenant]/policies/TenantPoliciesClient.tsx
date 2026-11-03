@@ -12,6 +12,7 @@ import {
   type TenantPolicyRow,
 } from "@/lib/actions/tenant-default-policy";
 
+import { PageTitle } from "@/components/common/PageHeader";
 export function TenantPoliciesClient({
   tenant,
   initialPolicies,
@@ -55,7 +56,7 @@ export function TenantPoliciesClient({
   return (
     <div className="mx-auto w-full max-w-[1200px] space-y-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Policies</h1>
+        <PageTitle>Policies</PageTitle>
         <p className="mt-1 text-sm text-muted-foreground">
           Runtime guardrail policies for this workspace. Set one as the global
           default to enforce it everywhere.

@@ -9,6 +9,7 @@ import { Shield, Bell, FileText, Settings } from "lucide-react";
 import { ActivateDialog } from "@/components/common/FeatureActivation";
 import { Button } from "@/components/ui/button";
 
+import { PageTitle } from "@/components/common/PageHeader";
 const Page = ({ isEnabled }: { isEnabled: boolean }) => {
   return (
     <>
@@ -22,9 +23,9 @@ const Page = ({ isEnabled }: { isEnabled: boolean }) => {
                 <Shield className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-foreground">
+                <PageTitle>
                   Shadow AI Governance
-                </h1>
+                </PageTitle>
                 <p className="text-xs text-muted-foreground">
                   Enterprise Security Dashboard
                 </p>

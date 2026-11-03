@@ -34,6 +34,7 @@ import { ModelInfoModal } from "./ModelInfoModal";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 import DynamicDetailsViewModal from "@/components/modal/DynamicDetailsViewModal";
 
+import { PageTitle } from "@/components/common/PageHeader";
 interface ApplicationModel {
   id: string;
   vendor?: string | null;
@@ -225,7 +226,7 @@ export function ModelsInfoList({
       <div className="h-screen overflow-y-auto scrollbar-hide scroll-smooth w-full">
         <div className="mx-auto space-y-4">
           <div className="mb-6 flex justify-between items-start">
-            <h1 className="text-2xl font-bold mb-2">Models Info</h1>
+            <PageTitle className="mb-2">Models Info</PageTitle>
           </div>
           {/* Search Input */}
           <div className="flex items-center justify-between">
