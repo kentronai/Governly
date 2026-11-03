@@ -333,7 +333,7 @@ export function UseCaseModal({ isOpen, mode, useCase, onClose, onSubmit, isPendi
             onClick={handleSubmit}
             disabled={isPending}
           >
-            {isPending ? 'Saving...' : mode === 'create' ? 'Create' : 'Save Changes'}
+            {isPending ? 'Saving...' : mode === 'create' ? 'Create' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

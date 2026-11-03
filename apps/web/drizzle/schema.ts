@@ -16,6 +16,7 @@ import {
   varchar,
   pgEnum,
   check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -3534,4 +3535,18 @@ export const langsmithRuns = pgTable(
       name: "langsmith_runs_integration_id_fkey",
     }).onDelete("cascade"),
   ],
+);
+
+export const euAiActControls = pgTable(
+  "eu_ai_act_controls",
+  {
+    tenantId: text("tenant_id").notNull(),
+    controlKey: text("control_key").notNull(),
+    data: jsonb().default({}).notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.controlKey] })],
 );

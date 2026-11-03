@@ -43,12 +43,12 @@ const InfoCard = ({
   value: React.ReactNode;
   className?: string;
 }) => (
-  <Card className={cn("py-4", className)}>
+  <Card className={cn("min-w-0 py-4 shadow-none", className)}>
     <CardContent className="flex items-start gap-3 px-4">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 text-sm font-medium">{value}</p>
+        <p className="mt-1 break-words text-sm font-medium">{value}</p>
       </div>
     </CardContent>
   </Card>
@@ -307,7 +307,7 @@ export default function GovIQOverviewPage() {
   }
 
   return (
-    <div className=" w-full">
+    <div className="w-full min-w-0">
       <div className="mx-auto space-y-4">
         {/* Header Section */}
         <div className="flex justify-between items-start">
@@ -319,12 +319,14 @@ export default function GovIQOverviewPage() {
               {applicationDetails?.application.description}
             </p>
           </div>
+          <div className="shrink-0">
           <ApplicationStatus
             id={applicationDetails?.application.id as string}
             tenant={params.tenant as string}
             // @ts-ignore
             defaultStatus={applicationDetails?.application.status}
           ></ApplicationStatus>
+          </div>
         </div>
 
         {/* Project info: five equal cards in one row on wide screens */}

@@ -153,7 +153,7 @@ const AgentSettings = () => {
 
         <div className="pt-4">
           <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Save Project Settings
+            Save
           </button>
         </div>
       </div>
@@ -409,7 +409,7 @@ const AgentSettings = () => {
 
           <div className="pt-4">
             <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-              Save API Keys
+              Save
             </button>
           </div>
         </div>

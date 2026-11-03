@@ -171,7 +171,7 @@ export function ComplianceEvidenceManager({
           </div>
         )}
       </div>
-      <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="button" onClick={save} disabled={loading}>{loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save evidence</Button></DialogFooter>
+      <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="button" onClick={save} disabled={loading}>{loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 
@@ -208,7 +208,7 @@ export function ComplianceEvidenceManager({
           <div className="space-y-2"><Label>Covers control</Label>{controlSelect(editing.controlKey, (value) => setEditing({ ...editing, controlKey: value }))}</div>
           <div className="space-y-2"><Label>Secure HTTP(S) link</Label><Input type="url" value={editing.externalUrl ?? ""} onChange={(event) => setEditing({ ...editing, externalUrl: event.target.value })} placeholder="https://…" /></div>
         </div>}
-        <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button type="button" onClick={saveEdit} disabled={loading}>{loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save changes</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button type="button" onClick={saveEdit} disabled={loading}>{loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;

@@ -302,6 +302,13 @@
       "when": 1786700000000,
       "tag": "0042_rename_eu_ai_act_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1786800000000,
+      "tag": "0043_eu_ai_act_controls",
+      "breakpoints": true
     }
   ]
 }

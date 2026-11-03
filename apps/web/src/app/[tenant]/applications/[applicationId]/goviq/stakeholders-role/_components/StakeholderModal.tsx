@@ -300,7 +300,7 @@ export function StakeholderModal({
                   ? "Saving..."
                   : mode === "create"
                     ? "Create"
-                    : "Save Changes"}
+                    : "Save"}
               </Button>
             </div>
           </div>

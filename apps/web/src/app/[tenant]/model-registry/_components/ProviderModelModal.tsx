@@ -573,7 +573,7 @@ export function ProviderModelModal({
                 ? "Saving..."
                 : mode === "create"
                   ? "Add"
-                  : "Save Changes"}
+                  : "Save"}
             </Button>
           </div>
         </div>

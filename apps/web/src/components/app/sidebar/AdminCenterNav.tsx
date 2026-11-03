@@ -26,6 +26,7 @@ export function AdminCenterNav({ tenant, pathname }: AdminCenterNavProps) {
 
   const groups = getVisibleAdminNav({
     govIQEnabled: Boolean(tenantInfo?.govIQEnabled),
+    euAiAct: Boolean(policyStatus?.euAiAct),
     iso42001: Boolean(policyStatus?.iso42001),
   });
 
