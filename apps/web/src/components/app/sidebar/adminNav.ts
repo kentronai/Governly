@@ -86,49 +86,44 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    title: "Regulations",
     isVisible: ({ govIQEnabled }) => govIQEnabled,
     items: [
       {
-        label: "Regulations",
+        label: "Manage Regulations",
+        path: "admin/settings/policy-center",
         icon: FileText,
-        children: [
-          {
-            label: "Manage Regulations",
-            path: "admin/settings/policy-center",
-            icon: FileText,
-          },
-          ...FRAMEWORKS.map(
-            (framework): AdminNavItem => ({
-              label: framework.navLabel,
-              path: frameworkPath(framework.slug),
-              icon: Scale,
-              isVisible: ({ activePolicyNames }) =>
-                enabledFrameworks(activePolicyNames).includes(framework),
-            }),
-          ),
-        ],
       },
+      ...FRAMEWORKS.map(
+        (framework): AdminNavItem => ({
+          label: framework.navLabel,
+          path: frameworkPath(framework.slug),
+          icon: Scale,
+          isVisible: ({ activePolicyNames }) =>
+            enabledFrameworks(activePolicyNames).includes(framework),
+        }),
+      ),
+    ],
+  },
+  {
+    title: "Frameworks",
+    isVisible: ({ govIQEnabled }) => govIQEnabled,
+    items: [
       {
-        label: "Frameworks",
+        label: "Manage Frameworks",
+        path: "admin/settings/frameworks",
         icon: Layers,
-        children: [
-          {
-            label: "Manage Frameworks",
-            path: "admin/settings/frameworks",
-            icon: Layers,
-            exact: true,
-          },
-          ...FRAMEWORK_CATALOG.map(
-            (framework): AdminNavItem => ({
-              label: framework.name,
-              path: catalogFrameworkPath(framework.slug),
-              icon: Layers,
-              isVisible: ({ enabledFrameworkSlugs = [] }) =>
-                enabledFrameworkSlugs.includes(framework.slug),
-            }),
-          ),
-        ],
+        exact: true,
       },
+      ...FRAMEWORK_CATALOG.map(
+        (framework): AdminNavItem => ({
+          label: framework.name,
+          path: catalogFrameworkPath(framework.slug),
+          icon: Layers,
+          isVisible: ({ enabledFrameworkSlugs = [] }) =>
+            enabledFrameworkSlugs.includes(framework.slug),
+        }),
+      ),
     ],
   },
   {
