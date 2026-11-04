@@ -40,6 +40,11 @@ const expandAdminCenter = () => {
   if (adminToggle().getAttribute("aria-expanded") !== "true") {
     fireEvent.click(adminToggle());
   }
+  for (const name of ["Regulations", "Frameworks"]) {
+    const folder = screen.queryByRole("button", { name });
+    if (folder?.getAttribute("aria-expanded") === "false")
+      fireEvent.click(folder);
+  }
 };
 
 // Expected Admin Center options and their routes — written out independently
@@ -50,9 +55,10 @@ const ADMIN_LINKS: [string, string][] = [
   ["Deactivated Users", "/acme/admin/users/deactivate"],
   ["Archived Applications", "/acme/admin/archived-applications"],
   ["Audit Logs", "/acme/admin/settings/audit-logs"],
-  ["AI Frameworks", "/acme/admin/settings/policy-center"],
-  ["ISO 42001", "/acme/admin/settings/iso-42001"],
+  ["Manage Regulations", "/acme/admin/settings/policy-center"],
+  ["Manage Frameworks", "/acme/admin/settings/frameworks"],
   ["Integrations", "/acme/admin/integrations"],
+  ["BYOK", "/acme/admin/settings/byok"],
   ["AI Radar", "/acme/admin/settings/ai-policies-updates"],
   ["Support", "/acme/admin/support"],
 ];
@@ -95,7 +101,7 @@ describe("Sidebar — Admin Center section", () => {
       ).toEqual(ADMIN_LINKS);
     });
 
-    it("groups options under Users, Settings and Frameworks headings", () => {
+    it("groups options under Users and Settings headings, with no Frameworks and Regulations heading", () => {
       setup();
       expandAdminCenter();
       const group = (name: string) => screen.getByRole("group", { name });
@@ -110,15 +116,11 @@ describe("Sidebar — Admin Center section", () => {
           .map((l) => l.textContent),
       ).toEqual(["Archived Applications", "Audit Logs"]);
       expect(
-        within(group("Frameworks"))
-          .getAllByRole("link")
-          .map((l) => l.textContent),
-      ).toEqual([
-        "AI Frameworks",
-        "ISO 42001",
-        "Integrations",
-        "AI Radar",
-      ]);
+        screen.queryByRole("group", { name: "Frameworks and Regulations" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "ISO 42001" }),
+      ).not.toBeInTheDocument();
     });
 
     it("no longer offers a 'Back to app' link", () => {
@@ -130,13 +132,14 @@ describe("Sidebar — Admin Center section", () => {
   });
 
   describe("feature gating", () => {
-    it("hides Frameworks options when GovIQ is disabled", () => {
+    it("hides Compliance options when GovIQ is disabled", () => {
       setup({ govIQEnabled: false });
       expandAdminCenter();
       for (const label of [
-        "AI Frameworks",
+        "Manage Regulations",
         "ISO 42001",
         "Integrations",
+        "BYOK",
         "AI Radar",
       ]) {
         expect(
@@ -144,7 +147,7 @@ describe("Sidebar — Admin Center section", () => {
         ).not.toBeInTheDocument();
       }
       expect(
-        screen.queryByRole("group", { name: "Frameworks" }),
+        screen.queryByRole("group", { name: "Frameworks and Regulations" }),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: "Active Users" }),
@@ -158,7 +161,7 @@ describe("Sidebar — Admin Center section", () => {
         screen.queryByRole("link", { name: "ISO 42001" }),
       ).not.toBeInTheDocument();
       expect(
-        screen.getByRole("link", { name: "AI Frameworks" }),
+        screen.getByRole("link", { name: "Manage Regulations" }),
       ).toBeInTheDocument();
     });
   });
@@ -196,7 +199,7 @@ describe("Sidebar — Admin Center section", () => {
     it("keeps the parent option current on nested admin routes", () => {
       setup({ pathname: "/acme/admin/settings/policy-center/eu-ai-act" });
       expect(
-        screen.getByRole("link", { name: "AI Frameworks" }),
+        screen.getByRole("link", { name: "Manage Regulations" }),
       ).toHaveAttribute("aria-current", "page");
     });
 
@@ -233,7 +236,9 @@ describe("Sidebar — existing navigation (regression)", () => {
     const links = screen.getAllByRole("link");
     expect(links[0]).toHaveTextContent("Dashboard");
     expect(links[0]).toHaveAttribute("href", "/acme/reports");
-    expect(screen.queryByRole("link", { name: "Reports" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Reports" }),
+    ).not.toBeInTheDocument();
   });
 
   it("highlights Dashboard on the reports route", () => {
@@ -246,7 +251,9 @@ describe("Sidebar — existing navigation (regression)", () => {
 
   it("hides Dashboard when govIQ is disabled", () => {
     setup({ orgRole: "org:member", govIQEnabled: false });
-    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Dashboard" }),
+    ).not.toBeInTheDocument();
   });
 
   it("still gates Operations on isAdminUser", () => {

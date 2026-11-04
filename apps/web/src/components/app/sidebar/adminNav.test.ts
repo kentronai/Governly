@@ -6,12 +6,19 @@ import path from "path";
 import {
   ADMIN_NAV,
   adminHref,
+  flattenNavItems,
   getVisibleAdminNav,
   isAdminRoute,
 } from "./adminNav";
+import { FRAMEWORKS, frameworkPath } from "@/lib/frameworks";
+import {
+  FRAMEWORK_CATALOG,
+  catalogFrameworkPath,
+} from "@/lib/frameworks/catalog";
+import { LEGACY_EU_AI_ACT_POLICY_NAME } from "@/lib/policy-names";
 
 const TENANT_APP_DIR = path.resolve(__dirname, "../../../app/[tenant]");
-const allItems = ADMIN_NAV.flatMap((group) => group.items);
+const allItems = flattenNavItems(ADMIN_NAV.flatMap((group) => group.items));
 
 describe("Admin Center navigation config", () => {
   it("contains every option from the former Admin Center sidebar", () => {
@@ -21,10 +28,12 @@ describe("Admin Center navigation config", () => {
       ["Deactivated Users", "admin/users/deactivate"],
       ["Archived Applications", "admin/archived-applications"],
       ["Audit Logs", "admin/settings/audit-logs"],
-      ["AI Frameworks", "admin/settings/policy-center"],
-      ["EU AI Act", "admin/settings/eu-ai-act"],
-      ["ISO 42001", "admin/settings/iso-42001"],
+      ["Manage Regulations", "admin/settings/policy-center"],
+      ...FRAMEWORKS.map((f) => [f.navLabel, frameworkPath(f.slug)]),
+      ["Manage Frameworks", "admin/settings/frameworks"],
+      ...FRAMEWORK_CATALOG.map((f) => [f.name, catalogFrameworkPath(f.slug)]),
       ["Integrations", "admin/integrations"],
+      ["BYOK", "admin/settings/byok"],
       ["AI Radar", "admin/settings/ai-policies-updates"],
       ["Support", "admin/support"],
     ]);
@@ -40,7 +49,11 @@ describe("Admin Center navigation config", () => {
   it.each(allItems.map((item) => [item.label, item.path]))(
     "%s links to an existing page (%s)",
     (_label, itemPath) => {
-      const page = path.join(TENANT_APP_DIR, itemPath, "page.tsx");
+      // Framework tabs share the dynamic /frameworks/[slug] page.
+      const routePath = itemPath!
+        .replace(/frameworks\/catalog\/[^/]+$/, "frameworks/catalog/[slug]")
+        .replace(/frameworks\/(?!catalog\/)[^/]+$/, "frameworks/[slug]");
+      const page = path.join(TENANT_APP_DIR, routePath, "page.tsx");
       expect(fs.existsSync(page)).toBe(true);
     },
   );
@@ -55,32 +68,66 @@ describe("Admin Center navigation config", () => {
 
   it("removes the old standalone admin sidebar", () => {
     expect(
-      fs.existsSync(
-        path.resolve(__dirname, "../../admin/sidebar/Sidebar.tsx"),
-      ),
+      fs.existsSync(path.resolve(__dirname, "../../admin/sidebar/Sidebar.tsx")),
     ).toBe(false);
   });
 });
 
 describe("getVisibleAdminNav", () => {
-  const labels = (ctx: { govIQEnabled: boolean; euAiAct?: boolean; iso42001: boolean }) =>
-    getVisibleAdminNav({ euAiAct: false, ...ctx }).flatMap((group) =>
-      group.items.map((item) => item.label),
+  const labels = (ctx: {
+    govIQEnabled: boolean;
+    iso42001: boolean;
+    activePolicyNames?: string[];
+  }) =>
+    getVisibleAdminNav({ activePolicyNames: [], ...ctx }).flatMap((group) =>
+      flattenNavItems(group.items).map((item) => item.label),
     );
+  const allPolicies = FRAMEWORKS.map((f) => f.policyNames[0]);
 
-  it("shows every option when GovIQ, EU AI Act and ISO 42001 are enabled", () => {
-    expect(labels({ govIQEnabled: true, euAiAct: true, iso42001: true })).toHaveLength(11);
+  it("shows every option when GovIQ, ISO 42001 and every framework are enabled", () => {
+    expect(
+      labels({
+        govIQEnabled: true,
+        iso42001: true,
+        activePolicyNames: allPolicies,
+      }),
+    ).toHaveLength(11 + FRAMEWORKS.length);
   });
 
-  it("shows EU AI Act right below AI Frameworks only when enabled", () => {
-    expect(labels({ govIQEnabled: true, iso42001: true })).not.toContain("EU AI Act");
-    const visible = labels({ govIQEnabled: true, euAiAct: true, iso42001: true });
-    expect(visible[visible.indexOf("AI Frameworks") + 1]).toBe("EU AI Act");
+  it("shows a framework tab right below Regulations only when its policy is enabled", () => {
+    expect(labels({ govIQEnabled: true, iso42001: true })).not.toContain(
+      "EU AI Act",
+    );
+    const visible = labels({
+      govIQEnabled: true,
+      iso42001: true,
+      activePolicyNames: ["NYC Local Law 144"],
+    });
+    expect(visible[visible.indexOf("Manage Regulations") + 1]).toBe(
+      "NYC Local Law 144",
+    );
+    expect(visible).not.toContain("EU AI Act");
   });
 
-  it("hides the whole Frameworks group without GovIQ", () => {
-    const visible = getVisibleAdminNav({ govIQEnabled: false, euAiAct: true, iso42001: true });
-    expect(visible.map((group) => group.title)).not.toContain("Frameworks");
+  it("recognises the legacy EU AI Act policy name", () => {
+    expect(
+      labels({
+        govIQEnabled: true,
+        iso42001: false,
+        activePolicyNames: [LEGACY_EU_AI_ACT_POLICY_NAME],
+      }),
+    ).toContain("EU AI Act");
+  });
+
+  it("hides the whole Frameworks and Regulations group without GovIQ", () => {
+    const visible = getVisibleAdminNav({
+      govIQEnabled: false,
+      iso42001: true,
+      activePolicyNames: allPolicies,
+    });
+    expect(visible.map((group) => group.title)).not.toContain(
+      "Frameworks and Regulations",
+    );
     expect(labels({ govIQEnabled: false, iso42001: true })).toEqual([
       "Admin Home",
       "Active Users",
@@ -96,8 +143,9 @@ describe("getVisibleAdminNav", () => {
     expect(visible).not.toContain("ISO 42001");
     expect(visible).toEqual(
       expect.arrayContaining([
-        "AI Frameworks",
+        "Manage Regulations",
         "Integrations",
+      "BYOK",
         "AI Radar",
       ]),
     );

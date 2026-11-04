@@ -1,10 +1,17 @@
 import type { LucideIcon } from "lucide-react";
+import { FRAMEWORKS, enabledFrameworks, frameworkPath } from "@/lib/frameworks";
+import {
+  FRAMEWORK_CATALOG,
+  catalogFrameworkPath,
+} from "@/lib/frameworks/catalog";
 import {
   Archive,
   Blocks,
   FileText,
   Headset,
   Home,
+  KeyRound,
+  Layers,
   Scale,
   ScrollText,
   Settings,
@@ -22,14 +29,21 @@ import {
 
 export interface AdminNavVisibility {
   govIQEnabled: boolean;
-  euAiAct: boolean;
   iso42001: boolean;
+  /** Enabled policy names; each matching framework gets its own tab. */
+  activePolicyNames: string[];
+  /** Catalog frameworks enabled on the Frameworks page; each gets a tab. */
+  enabledFrameworkSlugs?: string[];
 }
 
 export interface AdminNavItem {
   label: string;
-  /** Path relative to `/[tenant]`, e.g. `admin/users/active`. */
-  path: string;
+  /** Path relative to `/[tenant]`, e.g. `admin/users/active`. Omitted for a collapsible parent. */
+  path?: string;
+  /** Only active on this exact path (its sub-paths belong to other tabs). */
+  exact?: boolean;
+  /** Nested items; the parent renders as an open/close toggle. */
+  children?: AdminNavItem[];
   icon: LucideIcon;
   isVisible?: (ctx: AdminNavVisibility) => boolean;
 }
@@ -72,27 +86,56 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "Frameworks",
     isVisible: ({ govIQEnabled }) => govIQEnabled,
     items: [
       {
-        label: "AI Frameworks",
-        path: "admin/settings/policy-center",
+        label: "Regulations",
         icon: FileText,
+        children: [
+          {
+            label: "Manage Regulations",
+            path: "admin/settings/policy-center",
+            icon: FileText,
+          },
+          ...FRAMEWORKS.map(
+            (framework): AdminNavItem => ({
+              label: framework.navLabel,
+              path: frameworkPath(framework.slug),
+              icon: Scale,
+              isVisible: ({ activePolicyNames }) =>
+                enabledFrameworks(activePolicyNames).includes(framework),
+            }),
+          ),
+        ],
       },
       {
-        label: "EU AI Act",
-        path: "admin/settings/eu-ai-act",
-        icon: Scale,
-        isVisible: ({ euAiAct }) => euAiAct,
+        label: "Frameworks",
+        icon: Layers,
+        children: [
+          {
+            label: "Manage Frameworks",
+            path: "admin/settings/frameworks",
+            icon: Layers,
+            exact: true,
+          },
+          ...FRAMEWORK_CATALOG.map(
+            (framework): AdminNavItem => ({
+              label: framework.name,
+              path: catalogFrameworkPath(framework.slug),
+              icon: Layers,
+              isVisible: ({ enabledFrameworkSlugs = [] }) =>
+                enabledFrameworkSlugs.includes(framework.slug),
+            }),
+          ),
+        ],
       },
-      {
-        label: "ISO 42001",
-        path: "admin/settings/iso-42001",
-        icon: Scale,
-        isVisible: ({ iso42001 }) => iso42001,
-      },
+    ],
+  },
+  {
+    isVisible: ({ govIQEnabled }) => govIQEnabled,
+    items: [
       { label: "Integrations", path: "admin/integrations", icon: Blocks },
+      { label: "BYOK", path: "admin/settings/byok", icon: KeyRound },
       {
         label: "AI Radar",
         path: "admin/settings/ai-policies-updates",
@@ -105,15 +148,31 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
 ];
 
+const visibleItems = (
+  items: AdminNavItem[],
+  ctx: AdminNavVisibility,
+): AdminNavItem[] =>
+  items
+    .filter((item) => item.isVisible?.(ctx) ?? true)
+    .map((item) =>
+      item.children
+        ? { ...item, children: visibleItems(item.children, ctx) }
+        : item,
+    )
+    .filter((item) => item.path || item.children?.length);
+
 /** Groups and items the current tenant should see, with empty groups dropped. */
 export function getVisibleAdminNav(ctx: AdminNavVisibility): AdminNavGroup[] {
   return ADMIN_NAV.filter((group) => group.isVisible?.(ctx) ?? true)
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => item.isVisible?.(ctx) ?? true),
-    }))
+    .map((group) => ({ ...group, items: visibleItems(group.items, ctx) }))
     .filter((group) => group.items.length > 0);
 }
+
+/** Every linkable item, children flattened in place of their parent. */
+export const flattenNavItems = (items: AdminNavItem[]): AdminNavItem[] =>
+  items.flatMap((item) =>
+    item.children ? flattenNavItems(item.children) : [item],
+  );
 
 export const adminHref = (tenant: string, path: string) => `/${tenant}/${path}`;
 
