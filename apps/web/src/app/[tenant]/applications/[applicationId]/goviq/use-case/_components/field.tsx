@@ -18,7 +18,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface UseCase {
   id: string;
@@ -90,7 +90,10 @@ export const MultiSelectField = ({
     }
   };
 
+  // Keep keys typed here away from cmdk (Enter would pick the highlighted
+  // option) and from the dialog's Enter-to-save handler, which both fire first.
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddCustomValue();
@@ -141,7 +144,7 @@ export const MultiSelectField = ({
                   placeholder="Add custom value..."
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   className="text-sm"
                 />
                 <Button
@@ -221,23 +224,15 @@ export const SingleSelectField = ({
     }
   };
 
+  // Keep keys typed here away from cmdk (Enter would pick the highlighted
+  // option) and from the dialog's Enter-to-save handler, which both fire first.
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddCustomValue();
     }
   };
-
-  useEffect(() => {
-    if (formData.kpis && formData.kpis.length > 1) {
-      onUpdate({
-        ...formData,
-        kpis: formData.kpis
-          ? [formData.kpis[formData.formData.length - 1]]
-          : [],
-      });
-    }
-  }, [formData.kpis]);
 
   return (
     <div className="space-y-2">
@@ -267,7 +262,7 @@ export const SingleSelectField = ({
                   placeholder="Add custom value..."
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   className="text-sm"
                 />
                 <Button

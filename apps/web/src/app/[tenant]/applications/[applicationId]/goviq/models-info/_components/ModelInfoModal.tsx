@@ -21,7 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader, Upload, X, File, ExternalLink } from "lucide-react";
-import { getApprovedModelsByProvider } from "@/lib/actions/model-register";
+import {
+  getApprovedModelsByProvider,
+  getApprovedProviders,
+} from "@/lib/actions/model-register";
 
 interface Props {
   isOpen: boolean;
@@ -139,18 +142,22 @@ const PROMPT_REGISTRY_INTEGRATIONS = [
   { value: "custom", label: "Custom/Other", link: null },
 ];
 
-// Provider options matching model-registry
+// Vendor labels, matching the Model Registry
 const PROVIDER_OPTIONS = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
   { value: "gemini", label: "Google (Gemini)" },
   { value: "vertex", label: "Google (Vertex AI)" },
-  { value: "bedrock", label: "AWS (Bedrock)", disabled: true },
-  { value: "azure_openai", label: "Azure OpenAI", disabled: true },
-  { value: "groq", label: "Groq", disabled: true },
-  { value: "ollama", label: "Ollama", disabled: true },
+  { value: "openrouter", label: "OpenRouter" },
+  { value: "xai", label: "xAI (Grok)" },
+  { value: "groq", label: "Groq (Llama, GPT-OSS)" },
+  { value: "mistral", label: "Mistral" },
+  { value: "deepseek", label: "DeepSeek" },
+  { value: "bedrock", label: "AWS (Bedrock)" },
+  { value: "azure_openai", label: "Azure OpenAI" },
+  { value: "ollama", label: "Ollama (Llama, self-hosted)" },
   { value: "huggingface", label: "Hugging Face" },
-  { value: "custom", label: "Custom", disabled: true },
+  { value: "custom", label: "Custom" },
 ];
 
 export function ModelInfoModal({
@@ -183,11 +190,17 @@ export function ModelInfoModal({
     Array<{ id: string; displayName: string }>
   >([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [approvedProviders, setApprovedProviders] = useState<string[]>([]);
   const [architectureFiles, setArchitectureFiles] = useState<File[]>([]);
   const [softwareCustom, setSoftwareCustom] = useState("");
   const [promptRegistryCustom, setPromptRegistryCustom] = useState("");
   const [softwareIsCustom, setSoftwareIsCustom] = useState(false);
   const [promptRegistryIsCustom, setPromptRegistryIsCustom] = useState(false);
+
+  // Vendors come from the Model Registry: only those with an approved model
+  useEffect(() => {
+    if (isOpen) getApprovedProviders().then(setApprovedProviders).catch(() => setApprovedProviders([]));
+  }, [isOpen]);
 
   // Load models when vendor selection changes
   useEffect(() => {
@@ -472,15 +485,17 @@ export function ModelInfoModal({
                   <SelectValue placeholder="Select a vendor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PROVIDER_OPTIONS.map((provider) => (
-                    <SelectItem
-                      key={provider.value}
-                      value={provider.value}
-                      disabled={provider.disabled}
-                    >
-                      {provider.label}
-                    </SelectItem>
-                  ))}
+                  {approvedProviders.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      No approved models in Model Registry
+                    </div>
+                  ) : (
+                    approvedProviders.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {PROVIDER_OPTIONS.find((p) => p.value === value)?.label ?? value}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {errors.vendor && (

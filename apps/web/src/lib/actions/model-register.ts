@@ -2,8 +2,11 @@
 
 import { db } from "@db";
 import { providerModelMetadata, providerModels } from "@db";
-import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
+
+// A registry model is "approved" (selectable in applications) unless it is deprecated/unavailable.
+const APPROVED_STATUSES: ("available" | "preview")[] = ["available", "preview"];
 
 export async function getModelsByProvider(provider: string) {
   try {
@@ -56,7 +59,7 @@ export async function getModelsByProvider(provider: string) {
 
 /**
  * Models the tenant has approved in the Model Registry (its own entries plus
- * global ones), minus deprecated. Used to restrict model pickers in applications.
+ * global ones), available or preview only. Used to restrict model pickers in applications.
  */
 export async function getApprovedModelsByProvider(provider: string) {
   const { orgId } = await auth();
@@ -74,7 +77,7 @@ export async function getApprovedModelsByProvider(provider: string) {
         // @ts-ignore provider is an enum column
         eq(providerModels.provider, provider),
         or(eq(providerModels.tenantId, orgId), isNull(providerModels.tenantId)),
-        ne(providerModels.availabilityStatus, "deprecated"),
+        inArray(providerModels.availabilityStatus, APPROVED_STATUSES),
       ),
     )
     .orderBy(providerModels.displayName);
@@ -83,4 +86,21 @@ export async function getApprovedModelsByProvider(provider: string) {
     status: true,
     models: rows.map((m) => ({ id: m.id, displayName: m.displayName || m.modelId })),
   };
+}
+
+/** Providers that have at least one approved (non-deprecated) model in the tenant's registry. */
+export async function getApprovedProviders() {
+  const { orgId } = await auth();
+  if (!orgId) return [] as string[];
+
+  const rows = await db
+    .selectDistinct({ provider: providerModels.provider })
+    .from(providerModels)
+    .where(
+      and(
+        or(eq(providerModels.tenantId, orgId), isNull(providerModels.tenantId)),
+        inArray(providerModels.availabilityStatus, APPROVED_STATUSES),
+      ),
+    );
+  return rows.map((r) => r.provider as string);
 }

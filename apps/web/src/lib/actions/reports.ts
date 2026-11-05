@@ -4,7 +4,7 @@
 
 "use server";
 
-import { db, tenants, applications, useCases, risks } from "@db";
+import { db, tenants, applications, useCases, risks, agents } from "@db";
 import { eq, and, isNull, sql, ne } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 
@@ -79,21 +79,33 @@ export const getSummaryMetrics = async (tenantSlug: string) => {
     )
     .groupBy(sql`unnest(${useCases.agentPatterns})`);
 
-  // Format the response
+  // Use-case tags -> dashboard card. Tolerant of case/spelling variants; Agent
+  // is not a use-case count, it is the real agents in the Agent Registry.
+  const SYSTEM_TYPE_ALIASES: Record<string, "In-house ML" | "GenAI" | "3rd Party"> = {
+    "in-house ml": "In-house ML",
+    "in house ml": "In-house ML",
+    genai: "GenAI",
+    "gen ai": "GenAI",
+    "3rd party": "3rd Party",
+    "third party": "3rd Party",
+    "third-party": "3rd Party",
+  };
   const systemTypeCounts = {
     "In-house ML": 0,
     GenAI: 0,
     "3rd Party": 0,
     Agent: 0,
   };
-
-  // Populate the data from the query results
   useCasesBySystemType.forEach((item) => {
-    if (item.systemType in systemTypeCounts) {
-      systemTypeCounts[item.systemType as keyof typeof systemTypeCounts] =
-        item.count;
-    }
+    const key = SYSTEM_TYPE_ALIASES[String(item.systemType).trim().toLowerCase()];
+    if (key) systemTypeCounts[key] += Number(item.count);
   });
+
+  const [{ count: agentCount }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(agents)
+    .where(eq(agents.tenantId, tenantId));
+  systemTypeCounts.Agent = Number(agentCount);
 
   return {
     success: true,

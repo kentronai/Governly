@@ -499,7 +499,9 @@ export default function UseCaseModule({
           <div
             className="grid gap-6 py-4"
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
+              // Enter inside a dropdown (search / custom value) must not save the form
+              if (e.key === "Enter" && !(e.target as HTMLElement).closest("[cmdk-root]"))
+                handleSave();
             }}
           >
             <SingleSelectField
