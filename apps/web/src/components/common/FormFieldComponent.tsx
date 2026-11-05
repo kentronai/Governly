@@ -10,6 +10,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 import {
   Select,
   SelectContent,
@@ -24,7 +25,7 @@ interface FormFieldComponentProps {
   label: string;
   placeholder: string;
   description: string;
-  fieldType?: "textarea" | "select";
+  fieldType?: "textarea" | "select" | "richtext";
   selectOptions?: { value: string; label: string }[];
 }
 
@@ -58,6 +59,12 @@ export const FormFieldComponent: React.FC<FormFieldComponentProps> = ({
                   ))}
                 </SelectContent>
               </Select>
+            ) : fieldType === "richtext" ? (
+              <RichTextEditor
+                placeholder={placeholder}
+                value={field.value ?? ""}
+                onChange={field.onChange}
+              />
             ) : (
               <Textarea
                 className="bg-muted!"

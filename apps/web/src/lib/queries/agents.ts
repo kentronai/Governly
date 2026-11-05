@@ -6,7 +6,7 @@
  */
 
 import { db, agents, users, applications, providerModels, withDbRetry } from "@db";
-import { and, eq, desc, ilike, isNull, or, sql, count } from "drizzle-orm";
+import { and, eq, desc, ilike, inArray, isNull, notInArray, or, sql, count } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
 import { policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
@@ -19,6 +19,7 @@ export interface AgentListFilters {
   platform?: string;
   ownerUserId?: string | "unowned";
   deployed?: "yes" | "no";
+  policyViolation?: "yes" | "no";
   page?: number;
   pageSize?: number;
 }
@@ -53,11 +54,11 @@ export interface AgentApplicationOption {
  * governance rollups belong on application/compliance dashboards.
  */
 /** Agents breaking at least one governance policy (same checks as the detail dialog). */
-async function countPolicyViolationAgents(tenantId: string) {
+async function getPolicyViolationAgentIds(tenantId: string) {
   const [rows, approved] = await Promise.all([
     withDbRetry(() =>
       db
-        .select({ profile: agents.profile, model: agents.model })
+        .select({ id: agents.id, profile: agents.profile, model: agents.model })
         .from(agents)
         .where(eq(agents.tenantId, tenantId)),
     ),
@@ -69,11 +70,13 @@ async function countPolicyViolationAgents(tenantId: string) {
     ),
   ]);
   const approvedIds = approved.map((m) => m.modelId);
-  return rows.filter((row) => {
-    const profile = readProfile(row.profile);
-    const llms = profile.llms.length ? profile.llms : row.model ? [row.model] : [];
-    return policyViolations(profile.observability, llms, approvedIds).length > 0;
-  }).length;
+  return rows
+    .filter((row) => {
+      const profile = readProfile(row.profile);
+      const llms = profile.llms.length ? profile.llms : row.model ? [row.model] : [];
+      return policyViolations(profile.observability, llms, approvedIds).length > 0;
+    })
+    .map((row) => row.id);
 }
 
 export const getAgentInventorySummary = async (
@@ -106,7 +109,7 @@ export const getAgentInventorySummary = async (
     l3Agents: Number(agentMetrics?.l3Agents ?? 0),
     deployedAgents: Number(agentMetrics?.deployedAgents ?? 0),
     llmNotDetected: Number(agentMetrics?.llmNotDetected ?? 0),
-    policyViolationAgents: await countPolicyViolationAgents(tenantId),
+    policyViolationAgents: (await getPolicyViolationAgentIds(tenantId)).length,
     calculatedAt: new Date().toISOString(),
   };
 };
@@ -136,6 +139,15 @@ export const getAgents = cache(
       conditions.push(sql`${agents.profile}->>'deployed' = 'true'`);
     } else if (filters.deployed === "no") {
       conditions.push(sql`${agents.profile}->>'deployed' is distinct from 'true'`);
+    }
+    if (filters.policyViolation) {
+      // Violations are derived in JS (same rule as the summary card), so resolve the ids first.
+      const ids = await getPolicyViolationAgentIds(tenantId);
+      if (filters.policyViolation === "yes") {
+        conditions.push(ids.length ? inArray(agents.id, ids) : sql`false`);
+      } else if (ids.length) {
+        conditions.push(notInArray(agents.id, ids));
+      }
     }
     if (filters.search) {
       const term = `%${filters.search}%`;

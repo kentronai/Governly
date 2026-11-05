@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "@db";
-import { providerModelMetadata } from "@db";
-import { eq } from "drizzle-orm";
+import { providerModelMetadata, providerModels } from "@db";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 export async function getModelsByProvider(provider: string) {
   try {
@@ -51,4 +52,35 @@ export async function getModelsByProvider(provider: string) {
       models: [],
     };
   }
+}
+
+/**
+ * Models the tenant has approved in the Model Registry (its own entries plus
+ * global ones), minus deprecated. Used to restrict model pickers in applications.
+ */
+export async function getApprovedModelsByProvider(provider: string) {
+  const { orgId } = await auth();
+  if (!orgId || !provider) return { status: false, models: [] };
+
+  const rows = await db
+    .select({
+      id: providerModels.id,
+      modelId: providerModels.modelId,
+      displayName: providerModels.displayName,
+    })
+    .from(providerModels)
+    .where(
+      and(
+        // @ts-ignore provider is an enum column
+        eq(providerModels.provider, provider),
+        or(eq(providerModels.tenantId, orgId), isNull(providerModels.tenantId)),
+        ne(providerModels.availabilityStatus, "deprecated"),
+      ),
+    )
+    .orderBy(providerModels.displayName);
+
+  return {
+    status: true,
+    models: rows.map((m) => ({ id: m.id, displayName: m.displayName || m.modelId })),
+  };
 }

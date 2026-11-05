@@ -24,6 +24,12 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -44,6 +50,8 @@ import {
   Rocket,
   Cpu,
   Copy,
+  Eye,
+  MoreHorizontal,
 } from "lucide-react";
 import { successToast } from "@/lib/utils/toast";
 import { llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
@@ -259,6 +267,15 @@ function ChipList({ label, items, emptyText }: { label: string; items: string[];
 const cloudIdOf = (row: any): string | null =>
   row.platform === "github" ? null : (String(row.externalAgentId ?? "").split(":").pop() || null);
 
+const statusLabel = (profile: ReturnType<typeof readProfile>) =>
+  profile.deployed
+    ? "Running"
+    : profile.deployedAt
+      ? "Stopped"
+      : profile.deployedOn
+        ? "Not verified"
+        : "Not deployed";
+
 const textOrDash = (value?: string | null) =>
   value ? value : <span className="text-muted-foreground">—</span>;
 
@@ -306,6 +323,7 @@ export function AgentInventory({
   const [platform, setPlatform] = useState(ALL);
   const [ownerFilter, setOwnerFilter] = useState(ALL);
   const [deployed, setDeployed] = useState(ALL);
+  const [policy, setPolicy] = useState(ALL);
   const [options] = useState(initialData.options);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<any | null>(null);
@@ -337,6 +355,7 @@ export function AgentInventory({
               ? undefined
               : ownerFilter,
         deployed: deployed === ALL ? undefined : (deployed as "yes" | "no"),
+        policyViolation: policy === ALL ? undefined : (policy as "yes" | "no"),
         page,
         pageSize,
       });
@@ -355,6 +374,7 @@ export function AgentInventory({
     platform,
     ownerFilter,
     deployed,
+    policy,
     page,
     pageSize,
   ]);
@@ -402,7 +422,7 @@ export function AgentInventory({
 
   useEffect(
     () => setPage(1),
-    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed],
+    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed, policy],
   );
 
   useEffect(() => {
@@ -416,10 +436,10 @@ export function AgentInventory({
   const hasActiveFilters = useMemo(
     () =>
       search ||
-      [riskLevel, autonomyLevel, status, platform, ownerFilter, deployed].some(
+      [riskLevel, autonomyLevel, status, platform, ownerFilter, deployed, policy].some(
         (f) => f !== ALL,
       ),
-    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed],
+    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed, policy],
   );
 
   return (
@@ -524,6 +544,16 @@ export function AgentInventory({
                 <SelectItem value="no">Stopped</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={policy} onValueChange={setPolicy}>
+              <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
+                <SelectValue placeholder="Policy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Policy: All</SelectItem>
+                <SelectItem value="yes">Violating policies</SelectItem>
+                <SelectItem value="no">No violations</SelectItem>
+              </SelectContent>
+            </Select>
           </>
         ) : (
           <div className="h-8 w-full max-w-[720px] rounded-md border bg-muted/10" />
@@ -540,6 +570,7 @@ export function AgentInventory({
               setPlatform(ALL);
               setOwnerFilter(ALL);
               setDeployed(ALL);
+              setPolicy(ALL);
             }}
           >
             Clear filters
@@ -560,7 +591,7 @@ export function AgentInventory({
             <TableHead>Framework</TableHead>
             <TableHead>LLMs</TableHead>
             <TableHead>Observability</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="w-[80px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -579,11 +610,7 @@ export function AgentInventory({
             rows.map((r) => {
               const profile = readProfile(r.profile);
               return (
-                <TableRow
-                  key={r.id}
-                  className="cursor-pointer"
-                  onClick={() => setActiveAgentId(r.id)}
-                >
+                <TableRow key={r.id}>
                   <TableCell className="font-medium max-w-[220px] truncate">
                     <div className="flex items-center gap-2">
                       <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -653,22 +680,19 @@ export function AgentInventory({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      className={cn(
-                        "border-transparent",
-                        profile.deployed
-                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {profile.deployed
-                        ? "Running"
-                        : profile.deployedAt
-                          ? "Stopped"
-                          : profile.deployedOn
-                            ? "Not verified"
-                            : "Not deployed"}
-                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Agent actions">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setActiveAgentId(r.id)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
@@ -839,6 +863,16 @@ function AgentDetailModal({
             <DialogHeader className="shrink-0 border-b p-5 pr-12">
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-xl">{agent.name}</DialogTitle>
+                <Badge
+                  className={cn(
+                    "border-transparent",
+                    readProfile(agent.profile).deployed
+                      ? STATUS_STYLES.active
+                      : STATUS_STYLES.inactive,
+                  )}
+                >
+                  {statusLabel(readProfile(agent.profile))}
+                </Badge>
               </div>
               <DialogDescription>
                 {platformLabel(agent.platform)} · {agent.region} · Account{" "}
@@ -874,6 +908,7 @@ function AgentDetailModal({
                     : " Its source code could not be read: it is not in a connected GitHub repository and the platform exposes no deployed source.";
                   return (
                     <>
+                      <Field label="Status" value={statusLabel(profile)} />
                       <Field label="Agent ID" value={cloudIdOf(agent) ?? "None: not deployed to a connected cloud"} warn={!cloudIdOf(agent)} />
                       {profile.repository || agent.platform === "github" ? (
                         <Field label="Repository" value={profile.repository ?? agent.rawMetadata?.repository ?? agent.externalAgentId} />

@@ -5,7 +5,7 @@
 "use server";
 
 import { db, policyCenter, applicationPolicyCenter } from "@db";
-import { eq, and, isNull, ilike, or } from "drizzle-orm";
+import { eq, and, isNull, ilike, notInArray, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { rolloutTenantCompliancePolicy } from "@/lib/server/policy-enforcement/compliance-rollout";
@@ -18,6 +18,14 @@ export interface GetPolicyCenterPoliciesOptions {
   search?: string;
   type?: string;
 }
+
+// Voluntary standards that live under Admin Center → Frameworks, so they are
+// hidden from the Regulations library (rows stay for existing tenant mappings).
+const FRAMEWORK_ONLY_POLICIES = [
+  "ISO/IEC 42001",
+  "ISO/IEC 27001",
+  "NIST AI Risk Management Framework",
+];
 
 /**
  * Get policy center policies with filters
@@ -34,6 +42,7 @@ export const getPolicyCenterPoliciesAction = async (
   const filters = [
     isNull(policyCenter.parentPolicyId),
     isNull(policyCenter.tenantId),
+    notInArray(policyCenter.name, FRAMEWORK_ONLY_POLICIES),
   ];
   if (category) filters.push(eq(policyCenter.category, category));
   if (country) filters.push(eq(policyCenter.country, country));

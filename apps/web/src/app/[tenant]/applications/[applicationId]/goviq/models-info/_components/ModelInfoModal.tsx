@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader, Upload, X, File, ExternalLink } from "lucide-react";
-import { getModelsByProvider } from "@/lib/actions/model-register";
+import { getApprovedModelsByProvider } from "@/lib/actions/model-register";
 
 interface Props {
   isOpen: boolean;
@@ -192,10 +192,10 @@ export function ModelInfoModal({
   // Load models when vendor selection changes
   useEffect(() => {
     const loadModels = async () => {
-      if (formData.vendor && formData.vendor !== "huggingface") {
+      if (formData.vendor) {
         setLoadingModels(true);
         try {
-          const res = await getModelsByProvider(formData.vendor);
+          const res = await getApprovedModelsByProvider(formData.vendor);
           if (res.status && res.models) {
             setSelectedVendorModels(
               res.models.map((model: any) => ({
@@ -510,7 +510,7 @@ export function ModelInfoModal({
                       !formData.vendor
                         ? "Select vendor first"
                         : selectedVendorModels.length === 0
-                          ? "No models available"
+                          ? "No approved models for this vendor"
                           : "Select a model"
                     }
                   />
@@ -522,7 +522,7 @@ export function ModelInfoModal({
                     </div>
                   ) : selectedVendorModels.length === 0 ? (
                     <div className="px-2 py-1.5 text-sm text-gray-500">
-                      No models available
+                      No approved models in Model Registry
                     </div>
                   ) : (
                     selectedVendorModels.map((model) => (
