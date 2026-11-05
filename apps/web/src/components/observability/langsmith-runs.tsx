@@ -26,7 +26,6 @@ import { formatTimestamp } from "@/utils/formatTime";
 import { useObservabilityIntegrations } from "@/store/tenantLogs.store";
 import RunDetailDialog from "./run-detail-dialog";
 
-
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -117,9 +116,7 @@ export default function LangSmithRuns() {
                       {run.runType ? toLabel(run.runType) : "—"}
                     </TableCell>
                     <TableCell>{run.model ?? "—"}</TableCell>
-                    <TableCell>
-                      {run.totalTokens ?? "—"}
-                    </TableCell>
+                    <TableCell>{run.totalTokens ?? "—"}</TableCell>
                     <TableCell>
                       {run.totalCost != null ? `$${run.totalCost}` : "—"}
                     </TableCell>
@@ -130,7 +127,9 @@ export default function LangSmithRuns() {
                       <Badge
                         variant={run.errorMessage ? "destructive" : "secondary"}
                       >
-                        {run.errorMessage ? "Error" : toLabel(run.status ?? "ok")}
+                        {run.errorMessage
+                          ? "Error"
+                          : toLabel(run.status ?? "ok")}
                       </Badge>
                     </TableCell>
                     <TableCell>

@@ -13,9 +13,17 @@ import { createAuditEvent } from "@/lib/server/audit";
 import type { RuleCondition } from "@/lib/server/agents/rule-engine";
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
   if (!tenantRow.length) throw new Error("Tenant not found");
   return tenantRow[0].id;
@@ -23,7 +31,7 @@ async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
 
 export const getAgentRules = async (
   tenantSlugOrId: string,
-  engineType: "capability" | "autonomy" | "risk"
+  engineType: "capability" | "autonomy" | "risk",
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
@@ -32,7 +40,7 @@ export const getAgentRules = async (
   return db.query.agentRules.findMany({
     where: and(
       eq(agentRules.engineType, engineType),
-      or(isNull(agentRules.tenantId), eq(agentRules.tenantId, tenantId))
+      or(isNull(agentRules.tenantId), eq(agentRules.tenantId, tenantId)),
     ),
     orderBy: (t, { asc }) => [asc(t.priority)],
   });
@@ -54,7 +62,9 @@ export const updateAgentRule = async (input: UpdateAgentRuleInput) => {
   if (!userId) throw new Error("Authentication required");
 
   const tenantId = await resolveTenantId(input.tenantSlug);
-  const rule = await db.query.agentRules.findFirst({ where: eq(agentRules.id, input.ruleId) });
+  const rule = await db.query.agentRules.findFirst({
+    where: eq(agentRules.id, input.ruleId),
+  });
   if (!rule) throw new Error("Rule not found");
 
   const patch = {
@@ -66,7 +76,11 @@ export const updateAgentRule = async (input: UpdateAgentRuleInput) => {
 
   let updated;
   if (rule.tenantId === tenantId) {
-    [updated] = await db.update(agentRules).set(patch).where(eq(agentRules.id, rule.id)).returning();
+    [updated] = await db
+      .update(agentRules)
+      .set(patch)
+      .where(eq(agentRules.id, rule.id))
+      .returning();
   } else {
     [updated] = await db
       .insert(agentRules)

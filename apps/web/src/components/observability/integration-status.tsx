@@ -48,7 +48,9 @@ function StatusCard({
             <p className="text-xs text-muted-foreground">{subtitle}</p>
             <div className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
               <div>
-                <span className="text-muted-foreground">Project / Workspace: </span>
+                <span className="text-muted-foreground">
+                  Project / Workspace:{" "}
+                </span>
                 <span className="font-medium">
                   {status.projectName ?? (status.connected ? "Default" : "—")}
                 </span>

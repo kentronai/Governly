@@ -26,9 +26,13 @@ const iso = (value: Date | string | undefined): string | null => {
   return value instanceof Date ? value.toISOString() : value;
 };
 
-function modelFromEnvironment(environment: Record<string, string> | undefined): string | null {
+function modelFromEnvironment(
+  environment: Record<string, string> | undefined,
+): string | null {
   if (!environment) return null;
-  const match = Object.entries(environment).find(([key]) => MODEL_ENV_KEYS.has(key.toUpperCase()));
+  const match = Object.entries(environment).find(([key]) =>
+    MODEL_ENV_KEYS.has(key.toUpperCase()),
+  );
   return match?.[1]?.trim() || null;
 }
 
@@ -42,17 +46,17 @@ function clientFor(region: string, credentials: AwsCredentialIdentity) {
 
 export async function hasAgentCoreRuntimes(
   region: string,
-  credentials: AwsCredentialIdentity
+  credentials: AwsCredentialIdentity,
 ): Promise<boolean> {
   const response = await clientFor(region, credentials).send(
-    new ListAgentRuntimesCommand({ maxResults: 1 })
+    new ListAgentRuntimesCommand({ maxResults: 1 }),
   );
   return (response.agentRuntimes?.length ?? 0) > 0;
 }
 
 export async function discoverAgentCoreRuntimes(
   region: string,
-  credentials: AwsCredentialIdentity
+  credentials: AwsCredentialIdentity,
 ): Promise<RawDiscoveredResource[]> {
   const client = clientFor(region, credentials);
   const resources: RawDiscoveredResource[] = [];
@@ -60,7 +64,7 @@ export async function discoverAgentCoreRuntimes(
 
   do {
     const page = await client.send(
-      new ListAgentRuntimesCommand({ maxResults: 100, nextToken })
+      new ListAgentRuntimesCommand({ maxResults: 100, nextToken }),
     );
 
     for (const runtime of page.agentRuntimes ?? []) {
@@ -73,18 +77,20 @@ export async function discoverAgentCoreRuntimes(
           new GetAgentRuntimeCommand({
             agentRuntimeId: runtime.agentRuntimeId,
             agentRuntimeVersion: runtime.agentRuntimeVersion,
-          })
+          }),
         );
       } catch (error) {
-        detailError = error instanceof Error ? error.message : "GetAgentRuntime failed";
+        detailError =
+          error instanceof Error ? error.message : "GetAgentRuntime failed";
       }
 
-      const runtimeArn = detail?.agentRuntimeArn ?? runtime.agentRuntimeArn ?? null;
+      const runtimeArn =
+        detail?.agentRuntimeArn ?? runtime.agentRuntimeArn ?? null;
       let tags: Record<string, string> = {};
       if (runtimeArn) {
         try {
           const tagResponse = await client.send(
-            new ListTagsForResourceCommand({ resourceArn: runtimeArn })
+            new ListTagsForResourceCommand({ resourceArn: runtimeArn }),
           );
           tags = tagResponse.tags ?? {};
         } catch {
@@ -98,18 +104,24 @@ export async function discoverAgentCoreRuntimes(
         resourceType: "agentcore_runtime",
         resourceId: runtime.agentRuntimeId,
         resourceArn: runtimeArn,
-        resourceName: detail?.agentRuntimeName ?? runtime.agentRuntimeName ?? runtime.agentRuntimeId,
+        resourceName:
+          detail?.agentRuntimeName ??
+          runtime.agentRuntimeName ??
+          runtime.agentRuntimeId,
         region,
         tags,
         linkedRoleArn: detail?.roleArn ?? null,
         createdAt: iso(detail?.createdAt),
         lastUpdatedAt: iso(detail?.lastUpdatedAt ?? runtime.lastUpdatedAt),
         metadata: {
-          evidenceSource: detail ? "aws:GetAgentRuntime" : "aws:ListAgentRuntimes",
+          evidenceSource: detail
+            ? "aws:GetAgentRuntime"
+            : "aws:ListAgentRuntimes",
           detailAvailable: Boolean(detail),
           detailError,
           status: detail?.status ?? runtime.status ?? null,
-          version: detail?.agentRuntimeVersion ?? runtime.agentRuntimeVersion ?? null,
+          version:
+            detail?.agentRuntimeVersion ?? runtime.agentRuntimeVersion ?? null,
           description: detail?.description ?? runtime.description ?? null,
           roleArn: detail?.roleArn ?? null,
           modelId,
@@ -122,7 +134,8 @@ export async function discoverAgentCoreRuntimes(
           lifecycleConfiguration: detail?.lifecycleConfiguration ?? null,
           metadataConfiguration: detail?.metadataConfiguration ?? null,
           filesystemConfigurations: detail?.filesystemConfigurations ?? [],
-          requestHeaderConfiguration: detail?.requestHeaderConfiguration ?? null,
+          requestHeaderConfiguration:
+            detail?.requestHeaderConfiguration ?? null,
           failureReason: detail?.failureReason ?? null,
           createdAt: iso(detail?.createdAt),
           lastUpdatedAt: iso(detail?.lastUpdatedAt ?? runtime.lastUpdatedAt),

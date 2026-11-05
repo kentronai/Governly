@@ -18,7 +18,7 @@ export interface Recommendation {
 export function generateRecommendations(
   facts: CapabilityFacts,
   autonomy: AutonomyResult,
-  ownership: OwnershipResult
+  ownership: OwnershipResult,
 ): Recommendation[] {
   const recs: Recommendation[] = [];
   const highAutonomy = autonomy.level === "L3" || autonomy.level === "L4";
@@ -26,7 +26,8 @@ export function generateRecommendations(
   if (!ownership.ownerUserId) {
     recs.push({
       recommendationType: "assign_owner",
-      reason: "No owner could be identified from cloud resource tags or email match.",
+      reason:
+        "No owner could be identified from cloud resource tags or email match.",
       severity: highAutonomy ? "High" : "Medium",
       suggestedFix:
         "Tag the agent's cloud resources with an Owner/Email tag, or assign an owner manually in the Agent Inventory.",
@@ -36,22 +37,29 @@ export function generateRecommendations(
   if (facts.isDormant) {
     recs.push({
       recommendationType: "archive_dormant_agent",
-      reason: "No activity detected on this agent's resources within the dormancy window.",
+      reason:
+        "No activity detected on this agent's resources within the dormancy window.",
       severity: "Low",
-      suggestedFix: "Confirm the agent is still required; disable or archive it if not.",
+      suggestedFix:
+        "Confirm the agent is still required; disable or archive it if not.",
     });
   }
 
   if (facts.hasAdminRole) {
     recs.push({
       recommendationType: "restrict_iam_role",
-      reason: "The agent's execution role has administrator-equivalent permissions.",
+      reason:
+        "The agent's execution role has administrator-equivalent permissions.",
       severity: "Critical",
-      suggestedFix: "Replace the role's policy with least-privilege permissions scoped to the agent's actual actions.",
+      suggestedFix:
+        "Replace the role's policy with least-privilege permissions scoped to the agent's actual actions.",
     });
   }
 
-  if (typeof facts.credentialAgeDays === "number" && facts.credentialAgeDays > 90) {
+  if (
+    typeof facts.credentialAgeDays === "number" &&
+    facts.credentialAgeDays > 90
+  ) {
     recs.push({
       recommendationType: "rotate_credentials",
       reason: `Credentials associated with this agent are ${facts.credentialAgeDays} days old.`,
@@ -65,7 +73,8 @@ export function generateRecommendations(
       recommendationType: "enable_guardrails",
       reason: `Agent is classified ${autonomy.level} but has no cloud or ControlNet guardrail bound.`,
       severity: "High",
-      suggestedFix: "Bind a provider-native or ControlNet guardrail before this agent continues to run at this autonomy level.",
+      suggestedFix:
+        "Bind a provider-native or ControlNet guardrail before this agent continues to run at this autonomy level.",
     });
   }
 
@@ -74,7 +83,8 @@ export function generateRecommendations(
       recommendationType: "enable_approval_workflow",
       reason: `Agent is classified ${autonomy.level} but no approval-workflow tag/gate was found.`,
       severity: autonomy.level === "L4" ? "Critical" : "High",
-      suggestedFix: "Require human approval before this agent's actions execute, or reduce its autonomy level.",
+      suggestedFix:
+        "Require human approval before this agent's actions execute, or reduce its autonomy level.",
     });
   }
 
@@ -83,16 +93,19 @@ export function generateRecommendations(
       recommendationType: "review_public_endpoint",
       reason: "A public cloud API endpoint routes to this agent's resources.",
       severity: "Medium",
-      suggestedFix: "Confirm the endpoint requires authentication/authorization and is intentionally public.",
+      suggestedFix:
+        "Confirm the endpoint requires authentication/authorization and is intentionally public.",
     });
   }
 
   if (facts.hasCrossAccountPermissions) {
     recs.push({
       recommendationType: "review_cross_account_trust",
-      reason: "The agent's execution identity trusts a principal in another cloud account or tenant.",
+      reason:
+        "The agent's execution identity trusts a principal in another cloud account or tenant.",
       severity: "High",
-      suggestedFix: "Verify the trusted account is expected and scope the trust policy as tightly as possible.",
+      suggestedFix:
+        "Verify the trusted account is expected and scope the trust policy as tightly as possible.",
     });
   }
 

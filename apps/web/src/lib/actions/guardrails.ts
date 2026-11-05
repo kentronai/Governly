@@ -2,12 +2,12 @@
  * Server actions for Guardrails
  */
 
-'use server';
+"use server";
 
-import { db, guardrails, tenants } from '@db';
-import { eq, and, isNull } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
-import { createAuditEvent } from '@/lib/server/audit';
+import { db, guardrails, tenants } from "@db";
+import { eq, and, isNull } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { createAuditEvent } from "@/lib/server/audit";
 
 export interface CreateGuardrailInput {
   tenantSlug: string;
@@ -31,27 +31,32 @@ export interface CreateGuardrailInput {
 
 export const getGuardrails = async (tenantSlugOrId: string) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
   // Try to find by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   const guardrailsList = await db.query.guardrails.findMany({
-    where: and(
-      eq(guardrails.tenantId, tenantId),
-      isNull(guardrails.deletedAt)
-    ),
+    where: and(eq(guardrails.tenantId, tenantId), isNull(guardrails.deletedAt)),
     orderBy: (guardrails, { desc }) => [desc(guardrails.createdAt)],
   });
 
   return {
     success: true,
-    guardrails: guardrailsList.map(guardrail => ({
+    guardrails: guardrailsList.map((guardrail) => ({
       id: guardrail.id,
       tenant_id: guardrail.tenantId,
       key: guardrail.key,
@@ -59,7 +64,9 @@ export const getGuardrails = async (tenantSlugOrId: string) => {
       category: guardrail.category,
       description: guardrail.description,
       tier: guardrail.tier,
-      performance_budget_ms: guardrail.performanceBudgetMs ? Number(guardrail.performanceBudgetMs) : undefined,
+      performance_budget_ms: guardrail.performanceBudgetMs
+        ? Number(guardrail.performanceBudgetMs)
+        : undefined,
       requires_onnx: guardrail.requiresOnnx,
       onnx_model_id: guardrail.onnxModelId,
       default_params: guardrail.defaultParams,
@@ -82,58 +89,71 @@ export const getGuardrails = async (tenantSlugOrId: string) => {
 
 export const createGuardrail = async (input: CreateGuardrailInput) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
   // Try to find by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, input.tenantSlug)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, input.tenantSlug))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, input.tenantSlug)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, input.tenantSlug))
+      .limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   if (!input.key || !input.tier) {
-    throw new Error('Key and tier are required');
+    throw new Error("Key and tier are required");
   }
 
-  const newGuardrail = await db.insert(guardrails).values({
-    tenantId,
-    key: input.key,
-    version: input.version || 'v1',
-    category: input.category,
-    description: input.description,
-    tier: input.tier as any,
-    performanceBudgetMs: input.performance_budget_ms ? input.performance_budget_ms.toString() : null,
-    requiresOnnx: input.requires_onnx || false,
-    onnxModelId: input.onnx_model_id,
-    defaultParams: input.default_params || {},
-    metadata: input.metadata || {},
-    isEnabled: input.is_enabled !== undefined ? input.is_enabled : true,
-    packName: input.pack_name,
-    functionName: input.function_name,
-    inputSchema: input.input_schema,
-    outputSchema: input.output_schema,
-    fallbackStrategy: input.fallback_strategy || 'skip',
-    createdBy: userId,
-    updatedBy: userId,
-  }).returning();
+  const newGuardrail = await db
+    .insert(guardrails)
+    .values({
+      tenantId,
+      key: input.key,
+      version: input.version || "v1",
+      category: input.category,
+      description: input.description,
+      tier: input.tier as any,
+      performanceBudgetMs: input.performance_budget_ms
+        ? input.performance_budget_ms.toString()
+        : null,
+      requiresOnnx: input.requires_onnx || false,
+      onnxModelId: input.onnx_model_id,
+      defaultParams: input.default_params || {},
+      metadata: input.metadata || {},
+      isEnabled: input.is_enabled !== undefined ? input.is_enabled : true,
+      packName: input.pack_name,
+      functionName: input.function_name,
+      inputSchema: input.input_schema,
+      outputSchema: input.output_schema,
+      fallbackStrategy: input.fallback_strategy || "skip",
+      createdBy: userId,
+      updatedBy: userId,
+    })
+    .returning();
 
   try {
     await createAuditEvent({
       tenantId,
       actorUserId: userId,
-      action: 'guardrail.created',
-      targetType: 'guardrail',
+      action: "guardrail.created",
+      targetType: "guardrail",
       targetId: newGuardrail[0].id,
-      metadata: { key: input.key, version: input.version || 'v1' },
+      metadata: { key: input.key, version: input.version || "v1" },
     });
   } catch (e) {
-    console.error('Failed to write audit event (guardrail.created):', e);
+    console.error("Failed to write audit event (guardrail.created):", e);
   }
 
   return {
     success: true,
     guardrail: newGuardrail[0],
-    message: 'Guardrail created successfully',
+    message: "Guardrail created successfully",
   };
 };

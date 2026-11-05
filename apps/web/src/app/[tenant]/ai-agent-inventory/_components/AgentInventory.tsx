@@ -41,8 +41,12 @@ import {
   Bot,
   UserX,
   ShieldOff,
-  BadgeX,
+  Rocket,
+  Cpu,
+  Copy,
 } from "lucide-react";
+import { successToast } from "@/lib/utils/toast";
+import { llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
 import {
   fetchAgents,
   fetchAgentDetail,
@@ -83,14 +87,6 @@ const STATUS_STYLES: Record<string, string> = {
   dormant: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
 };
 
-const COMPLIANCE_STYLES: Record<string, string> = {
-  compliant: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  partially_compliant: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  non_compliant: "bg-red-500/15 text-red-600 dark:text-red-400",
-  not_applicable: "bg-muted text-muted-foreground",
-  not_evaluated: "bg-muted text-muted-foreground",
-};
-
 const PLATFORM_LABELS: Record<string, string> = {
   aws_bedrock: "AWS Bedrock",
   aws_agentcore: "AWS AgentCore",
@@ -117,6 +113,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   databricks_apps: "Databricks Apps",
   databricks_jobs: "Databricks Jobs",
   databricks_genie: "Databricks Genie Agent",
+  crewai: "CrewAI",
+  github: "GitHub",
 };
 const platformLabel = (value: string) =>
   PLATFORM_LABELS[value] ?? value.replaceAll("_", " ");
@@ -161,6 +159,127 @@ function relativeFromNow(iso: string | null): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+// Shows the first few items and a "+N" with the full list on hover.
+function Chips({ items, max = 2 }: { items: string[]; max?: number }) {
+  if (items.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex max-w-[220px] flex-wrap gap-1" title={items.join(", ")}>
+      {items.slice(0, max).map((item) => (
+        <Badge key={item} variant="outline" className="max-w-[140px] truncate font-normal">
+          {item}
+        </Badge>
+      ))}
+      {items.length > max ? (
+        <span className="self-center text-xs text-muted-foreground">
+          +{items.length - max}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Why observability is (or is not) available for this agent, with the real cause. */
+function ObservabilityStatus({ agent }: { agent: any }) {
+  const profile = readProfile(agent.profile);
+  const stack = observabilityOf(agent);
+  // Only permissions that stop NORIX reading where observability is configured
+  // (tags, startup script, image, function code) — not deployer/audit ones.
+  const gaps: string[] = String(agent.platform).startsWith("aws_")
+    ? (Array.from(
+        new Set(
+          (agent.agentResources ?? []).flatMap((r: any) =>
+            Array.isArray(r.rawData?.permissionGaps) ? r.rawData.permissionGaps : [],
+          ),
+        ),
+      ) as string[]).filter((g) => /^(ec2:Describe|ecr:|lambda:GetFunction)/.test(g))
+    : [];
+  const state = (agent.agentResources ?? [])
+    .map((r: any) => r.rawData?.state ?? r.rawData?.computeStatus?.state ?? r.rawData?.appStatus?.state)
+    .find(Boolean);
+  return (
+    <div className="mb-4 space-y-2 rounded-md border p-3 text-sm">
+      <div>
+        <span className="text-xs text-muted-foreground">Detected observability</span>
+        {stack.length ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {stack.map((item) => (
+              <Badge key={item} variant="outline" className="font-normal">{item}</Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-amber-600">
+            None detected in tags, environment, code or startup script.
+          </p>
+        )}
+      </div>
+      {!profile.deployed ? (
+        <p className="text-muted-foreground">
+          Runtime: not running{state ? ` (provider state: ${String(state).toLowerCase()})` : ""}. No live telemetry exists until it is started.
+        </p>
+      ) : null}
+      {gaps.length ? (
+        <div className="rounded bg-amber-500/10 p-2 text-amber-700 dark:text-amber-400">
+          <p className="font-medium">AWS permissions needed to detect observability for this agent</p>
+          <ul className="list-disc pl-5">
+            {gaps.map((g) => (<li key={g}>{g}</li>))}
+          </ul>
+          <p className="text-xs">Without them NORIX cannot read the startup script, image or code where observability is configured. Grant them to the AWS connection, then press Refresh.</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Full list for the detail dialog; scrolls when long (skills / packages). */
+function ChipList({ label, items, emptyText }: { label: string; items: string[]; emptyText?: string }) {
+  return (
+    <div className="px-3 py-2 space-y-1.5">
+      <span className="text-xs text-muted-foreground">
+        {label}
+        {items.length ? ` (${items.length})` : ""}
+      </span>
+      {items.length ? (
+        <div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto">
+          {items.map((item) => (
+            <Badge key={item} variant="outline" className="font-normal">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-amber-600">{emptyText ?? "Not detected"}</p>
+      )}
+    </div>
+  );
+}
+
+/** The ID the cloud gave the running agent (EC2 instance, app id…); code-only agents have none. */
+const cloudIdOf = (row: any): string | null =>
+  row.platform === "github" ? null : (String(row.externalAgentId ?? "").split(":").pop() || null);
+
+const textOrDash = (value?: string | null) =>
+  value ? value : <span className="text-muted-foreground">—</span>;
+
+// LangSmith tracing is linked per agent (not discovered), so fold it in here.
+const observabilityOf = (row: any) => {
+  const profile = readProfile(row.profile);
+  return row.langsmithProject && !profile.observability.includes("LangSmith")
+    ? [...profile.observability, "LangSmith"]
+    : profile.observability;
+};
+
+const violationsOf = (agent: any) =>
+  policyViolations(observabilityOf(agent), llmsOf(agent), agent.approvedModels ?? []);
+
+// The registry shows one LLM list: whatever discovery stored on the profile,
+// falling back to the legacy single `model` column for older rows.
+const llmsOf = (row: any) => {
+  const llms = readProfile(row.profile).llms;
+  return llms.length === 0 && row.model ? [row.model] : llms;
+};
+
 export function AgentInventory({
   tenant,
   initialAutonomy,
@@ -174,7 +293,7 @@ export function AgentInventory({
   const [total, setTotal] = useState(initialData.list.total);
   const [totalPages, setTotalPages] = useState(initialData.list.totalPages);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [riskLevel, setRiskLevel] = useState(ALL);
@@ -186,6 +305,7 @@ export function AgentInventory({
   const [status, setStatus] = useState(ALL);
   const [platform, setPlatform] = useState(ALL);
   const [ownerFilter, setOwnerFilter] = useState(ALL);
+  const [deployed, setDeployed] = useState(ALL);
   const [options] = useState(initialData.options);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<any | null>(null);
@@ -216,6 +336,7 @@ export function AgentInventory({
             : ownerFilter === ALL
               ? undefined
               : ownerFilter,
+        deployed: deployed === ALL ? undefined : (deployed as "yes" | "no"),
         page,
         pageSize,
       });
@@ -233,6 +354,7 @@ export function AgentInventory({
     status,
     platform,
     ownerFilter,
+    deployed,
     page,
     pageSize,
   ]);
@@ -280,7 +402,7 @@ export function AgentInventory({
 
   useEffect(
     () => setPage(1),
-    [search, riskLevel, autonomyLevel, status, platform, ownerFilter],
+    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed],
   );
 
   useEffect(() => {
@@ -294,10 +416,10 @@ export function AgentInventory({
   const hasActiveFilters = useMemo(
     () =>
       search ||
-      [riskLevel, autonomyLevel, status, platform, ownerFilter].some(
+      [riskLevel, autonomyLevel, status, platform, ownerFilter, deployed].some(
         (f) => f !== ALL,
       ),
-    [search, riskLevel, autonomyLevel, status, platform, ownerFilter],
+    [search, riskLevel, autonomyLevel, status, platform, ownerFilter, deployed],
   );
 
   return (
@@ -342,28 +464,28 @@ export function AgentInventory({
           description="Agent records discovered from connected providers or ingestion."
         />
         <SummaryCard
-          label="Unowned Agents"
-          value={summary?.unownedAgents}
-          icon={UserX}
+          label="Running Agents"
+          value={summary?.deployedAgents}
+          icon={Rocket}
           loading={isSummaryLoading}
-          tone="text-orange-600 dark:text-orange-400"
-          description="Agents with no provider owner evidence mapped to a NORIX user."
+          tone="text-emerald-600 dark:text-emerald-400"
+          description="Agents whose runtime is up right now (cloud resource running, or a live GitHub deployment)."
         />
         <SummaryCard
-          label="Non-Compliant Agents"
-          value={summary?.nonCompliantAgents}
-          icon={BadgeX}
-          loading={isSummaryLoading}
-          tone="text-red-600 dark:text-red-400"
-          description="Agents with an active compliance policy evaluation marked non-compliant."
-        />
-        <SummaryCard
-          label="Missing Runtime Evidence"
-          value={summary?.agentsWithoutRuntimeEvidence}
-          icon={ShieldOff}
+          label="LLM Not Detected"
+          value={summary?.llmNotDetected}
+          icon={Cpu}
           loading={isSummaryLoading}
           tone="text-amber-600 dark:text-amber-400"
-          description="Agents whose configured runtime policy has not been fully observed executing through ControlNet."
+          description="Agents where no model was found in provider config, environment, IAM invoke policy or source code."
+        />
+        <SummaryCard
+          label="Policy Violations"
+          value={summary?.policyViolationAgents}
+          icon={ShieldOff}
+          loading={isSummaryLoading}
+          tone="text-red-600 dark:text-red-400"
+          description="Agents violating a policy: no observability detected, or using a model not approved in the Model Registry. Open an agent's Policy Violations tab for details."
         />
       </div>
 
@@ -386,37 +508,20 @@ export function AgentInventory({
         {mounted ? (
           <>
             <FilterSelect
-              label="Risk"
-              value={riskLevel}
-              onChange={setRiskLevel}
-              options={options.riskLevels}
-            />
-            <FilterSelect
-              label="Autonomy"
-              value={autonomyLevel}
-              onChange={setAutonomyLevel}
-              options={options.autonomyLevels}
-            />
-            <FilterSelect
-              label="Status"
-              value={status}
-              onChange={setStatus}
-              options={options.statuses}
-            />
-            <FilterSelect
               label="Platform"
               value={platform}
               onChange={setPlatform}
               options={options.platforms}
               formatOption={platformLabel}
             />
-            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <Select value={deployed} onValueChange={setDeployed}>
               <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs">
-                <SelectValue placeholder="Owner" />
+                <SelectValue placeholder="Deployment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Owner: All</SelectItem>
-                <SelectItem value={UNOWNED}>Unowned</SelectItem>
+                <SelectItem value={ALL}>Status: All</SelectItem>
+                <SelectItem value="yes">Running</SelectItem>
+                <SelectItem value="no">Stopped</SelectItem>
               </SelectContent>
             </Select>
           </>
@@ -434,6 +539,7 @@ export function AgentInventory({
               setStatus(ALL);
               setPlatform(ALL);
               setOwnerFilter(ALL);
+              setDeployed(ALL);
             }}
           >
             Clear filters
@@ -448,148 +554,125 @@ export function AgentInventory({
         <TableHeader>
           <TableRow>
             <TableHead>Agent</TableHead>
+            <TableHead>Agent ID</TableHead>
             <TableHead>Platform</TableHead>
-            <TableHead>Owner</TableHead>
-            <TableHead>Function</TableHead>
-            <TableHead>Autonomy</TableHead>
-            <TableHead>Risk</TableHead>
-            <TableHead>Compliance</TableHead>
-            <TableHead>Open Gaps</TableHead>
+            <TableHead>Last Deployed</TableHead>
+            <TableHead>Framework</TableHead>
+            <TableHead>LLMs</TableHead>
+            <TableHead>Observability</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Region / Account</TableHead>
-            <TableHead>Last Active</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={11}
+                colSpan={8}
                 className="text-center py-10 text-muted-foreground"
               >
                 {isLoading
                   ? "Loading agents…"
-                  : "No agents discovered yet. Connect AWS, Azure, Google Cloud, Databricks, or CrewAI in Admin → Integrations."}
+                  : "No agents discovered yet. Connect AWS, GitHub, Azure, Google Cloud, Databricks, or CrewAI in Admin → Integrations."}
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((r) => (
-              <TableRow
-                key={r.id}
-                className="cursor-pointer"
-                onClick={() => setActiveAgentId(r.id)}
-              >
-                <TableCell className="font-medium max-w-[220px] truncate">
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {r.name}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {platformLabel(r.platform)}
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-0.5">
-                    <div>{ownerDisplay(r.ownerName)}</div>
-                    {!r.ownerName ? (
-                      <div className="text-xs text-muted-foreground">
-                        no provider owner match
-                      </div>
-                    ) : null}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {functionDisplay(r.businessFunction)}
-                </TableCell>
-                <TableCell>
-                  {autonomyLevelDisplay(r) ? (
-                    <Badge
-                      className={cn(
-                        "border-transparent",
-                        AUTONOMY_STYLES[autonomyLevelDisplay(r)!],
-                      )}
-                    >
-                      {toLabel(autonomyLevelDisplay(r))}
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell>
-                  {r.riskLevel ? (
-                    <Badge
-                      className={cn(
-                        "border-transparent",
-                        RISK_STYLES[r.riskLevel],
-                      )}
-                    >
-                      {toLabel(r.riskLevel)} · {Number(r.riskScore ?? 0)}
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell>
-                  {r.complianceStatus ? (
-                    <div className="space-y-1">
-                      <Badge
-                        className={cn(
-                          "border-transparent",
-                          COMPLIANCE_STYLES[r.complianceStatus] ??
-                            COMPLIANCE_STYLES.not_evaluated,
-                        )}
-                      >
-                        {toLabel(r.complianceStatus)}
-                      </Badge>
-                      <p
-                        className="max-w-[150px] truncate text-xs text-muted-foreground"
-                        title={r.compliancePolicyName ?? undefined}
-                      >
-                        {r.compliancePolicyName} ·{" "}
-                        {Number(r.complianceCoverage ?? 0).toFixed(0)}%
-                      </p>
+            rows.map((r) => {
+              const profile = readProfile(r.profile);
+              return (
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer"
+                  onClick={() => setActiveAgentId(r.id)}
+                >
+                  <TableCell className="font-medium max-w-[220px] truncate">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
+                      {r.name}
                     </div>
-                  ) : (
+                  </TableCell>
+                  <TableCell>
+                    {cloudIdOf(r) ? (
+                      <div className="flex items-center gap-1">
+                        <code className="max-w-[140px] truncate text-xs" title={cloudIdOf(r)!}>
+                          {cloudIdOf(r)}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          aria-label="Copy agent ID"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void navigator.clipboard.writeText(cloudIdOf(r)!);
+                            successToast("", "", "", "Agent ID copied");
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground" title="Not deployed to a connected cloud, so no agent ID">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-0.5">
+                      {/* A repo-only agent: show where it deploys, not "GitHub". */}
+                      <div>
+                        {r.platform === "github"
+                          ? (profile.deployedOn?.split(/ · | \(/)[0] ?? "Not deployed")
+                          : platformLabel(r.platform)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.platform === "github" ? `code: ${r.externalAgentId}` : `${r.region} · ${r.accountId}`}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {profile.deployedAt ? (
+                      <div className="space-y-0.5">
+                        <div>{formatTimestamp(profile.deployedAt)}</div>
+                        {profile.deployedOn ? (
+                          <div className="max-w-[180px] truncate text-xs text-muted-foreground" title={profile.deployedOn}>
+                            {profile.deployedOn}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Never</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{textOrDash(profile.framework)}</TableCell>
+                  <TableCell>
+                    <Chips items={llmCompanies(llmsOf(r))} />
+                  </TableCell>
+                  <TableCell>
+                    {observabilityOf(r).length ? (
+                      <Chips items={observabilityOf(r)} />
+                    ) : (
+                      <span className="text-xs text-amber-600">Not detected</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge
                       className={cn(
                         "border-transparent",
-                        COMPLIANCE_STYLES.not_evaluated,
+                        profile.deployed
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground",
                       )}
                     >
-                      Not evaluated
+                      {profile.deployed
+                        ? "Running"
+                        : profile.deployedAt
+                          ? "Stopped"
+                          : profile.deployedOn
+                            ? "Not verified"
+                            : "Not deployed"}
                     </Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={cn(
-                      "border-transparent tabular-nums",
-                      Number(r.openFindingCount) > 0
-                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                    )}
-                  >
-                    {Number(r.openFindingCount)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={cn(
-                      "border-transparent",
-                      STATUS_STYLES[r.status],
-                    )}
-                  >
-                    {toLabel(r.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {r.region} · {r.accountId}
-                </TableCell>
-                <TableCell>
-                  {mounted ? relativeFromNow(r.lastSeenAt) : "—"}
-                </TableCell>
-              </TableRow>
-            ))
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -715,11 +798,11 @@ function Field({
   warn?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex items-start justify-between gap-4 px-3 py-2 text-sm">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "font-medium text-right",
+          "min-w-0 break-words text-right font-medium [overflow-wrap:anywhere]",
           warn && "text-orange-600 dark:text-orange-400",
         )}
       >
@@ -746,36 +829,16 @@ function AgentDetailModal({
   return (
     <Dialog open={!!agent} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        className="h-[85vh] w-[95vw] gap-0 overflow-hidden p-0 sm:max-w-4xl"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
         {agent && (
-          <div className="flex max-h-[90vh] flex-col">
+          <div className="flex h-full min-h-0 flex-col">
             <DialogHeader className="shrink-0 border-b p-5 pr-12">
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-xl">{agent.name}</DialogTitle>
-                {agent.riskLevel && (
-                  <Badge
-                    className={cn(
-                      "border-transparent",
-                      RISK_STYLES[agent.riskLevel],
-                    )}
-                  >
-                    {agent.riskLevel} risk
-                  </Badge>
-                )}
-                {autonomyLevelDisplay(agent) && (
-                  <Badge
-                    className={cn(
-                      "border-transparent",
-                      AUTONOMY_STYLES[autonomyLevelDisplay(agent)!],
-                    )}
-                  >
-                    {autonomyLevelDisplay(agent)}
-                  </Badge>
-                )}
               </div>
               <DialogDescription>
                 {platformLabel(agent.platform)} · {agent.region} · Account{" "}
@@ -790,333 +853,69 @@ function AgentDetailModal({
               <TabsList className="mx-5 mt-4 w-fit shrink-0">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="observability">Observability</TabsTrigger>
+                <TabsTrigger value="violations">
+                  Policy Violations ({violationsOf(agent).length})
+                </TabsTrigger>
               </TabsList>
               <TabsContent
                 value="details"
-                className="space-y-6 overflow-y-auto p-5"
+                className="min-h-0 min-w-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden p-5"
               >
-              <Section title="Ownership">
-                <Field
-                  label="Owner"
-                  value={
-                    agent.owner
-                      ? `${agent.owner.name}${agent.owner.email ? ` · ${agent.owner.email}` : ""}`
-                      : "Unowned · no provider owner match"
-                  }
-                  warn={!agent.owner}
-                />
-                <Field
-                  label="Owner Evidence"
-                  value={
-                    agent.ownerSource ??
-                    "No owner evidence matched a NORIX user"
-                  }
-                  warn={!agent.ownerSource}
-                />
-                <Field
-                  label="Function"
-                  value={agent.businessFunction ?? "Not provided by provider"}
-                  warn={!agent.businessFunction}
-                />
-                <div className="px-3 py-2 space-y-1.5">
-                  <span className="text-xs text-muted-foreground">
-                    Governed Application
-                  </span>
-                  <Select
-                    value={agent.application?.id ?? "__unlinked__"}
-                    disabled={assigning}
-                    onValueChange={async (value) => {
-                      setAssigning(true);
-                      try {
-                        await onAssignApplication(
-                          value === "__unlinked__" ? null : value,
-                        );
-                      } finally {
-                        setAssigning(false);
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__unlinked__">
-                        Unlinked — tenant policies only
-                      </SelectItem>
-                      {applications.map((application) => (
-                        <SelectItem key={application.id} value={application.id}>
-                          {application.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Linking applies the application's default runtime policy;
-                    tenant compliance policies apply either way.
-                  </p>
-                </div>
+              <Section title="Registry Profile">
+                {(() => {
+                  const profile = readProfile(agent.profile);
+                  const llms = profile.llms.length
+                    ? profile.llms
+                    : agent.model
+                      ? [agent.model]
+                      : [];
+                  const linkHint = profile.repository
+                    ? ""
+                    : " Its source code could not be read: it is not in a connected GitHub repository and the platform exposes no deployed source.";
+                  return (
+                    <>
+                      <Field label="Agent ID" value={cloudIdOf(agent) ?? "None: not deployed to a connected cloud"} warn={!cloudIdOf(agent)} />
+                      {profile.repository || agent.platform === "github" ? (
+                        <Field label="Repository" value={profile.repository ?? agent.rawMetadata?.repository ?? agent.externalAgentId} />
+                      ) : null}
+                      <Field
+                        label="Last Deployed"
+                        value={
+                          profile.deployedAt
+                            ? `${formatTimestamp(profile.deployedAt)}${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} · ${profile.deployed ? "running now" : "stopped now"}`
+                            : "Never deployed"
+                        }
+                        warn={!profile.deployedAt}
+                      />
+                      <Field label="Developer" value={profile.developer ?? `Not recorded.${linkHint}`} warn={!profile.developer} />
+                      <Field
+                        label="Deployer"
+                        value={
+                          profile.deployer ??
+                          (agent.platform === "github"
+                            ? "Not recorded: GitHub has no deployment or deploy workflow for this code, and its host is not connected. Connect the host (Render, Vercel…) to read who deployed it."
+                            : "Not recorded: the cloud only logs who launched it in its audit log. Grant read access to it (AWS: cloudtrail:LookupEvents), then Refresh.")
+                        }
+                        warn={!profile.deployer}
+                      />
+                      <Field label="Framework" value={profile.framework ?? `No agent framework found in tags, startup script or code.${linkHint}`} warn={!profile.framework} />
+                      <Field label="LLMs" value={llmCompanies(llms).join(", ") || `No model or provider found in config, environment names or code.${linkHint}`} warn={llms.length === 0} />
+                      {llms.length > 0 && llms.join() !== llmCompanies(llms).join() ? (
+                        <ChipList label="Models" items={llms} />
+                      ) : null}
+                      <ChipList label="Applications Access" items={profile.applicationsAccess} />
+                      <ChipList label="Skills" items={profile.skills} emptyText={`No SKILL.md folders or tool definitions found in the deployed image or code.${linkHint}`} />
+                      <ChipList label="Observability" items={observabilityOf(agent)} />
+                      <ChipList label="Packages" items={profile.packages} emptyText={`None found in the startup script or bundle.${linkHint}`} />
+                      <Field label="Evidence from" value={profile.sources.join(" + ") || "—"} />
+                    </>
+                  );
+                })()}
               </Section>
 
-              <Section title="Real Provider Evidence">
-                <Field
-                  label="Provider Agent ID"
-                  value={agent.externalAgentId ?? "—"}
-                />
-                <Field
-                  label="Discovery Source"
-                  value={(
-                    agent.rawMetadata?.evidenceSource ??
-                    agent.discoverySource ??
-                    "—"
-                  ).replaceAll("_", " ")}
-                />
-                <Field
-                  label="Model"
-                  value={
-                    agent.model ??
-                    agent.rawMetadata?.providerEvidence?.modelId ??
-                    "Not exposed by provider"
-                  }
-                  warn={
-                    !agent.model &&
-                    !agent.rawMetadata?.providerEvidence?.modelId
-                  }
-                />
-                <Field
-                  label="IAM / Managed Identity"
-                  value={
-                    agent.iamRoleArn ??
-                    agent.rawMetadata?.providerEvidence?.roleArn ??
-                    "Not exposed by provider"
-                  }
-                  warn={
-                    !agent.iamRoleArn &&
-                    !agent.rawMetadata?.providerEvidence?.roleArn
-                  }
-                />
-                <Field
-                  label="Provider Status"
-                  value={
-                    agent.rawMetadata?.providerEvidence?.status ??
-                    agent.status ??
-                    "—"
-                  }
-                />
-                <Field
-                  label="Provider Version"
-                  value={String(
-                    agent.rawMetadata?.providerEvidence?.version ?? "—",
-                  )}
-                />
-                <Field
-                  label="First Discovered"
-                  value={formatTimestamp(agent.firstSeenAt)}
-                />
-                <Field
-                  label="Last Provider Sync"
-                  value={formatTimestamp(agent.lastSeenAt)}
-                />
-              </Section>
-
-              <Section title="Policy Coverage">
-                {agent.policyEvaluations?.length ? (
-                  agent.policyEvaluations.map((evaluation: any) => (
-                    <div
-                      key={evaluation.id}
-                      className="px-3 py-2 text-sm space-y-1"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">
-                          {evaluation.policyName}
-                        </span>
-                        <Badge variant="outline">
-                          {evaluation.complianceStatus.replaceAll("_", " ")}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {evaluation.policyType} ·{" "}
-                        {evaluation.assignmentSource.replaceAll("_", " ")} ·{" "}
-                        {Number(evaluation.coverageScore)}% evidence coverage
-                      </p>
-                      {evaluation.evaluation?.summary && (
-                        <p className="text-xs">
-                          {evaluation.evaluation.summary}
-                        </p>
-                      )}
-                      {Array.isArray(evaluation.gaps) &&
-                        evaluation.gaps.length > 0 && (
-                          <div className="mt-2 space-y-2 border-t pt-2">
-                            <p className="text-xs font-semibold text-red-600">
-                              {evaluation.gaps.length} missing control(s)
-                            </p>
-                            {evaluation.gaps.map((gap: any) => (
-                              <div
-                                key={gap.key}
-                                className="rounded-md bg-red-500/5 p-2 text-xs"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <span className="font-medium">
-                                    {gap.title}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs capitalize"
-                                  >
-                                    {gap.priority ?? "medium"}
-                                  </Badge>
-                                </div>
-                                <p className="mt-1 text-muted-foreground">
-                                  {gap.reason}
-                                </p>
-                                {Array.isArray(gap.requiredEvidence) &&
-                                  gap.requiredEvidence.length > 0 && (
-                                    <p className="mt-1 text-muted-foreground">
-                                      Evidence needed:{" "}
-                                      {gap.requiredEvidence.join("; ")}
-                                    </p>
-                                  )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="px-3 py-3 text-sm text-muted-foreground">
-                    No effective policies have been evaluated for this agent.
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Open Breaches & Gaps">
-                {agent.policyFindings?.length ? (
-                  agent.policyFindings.map((finding: any) => (
-                    <div
-                      key={finding.id}
-                      className="px-3 py-2 text-sm space-y-1"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{finding.title}</span>
-                        <Badge
-                          className={cn(
-                            "border-transparent",
-                            RISK_STYLES[
-                              finding.severity?.[0]?.toUpperCase() +
-                                finding.severity?.slice(1)
-                            ] ?? "bg-red-500/10 text-red-600",
-                          )}
-                        >
-                          {finding.severity}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {finding.description}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {finding.source.replaceAll("_", " ")} · seen{" "}
-                        {finding.occurrenceCount} time(s) ·{" "}
-                        {formatTimestamp(finding.lastDetectedAt)}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="px-3 py-3 text-sm text-muted-foreground">
-                    No open policy findings.
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Autonomy">
-                <Field
-                  label="Level"
-                  value={autonomyLevelDisplay(agent) ?? "—"}
-                />
-                <Field
-                  label="Confidence"
-                  value={
-                    agent.autonomyConfidence
-                      ? `${Math.round(Number(agent.autonomyConfidence) * 100)}%`
-                      : "—"
-                  }
-                />
-                <Field label="Reason" value={autonomyReasonDisplay(agent)} />
-              </Section>
-
-              <Section title="Risk">
-                <Field
-                  label="Score"
-                  value={
-                    agent.riskScore != null
-                      ? `${Number(agent.riskScore)} / 100`
-                      : "—"
-                  }
-                  warn={Number(agent.riskScore) >= 50}
-                />
-                <Field label="Level" value={agent.riskLevel ?? "—"} />
-              </Section>
-              {Array.isArray(agent.riskFactors) &&
-                agent.riskFactors.length > 0 && (
-                  <div className="rounded-lg border divide-y">
-                    {agent.riskFactors.map((f: any, i: number) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between px-3 py-2 text-sm"
-                      >
-                        <span className="text-muted-foreground">
-                          {f.description}
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          +{f.points}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-              <Section title="Discovered Resources">
-                <Field
-                  label="Total"
-                  value={String(agent.agentResources?.length ?? 0)}
-                />
-              </Section>
-              {agent.agentResources?.length > 0 && (
-                <div className="rounded-lg border divide-y">
-                  {agent.agentResources.map((r: any) => (
-                    <div key={r.id} className="px-3 py-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">
-                          {r.resourceType.replaceAll("_", " ")}
-                        </span>
-                        <span
-                          className="font-medium truncate max-w-[300px]"
-                          title={r.resourceName ?? r.resourceArn}
-                        >
-                          {r.resourceName ?? r.resourceArn}
-                        </span>
-                      </div>
-                      {r.resourceArn && (
-                        <p className="mt-1 break-all text-xs text-muted-foreground">
-                          {r.resourceArn}
-                        </p>
-                      )}
-                      {r.rawData && Object.keys(r.rawData).length > 0 && (
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-xs font-medium text-primary">
-                            View collected provider metadata
-                          </summary>
-                          <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs leading-relaxed">
-                            {JSON.stringify(r.rawData, null, 2)}
-                          </pre>
-                        </details>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {agent.agentRecommendations?.length > 0 && (
+              {agent.agentRecommendations?.some((rec: any) => !/owner/i.test(rec.recommendationType)) && (
                 <Section title="Recommendations">
-                  {agent.agentRecommendations.map((rec: any) => (
+                  {agent.agentRecommendations.filter((rec: any) => !/owner/i.test(rec.recommendationType)).map((rec: any) => (
                     <div key={rec.id} className="px-3 py-2 text-sm space-y-0.5">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">
@@ -1146,7 +945,7 @@ function AgentDetailModal({
                   value={formatTimestamp(agent.firstSeenAt)}
                 />
                 <Field
-                  label="Last Active"
+                  label="Last Provider Sync"
                   value={formatTimestamp(agent.lastSeenAt)}
                 />
                 <Field label="Sync Status" value={agent.syncStatus} />
@@ -1155,39 +954,40 @@ function AgentDetailModal({
                   label="External Agent ID"
                   value={agent.externalAgentId}
                 />
-                <Field
-                  label="Model"
-                  value={agent.model ?? "Not returned by provider"}
-                />
-                <Field
-                  label="Knowledge Base"
-                  value={agent.knowledgeBaseId ?? "—"}
-                />
               </Section>
 
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  Normalized Capability Evidence
-                </h3>
-                <pre className="max-h-64 overflow-auto rounded-lg border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                  {JSON.stringify(agent.capabilities ?? {}, null, 2)}
-                </pre>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  Provider Metadata & Provenance
-                </h3>
-                <pre className="max-h-64 overflow-auto rounded-lg border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                  {JSON.stringify(agent.rawMetadata ?? {}, null, 2)}
-                </pre>
-              </div>
               </TabsContent>
               <TabsContent
                 value="observability"
-                className="overflow-y-auto p-5"
+                className="min-h-0 flex-1 overflow-y-auto p-5"
               >
-                <AgentObservabilityTab tenant={tenant} agentId={agent.id} />
+                <ObservabilityStatus agent={agent} />
+                <AgentObservabilityTab
+                  tenant={tenant}
+                  agentId={agent.id}
+                  deployed={readProfile(agent.profile).deployed}
+                />
+              </TabsContent>
+              <TabsContent value="violations" className="min-h-0 flex-1 overflow-y-auto p-5">
+                {violationsOf(agent).length ? (
+                  <div className="divide-y rounded-lg border">
+                    {violationsOf(agent).map((v) => (
+                      <div key={v.reason} className="space-y-1 px-3 py-3 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium">{v.policy}</span>
+                          <Badge className="border-transparent bg-red-500/15 text-red-600 dark:text-red-400">
+                            Violated
+                          </Badge>
+                        </div>
+                        <p className="text-muted-foreground">{v.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No policy violations: observability is set up and every model is approved in the Model Registry.
+                  </p>
+                )}
               </TabsContent>
             </Tabs>
           </div>

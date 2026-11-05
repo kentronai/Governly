@@ -267,9 +267,7 @@ export const syncAwsConnectionFromNango = async (
   };
   const existingId = (integration.configuration as { awsConnectionId?: string })
     ?.awsConnectionId;
-  let row:
-    | typeof awsDiscoveryConnections.$inferSelect
-    | undefined;
+  let row: typeof awsDiscoveryConnections.$inferSelect | undefined;
   if (existingId) {
     [row] = await db
       .update(awsDiscoveryConnections)

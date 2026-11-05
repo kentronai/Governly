@@ -14,17 +14,17 @@ export function formatDate(
     year: "numeric",
     month: "long",
     day: "numeric",
-  }
+  },
 ): string {
-  if (!dateString) return "N/A"
-  
+  if (!dateString) return "N/A";
+
   try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return "N/A"
-    
-    return date.toLocaleDateString("en-US", options)
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "N/A";
+
+    return date.toLocaleDateString("en-US", options);
   } catch {
-    return "N/A"
+    return "N/A";
   }
 }
 
@@ -34,26 +34,30 @@ export function formatDate(
  * @returns Relative time string or "N/A" if invalid
  */
 export function formatRelativeTime(
-  dateString: string | Date | null | undefined
+  dateString: string | Date | null | undefined,
 ): string {
-  if (!dateString) return "N/A"
-  
+  if (!dateString) return "N/A";
+
   try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return "N/A"
-    
-    const now = new Date()
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-    
-    if (diffInSeconds < 60) return "Just now"
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`
-    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
-    
-    return `${Math.floor(diffInSeconds / 31536000)} years ago`
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "N/A";
+
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600)
+      return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 2592000)
+      return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    if (diffInSeconds < 31536000)
+      return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+
+    return `${Math.floor(diffInSeconds / 31536000)} years ago`;
   } catch {
-    return "N/A"
+    return "N/A";
   }
 }
 
@@ -63,11 +67,11 @@ export function formatRelativeTime(
  * @returns Compact date string or "N/A" if invalid
  */
 export function formatCompactDate(
-  dateString: string | Date | null | undefined
+  dateString: string | Date | null | undefined,
 ): string {
   return formatDate(dateString, {
     year: "numeric",
     month: "short",
     day: "numeric",
-  })
+  });
 }

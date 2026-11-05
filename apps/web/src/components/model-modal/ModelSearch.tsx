@@ -1,13 +1,16 @@
-import React from 'react';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import React from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface WorkspaceSearchProps {
   search: string;
   onSearchChange: (value: string) => void;
 }
 
-const WorkspaceSearch: React.FC<WorkspaceSearchProps> = ({ search, onSearchChange }) => {
+const WorkspaceSearch: React.FC<WorkspaceSearchProps> = ({
+  search,
+  onSearchChange,
+}) => {
   return (
     <div className="flex items-center justify-start">
       <div className="relative">

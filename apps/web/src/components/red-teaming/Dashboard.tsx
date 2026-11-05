@@ -17,7 +17,11 @@ interface RecentTest {
   time: string;
 }
 
-export const Dashboard = ({ recentTests = [] }: { recentTests?: RecentTest[] }) => {
+export const Dashboard = ({
+  recentTests = [],
+}: {
+  recentTests?: RecentTest[];
+}) => {
   // Mock data for test results
   const stats = {
     totalTests: 1247,

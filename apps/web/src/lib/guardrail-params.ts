@@ -31,7 +31,7 @@ export function getThresholdKind(guardrailKey?: string): ThresholdKind {
 export function getNumericParamConfig(
   guardrailKey: string | undefined,
   paramKey: string,
-  defaultValue: number
+  defaultValue: number,
 ): { min?: number; max?: number; step: string; hint: string } {
   if (!paramKey.includes("threshold")) {
     return { step: "1", hint: `Default: ${defaultValue}` };

@@ -18,7 +18,13 @@ jest.mock("@clerk/nextjs/server", () => ({
   clerkClient: jest.fn(async () => ({ users: { updateUser: mockUpdateUser } })),
 }));
 jest.mock("@db", () => ({
-  db: { query: { memberships: { findFirst: (...args: unknown[]) => mockFindFirst(...args) } } },
+  db: {
+    query: {
+      memberships: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+    },
+  },
   users: {},
   memberships: {},
   auditEvents: {},
@@ -31,17 +37,28 @@ import { resetUserPassword } from "./users";
 
 const mockedAuth = auth as unknown as jest.Mock;
 
-const ADMIN_IN_ORG_1 = { userId: "user_admin", orgId: "org_1", orgRole: "org:admin" };
+const ADMIN_IN_ORG_1 = {
+  userId: "user_admin",
+  orgId: "org_1",
+  orgRole: "org:admin",
+};
 
 describe("resetUserPassword authorization", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Default: target IS a member of the caller's org.
-    mockFindFirst.mockResolvedValue({ userId: "user_target", tenantId: "org_1" });
+    mockFindFirst.mockResolvedValue({
+      userId: "user_target",
+      tenantId: "org_1",
+    });
   });
 
   it("rejects a caller with no active organization", async () => {
-    mockedAuth.mockResolvedValue({ userId: "user_1", orgId: null, orgRole: null });
+    mockedAuth.mockResolvedValue({
+      userId: "user_1",
+      orgId: null,
+      orgRole: null,
+    });
 
     await expect(resetUserPassword("user_target", "hunter2")).rejects.toThrow(
       /active organization/i,
@@ -91,9 +108,9 @@ describe("resetUserPassword authorization", () => {
   it("allows an org admin to reset a password for a member of their own org", async () => {
     mockedAuth.mockResolvedValue(ADMIN_IN_ORG_1);
 
-    await expect(
-      resetUserPassword("user_target", "hunter2"),
-    ).resolves.toEqual({ success: true });
+    await expect(resetUserPassword("user_target", "hunter2")).resolves.toEqual({
+      success: true,
+    });
 
     expect(mockUpdateUser).toHaveBeenCalledWith("user_target", {
       password: "hunter2",
@@ -107,9 +124,9 @@ describe("resetUserPassword authorization", () => {
       orgRole: "org:owner",
     });
 
-    await expect(
-      resetUserPassword("user_target", "hunter2"),
-    ).resolves.toEqual({ success: true });
+    await expect(resetUserPassword("user_target", "hunter2")).resolves.toEqual({
+      success: true,
+    });
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
   });
 
@@ -138,7 +155,10 @@ describe("resetUserPassword authorization", () => {
         orgRole: null,
       });
       // Falls back to the target's own membership row to attribute the audit event.
-      mockFindFirst.mockResolvedValue({ userId: "user_member", tenantId: "org_1" });
+      mockFindFirst.mockResolvedValue({
+        userId: "user_member",
+        tenantId: "org_1",
+      });
 
       await expect(
         resetUserPassword("user_member", "newpass1"),
@@ -155,9 +175,9 @@ describe("resetUserPassword authorization", () => {
         orgRole: "org:member",
       });
 
-      await expect(
-        resetUserPassword("user_target", "hunter2"),
-      ).rejects.toThrow(/admin role required/i);
+      await expect(resetUserPassword("user_target", "hunter2")).rejects.toThrow(
+        /admin role required/i,
+      );
       expect(mockUpdateUser).not.toHaveBeenCalled();
     });
   });

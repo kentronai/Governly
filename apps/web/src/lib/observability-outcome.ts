@@ -30,7 +30,7 @@ interface GuardrailDecisionShape {
  * reached a decision (auth failure, provider error before/after the guards).
  */
 export function getPolicyDecision(
-  guardrailResults: unknown
+  guardrailResults: unknown,
 ): "allow" | "block" | null {
   const results = guardrailResults as GuardrailDecisionShape | null | undefined;
   if (!results || typeof results !== "object") return null;
@@ -145,7 +145,9 @@ export function getErrorMessage(log: {
   return (
     fromPayload(log.responsePayload) ??
     fromPayload(log.metadata) ??
-    (log.statusCode != null ? `Request failed with HTTP ${log.statusCode}` : null)
+    (log.statusCode != null
+      ? `Request failed with HTTP ${log.statusCode}`
+      : null)
   );
 }
 
@@ -155,7 +157,9 @@ export function getErrorMessage(log: {
  * Streaming responses are logged as a completion marker rather than the
  * assembled text, so say that plainly instead of rendering `[object Object]`.
  */
-export function getResponseText(log: { responsePayload?: unknown }): string | null {
+export function getResponseText(log: {
+  responsePayload?: unknown;
+}): string | null {
   const payload = log.responsePayload;
   if (!payload || typeof payload !== "object") return null;
   const record = payload as Record<string, any>;

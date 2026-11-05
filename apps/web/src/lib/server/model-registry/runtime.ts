@@ -1,6 +1,7 @@
 import "server-only";
 
-import { db, providerModels, tenantModelSettings } from "@db";
+import { db, providerModels, tenantModelSettings, tenantLlmKeys } from "@db";
+import { decryptSecret } from "@/lib/server/crypto";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import {
   getModelProviderAdapter,
@@ -77,10 +78,7 @@ export async function ensureDefaultGeminiModel(tenantId: string) {
       and(
         eq(providerModels.tenantId, tenantId),
         eq(providerModels.provider, "openai"),
-        eq(
-          providerModels.purposeUseCase,
-          "NORIX policy and guardrail testing",
-        ),
+        eq(providerModels.purposeUseCase, "NORIX policy and guardrail testing"),
         eq(providerModels.availabilityStatus, "available"),
       ),
     );
@@ -154,6 +152,22 @@ export async function ensureDefaultGeminiModel(tenantId: string) {
   }
 
   return model;
+}
+
+/** The tenant's decrypted BYOK key for a provider, if they saved one. */
+export async function getTenantLlmKey(tenantId: string, provider: string) {
+  const [row] = await db
+    .select({ keyEncrypted: tenantLlmKeys.keyEncrypted })
+    .from(tenantLlmKeys)
+    .where(
+      and(
+        eq(tenantLlmKeys.tenantId, tenantId),
+        eq(tenantLlmKeys.provider, provider),
+      ),
+    )
+    .orderBy(desc(tenantLlmKeys.updatedAt))
+    .limit(1);
+  return row ? decryptSecret(row.keyEncrypted) : undefined;
 }
 
 export async function getModelRegistryRuntime(tenantId: string) {
@@ -297,7 +311,11 @@ export async function testTenantModelConnection(
     });
 
   const adapter = getModelProviderAdapter(model.provider);
-  const result = await adapter.testConnection(model.modelId, model.modelUrl!);
+  const result = await adapter.testConnection(
+    model.modelId,
+    model.modelUrl!,
+    await getTenantLlmKey(tenantId, model.provider),
+  );
   const testedAt = new Date().toISOString();
 
   await db

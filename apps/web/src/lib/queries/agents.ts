@@ -5,10 +5,11 @@
  * discovered by the Agent Registry, optionally linked to an Application.
  */
 
-import { db, agents, users, applications, tenants, withDbRetry } from "@db";
+import { db, agents, users, applications, providerModels, withDbRetry } from "@db";
 import { and, eq, desc, ilike, isNull, or, sql, count } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
+import { policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
 
 export interface AgentListFilters {
   search?: string;
@@ -17,6 +18,7 @@ export interface AgentListFilters {
   status?: string;
   platform?: string;
   ownerUserId?: string | "unowned";
+  deployed?: "yes" | "no";
   page?: number;
   pageSize?: number;
 }
@@ -28,9 +30,9 @@ export interface AgentInventorySummary {
   unownedAgents: number;
   l4Agents: number;
   l3Agents: number;
-  nonCompliantAgents: number;
-  agentsWithOpenFindings: number;
-  agentsWithoutRuntimeEvidence: number;
+  deployedAgents: number;
+  llmNotDetected: number;
+  policyViolationAgents: number;
   calculatedAt: string;
 }
 
@@ -50,53 +52,49 @@ export interface AgentApplicationOption {
  * Live Agent Registry KPIs. These are agent-scoped counts only; application
  * governance rollups belong on application/compliance dashboards.
  */
+/** Agents breaking at least one governance policy (same checks as the detail dialog). */
+async function countPolicyViolationAgents(tenantId: string) {
+  const [rows, approved] = await Promise.all([
+    withDbRetry(() =>
+      db
+        .select({ profile: agents.profile, model: agents.model })
+        .from(agents)
+        .where(eq(agents.tenantId, tenantId)),
+    ),
+    withDbRetry(() =>
+      db
+        .select({ modelId: providerModels.modelId })
+        .from(providerModels)
+        .where(eq(providerModels.tenantId, tenantId)),
+    ),
+  ]);
+  const approvedIds = approved.map((m) => m.modelId);
+  return rows.filter((row) => {
+    const profile = readProfile(row.profile);
+    const llms = profile.llms.length ? profile.llms : row.model ? [row.model] : [];
+    return policyViolations(profile.observability, llms, approvedIds).length > 0;
+  }).length;
+}
+
 export const getAgentInventorySummary = async (
   tenantId: string,
 ): Promise<AgentInventorySummary> => {
-  const [[agentMetrics], [policyMetrics]] = await withDbRetry(() =>
-    Promise.all([
-      db
-        .select({
-          totalAiAgents: count(),
-          criticalRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
-          highRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
-          unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
-          l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
-          l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
-        })
-        .from(agents)
-        .where(eq(agents.tenantId, tenantId)),
-      db
-        .select({
-          nonCompliantAgents: sql<number>`(
-          select count(distinct ape.agent_id)
-          from agent_policy_evaluations ape
-          where ape.tenant_id = ${tenantId}
-            and ape.agent_id is not null
-            and ape.is_active = true
-            and ape.compliance_status = 'non_compliant'
-        )`,
-          agentsWithOpenFindings: sql<number>`(
-          select count(distinct pf.agent_id) from policy_findings pf
-          where pf.tenant_id = ${tenantId}
-            and pf.agent_id is not null
-            and pf.status = 'open'
-        )`,
-          agentsWithoutRuntimeEvidence: sql<number>`(
-          select count(*) from agents ag
-          where ag.tenant_id = ${tenantId}
-            and not exists (
-              select 1 from observability_logs ol
-              where ol.tenant_id = ${tenantId}
-                and ol.agent_id = ag.id
-                and ol.guardrail_results is not null
-            )
-        )`,
-        })
-        .from(tenants)
-        .where(eq(tenants.id, tenantId))
-        .limit(1),
-    ]),
+  // One pass over `agents` — the former compliance/finding subqueries ran a
+  // correlated scan per tenant on every poll and are gone from this view.
+  const [agentMetrics] = await withDbRetry(() =>
+    db
+      .select({
+        totalAiAgents: count(),
+        criticalRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
+        highRisk: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
+        unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
+        l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
+        l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
+        deployedAgents: sql<number>`count(*) filter (where ${agents.profile}->>'deployed' = 'true')`,
+        llmNotDetected: sql<number>`count(*) filter (where ${agents.model} is null and jsonb_array_length(coalesce(${agents.profile}->'llms', '[]'::jsonb)) = 0)`,
+      })
+      .from(agents)
+      .where(eq(agents.tenantId, tenantId)),
   );
 
   return {
@@ -106,11 +104,9 @@ export const getAgentInventorySummary = async (
     unownedAgents: Number(agentMetrics?.unownedAgents ?? 0),
     l4Agents: Number(agentMetrics?.l4Agents ?? 0),
     l3Agents: Number(agentMetrics?.l3Agents ?? 0),
-    nonCompliantAgents: Number(policyMetrics?.nonCompliantAgents ?? 0),
-    agentsWithOpenFindings: Number(policyMetrics?.agentsWithOpenFindings ?? 0),
-    agentsWithoutRuntimeEvidence: Number(
-      policyMetrics?.agentsWithoutRuntimeEvidence ?? 0,
-    ),
+    deployedAgents: Number(agentMetrics?.deployedAgents ?? 0),
+    llmNotDetected: Number(agentMetrics?.llmNotDetected ?? 0),
+    policyViolationAgents: await countPolicyViolationAgents(tenantId),
     calculatedAt: new Date().toISOString(),
   };
 };
@@ -119,7 +115,7 @@ export const getAgents = cache(
   async (tenantId: string, filters: AgentListFilters = {}) => {
     const owner = alias(users, "owner");
     const page = filters.page ?? 1;
-    const pageSize = filters.pageSize ?? 25;
+    const pageSize = filters.pageSize ?? 10;
     const offset = (page - 1) * pageSize;
 
     const conditions = [eq(agents.tenantId, tenantId)];
@@ -136,6 +132,11 @@ export const getAgents = cache(
     } else if (filters.ownerUserId) {
       conditions.push(eq(agents.ownerUserId, filters.ownerUserId));
     }
+    if (filters.deployed === "yes") {
+      conditions.push(sql`${agents.profile}->>'deployed' = 'true'`);
+    } else if (filters.deployed === "no") {
+      conditions.push(sql`${agents.profile}->>'deployed' is distinct from 'true'`);
+    }
     if (filters.search) {
       const term = `%${filters.search}%`;
       conditions.push(
@@ -143,6 +144,8 @@ export const getAgents = cache(
           ilike(agents.name, term),
           ilike(agents.businessFunction, term),
           ilike(agents.model, term),
+          // framework, LLMs, skills, packages, developer, deployer, apps
+          sql`${agents.profile}::text ilike ${term}`,
           ilike(owner.name, term),
         )!,
       );
@@ -179,43 +182,8 @@ export const getAgents = cache(
             autonomyConfidence: agents.autonomyConfidence,
             riskScore: agents.riskScore,
             riskLevel: agents.riskLevel,
-            compliancePolicyName: sql<string | null>`(
-          select ape.policy_name
-          from agent_policy_evaluations ape
-          where ape.agent_id = ${agents.id}
-            and ape.tenant_id = ${tenantId}
-            and ape.is_active = true
-            and ape.policy_type = 'compliance'
-          order by ape.evaluated_at desc
-          limit 1
-        )`,
-            complianceStatus: sql<string | null>`(
-          select ape.compliance_status
-          from agent_policy_evaluations ape
-          where ape.agent_id = ${agents.id}
-            and ape.tenant_id = ${tenantId}
-            and ape.is_active = true
-            and ape.policy_type = 'compliance'
-          order by ape.evaluated_at desc
-          limit 1
-        )`,
-            complianceCoverage: sql<number | null>`(
-          select ape.coverage_score
-          from agent_policy_evaluations ape
-          where ape.agent_id = ${agents.id}
-            and ape.tenant_id = ${tenantId}
-            and ape.is_active = true
-            and ape.policy_type = 'compliance'
-          order by ape.evaluated_at desc
-          limit 1
-        )`,
-            openFindingCount: sql<number>`(
-          select count(*)
-          from policy_findings pf
-          where pf.agent_id = ${agents.id}
-            and pf.tenant_id = ${tenantId}
-            and pf.status = 'open'
-        )`,
+            profile: agents.profile,
+            langsmithProject: agents.langsmithProject,
             discoverySource: agents.discoverySource,
             firstSeenAt: agents.firstSeenAt,
             lastSeenAt: agents.lastSeenAt,
@@ -260,18 +228,18 @@ export const getAgentDetail = cache(
           },
           owner: { columns: { id: true, name: true, email: true } },
           application: { columns: { id: true, name: true } },
-          policyEvaluations: {
-            where: (rows, { eq }) => eq(rows.isActive, true),
-            orderBy: (rows, { desc }) => [desc(rows.evaluatedAt)],
-          },
-          policyFindings: {
-            where: (rows, { eq }) => eq(rows.status, "open"),
-            orderBy: (rows, { desc }) => [desc(rows.lastDetectedAt)],
-          },
         },
       }),
     );
-    return agent ?? null;
+    if (!agent) return null;
+    // The tenant's Model Registry is the approved-model list for policy checks.
+    const approved = await withDbRetry(() =>
+      db
+        .select({ modelId: providerModels.modelId })
+        .from(providerModels)
+        .where(eq(providerModels.tenantId, tenantId)),
+    );
+    return { ...agent, approvedModels: approved.map((m) => m.modelId) };
   },
 );
 

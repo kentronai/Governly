@@ -9,14 +9,14 @@ interface AdminProtectionProps {
 
 export default function AdminProtection({
   children,
-  fallback = <div>Access Denied</div>
+  fallback = <div>Access Denied</div>,
 }: AdminProtectionProps) {
   const { isAdmin, isLoading } = useUserRole();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
-      router.push('/unauthorized');
+      router.push("/unauthorized");
     }
   }, [isAdmin, isLoading, router]);
 

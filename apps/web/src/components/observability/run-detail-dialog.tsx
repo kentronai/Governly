@@ -38,7 +38,13 @@ function Json({ value }: { value: unknown }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
@@ -57,12 +63,12 @@ function LangGraphView({ langgraph }: { langgraph: DerivedLangGraph }) {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <Field label="Graph">{langgraph.graphName ?? "—"}</Field>
         <Field label="Thread ID">
-          <span className="font-mono text-xs">
-            {langgraph.threadId ?? "—"}
-          </span>
+          <span className="font-mono text-xs">{langgraph.threadId ?? "—"}</span>
         </Field>
         <Field label="Status">
-          <Badge variant={langgraph.status === "error" ? "destructive" : "secondary"}>
+          <Badge
+            variant={langgraph.status === "error" ? "destructive" : "secondary"}
+          >
             {langgraph.status ?? "—"}
           </Badge>
         </Field>
@@ -148,20 +154,28 @@ function LangGraphView({ langgraph }: { langgraph: DerivedLangGraph }) {
                 <span className="truncate font-mono text-xs font-medium">
                   {step.step != null ? `${step.step}. ` : ""}
                   {step.node}
-                  {step.name && step.name !== step.node ? ` · ${step.name}` : ""}
+                  {step.name && step.name !== step.node
+                    ? ` · ${step.name}`
+                    : ""}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {step.latencyMs != null ? `${step.latencyMs} ms` : ""}
-                  {step.startTime ? ` · ${formatTimestamp(step.startTime)}` : ""}
+                  {step.startTime
+                    ? ` · ${formatTimestamp(step.startTime)}`
+                    : ""}
                 </span>
               </div>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <div>
-                  <div className="mb-1 text-xs text-muted-foreground">Inputs</div>
+                  <div className="mb-1 text-xs text-muted-foreground">
+                    Inputs
+                  </div>
                   <Json value={step.inputs} />
                 </div>
                 <div>
-                  <div className="mb-1 text-xs text-muted-foreground">Outputs</div>
+                  <div className="mb-1 text-xs text-muted-foreground">
+                    Outputs
+                  </div>
                   <Json value={step.outputs} />
                 </div>
               </div>
@@ -238,9 +252,7 @@ export default function RunDetailDialog({
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                   <Field label="Status">
                     <Badge
-                      variant={
-                        run.errorMessage ? "destructive" : "secondary"
-                      }
+                      variant={run.errorMessage ? "destructive" : "secondary"}
                     >
                       {run.status ?? "unknown"}
                     </Badge>
@@ -248,15 +260,11 @@ export default function RunDetailDialog({
                   <Field label="Latency">
                     {run.latencyMs != null ? `${run.latencyMs} ms` : "—"}
                   </Field>
-                  <Field label="Total tokens">
-                    {run.totalTokens ?? "—"}
-                  </Field>
+                  <Field label="Total tokens">{run.totalTokens ?? "—"}</Field>
                   <Field label="Cost">
                     {run.totalCost != null ? `$${run.totalCost}` : "—"}
                   </Field>
-                  <Field label="Prompt tokens">
-                    {run.promptTokens ?? "—"}
-                  </Field>
+                  <Field label="Prompt tokens">{run.promptTokens ?? "—"}</Field>
                   <Field label="Completion tokens">
                     {run.completionTokens ?? "—"}
                   </Field>

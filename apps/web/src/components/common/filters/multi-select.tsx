@@ -48,7 +48,7 @@ const MultiSelectFilter = ({
             "flex items-center justify-between  py-2 px-3 border rounded-md  w-auto gap-14  cursor-pointer",
             {
               "hover:bg-muted": selectedItems.length > 0,
-            }
+            },
           )}
           onClick={() => setIsOpen(true)}
         >
@@ -81,7 +81,7 @@ const MultiSelectFilter = ({
         <div className="max-h-[300px] overflow-y-auto">
           {items
             .filter((i) =>
-              i.label.toLowerCase().includes(searchQuery.toLowerCase())
+              i.label.toLowerCase().includes(searchQuery.toLowerCase()),
             )
             .map((item) => (
               <div className="flex py-2 px-6 gap-3 items-center " key={item.id}>

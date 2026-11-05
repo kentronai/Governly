@@ -53,7 +53,6 @@ export const ISO_42001ComplianceTrackingProvider = ({
     setData(exist);
   };
 
-
   useEffect(() => {
     setData(get());
   }, []);
@@ -63,7 +62,7 @@ export const ISO_42001ComplianceTrackingProvider = ({
 
     if (category.trim() !== "") {
       filtered = filtered.filter(
-        (item) => item.category.toLowerCase() === category.toLowerCase()
+        (item) => item.category.toLowerCase() === category.toLowerCase(),
       );
     }
 
@@ -73,7 +72,7 @@ export const ISO_42001ComplianceTrackingProvider = ({
       filtered = filtered.filter(
         (item) =>
           item.title.toLowerCase().includes(query) ||
-          item.description.toLowerCase().includes(query)
+          item.description.toLowerCase().includes(query),
       );
     }
 

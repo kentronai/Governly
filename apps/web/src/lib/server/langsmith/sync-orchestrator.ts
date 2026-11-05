@@ -117,7 +117,9 @@ export async function resolveLangSmithCredentials(
     );
     const apiKey = pickLangSmithKey(credentials);
     if (!apiKey) {
-      throw new Error("LangSmith API key was not found on the Nango connection");
+      throw new Error(
+        "LangSmith API key was not found on the Nango connection",
+      );
     }
     const baseUrlValue = connectionConfig.baseUrl ?? credentials.baseUrl;
     const baseUrl =
@@ -267,7 +269,11 @@ export async function testLangSmithConnection(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     await withAccess(connection, ({ credentials }) =>
-      langsmithApi(credentials, "GET", `${LANGSMITH_ENDPOINTS.sessions}?limit=1`),
+      langsmithApi(
+        credentials,
+        "GET",
+        `${LANGSMITH_ENDPOINTS.sessions}?limit=1`,
+      ),
     );
     return { ok: true };
   } catch (error) {
@@ -310,7 +316,11 @@ export async function listLangSmithProjects(
 
 function num(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) {
+  if (
+    typeof value === "string" &&
+    value.trim() &&
+    !Number.isNaN(Number(value))
+  ) {
     return Number(value);
   }
   return null;
@@ -332,7 +342,9 @@ function systemPrompt(run: LangSmithRunRaw): string | null {
   const list = Array.isArray(messages) ? messages : [];
   for (const item of list) {
     if (item && typeof item === "object") {
-      const role = (item as Record<string, unknown>).role ?? (item as Record<string, unknown>).type;
+      const role =
+        (item as Record<string, unknown>).role ??
+        (item as Record<string, unknown>).type;
       if (typeof role === "string" && role.toLowerCase().includes("system")) {
         const content = (item as Record<string, unknown>).content;
         if (typeof content === "string") return content;
@@ -351,7 +363,9 @@ function toolCalls(run: LangSmithRunRaw): unknown[] {
   if (Array.isArray(generations)) {
     const calls: unknown[] = [];
     for (const gen of generations.flat()) {
-      const message = (gen as Record<string, unknown>)?.message as Record<string, unknown> | undefined;
+      const message = (gen as Record<string, unknown>)?.message as
+        | Record<string, unknown>
+        | undefined;
       const tc = message?.tool_calls ?? message?.additional_kwargs;
       if (Array.isArray(tc)) calls.push(...tc);
     }
@@ -365,7 +379,8 @@ function modelName(run: LangSmithRunRaw): string | null {
   const candidates = [
     meta.ls_model_name,
     meta.model,
-    (run.extra?.invocation_params as Record<string, unknown> | undefined)?.model,
+    (run.extra?.invocation_params as Record<string, unknown> | undefined)
+      ?.model,
     (run.serialized?.kwargs as Record<string, unknown> | undefined)?.model,
   ];
   const found = candidates.find(
@@ -505,8 +520,7 @@ export async function syncLangSmithRuns(
         configuration: {
           ...configuration,
           baseUrl: credentials.baseUrl,
-          authentication:
-            credentials.mode === "nango" ? "nango" : "api_key",
+          authentication: credentials.mode === "nango" ? "nango" : "api_key",
           lastRunsSynced: runs.length,
         },
         updatedAt: now,

@@ -1,11 +1,27 @@
 // db.select().from(table).where() is called for agents, integrations and users;
 // resolve each from a per-table fixture keyed by a marker on the mocked table.
-const fixtures: Record<string, unknown[]> = { agents: [], integrations: [], users: [] };
+const fixtures: Record<string, unknown[]> = {
+  agents: [],
+  integrations: [],
+  users: [],
+};
 const updatedIds: unknown[] = [];
 
 jest.mock("@db", () => ({
-  agents: { __t: "agents", tenantId: "tenantId", id: "id", ownerUserId: "ownerUserId", platform: "platform" },
-  integrations: { __t: "integrations", tenantId: "tenantId", name: "name", createdBy: "createdBy", id: "id" },
+  agents: {
+    __t: "agents",
+    tenantId: "tenantId",
+    id: "id",
+    ownerUserId: "ownerUserId",
+    platform: "platform",
+  },
+  integrations: {
+    __t: "integrations",
+    tenantId: "tenantId",
+    name: "name",
+    createdBy: "createdBy",
+    id: "id",
+  },
   users: { __t: "users", id: "id" },
   db: {
     select: () => ({

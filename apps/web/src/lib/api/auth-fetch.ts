@@ -33,7 +33,7 @@ export function useAuthFetch() {
 
     if (!tenant?.id) {
       throw new Error(
-        "No tenant context available. Must be used within tenant routes."
+        "No tenant context available. Must be used within tenant routes.",
       );
     }
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Loader } from 'lucide-react';
+import React from "react";
+import { Loader } from "lucide-react";
 
 import {
   Dialog,
@@ -7,11 +7,11 @@ import {
   DialogHeader,
   DialogFooter,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AIModel } from '@/contexts/AIModelContext';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AIModel } from "@/contexts/AIModelContext";
 
 interface AddModelData {
   model_name: string;
@@ -52,7 +52,9 @@ interface ModelModalsProps {
   onEditSave: (model: AIModel) => void;
   onCreateSave: () => void;
   onEditModelChange: (model: AIModel) => void;
-  onCreateInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onCreateInputChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => void;
 }
 
 const ModelModals: React.FC<ModelModalsProps> = ({
@@ -89,7 +91,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
     <>
       {/* Edit Model Modal */}
       <Dialog
-        open={openModal === 'edit model'}
+        open={openModal === "edit model"}
         onOpenChange={(open) => !open && onEditClose()}
       >
         <DialogContent className="sm:max-w-[600px] text-black p-0 gap-0 z-50">
@@ -104,14 +106,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-name" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-name"
+                    className="text-sm font-medium"
+                  >
                     Model Name*
                   </Label>
                   <Input
                     id="edit-model-name"
-                    className={`${errors.model_name ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_name || ''}
-                    onChange={(e) => handleEditInputChange('model_name', e.target.value)}
+                    className={`${errors.model_name ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_name || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_name", e.target.value)
+                    }
                     placeholder="Enter model name"
                   />
                   {errors.model_name && (
@@ -122,14 +129,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-id" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-id"
+                    className="text-sm font-medium"
+                  >
                     Model ID*
                   </Label>
                   <Input
                     id="edit-model-id"
-                    className={`${errors.model_id ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_id || ''}
-                    onChange={(e) => handleEditInputChange('model_id', e.target.value)}
+                    className={`${errors.model_id ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_id || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_id", e.target.value)
+                    }
                     placeholder="Enter model ID"
                   />
                   {errors.model_id && (
@@ -140,14 +152,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-owner" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-owner"
+                    className="text-sm font-medium"
+                  >
                     Model Owner*
                   </Label>
                   <Input
                     id="edit-model-owner"
-                    className={`${errors.model_owner ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_owner || ''}
-                    onChange={(e) => handleEditInputChange('model_owner', e.target.value)}
+                    className={`${errors.model_owner ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_owner || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_owner", e.target.value)
+                    }
                     placeholder="Enter model owner"
                   />
                   {errors.model_owner && (
@@ -158,14 +175,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-business-unit" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-business-unit"
+                    className="text-sm font-medium"
+                  >
                     Business Unit*
                   </Label>
                   <Input
                     id="edit-business-unit"
-                    className={`${errors.business_unit ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.business_unit || ''}
-                    onChange={(e) => handleEditInputChange('business_unit', e.target.value)}
+                    className={`${errors.business_unit ? "border-destructive" : ""} h-9`}
+                    value={editModelData.business_unit || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("business_unit", e.target.value)
+                    }
                     placeholder="Enter business unit"
                   />
                   {errors.business_unit && (
@@ -176,14 +198,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-type" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-type"
+                    className="text-sm font-medium"
+                  >
                     Model Type*
                   </Label>
                   <Input
                     id="edit-model-type"
-                    className={`${errors.model_type ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_type || ''}
-                    onChange={(e) => handleEditInputChange('model_type', e.target.value)}
+                    className={`${errors.model_type ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_type || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_type", e.target.value)
+                    }
                     placeholder="Enter model type"
                   />
                   {errors.model_type && (
@@ -194,14 +221,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-version" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-version"
+                    className="text-sm font-medium"
+                  >
                     Version*
                   </Label>
                   <Input
                     id="edit-model-version"
-                    className={`${errors.model_version ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_version || ''}
-                    onChange={(e) => handleEditInputChange('model_version', e.target.value)}
+                    className={`${errors.model_version ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_version || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_version", e.target.value)
+                    }
                     placeholder="Enter version"
                   />
                   {errors.model_version && (
@@ -212,14 +244,19 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-model-source" className="text-sm font-medium">
+                  <Label
+                    htmlFor="edit-model-source"
+                    className="text-sm font-medium"
+                  >
                     Source*
                   </Label>
                   <Input
                     id="edit-model-source"
-                    className={`${errors.model_source ? 'border-destructive' : ''} h-9`}
-                    value={editModelData.model_source || ''}
-                    onChange={(e) => handleEditInputChange('model_source', e.target.value)}
+                    className={`${errors.model_source ? "border-destructive" : ""} h-9`}
+                    value={editModelData.model_source || ""}
+                    onChange={(e) =>
+                      handleEditInputChange("model_source", e.target.value)
+                    }
                     placeholder="Enter source"
                   />
                   {errors.model_source && (
@@ -256,7 +293,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
 
       {/* Create Model Modal */}
       <Dialog
-        open={openModal === 'create model'}
+        open={openModal === "create model"}
         onOpenChange={(open) => !open && onCreateClose()}
       >
         <DialogContent className="sm:max-w-[600px] text-black p-0 gap-0">
@@ -277,7 +314,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="model-name"
                   placeholder="Enter model name"
                   type="text"
-                  className={`${errors.model_name ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.model_name ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_name}
                   name="model_name"
                   onChange={onCreateInputChange}
@@ -296,8 +333,8 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                 <Input
                   id="model-id"
                   placeholder="Enter model ID"
-                  type='text'
-                  className={`${errors.model_id ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  type="text"
+                  className={`${errors.model_id ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_id}
                   name="model_id"
                   onChange={onCreateInputChange}
@@ -317,7 +354,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="model-owner"
                   placeholder="Enter model owner"
                   type="text"
-                  className={`${errors.model_owner ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.model_owner ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_owner}
                   name="model_owner"
                   onChange={onCreateInputChange}
@@ -337,7 +374,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="business-unit"
                   placeholder="Enter business unit"
                   type="text"
-                  className={`${errors.business_unit ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.business_unit ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.business_unit}
                   name="business_unit"
                   onChange={onCreateInputChange}
@@ -357,7 +394,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="model-type"
                   placeholder="Enter model type"
                   type="text"
-                  className={`${errors.model_type ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.model_type ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_type}
                   name="model_type"
                   onChange={onCreateInputChange}
@@ -377,7 +414,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="model-version"
                   placeholder="Enter version"
                   type="text"
-                  className={`${errors.model_version ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.model_version ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_version}
                   name="model_version"
                   onChange={onCreateInputChange}
@@ -397,7 +434,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
                   id="model-source"
                   placeholder="Enter source"
                   type="text"
-                  className={`${errors.model_source ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}
+                  className={`${errors.model_source ? "border-red-500 focus-visible:border-red-500 border-destructive" : ""} h-9`}
                   value={addModelData.model_source}
                   name="model_source"
                   onChange={onCreateInputChange}

@@ -55,7 +55,7 @@ export interface CreateDefaultLaunchPolicyResult {
  * can isolate it (a failure must never fail application creation).
  */
 export async function createDefaultLaunchPolicy(
-  args: CreateDefaultLaunchPolicyArgs
+  args: CreateDefaultLaunchPolicyArgs,
 ): Promise<CreateDefaultLaunchPolicyResult> {
   const { orgId, applicationId, userId, token } = args;
 
@@ -66,8 +66,8 @@ export async function createDefaultLaunchPolicy(
     .where(
       and(
         eq(applicationPolicies.applicationId, applicationId),
-        eq(applicationPolicies.policyName, LAUNCH_POLICY_NAME)
-      )
+        eq(applicationPolicies.policyName, LAUNCH_POLICY_NAME),
+      ),
     )
     .limit(1);
   if (existing.length > 0) {
@@ -87,8 +87,8 @@ export async function createDefaultLaunchPolicy(
       and(
         inArray(guardrails.key, DEFAULT_GUARD_KEYS),
         or(eq(guardrails.tenantId, orgId), isNull(guardrails.tenantId)),
-        isNull(guardrails.deletedAt)
-      )
+        isNull(guardrails.deletedAt),
+      ),
     );
 
   const byKey = new Map<string, { id: string; tenantId: string | null }>();
@@ -158,7 +158,7 @@ export async function createDefaultLaunchPolicy(
   if (!response.ok) {
     const body = await response.text();
     throw new Error(
-      `ControlNet /v1/policies failed (${response.status}): ${body}`
+      `ControlNet /v1/policies failed (${response.status}): ${body}`,
     );
   }
 

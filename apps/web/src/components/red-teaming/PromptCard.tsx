@@ -50,7 +50,7 @@ export const PromptCard = ({
           <div className="flex items-start justify-between gap-2 mb-2">
             <h4 className="font-medium text-foreground truncate">{title}</h4>
             <Badge
-            /* @ts-ignore */
+              /* @ts-ignore */
               variant={difficultyColors[difficulty]}
               className="shrink-0 text-xs"
             >

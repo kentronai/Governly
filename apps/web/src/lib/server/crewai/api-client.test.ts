@@ -41,11 +41,14 @@ describe("crewaiApi", () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 401,
-      json: async () => ({ error: "bad_credentials", message: "Bad credentials" }),
+      json: async () => ({
+        error: "bad_credentials",
+        message: "Bad credentials",
+      }),
     });
-    await expect(crewaiApi(creds, CREWAI_ENDPOINTS.crews)).rejects.toBeInstanceOf(
-      CrewAIApiError,
-    );
+    await expect(
+      crewaiApi(creds, CREWAI_ENDPOINTS.crews),
+    ).rejects.toBeInstanceOf(CrewAIApiError);
     await expect(
       crewaiApi(creds, CREWAI_ENDPOINTS.crews),
     ).rejects.toMatchObject({ status: 401 });
@@ -78,9 +81,9 @@ describe("normalizeCrewAIBaseUrl", () => {
   });
 
   it("accepts any *.crewai.com deployment host", () => {
-    expect(
-      normalizeCrewAIBaseUrl("https://my-crew-123.crewai.com"),
-    ).toBe("https://my-crew-123.crewai.com");
+    expect(normalizeCrewAIBaseUrl("https://my-crew-123.crewai.com")).toBe(
+      "https://my-crew-123.crewai.com",
+    );
   });
 
   it("rejects a non-crewai host", () => {

@@ -26,9 +26,7 @@ export async function discoverEksClusters(
   const names: string[] = [];
   let nextToken: string | undefined;
   do {
-    const page = await clients.eks.send(
-      new ListClustersCommand({ nextToken }),
-    );
+    const page = await clients.eks.send(new ListClustersCommand({ nextToken }));
     names.push(...(page.clusters ?? []));
     nextToken = page.nextToken;
   } while (nextToken);

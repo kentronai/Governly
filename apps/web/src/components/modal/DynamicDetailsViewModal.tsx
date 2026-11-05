@@ -19,17 +19,17 @@ interface FieldConfig {
   key: string;
   label: string;
   type?:
-  | "text"
-  | "badge"
-  | "list"
-  | "expandableList"
-  | "dateRange"
-  | "files"
-  | "custom"
-  | "date"
-  | "textarea"
-  | "datetime"
-  | "boolean";
+    | "text"
+    | "badge"
+    | "list"
+    | "expandableList"
+    | "dateRange"
+    | "files"
+    | "custom"
+    | "date"
+    | "textarea"
+    | "datetime"
+    | "boolean";
   render?: (value: any, data: any) => React.ReactNode;
   badgeColor?: string;
   maxItems?: number;
@@ -71,7 +71,7 @@ export const createFieldConfig = {
 
   // Project Fields
   application: (): FieldConfig[] => [
-    { key: "name", label: "Application Name", type: "text" }
+    { key: "name", label: "Application Name", type: "text" },
   ],
 
   // Business Context Fields
@@ -262,7 +262,9 @@ export const createFieldConfig = {
                       </span>
                       <span className="text-gray-600">
                         {risk.dTargetDate
-                          ? new Date(risk.dTargetDate).toLocaleDateString("en-US")
+                          ? new Date(risk.dTargetDate).toLocaleDateString(
+                              "en-US",
+                            )
                           : "N/A"}
                       </span>
                     </div>
@@ -274,9 +276,9 @@ export const createFieldConfig = {
                         Last Review:
                       </span>
                       <span className="text-gray-600">
-                        {new Date(
-                          risk.dLastRiskReviewDate
-                        ).toLocaleDateString("en-US")}
+                        {new Date(risk.dLastRiskReviewDate).toLocaleDateString(
+                          "en-US",
+                        )}
                       </span>
                     </div>
                   )}

@@ -10,11 +10,12 @@ import {
   DescribeStateMachineCommand,
 } from "@aws-sdk/client-sfn";
 import type { AwsClientBundle } from "../client-factory";
+import { extractModelIds } from "../../agents/agent-profile";
 import type { RawDiscoveredResource } from "./types";
 
 export async function discoverStepFunctions(
   clients: AwsClientBundle,
-  aiLambdaArns: Set<string>
+  aiLambdaArns: Set<string>,
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   const { stepFunctions, region } = clients;
@@ -22,7 +23,7 @@ export async function discoverStepFunctions(
   let nextToken: string | undefined;
   do {
     const page = await stepFunctions.send(
-      new ListStateMachinesCommand({ nextToken })
+      new ListStateMachinesCommand({ nextToken }),
     );
     for (const machine of page.stateMachines ?? []) {
       if (!machine.stateMachineArn || !machine.name) continue;
@@ -32,7 +33,7 @@ export async function discoverStepFunctions(
         const detail = await stepFunctions.send(
           new DescribeStateMachineCommand({
             stateMachineArn: machine.stateMachineArn,
-          })
+          }),
         );
         definition = detail.definition ?? "";
       } catch {
@@ -40,7 +41,7 @@ export async function discoverStepFunctions(
       }
 
       const referencesAiLambda = Array.from(aiLambdaArns).some((arn) =>
-        definition.includes(arn)
+        definition.includes(arn),
       );
       if (!referencesAiLambda) continue;
 
@@ -52,10 +53,10 @@ export async function discoverStepFunctions(
         region,
         tags: {},
         linkedFunctionArns: Array.from(aiLambdaArns).filter((arn) =>
-          definition.includes(arn)
+          definition.includes(arn),
         ),
         createdAt: machine.creationDate?.toISOString?.() ?? null,
-        metadata: { type: machine.type },
+        metadata: { type: machine.type, modelIds: extractModelIds(definition) },
       });
     }
     nextToken = page.nextToken;

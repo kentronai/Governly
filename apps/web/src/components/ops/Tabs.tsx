@@ -34,7 +34,7 @@ export default function OpsTabs() {
                   "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
                   isActive
                     ? "border-muted-foreground"
-                    : "border-transparent text-muted-foreground hover:text-inherit hover:border-muted-foreground"
+                    : "border-transparent text-muted-foreground hover:text-inherit hover:border-muted-foreground",
                 )}
               >
                 <Icon className="h-4 w-4" />

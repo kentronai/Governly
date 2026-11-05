@@ -5,14 +5,20 @@
  * instead of a guess.
  */
 
-import { GetRestApisCommand, GetResourcesCommand } from "@aws-sdk/client-api-gateway";
-import { GetApisCommand, GetIntegrationsCommand } from "@aws-sdk/client-apigatewayv2";
+import {
+  GetRestApisCommand,
+  GetResourcesCommand,
+} from "@aws-sdk/client-api-gateway";
+import {
+  GetApisCommand,
+  GetIntegrationsCommand,
+} from "@aws-sdk/client-apigatewayv2";
 import type { AwsClientBundle } from "../client-factory";
 import type { RawDiscoveredResource } from "./types";
 
 export async function discoverApiGateway(
   clients: AwsClientBundle,
-  aiLambdaArns: Set<string>
+  aiLambdaArns: Set<string>,
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   const { apiGateway, apiGatewayV2, region } = clients;
@@ -26,13 +32,17 @@ export async function discoverApiGateway(
       let referencesAiLambda = false;
       try {
         const apiResources = await apiGateway.send(
-          new GetResourcesCommand({ restApiId: api.id })
+          new GetResourcesCommand({ restApiId: api.id }),
         );
         referencesAiLambda = (apiResources.items ?? []).some((resource) =>
           Object.values(resource.resourceMethods ?? {}).some((method) => {
-            const uri = (method as any)?.methodIntegration?.uri as string | undefined;
-            return uri ? Array.from(aiLambdaArns).some((arn) => uri.includes(arn)) : false;
-          })
+            const uri = (method as any)?.methodIntegration?.uri as
+              | string
+              | undefined;
+            return uri
+              ? Array.from(aiLambdaArns).some((arn) => uri.includes(arn))
+              : false;
+          }),
         );
       } catch {
         // best-effort
@@ -65,12 +75,12 @@ export async function discoverApiGateway(
       let referencesAiLambda = false;
       try {
         const integrations = await apiGatewayV2.send(
-          new GetIntegrationsCommand({ ApiId: api.ApiId })
+          new GetIntegrationsCommand({ ApiId: api.ApiId }),
         );
         referencesAiLambda = (integrations.Items ?? []).some((integration) =>
           Array.from(aiLambdaArns).some((arn) =>
-            integration.IntegrationUri?.includes(arn)
-          )
+            integration.IntegrationUri?.includes(arn),
+          ),
         );
       } catch {
         // best-effort

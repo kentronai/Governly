@@ -8,22 +8,32 @@ export const PLACEHOLDER_EMAIL_SUFFIX = "@unknown.local";
 export const isPlaceholderEmail = (email?: string | null) =>
   !email || email.endsWith(PLACEHOLDER_EMAIL_SUFFIX);
 
-type ClerkIdentity = { email: string | null; name: string | null; imageUrl: string | null };
+type ClerkIdentity = {
+  email: string | null;
+  name: string | null;
+  imageUrl: string | null;
+};
 
 /**
  * Look a user up in Clerk by id. Unlike currentUser(), this does not depend on
  * the request's session context, so it also works where Clerk middleware
  * context is missing (which is how placeholder emails got written).
  */
-export async function fetchClerkIdentity(userId: string): Promise<ClerkIdentity | null> {
+export async function fetchClerkIdentity(
+  userId: string,
+): Promise<ClerkIdentity | null> {
   try {
     const clerk = await clerkClient();
     const user = await clerk.users.getUser(userId);
     const email =
-      user.emailAddresses.find((a) => a.id === user.primaryEmailAddressId)?.emailAddress ||
+      user.emailAddresses.find((a) => a.id === user.primaryEmailAddressId)
+        ?.emailAddress ||
       user.emailAddresses[0]?.emailAddress ||
       null;
-    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || null;
+    const name =
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      user.username ||
+      null;
     return { email, name, imageUrl: user.imageUrl || null };
   } catch (error) {
     console.error(`Failed to fetch Clerk identity for ${userId}:`, error);
@@ -44,7 +54,10 @@ export async function healPlaceholderEmails(
     broken.map(async (row) => {
       const identity = await fetchClerkIdentity(row.id);
       if (!identity?.email) return;
-      await db.update(users).set({ email: identity.email }).where(eq(users.id, row.id));
+      await db
+        .update(users)
+        .set({ email: identity.email })
+        .where(eq(users.id, row.id));
       healed.set(row.id, identity.email);
     }),
   );

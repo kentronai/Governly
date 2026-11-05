@@ -121,7 +121,7 @@ export function UserRiskScoreboard() {
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-700",
-                      riskColor.bg
+                      riskColor.bg,
                     )}
                     style={{ width: `${dept.risk}%` }}
                   />

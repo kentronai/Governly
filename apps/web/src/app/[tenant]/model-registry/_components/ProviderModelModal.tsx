@@ -69,6 +69,25 @@ interface Props {
 }
 
 // Provider URL mappings
+const OTHER_MODEL = "__other__";
+
+const PROVIDER_OPTIONS: Array<[string, string]> = [
+  ["openai", "OpenAI"],
+  ["anthropic", "Anthropic"],
+  ["gemini", "Google (Gemini)"],
+  ["vertex", "Google (Vertex AI)"],
+  ["openrouter", "OpenRouter"],
+  ["xai", "xAI (Grok)"],
+  ["groq", "Groq (Llama, GPT-OSS)"],
+  ["mistral", "Mistral"],
+  ["deepseek", "DeepSeek"],
+  ["bedrock", "AWS (Bedrock)"],
+  ["azure_openai", "Azure OpenAI"],
+  ["ollama", "Ollama (Llama, self-hosted)"],
+  ["huggingface", "Hugging Face"],
+  ["custom", "Custom"],
+];
+
 const providerUrls: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   anthropic: "https://api.anthropic.com/v1",
@@ -81,6 +100,10 @@ const providerUrls: Record<string, string> = {
   azure_openai: "https://your-resource.openai.azure.com",
   groq: "https://api.groq.com/openai/v1",
   ollama: "http://localhost:11434/v1",
+  openrouter: "https://openrouter.ai/api/v1",
+  mistral: "https://api.mistral.ai/v1",
+  xai: "https://api.x.ai/v1",
+  deepseek: "https://api.deepseek.com/v1",
   huggingface: "",
   custom: "",
 };
@@ -220,6 +243,11 @@ export function ProviderModelModal({
   }, [mode, model, isOpen]);
 
   const handleModelSelect = (value: string) => {
+    if (value === OTHER_MODEL) {
+      setSelectedModelId(OTHER_MODEL);
+      setFormData((prev) => ({ ...prev, family: "", displayName: "" }));
+      return;
+    }
     if (!value) {
       setSelectedModelId("");
       setFormData((prev) => ({ ...prev, family: "", displayName: "" }));
@@ -307,7 +335,7 @@ export function ProviderModelModal({
       } else {
         // For all other providers: Use form data
         Object.assign(submitData, {
-          displayName: formData.displayName || undefined,
+          displayName: formData.displayName || formData.family || undefined,
           family: formData.family || undefined,
           modality: formData.modality ? [formData.modality] : ["text"],
           contextWindowTokens: formData.contextWindowTokens
@@ -387,26 +415,11 @@ export function ProviderModelModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="gemini">Google (Gemini)</SelectItem>
-                    <SelectItem value="vertex">Google (Vertex AI)</SelectItem>
-                    <SelectItem value="bedrock" disabled>
-                      AWS (Bedrock)
-                    </SelectItem>
-                    <SelectItem value="azure_openai" disabled>
-                      Azure OpenAI
-                    </SelectItem>
-                    <SelectItem value="groq" disabled>
-                      Groq
-                    </SelectItem>
-                    <SelectItem value="ollama" disabled>
-                      Ollama
-                    </SelectItem>
-                    <SelectItem value="huggingface">Hugging Face</SelectItem>
-                    <SelectItem value="custom" disabled>
-                      Custom
-                    </SelectItem>
+                    {PROVIDER_OPTIONS.map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.provider && (
@@ -440,7 +453,9 @@ export function ProviderModelModal({
               </div>
             </div>
 
-            {formData.provider === "huggingface" ? (
+            {formData.provider === "huggingface" ||
+            (mode === "create" && !loadingModels && availableModels.length === 0) ||
+            selectedModelId === OTHER_MODEL ? (
               <>
                 {/* For Hugging Face, Model Name is the identifier */}
                 <div className="space-y-2">
@@ -456,7 +471,7 @@ export function ProviderModelModal({
                         family: e.target.value,
                       }))
                     }
-                    placeholder="e.g., meta-llama/Llama-3.1-8B-Instruct"
+                    placeholder={formData.provider === "huggingface" ? "e.g., meta-llama/Llama-3.1-8B-Instruct" : "e.g., my-model-v1"}
                     className={cn(
                       "font-mono text-sm",
                       errors.family ? "border-destructive" : ""
@@ -496,11 +511,16 @@ export function ProviderModelModal({
                               {loadingModels ? "Loading..." : "No models available"}
                             </div>
                           ) : (
-                            availableModels.map((model) => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.displayName}
-                              </SelectItem>
-                            ))
+                            [
+                              ...availableModels.map((model) => (
+                                <SelectItem key={model.id} value={model.id}>
+                                  {model.displayName}
+                                </SelectItem>
+                              )),
+                              <SelectItem key={OTHER_MODEL} value={OTHER_MODEL}>
+                                Other (type model ID)
+                              </SelectItem>,
+                            ]
                           )}
                         </SelectContent>
                       </Select>

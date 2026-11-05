@@ -15,7 +15,7 @@ describe("observability-outcome", () => {
           blocked: false,
           _summary: { decision: "allow", was_blocked: false },
         },
-      })
+      }),
     ).toBe("allowed");
   });
 
@@ -28,7 +28,7 @@ describe("observability-outcome", () => {
           blocked: true,
           _summary: { decision: "block", was_blocked: true },
         },
-      })
+      }),
     ).toBe("blocked");
   });
 
@@ -43,13 +43,13 @@ describe("observability-outcome", () => {
           blocked: false,
           _summary: { decision: "allow", was_blocked: false },
         },
-      })
+      }),
     ).toBe("error");
   });
 
   it("treats a failure with no guardrail decision as an error", () => {
     expect(
-      classifyLogOutcome({ statusCode: 404, guardrailResults: null })
+      classifyLogOutcome({ statusCode: 404, guardrailResults: null }),
     ).toBe("error");
   });
 
@@ -60,7 +60,7 @@ describe("observability-outcome", () => {
       classifyLogOutcome({
         statusCode: 200,
         guardrailResults: { _summary: { was_blocked: true } },
-      })
+      }),
     ).toBe("blocked");
   });
 
@@ -81,7 +81,9 @@ describe("observability-outcome", () => {
 
   it("reads the decision from any of the shapes the gateway writes", () => {
     expect(getPolicyDecision({ blocked: true })).toBe("block");
-    expect(getPolicyDecision({ _summary: { decision: "allow" } })).toBe("allow");
+    expect(getPolicyDecision({ _summary: { decision: "allow" } })).toBe(
+      "allow",
+    );
     expect(getPolicyDecision(null)).toBeNull();
     expect(getPolicyDecision({ input_guards: [] })).toBeNull();
   });
@@ -96,11 +98,11 @@ describe("observability-outcome", () => {
             message: "The model provider rejected the request (HTTP 400).",
           },
         },
-      })
+      }),
     ).toBe("The model provider rejected the request (HTTP 400).");
 
     expect(getErrorMessage({ statusCode: 502 })).toBe(
-      "Request failed with HTTP 502"
+      "Request failed with HTTP 502",
     );
 
     // The provider's own words beat the gateway's generic summary.
@@ -114,7 +116,7 @@ describe("observability-outcome", () => {
             provider_message: "The model `x` does not exist",
           },
         },
-      })
+      }),
     ).toBe("The model `x` does not exist");
   });
 });
@@ -126,9 +128,9 @@ describe("describeRouting", () => {
         model: "gpt-4o-mini",
         routed_model: "gemini-2.0-flash",
         routed_provider: "gemini",
-      })
+      }),
     ).toBe(
-      'gemini / gemini-2.0-flash — overrides requested "gpt-4o-mini" (Model Registry selection)'
+      'gemini / gemini-2.0-flash — overrides requested "gpt-4o-mini" (Model Registry selection)',
     );
   });
 
@@ -138,7 +140,7 @@ describe("describeRouting", () => {
         model: "gpt-4o-mini",
         routed_model: "gpt-4o-mini",
         routed_provider: "openai",
-      })
+      }),
     ).toBe("openai / gpt-4o-mini");
     expect(describeRouting({ model: "gpt-4o-mini" })).toBeNull();
     expect(describeRouting(null)).toBeNull();

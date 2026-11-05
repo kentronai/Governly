@@ -14,6 +14,7 @@ import type {
   DiscoveredResourceType,
   RawDiscoveredResource,
 } from "@/lib/server/aws/discovery/types";
+import { composeProfile } from "@/lib/server/agents/agent-profile";
 import type { CorrelatedAgent } from "@/lib/server/aws/correlation";
 import { buildCapabilityFacts } from "@/lib/server/agents/capability-engine";
 import { classifyAutonomy } from "@/lib/server/agents/autonomy-engine";
@@ -424,7 +425,9 @@ export async function runGoogleCloudDiscoveryScan(
           eq(agents.externalAgentId, agent.externalAgentId),
         ),
       });
+      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
       const values = {
+        profile,
         tenantId,
         connectionId: null,
         azureConnectionId: null,
@@ -459,6 +462,7 @@ export async function runGoogleCloudDiscoveryScan(
         lastSeenAt: now,
         syncStatus: "success" as const,
         rawMetadata: {
+          ...profileMeta,
           resourceCount: agent.resources.length,
           provider: "google_cloud",
         },

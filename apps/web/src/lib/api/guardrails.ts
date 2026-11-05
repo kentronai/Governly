@@ -1,12 +1,12 @@
 // lib/api/guardrails.ts
-import { GuardTier } from '@/types/guardrails';
-import { getGuardrails } from '@/lib/actions/guardrails';
+import { GuardTier } from "@/types/guardrails";
+import { getGuardrails } from "@/lib/actions/guardrails";
 
 export interface GuardrailConfig {
   // Security
   injectionAttack: boolean;
   systemPromptLeak: boolean;
-  // Privacy  
+  // Privacy
   piiDetector: boolean;
   copyrightIP: boolean;
   // Compliance
@@ -91,27 +91,34 @@ export interface CreateGuardrailRequest {
 }
 
 // Fetch guardrails from the database via API
-export async function fetchGuardrails(tenantSlugOrId: string): Promise<Guardrail[]> {
+export async function fetchGuardrails(
+  tenantSlugOrId: string,
+): Promise<Guardrail[]> {
   try {
     const data = await getGuardrails(tenantSlugOrId);
-    return data.guardrails as Guardrail[] || []
+    return (data.guardrails as Guardrail[]) || [];
   } catch (error) {
-    console.error('Error fetching guardrails from API:', error)
+    console.error("Error fetching guardrails from API:", error);
     // Fallback to localStorage if API fails
     try {
-      const stored = localStorage.getItem(`guardrails_${tenantSlugOrId}`)
-      if (!stored) return []
-      return JSON.parse(stored)
+      const stored = localStorage.getItem(`guardrails_${tenantSlugOrId}`);
+      if (!stored) return [];
+      return JSON.parse(stored);
     } catch (localError) {
-      console.error('Error loading guardrails from localStorage:', localError)
-      return []
+      console.error("Error loading guardrails from localStorage:", localError);
+      return [];
     }
   }
 }
 
 // Create guardrail via server action
-export async function createGuardrail(tenantSlugOrId: string, data: CreateGuardrailRequest): Promise<Guardrail> {
-  const { createGuardrail: createGuardrailAction } = await import('@/lib/actions/guardrails');
+export async function createGuardrail(
+  tenantSlugOrId: string,
+  data: CreateGuardrailRequest,
+): Promise<Guardrail> {
+  const { createGuardrail: createGuardrailAction } = await import(
+    "@/lib/actions/guardrails"
+  );
   const result = await createGuardrailAction({
     tenantSlug: tenantSlugOrId,
     ...data,
@@ -119,7 +126,7 @@ export async function createGuardrail(tenantSlugOrId: string, data: CreateGuardr
   // Transform database record (camelCase) to Guardrail interface (snake_case)
   const guardrail = result.guardrail;
   if (!guardrail.tenantId || !guardrail.createdBy) {
-    throw new Error('Invalid guardrail data: missing required fields');
+    throw new Error("Invalid guardrail data: missing required fields");
   }
   return {
     id: guardrail.id,
@@ -129,7 +136,9 @@ export async function createGuardrail(tenantSlugOrId: string, data: CreateGuardr
     category: guardrail.category || undefined,
     description: guardrail.description || undefined,
     tier: guardrail.tier as GuardTier,
-    performance_budget_ms: guardrail.performanceBudgetMs ? Number(guardrail.performanceBudgetMs) : undefined,
+    performance_budget_ms: guardrail.performanceBudgetMs
+      ? Number(guardrail.performanceBudgetMs)
+      : undefined,
     requires_onnx: guardrail.requiresOnnx,
     onnx_model_id: guardrail.onnxModelId || undefined,
     default_params: guardrail.defaultParams || {},
@@ -139,7 +148,7 @@ export async function createGuardrail(tenantSlugOrId: string, data: CreateGuardr
     function_name: guardrail.functionName || undefined,
     input_schema: guardrail.inputSchema || undefined,
     output_schema: guardrail.outputSchema || undefined,
-    fallback_strategy: guardrail.fallbackStrategy || 'skip',
+    fallback_strategy: guardrail.fallbackStrategy || "skip",
     created_by: guardrail.createdBy,
     updated_by: guardrail.updatedBy || undefined,
     created_at: guardrail.createdAt,
@@ -149,37 +158,46 @@ export async function createGuardrail(tenantSlugOrId: string, data: CreateGuardr
 }
 
 // Frontend-only policy-guardrail management
-export function savePolicyGuardrails(tenantId: string, policyGuardrails: PolicyGuardrail[]): void {
+export function savePolicyGuardrails(
+  tenantId: string,
+  policyGuardrails: PolicyGuardrail[],
+): void {
   try {
-    localStorage.setItem(`policy_guardrails_${tenantId}`, JSON.stringify(policyGuardrails))
+    localStorage.setItem(
+      `policy_guardrails_${tenantId}`,
+      JSON.stringify(policyGuardrails),
+    );
   } catch (error) {
-    console.error('Error saving policy-guardrails to localStorage:', error)
+    console.error("Error saving policy-guardrails to localStorage:", error);
   }
 }
 
 export function loadPolicyGuardrails(tenantId: string): PolicyGuardrail[] {
   try {
-    const stored = localStorage.getItem(`policy_guardrails_${tenantId}`)
-    if (!stored) return []
-    return JSON.parse(stored)
+    const stored = localStorage.getItem(`policy_guardrails_${tenantId}`);
+    if (!stored) return [];
+    return JSON.parse(stored);
   } catch (error) {
-    console.error('Error loading policy-guardrails from localStorage:', error)
-    return []
+    console.error("Error loading policy-guardrails from localStorage:", error);
+    return [];
   }
 }
 
-export function createPolicyGuardrail(tenantId: string, data: Omit<PolicyGuardrail, 'id' | 'created_at' | 'updated_at'>): PolicyGuardrail {
-  const now = new Date().toISOString()
+export function createPolicyGuardrail(
+  tenantId: string,
+  data: Omit<PolicyGuardrail, "id" | "created_at" | "updated_at">,
+): PolicyGuardrail {
+  const now = new Date().toISOString();
   const policyGuardrail: PolicyGuardrail = {
     ...data,
     id: `policy_guardrail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     created_at: now,
     updated_at: now,
-  }
-  
-  const existing = loadPolicyGuardrails(tenantId)
-  const updated = [...existing, policyGuardrail]
-  savePolicyGuardrails(tenantId, updated)
-  
-  return policyGuardrail
+  };
+
+  const existing = loadPolicyGuardrails(tenantId);
+  const updated = [...existing, policyGuardrail];
+  savePolicyGuardrails(tenantId, updated);
+
+  return policyGuardrail;
 }

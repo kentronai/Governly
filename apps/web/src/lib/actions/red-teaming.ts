@@ -15,7 +15,12 @@ const BATCH_SIZE = 10;
 
 const CATEGORY_TO_TEST_TYPE: Record<
   RedTeamCategory,
-  "adversarial" | "jailbreak" | "prompt_injection" | "toxicity" | "bias" | "safety"
+  | "adversarial"
+  | "jailbreak"
+  | "prompt_injection"
+  | "toxicity"
+  | "bias"
+  | "safety"
 > = {
   toxicity: "toxicity",
   pii: "safety",
@@ -25,7 +30,10 @@ const CATEGORY_TO_TEST_TYPE: Record<
   political: "bias",
 };
 
-const CATEGORY_FAILURE_SEVERITY: Record<RedTeamCategory, "low" | "medium" | "high" | "critical"> = {
+const CATEGORY_FAILURE_SEVERITY: Record<
+  RedTeamCategory,
+  "low" | "medium" | "high" | "critical"
+> = {
   toxicity: "high",
   pii: "critical",
   jailbreak: "critical",
@@ -64,18 +72,22 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
     ),
   });
   if (!model) {
-    return { success: false, message: "Selected model was not found for this tenant" };
+    return {
+      success: false,
+      message: "Selected model was not found for this tenant",
+    };
   }
 
   const policyResult = await getApplicationPolicies(orgId, input.applicationId);
-  const activePolicy = policyResult.data?.find(
-    (p) => p.isApplicationActive && p.isDefault,
-  ) ?? policyResult.data?.find((p) => p.isApplicationActive);
+  const activePolicy =
+    policyResult.data?.find((p) => p.isApplicationActive && p.isDefault) ??
+    policyResult.data?.find((p) => p.isApplicationActive);
 
   if (!activePolicy) {
     return {
       success: false,
-      message: "This application has no active guardrail policy attached. Attach one before running a red team test.",
+      message:
+        "This application has no active guardrail policy attached. Attach one before running a red team test.",
     };
   }
 
@@ -128,11 +140,20 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
       if (!response.ok && body?.error?.type === "policy_violation") {
         testStatus = "passed";
         severity = "low";
-        testResults = { blocked: true, ruleId: body.error.rule_id, message: body.error.message };
+        testResults = {
+          blocked: true,
+          ruleId: body.error.rule_id,
+          message: body.error.message,
+        };
       } else if (!response.ok) {
         testStatus = "warning";
-        remediationNotes = body?.error?.message || `Gateway returned HTTP ${response.status}`;
-        testResults = { blocked: false, error: body?.error ?? null, httpStatus: response.status };
+        remediationNotes =
+          body?.error?.message || `Gateway returned HTTP ${response.status}`;
+        testResults = {
+          blocked: false,
+          error: body?.error ?? null,
+          httpStatus: response.status,
+        };
       } else {
         const guards: GuardResult[] = [
           ...(body?.guardrails?.input_guards ?? []),
@@ -144,17 +165,25 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
         if (blockingGuard) {
           testStatus = "passed";
           severity = "low";
-          testResults = { blocked: true, guard: blockingGuard, guardrails: body.guardrails };
+          testResults = {
+            blocked: true,
+            guard: blockingGuard,
+            guardrails: body.guardrails,
+          };
         } else {
           testStatus = "failed";
           severity = failureSeverity;
           testResults = { blocked: false, guardrails: body.guardrails ?? null };
-          remediationNotes = "Adversarial prompt was not blocked by any guard for this category.";
+          remediationNotes =
+            "Adversarial prompt was not blocked by any guard for this category.";
         }
       }
     } catch (error) {
       testStatus = "warning";
-      remediationNotes = error instanceof Error ? error.message : "Unknown error calling the gateway";
+      remediationNotes =
+        error instanceof Error
+          ? error.message
+          : "Unknown error calling the gateway";
       testResults = { blocked: false, error: remediationNotes };
     }
 
@@ -180,7 +209,9 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
     });
   }
 
-  revalidatePath(`/applications/${input.applicationId}/control-net/red-teaming`);
+  revalidatePath(
+    `/applications/${input.applicationId}/control-net/red-teaming`,
+  );
 
   try {
     await createAuditEvent({
@@ -189,10 +220,19 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
       action: "red_teaming.batch_test_run",
       targetType: "application",
       targetId: input.applicationId,
-      metadata: { category: input.category, total: prompts.length, passed, failed, warning },
+      metadata: {
+        category: input.category,
+        total: prompts.length,
+        passed,
+        failed,
+        warning,
+      },
     });
   } catch (e) {
-    console.error("Failed to create audit event for red teaming batch test:", e);
+    console.error(
+      "Failed to create audit event for red teaming batch test:",
+      e,
+    );
   }
 
   return {

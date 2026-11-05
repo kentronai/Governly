@@ -39,7 +39,8 @@ describe("getGatewayBaseUrl", () => {
   });
 
   it("normalizes trailing slashes and a trailing /v1 on the override", () => {
-    process.env.NEXT_PUBLIC_CONTROLNET_GATEWAY_URL = "https://gw.kentron.ai/v1/";
+    process.env.NEXT_PUBLIC_CONTROLNET_GATEWAY_URL =
+      "https://gw.kentron.ai/v1/";
     expect(getGatewayBaseUrl()).toBe("https://gw.kentron.ai");
   });
 

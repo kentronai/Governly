@@ -3,9 +3,9 @@
  * Updates the application's updated_by and updated_at fields whenever related data changes
  */
 
-import { db, applications } from '@db';
-import { eq } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { db, applications } from "@db";
+import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 /**
  * Updates the application's last updated timestamp and user
@@ -14,7 +14,7 @@ import { auth } from '@clerk/nextjs/server';
  */
 export const updateApplicationTimestamp = async (
   applicationId: string,
-  userId?: string
+  userId?: string,
 ): Promise<void> => {
   try {
     // Get user ID from auth if not provided
@@ -36,9 +36,8 @@ export const updateApplicationTimestamp = async (
         updatedAt: new Date().toISOString(),
       })
       .where(eq(applications.id, applicationId));
-
   } catch (error) {
-    console.error('Error updating application timestamp:', error);
+    console.error("Error updating application timestamp:", error);
     // Don't throw error to avoid breaking the main operation
   }
 };
@@ -52,15 +51,15 @@ export const updateApplicationTimestamp = async (
 export const withApplicationTracking = async <T>(
   applicationId: string,
   operation: () => Promise<T>,
-  userId?: string
+  userId?: string,
 ): Promise<T> => {
   try {
     // Execute the main operation
     const result = await operation();
-    
+
     // Update application timestamp after successful operation
     await updateApplicationTimestamp(applicationId, userId);
-    
+
     return result;
   } catch (error) {
     // Re-throw the error to maintain the original behavior

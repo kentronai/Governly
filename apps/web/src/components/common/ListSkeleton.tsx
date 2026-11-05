@@ -1,5 +1,5 @@
-import React from 'react';
-import { Skeleton } from '../ui/skeleton';
+import React from "react";
+import { Skeleton } from "../ui/skeleton";
 
 interface ListSkeletonProps {
   columns?: number;
@@ -19,10 +19,7 @@ const ListSkeleton = ({ columns = 10 }: ListSkeletonProps) => {
           }}
         >
           {Array.from({ length: columns }).map((_, colIndex) => (
-            <Skeleton
-              key={colIndex}
-              className="h-[20px] w-[95%] rounded-md"
-            />
+            <Skeleton key={colIndex} className="h-[20px] w-[95%] rounded-md" />
           ))}
         </div>
       ))}

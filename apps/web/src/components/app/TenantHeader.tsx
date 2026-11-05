@@ -69,7 +69,7 @@ export function TenantHeader() {
   }, [applicationId, tenant]);
 
   const shouldHideLogo = /^\/[^\/]+\/applications\/[^\/]+(\/.*)?$/.test(
-    pathname
+    pathname,
   );
 
   // Clerk, next-themes, and navigation hooks can resolve to browser-specific

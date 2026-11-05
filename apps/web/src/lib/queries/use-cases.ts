@@ -12,7 +12,7 @@ export const getUseCases = cache(async (applicationId: string) => {
   return await db.query.useCases.findMany({
     where: and(
       eq(useCases.applicationId, applicationId),
-      isNull(useCases.deletedAt)
+      isNull(useCases.deletedAt),
     ),
     with: {
       application: {

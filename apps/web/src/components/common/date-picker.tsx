@@ -1,14 +1,14 @@
-import * as React from 'react';
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import * as React from "react";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 
 interface Props {
   date: Date;
@@ -22,14 +22,14 @@ const DatePicker = ({ date, onChange, open, setOpen }: Props) => {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild className="w-full">
         <Button
-          variant={'outline'}
+          variant={"outline"}
           className={cn(
-            'justify-start text-left font-normal gap-2',
-            !date && 'text-muted-foreground'
+            "justify-start text-left font-normal gap-2",
+            !date && "text-muted-foreground",
           )}
         >
           <CalendarIcon size="16px" className="text-slate-500" />
-          {date ? format(date, 'dd/MM/yyyy') : <span>DD/MM/YYYY</span>}
+          {date ? format(date, "dd/MM/yyyy") : <span>DD/MM/YYYY</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

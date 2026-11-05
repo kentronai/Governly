@@ -8,7 +8,7 @@ export default function Overview() {
     totalControls: Object.keys(complianceData).length,
     totalSubcontrols: Object.values(complianceData).reduce(
       (total, section) => total + section.subcontrols.length,
-      0
+      0,
     ),
     completedSubcontrols: 45,
     overdueSubcontrols: 12,
@@ -18,9 +18,7 @@ export default function Overview() {
     <>
       {/* Overview Header */}
       <div className="mb-6">
-        <PageTitle className="mb-2">
-          Compliance Overview
-        </PageTitle>
+        <PageTitle className="mb-2">Compliance Overview</PageTitle>
         <p className="text-gray-600">
           Track your organization's progress toward AI compliance goals
         </p>
@@ -37,7 +35,7 @@ export default function Overview() {
             {Math.round(
               (overviewStats.completedSubcontrols /
                 overviewStats.totalSubcontrols) *
-                100
+                100,
             )}
             %
           </span>

@@ -10,7 +10,7 @@ import type { RawDiscoveredResource } from "./types";
 
 export async function discoverCloudWatchLogGroups(
   clients: AwsClientBundle,
-  lambdaFunctionNames: string[]
+  lambdaFunctionNames: string[],
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   const { cloudWatchLogs, region } = clients;
@@ -23,7 +23,7 @@ export async function discoverCloudWatchLogGroups(
   for (const prefix of prefixesToCheck) {
     try {
       const resp = await cloudWatchLogs.send(
-        new DescribeLogGroupsCommand({ logGroupNamePrefix: prefix })
+        new DescribeLogGroupsCommand({ logGroupNamePrefix: prefix }),
       );
       for (const group of resp.logGroups ?? []) {
         if (!group.logGroupName) continue;

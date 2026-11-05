@@ -119,7 +119,7 @@ export const getISOEndOfDay = (date: Date) => {
   const day = date.getUTCDate();
 
   const isoDate = new Date(
-    Date.UTC(year, month, day, 23, 59, 59)
+    Date.UTC(year, month, day, 23, 59, 59),
   ).toISOString();
   return isoDate;
 };
@@ -131,7 +131,7 @@ export const getISOEndOfDay = (date: Date) => {
  */
 export const getFormattedTimestamp = (
   timestamp: string,
-  includeTime: boolean = true
+  includeTime: boolean = true,
 ) => {
   const date = format(timestamp, "MM/dd/yyyy");
 
@@ -145,7 +145,7 @@ export const getFormattedTimestamp = (
 export const getFormattedDateString = (
   timestamp: string,
   includeTime = true,
-  includeUTCSuffix = true
+  includeUTCSuffix = true,
 ) => {
   const date = new Date(timestamp.replace(/,(\d)/, ", $1")); // normalize input
 
@@ -241,7 +241,7 @@ export interface customRule {
 
 export function transformQueriesToPayload(
   queryOne: RuleGroupType,
-  queryTwo: any[]
+  queryTwo: any[],
 ): RuleGroupType {
   const rules: customRule[] = [];
 
@@ -258,7 +258,7 @@ export function transformQueriesToPayload(
   const groupedByTypeOnly = ["classifier", "file_type"];
 
   const rest = queryTwo.filter(
-    (rule) => !groupedByTypeOnly.includes(rule.type)
+    (rule) => !groupedByTypeOnly.includes(rule.type),
   );
   const groupedByField = new Map();
 
@@ -357,12 +357,14 @@ export const getStaticFileUrl = (fileName: string) => {
   const bucketName = process.env.NEXT_PUBLIC_STATIC_FILES_BUCKET;
 
   if (!bucketName) {
-    throw new Error('NEXT_PUBLIC_STATIC_FILES_BUCKET environment variable is required');
+    throw new Error(
+      "NEXT_PUBLIC_STATIC_FILES_BUCKET environment variable is required",
+    );
   }
 
   // Default to AWS S3 (us-east-1). Override the region via
   // NEXT_PUBLIC_STATIC_FILES_REGION if the bucket lives elsewhere.
-  const region = process.env.NEXT_PUBLIC_STATIC_FILES_REGION || 'us-east-1';
+  const region = process.env.NEXT_PUBLIC_STATIC_FILES_REGION || "us-east-1";
   return `https://${bucketName}.s3.${region}.amazonaws.com/static/${fileName}`;
 };
 

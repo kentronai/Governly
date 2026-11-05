@@ -79,9 +79,7 @@ export default function Feedback() {
           {openModal === "support" && (
             <div className="flex w-full items-center">
               {/* <MdPersonAddAlt size={24} color="#000000" /> */}
-              <h2 className="flex mx-3  font-semibold text-lg">
-                Support
-              </h2>
+              <h2 className="flex mx-3  font-semibold text-lg">Support</h2>
             </div>
           )}
         </DialogHeader>

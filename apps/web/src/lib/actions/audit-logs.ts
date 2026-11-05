@@ -2,11 +2,11 @@
  * Server actions for Audit Logs
  */
 
-'use server';
+"use server";
 
-import { db, tenants, auditEvents, users } from '@db';
-import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
-import type { SQL } from 'drizzle-orm';
+import { db, tenants, auditEvents, users } from "@db";
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 export interface GetAuditLogsInput {
   tenantSlug: string;
@@ -22,11 +22,20 @@ export interface GetAuditLogsInput {
 
 export const getAuditLogs = async (input: GetAuditLogsInput) => {
   const page = input.page && input.page > 0 ? input.page : 1;
-  const pageSize = input.pageSize && input.pageSize > 0 ? Math.min(input.pageSize, 200) : 50;
+  const pageSize =
+    input.pageSize && input.pageSize > 0 ? Math.min(input.pageSize, 200) : 50;
 
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, input.tenantSlug)).limit(1);
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, input.tenantSlug))
+    .limit(1);
   if (!tenantRow.length) {
-    return { results: [], total: 0, pagination: { page, pageSize, totalPages: 1 } };
+    return {
+      results: [],
+      total: 0,
+      pagination: { page, pageSize, totalPages: 1 },
+    };
   }
   const tenantId = tenantRow[0].id;
 
@@ -36,14 +45,18 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
     const searchExpr = or(
       ilike(auditEvents.action, term),
       ilike(auditEvents.targetType, term),
-      ilike(auditEvents.targetId, term)
+      ilike(auditEvents.targetId, term),
     );
     if (searchExpr) conditions.push(searchExpr);
   }
-  if (input.action) conditions.push(ilike(auditEvents.action, `%${input.action}%`));
-  if (input.actorUserId) conditions.push(eq(auditEvents.actorUserId, input.actorUserId));
-  if (input.targetType) conditions.push(ilike(auditEvents.targetType, `%${input.targetType}%`));
-  if (input.dateFrom) conditions.push(gte(auditEvents.createdAt, input.dateFrom));
+  if (input.action)
+    conditions.push(ilike(auditEvents.action, `%${input.action}%`));
+  if (input.actorUserId)
+    conditions.push(eq(auditEvents.actorUserId, input.actorUserId));
+  if (input.targetType)
+    conditions.push(ilike(auditEvents.targetType, `%${input.targetType}%`));
+  if (input.dateFrom)
+    conditions.push(gte(auditEvents.createdAt, input.dateFrom));
   if (input.dateTo) conditions.push(lte(auditEvents.createdAt, input.dateTo));
 
   const whereExpr = and(...conditions);
@@ -80,18 +93,33 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return {
-    results: rows.map(r => {
+    results: rows.map((r) => {
       const metadata = (r.metadata as Record<string, unknown>) || {};
-      const contextFromMetadata = (metadata.context as Record<string, unknown>) || {};
-      
+      const contextFromMetadata =
+        (metadata.context as Record<string, unknown>) || {};
+
       // Build comprehensive context object from metadata.context and direct columns
       const context = {
-        ip_address: r.ipAddress || (contextFromMetadata.ip_address as string) || null,
-        user_agent: r.userAgent || (contextFromMetadata.user_agent as string) || (contextFromMetadata.ua as string) || null,
-        ua: r.userAgent || (contextFromMetadata.ua as string) || (contextFromMetadata.user_agent as string) || null,
+        ip_address:
+          r.ipAddress || (contextFromMetadata.ip_address as string) || null,
+        user_agent:
+          r.userAgent ||
+          (contextFromMetadata.user_agent as string) ||
+          (contextFromMetadata.ua as string) ||
+          null,
+        ua:
+          r.userAgent ||
+          (contextFromMetadata.ua as string) ||
+          (contextFromMetadata.user_agent as string) ||
+          null,
         referer: (contextFromMetadata.referer as string) || null,
         session_id: (contextFromMetadata.session_id as string) || null,
-        location: (contextFromMetadata.location as { type?: string; url?: string; domain?: string }) || null,
+        location:
+          (contextFromMetadata.location as {
+            type?: string;
+            url?: string;
+            domain?: string;
+          }) || null,
       };
 
       return {
@@ -106,7 +134,11 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
         ipAddress: r.ipAddress,
         userAgent: r.userAgent,
         created_at: r.createdAt,
-        actor: { id: r.actorUserId, name: r.actorName, user: { name: r.actorName, email: r.actorEmail } },
+        actor: {
+          id: r.actorUserId,
+          name: r.actorName,
+          user: { name: r.actorName, email: r.actorEmail },
+        },
       };
     }),
     total,
@@ -115,7 +147,11 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
 };
 
 export const getAuditLogById = async (tenantSlug: string, id: string) => {
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
   if (!tenantRow.length) return null;
   const tenantId = tenantRow[0].id;
 
@@ -142,16 +178,31 @@ export const getAuditLogById = async (tenantSlug: string, id: string) => {
   if (!rows.length) return null;
   const r = rows[0];
   const metadata = (r.metadata as Record<string, unknown>) || {};
-  const contextFromMetadata = (metadata.context as Record<string, unknown>) || {};
-  
+  const contextFromMetadata =
+    (metadata.context as Record<string, unknown>) || {};
+
   // Build comprehensive context object from metadata.context and direct columns
   const context = {
-    ip_address: r.ipAddress || (contextFromMetadata.ip_address as string) || null,
-    user_agent: r.userAgent || (contextFromMetadata.user_agent as string) || (contextFromMetadata.ua as string) || null,
-    ua: r.userAgent || (contextFromMetadata.ua as string) || (contextFromMetadata.user_agent as string) || null,
+    ip_address:
+      r.ipAddress || (contextFromMetadata.ip_address as string) || null,
+    user_agent:
+      r.userAgent ||
+      (contextFromMetadata.user_agent as string) ||
+      (contextFromMetadata.ua as string) ||
+      null,
+    ua:
+      r.userAgent ||
+      (contextFromMetadata.ua as string) ||
+      (contextFromMetadata.user_agent as string) ||
+      null,
     referer: (contextFromMetadata.referer as string) || null,
     session_id: (contextFromMetadata.session_id as string) || null,
-    location: (contextFromMetadata.location as { type?: string; url?: string; domain?: string }) || null,
+    location:
+      (contextFromMetadata.location as {
+        type?: string;
+        url?: string;
+        domain?: string;
+      }) || null,
   };
 
   return {
@@ -166,8 +217,10 @@ export const getAuditLogById = async (tenantSlug: string, id: string) => {
     ipAddress: r.ipAddress,
     userAgent: r.userAgent,
     created_at: r.createdAt,
-    actor: { id: r.actorUserId, name: r.actorName, user: { name: r.actorName, email: r.actorEmail } },
+    actor: {
+      id: r.actorUserId,
+      name: r.actorName,
+      user: { name: r.actorName, email: r.actorEmail },
+    },
   };
 };
-
-

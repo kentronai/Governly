@@ -1,41 +1,45 @@
 /**
  * API Route Tracking Wrapper
- * 
+ *
  * Provides easy-to-use wrappers for adding tracking to Next.js API routes
  * without modifying existing route handlers.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { trackServerAPICall, trackServerAPIError, ServerAPITrackingOptions } from './server-api-tracking'
+import { NextRequest, NextResponse } from "next/server";
+import {
+  trackServerAPICall,
+  trackServerAPIError,
+  ServerAPITrackingOptions,
+} from "./server-api-tracking";
 
 /**
  * Track GET requests
  */
 export function trackGET(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -43,29 +47,29 @@ export function trackGET(
  */
 export function trackPOST(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -73,29 +77,29 @@ export function trackPOST(
  */
 export function trackPUT(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -103,29 +107,29 @@ export function trackPUT(
  */
 export function trackDELETE(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -133,29 +137,29 @@ export function trackDELETE(
  */
 export function trackPATCH(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -163,29 +167,29 @@ export function trackPATCH(
  */
 export function trackAPI(
   handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
   return async (request: NextRequest, context?: any): Promise<NextResponse> => {
-    const startTime = Date.now()
-    let response: NextResponse | undefined
-    let error: Error | undefined
+    const startTime = Date.now();
+    let response: NextResponse | undefined;
+    let error: Error | undefined;
 
     try {
-      response = await handler(request, context)
-      return response
+      response = await handler(request, context);
+      return response;
     } catch (err) {
-      error = err instanceof Error ? err : new Error(String(err))
-      
+      error = err instanceof Error ? err : new Error(String(err));
+
       // Track error
-      await trackServerAPIError(request, error, options)
-      throw err
+      await trackServerAPIError(request, error, options);
+      throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(request, response, startTime, error, options)
+        await trackServerAPICall(request, response, startTime, error, options);
       }
     }
-  }
+  };
 }
 
 /**
@@ -193,33 +197,33 @@ export function trackAPI(
  */
 export function createTrackedHandlers(
   handlers: {
-    GET?: (request: NextRequest, context?: any) => Promise<NextResponse>
-    POST?: (request: NextRequest, context?: any) => Promise<NextResponse>
-    PUT?: (request: NextRequest, context?: any) => Promise<NextResponse>
-    DELETE?: (request: NextRequest, context?: any) => Promise<NextResponse>
-    PATCH?: (request: NextRequest, context?: any) => Promise<NextResponse>
+    GET?: (request: NextRequest, context?: any) => Promise<NextResponse>;
+    POST?: (request: NextRequest, context?: any) => Promise<NextResponse>;
+    PUT?: (request: NextRequest, context?: any) => Promise<NextResponse>;
+    DELETE?: (request: NextRequest, context?: any) => Promise<NextResponse>;
+    PATCH?: (request: NextRequest, context?: any) => Promise<NextResponse>;
   },
-  options: ServerAPITrackingOptions = {}
+  options: ServerAPITrackingOptions = {},
 ) {
-  const trackedHandlers: any = {}
+  const trackedHandlers: any = {};
 
   if (handlers.GET) {
-    trackedHandlers.GET = trackGET(handlers.GET, options)
+    trackedHandlers.GET = trackGET(handlers.GET, options);
   }
   if (handlers.POST) {
-    trackedHandlers.POST = trackPOST(handlers.POST, options)
+    trackedHandlers.POST = trackPOST(handlers.POST, options);
   }
   if (handlers.PUT) {
-    trackedHandlers.PUT = trackPUT(handlers.PUT, options)
+    trackedHandlers.PUT = trackPUT(handlers.PUT, options);
   }
   if (handlers.DELETE) {
-    trackedHandlers.DELETE = trackDELETE(handlers.DELETE, options)
+    trackedHandlers.DELETE = trackDELETE(handlers.DELETE, options);
   }
   if (handlers.PATCH) {
-    trackedHandlers.PATCH = trackPATCH(handlers.PATCH, options)
+    trackedHandlers.PATCH = trackPATCH(handlers.PATCH, options);
   }
 
-  return trackedHandlers
+  return trackedHandlers;
 }
 
 /**
@@ -235,7 +239,7 @@ export const TRACKING_OPTIONS = {
     includeUserId: true,
     includeTenantId: true,
   },
-  
+
   // Webhook endpoints (less verbose)
   WEBHOOK: {
     trackRequestSize: false,
@@ -245,7 +249,7 @@ export const TRACKING_OPTIONS = {
     includeUserId: false,
     includeTenantId: false,
   },
-  
+
   // Health check endpoints (minimal)
   HEALTH: {
     trackRequestSize: false,
@@ -255,7 +259,7 @@ export const TRACKING_OPTIONS = {
     includeUserId: false,
     includeTenantId: false,
   },
-  
+
   // High-frequency endpoints (optimized)
   HIGH_FREQUENCY: {
     trackRequestSize: false,
@@ -264,5 +268,5 @@ export const TRACKING_OPTIONS = {
     trackIPAddress: false,
     includeUserId: true,
     includeTenantId: true,
-  }
-} as const
+  },
+} as const;

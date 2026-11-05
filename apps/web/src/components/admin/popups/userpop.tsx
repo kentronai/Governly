@@ -1,29 +1,29 @@
-import { MdPersonAddAlt } from 'react-icons/md';
-import { GrFormClose } from 'react-icons/gr';
-import React, { useState } from 'react';
-import { RiInformationLine } from 'react-icons/ri';
+import { MdPersonAddAlt } from "react-icons/md";
+import { GrFormClose } from "react-icons/gr";
+import React, { useState } from "react";
+import { RiInformationLine } from "react-icons/ri";
 
 interface UserPopupProps {
   onClose: () => void;
 }
 
 const UserPopup: React.FC<UserPopupProps> = ({ onClose }) => {
-  const [name, setName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
   const handleSave = () => {
     // Validate name
     if (!name.trim()) {
-      setNameError('Please enter a valid name');
+      setNameError("Please enter a valid name");
       return;
     }
 
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      setEmailError('Please enter a valid email address');
+      setEmailError("Please enter a valid email address");
       return;
     }
 
@@ -72,7 +72,7 @@ const UserPopup: React.FC<UserPopupProps> = ({ onClose }) => {
           {/* Email ID */}
           <div className="flex w-full mx-6 -mb-6  my-0">
             <span className="flex text-sm 2xl:text-base h-full items-center">
-              Email ID{' '}
+              Email ID{" "}
             </span>
             <span className="flex h-full items-center text-[#8D8D8D] text-xs 2xl:text-sm mx-2">
               *

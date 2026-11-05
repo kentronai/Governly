@@ -29,18 +29,18 @@ interface AddProjectData {
 }
 
 const STORAGE_KEYS = {
-  PROJECTS: 'projects_data',
-  PROJECTS_META: 'projects_meta',
-  SELECTED_PROJECT: 'selected_project',
-  PROJECT_FILTERS: 'project_filters',
-  PROJECT_PAGINATION: 'project_pagination'
+  PROJECTS: "projects_data",
+  PROJECTS_META: "projects_meta",
+  SELECTED_PROJECT: "selected_project",
+  PROJECT_FILTERS: "project_filters",
+  PROJECT_PAGINATION: "project_pagination",
 };
 
 // Check if localStorage is available
 const isLocalStorageAvailable = (): boolean => {
   try {
-    const testKey = '__localStorage_test__';
-    localStorage.setItem(testKey, 'test');
+    const testKey = "__localStorage_test__";
+    localStorage.setItem(testKey, "test");
     localStorage.removeItem(testKey);
     return true;
   } catch {
@@ -59,7 +59,7 @@ const safeLocalStorage = {
       return null;
     }
   },
-  
+
   setItem: (key: string, value: string): boolean => {
     if (!isLocalStorageAvailable()) return false;
     try {
@@ -70,7 +70,7 @@ const safeLocalStorage = {
       return false;
     }
   },
-  
+
   removeItem: (key: string): boolean => {
     if (!isLocalStorageAvailable()) return false;
     try {
@@ -80,7 +80,7 @@ const safeLocalStorage = {
       console.warn(`Failed to remove item from localStorage: ${key}`, error);
       return false;
     }
-  }
+  },
 };
 
 // Project-specific localStorage functions
@@ -92,7 +92,7 @@ export const projectStorage = {
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.warn('Failed to parse projects from localStorage', error);
+      console.warn("Failed to parse projects from localStorage", error);
       return [];
     }
   },
@@ -103,7 +103,7 @@ export const projectStorage = {
       const data = JSON.stringify(projects);
       return safeLocalStorage.setItem(STORAGE_KEYS.PROJECTS, data);
     } catch (error) {
-      console.warn('Failed to save projects to localStorage', error);
+      console.warn("Failed to save projects to localStorage", error);
       return false;
     }
   },
@@ -117,41 +117,44 @@ export const projectStorage = {
         sProjectId: `PROJ_${Date.now()}`,
         ...projectData,
         dCreatedAt: new Date().toISOString(),
-        dUpdatedAt: new Date().toISOString()
+        dUpdatedAt: new Date().toISOString(),
       };
-      
+
       projects.unshift(newProject); // Add to beginning
-      
+
       if (projectStorage.saveProjects(projects)) {
         return newProject;
       }
       return null;
     } catch (error) {
-      console.warn('Failed to add project', error);
+      console.warn("Failed to add project", error);
       return null;
     }
   },
 
   // Update an existing project
-  updateProject: (projectId: string, updatedData: Partial<Project>): Project | null => {
+  updateProject: (
+    projectId: string,
+    updatedData: Partial<Project>,
+  ): Project | null => {
     try {
       const projects = projectStorage.getProjects();
-      const projectIndex = projects.findIndex(p => p._id === projectId);
-      
+      const projectIndex = projects.findIndex((p) => p._id === projectId);
+
       if (projectIndex === -1) return null;
-      
+
       projects[projectIndex] = {
         ...projects[projectIndex],
         ...updatedData,
-        dUpdatedAt: new Date().toISOString()
+        dUpdatedAt: new Date().toISOString(),
       };
-      
+
       if (projectStorage.saveProjects(projects)) {
         return projects[projectIndex];
       }
       return null;
     } catch (error) {
-      console.warn('Failed to update project', error);
+      console.warn("Failed to update project", error);
       return null;
     }
   },
@@ -160,10 +163,10 @@ export const projectStorage = {
   deleteProject: (projectId: string): boolean => {
     try {
       const projects = projectStorage.getProjects();
-      const filteredProjects = projects.filter(p => p._id !== projectId);
+      const filteredProjects = projects.filter((p) => p._id !== projectId);
       return projectStorage.saveProjects(filteredProjects);
     } catch (error) {
-      console.warn('Failed to delete project', error);
+      console.warn("Failed to delete project", error);
       return false;
     }
   },
@@ -171,35 +174,42 @@ export const projectStorage = {
   // Get project by ID
   getProjectById: (projectId: string): Project | null => {
     const projects = projectStorage.getProjects();
-    return projects.find(p => p._id === projectId) || null;
+    return projects.find((p) => p._id === projectId) || null;
   },
 
   // Search projects
   searchProjects: (searchTerm: string, status?: string): Project[] => {
     const projects = projectStorage.getProjects();
-    return projects.filter(project => {
-      const matchesSearch = !searchTerm || 
+    return projects.filter((project) => {
+      const matchesSearch =
+        !searchTerm ||
         project.sProjectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.sDescription.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = !status || status === 'active' || project.eStatus === status;
-      
+
+      const matchesStatus =
+        !status || status === "active" || project.eStatus === status;
+
       return matchesSearch && matchesStatus;
     });
   },
 
   // Get paginated projects
-  getPaginatedProjects: (page: number, pageSize: number, searchTerm?: string, status?: string) => {
-    const allProjects = projectStorage.searchProjects(searchTerm || '', status);
+  getPaginatedProjects: (
+    page: number,
+    pageSize: number,
+    searchTerm?: string,
+    status?: string,
+  ) => {
+    const allProjects = projectStorage.searchProjects(searchTerm || "", status);
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    
+
     return {
       projects: allProjects.slice(startIndex, endIndex),
       totalCount: allProjects.length,
       totalPages: Math.ceil(allProjects.length / pageSize),
       currentPage: page,
-      pageSize
+      pageSize,
     };
   },
 
@@ -209,7 +219,7 @@ export const projectStorage = {
       const data = JSON.stringify(project);
       return safeLocalStorage.setItem(STORAGE_KEYS.SELECTED_PROJECT, data);
     } catch (error) {
-      console.warn('Failed to save selected project', error);
+      console.warn("Failed to save selected project", error);
       return false;
     }
   },
@@ -220,7 +230,7 @@ export const projectStorage = {
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.warn('Failed to parse selected project', error);
+      console.warn("Failed to parse selected project", error);
       return null;
     }
   },
@@ -231,19 +241,19 @@ export const projectStorage = {
       const data = JSON.stringify(filters);
       return safeLocalStorage.setItem(STORAGE_KEYS.PROJECT_FILTERS, data);
     } catch (error) {
-      console.warn('Failed to save filters', error);
+      console.warn("Failed to save filters", error);
       return false;
     }
   },
 
   getFilters: (): { search: string; status: string } => {
     const data = safeLocalStorage.getItem(STORAGE_KEYS.PROJECT_FILTERS);
-    if (!data) return { search: '', status: 'active' };
+    if (!data) return { search: "", status: "active" };
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.warn('Failed to parse filters', error);
-      return { search: '', status: 'active' };
+      console.warn("Failed to parse filters", error);
+      return { search: "", status: "active" };
     }
   },
 
@@ -252,7 +262,7 @@ export const projectStorage = {
       const data = JSON.stringify(pagination);
       return safeLocalStorage.setItem(STORAGE_KEYS.PROJECT_PAGINATION, data);
     } catch (error) {
-      console.warn('Failed to save pagination', error);
+      console.warn("Failed to save pagination", error);
       return false;
     }
   },
@@ -263,7 +273,7 @@ export const projectStorage = {
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.warn('Failed to parse pagination', error);
+      console.warn("Failed to parse pagination", error);
       return { page: 1, pageSize: 50 };
     }
   },
@@ -272,10 +282,14 @@ export const projectStorage = {
   clearAll: (): boolean => {
     let success = true;
     success = success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECTS);
-    success = success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECTS_META);
-    success = success && safeLocalStorage.removeItem(STORAGE_KEYS.SELECTED_PROJECT);
-    success = success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECT_FILTERS);
-    success = success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECT_PAGINATION);
+    success =
+      success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECTS_META);
+    success =
+      success && safeLocalStorage.removeItem(STORAGE_KEYS.SELECTED_PROJECT);
+    success =
+      success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECT_FILTERS);
+    success =
+      success && safeLocalStorage.removeItem(STORAGE_KEYS.PROJECT_PAGINATION);
     return success;
-  }
+  },
 };

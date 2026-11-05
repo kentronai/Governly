@@ -1,7 +1,15 @@
 // src/lib/rbac.ts
-import { auth } from '@clerk/nextjs/server';
-import { requireActiveTenantId, hasPermission, hasRole, hasAnyPermission, hasAnyRole, PERMISSIONS, ROLES } from '@db';
-import { NextResponse } from 'next/server';
+import { auth } from "@clerk/nextjs/server";
+import {
+  requireActiveTenantId,
+  hasPermission,
+  hasRole,
+  hasAnyPermission,
+  hasAnyRole,
+  PERMISSIONS,
+  ROLES,
+} from "@db";
+import { NextResponse } from "next/server";
 
 export interface RBACContext {
   tenantId: string;
@@ -23,56 +31,68 @@ export async function getRBACContext(): Promise<RBACContext> {
  */
 export async function requireAuth(): Promise<RBACContext> {
   const { userId, orgId } = await auth();
-  
+
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
-  
+
   if (!orgId) {
-    throw new Error('Organization context required');
+    throw new Error("Organization context required");
   }
-  
+
   return await getRBACContext();
 }
 
 /**
  * Guard function that requires specific permission
  */
-export async function requirePermission(permission: string): Promise<RBACContext> {
+export async function requirePermission(
+  permission: string,
+): Promise<RBACContext> {
   const context = await requireAuth();
-  
+
   if (!hasPermission(context, permission)) {
     throw new Error(`Permission '${permission}' required`);
   }
-  
+
   return context;
 }
 
 /**
  * Guard function that requires any of the specified permissions
  */
-export async function requireAnyPermission(permissions: string[]): Promise<RBACContext> {
+export async function requireAnyPermission(
+  permissions: string[],
+): Promise<RBACContext> {
   const context = await requireAuth();
-  
+
   if (!hasAnyPermission(context, permissions)) {
-    throw new Error(`One of the following permissions required: ${permissions.join(', ')}`);
+    throw new Error(
+      `One of the following permissions required: ${permissions.join(", ")}`,
+    );
   }
-  
+
   return context;
 }
 
 /**
  * Guard function that requires all of the specified permissions
  */
-export async function requireAllPermissions(permissions: string[]): Promise<RBACContext> {
+export async function requireAllPermissions(
+  permissions: string[],
+): Promise<RBACContext> {
   const context = await requireAuth();
-  
-  const missingPermissions = permissions.filter(permission => !hasPermission(context, permission));
-  
+
+  const missingPermissions = permissions.filter(
+    (permission) => !hasPermission(context, permission),
+  );
+
   if (missingPermissions.length > 0) {
-    throw new Error(`Missing required permissions: ${missingPermissions.join(', ')}`);
+    throw new Error(
+      `Missing required permissions: ${missingPermissions.join(", ")}`,
+    );
   }
-  
+
   return context;
 }
 
@@ -81,11 +101,11 @@ export async function requireAllPermissions(permissions: string[]): Promise<RBAC
  */
 export async function requireRole(role: string): Promise<RBACContext> {
   const context = await requireAuth();
-  
+
   if (!hasRole(context, role)) {
     throw new Error(`Role '${role}' required`);
   }
-  
+
   return context;
 }
 
@@ -94,11 +114,11 @@ export async function requireRole(role: string): Promise<RBACContext> {
  */
 export async function requireAnyRole(roles: string[]): Promise<RBACContext> {
   const context = await requireAuth();
-  
+
   if (!hasAnyRole(context, roles)) {
-    throw new Error(`One of the following roles required: ${roles.join(', ')}`);
+    throw new Error(`One of the following roles required: ${roles.join(", ")}`);
   }
-  
+
   return context;
 }
 
@@ -119,14 +139,18 @@ export async function requireOwner(): Promise<RBACContext> {
 /**
  * Create a Next.js response for unauthorized access
  */
-export function unauthorizedResponse(message: string = 'Unauthorized access'): NextResponse {
+export function unauthorizedResponse(
+  message: string = "Unauthorized access",
+): NextResponse {
   return NextResponse.json({ error: message }, { status: 403 });
 }
 
 /**
  * Create a Next.js response for authentication required
  */
-export function authenticationRequiredResponse(message: string = 'Authentication required'): NextResponse {
+export function authenticationRequiredResponse(
+  message: string = "Authentication required",
+): NextResponse {
   return NextResponse.json({ error: message }, { status: 401 });
 }
 
@@ -138,12 +162,12 @@ export function withRBAC<T extends any[]>(
   permission?: string,
   permissions?: string[],
   role?: string,
-  roles?: string[]
+  roles?: string[],
 ) {
   return async (...args: T): Promise<Response> => {
     try {
       let context: RBACContext;
-      
+
       if (role) {
         context = await requireRole(role);
       } else if (roles) {
@@ -155,15 +179,16 @@ export function withRBAC<T extends any[]>(
       } else {
         context = await requireAuth();
       }
-      
+
       return await handler(context, ...args);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unauthorized access';
-      
-      if (message.includes('Authentication required')) {
+      const message =
+        error instanceof Error ? error.message : "Unauthorized access";
+
+      if (message.includes("Authentication required")) {
         return authenticationRequiredResponse(message);
       }
-      
+
       return unauthorizedResponse(message);
     }
   };
@@ -172,33 +197,53 @@ export function withRBAC<T extends any[]>(
 /**
  * Permission-based API route decorators
  */
-export const withPermission = (permission: string) => 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
+export const withPermission =
+  (permission: string) =>
+  <T extends any[]>(
+    handler: (context: RBACContext, ...args: T) => Promise<Response>,
+  ) =>
     withRBAC(handler, permission);
 
-export const withAnyPermission = (permissions: string[]) => 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
+export const withAnyPermission =
+  (permissions: string[]) =>
+  <T extends any[]>(
+    handler: (context: RBACContext, ...args: T) => Promise<Response>,
+  ) =>
     withRBAC(handler, undefined, permissions);
 
-export const withAllPermissions = (permissions: string[]) => 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
+export const withAllPermissions =
+  (permissions: string[]) =>
+  <T extends any[]>(
+    handler: (context: RBACContext, ...args: T) => Promise<Response>,
+  ) =>
     withRBAC(handler, undefined, permissions);
 
-export const withRole = (role: string) => 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
+export const withRole =
+  (role: string) =>
+  <T extends any[]>(
+    handler: (context: RBACContext, ...args: T) => Promise<Response>,
+  ) =>
     withRBAC(handler, undefined, undefined, role);
 
-export const withAnyRole = (roles: string[]) => 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
+export const withAnyRole =
+  (roles: string[]) =>
+  <T extends any[]>(
+    handler: (context: RBACContext, ...args: T) => Promise<Response>,
+  ) =>
     withRBAC(handler, undefined, undefined, undefined, roles);
 
-export const withAdmin = 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
-    withRBAC(handler, undefined, undefined, undefined, [ROLES.ADMIN, ROLES.ORG_ADMIN, ROLES.OWNER]);
+export const withAdmin = <T extends any[]>(
+  handler: (context: RBACContext, ...args: T) => Promise<Response>,
+) =>
+  withRBAC(handler, undefined, undefined, undefined, [
+    ROLES.ADMIN,
+    ROLES.ORG_ADMIN,
+    ROLES.OWNER,
+  ]);
 
-export const withOwner = 
-  <T extends any[]>(handler: (context: RBACContext, ...args: T) => Promise<Response>) =>
-    withRBAC(handler, undefined, undefined, ROLES.OWNER);
+export const withOwner = <T extends any[]>(
+  handler: (context: RBACContext, ...args: T) => Promise<Response>,
+) => withRBAC(handler, undefined, undefined, ROLES.OWNER);
 
 /**
  * Server Action RBAC guards
@@ -208,11 +253,11 @@ export async function guardServerAction<T>(
   permission?: string,
   permissions?: string[],
   role?: string,
-  roles?: string[]
+  roles?: string[],
 ): Promise<T> {
   try {
     let context: RBACContext;
-    
+
     if (role) {
       context = await requireRole(role);
     } else if (roles) {
@@ -224,10 +269,11 @@ export async function guardServerAction<T>(
     } else {
       context = await requireAuth();
     }
-    
+
     return await action();
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unauthorized access';
+    const message =
+      error instanceof Error ? error.message : "Unauthorized access";
     throw new Error(message);
   }
 }

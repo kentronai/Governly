@@ -8,5 +8,5 @@ export function validateEmail(email: string): boolean {
  * Safe to use in Edge Runtime (middleware) - no database access
  */
 export function isKentronEmail(email: string): boolean {
-  return email.endsWith('@kentron.ai');
+  return email.endsWith("@kentron.ai");
 }

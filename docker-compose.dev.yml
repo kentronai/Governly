@@ -278,6 +278,29 @@ services:
           sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
         done
 
+  # AI Radar scheduler. Polls hourly; the endpoint itself only starts a sweep
+  # when the last one is older than RADAR_INTERVAL_HOURS (default 72 = every
+  # 3 days), so restarts/redeploys never trigger an early run.
+  ai-radar-scheduler:
+    image: alpine:3.20
+    container_name: controlnet-ai-radar-scheduler
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:-norix-local-agent-discovery}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          wget -qO- --timeout=60 \
+            --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
+            http://web:8080/api/cron/ai-radar || true
+          sleep 3600
+        done
+
   # ------------------------------------------------------------------
   # Self-hosted Nango (open-source, free — no Nango cloud account).
   # Same Auth + Proxy layer as prod; NORIX web reaches it at

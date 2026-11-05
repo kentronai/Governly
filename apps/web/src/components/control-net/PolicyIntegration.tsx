@@ -208,7 +208,10 @@ const response = await client.chat.completions.create({
         <h4 className="text-xl font-semibold">Integration</h4>
       </div>
 
-      <Tabs value={mode} onValueChange={(value) => setMode(value as IntegrationMode)}>
+      <Tabs
+        value={mode}
+        onValueChange={(value) => setMode(value as IntegrationMode)}
+      >
         <TabsList>
           <TabsTrigger value="check">Policy check</TabsTrigger>
           <TabsTrigger value="proxy">Proxy through NORIX</TabsTrigger>

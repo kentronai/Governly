@@ -12,7 +12,7 @@ export default function Control({
     totalControls: Object.keys(complianceData).length,
     totalSubcontrols: Object.values(complianceData).reduce(
       (total, section) => total + section.subcontrols.length,
-      0
+      0,
     ),
     completedSubcontrols: 45,
     overdueSubcontrols: 12,
@@ -61,7 +61,7 @@ export default function Control({
             {Math.round(
               (overviewStats.completedSubcontrols /
                 overviewStats.totalSubcontrols) *
-                100
+                100,
             )}
             %
           </span>

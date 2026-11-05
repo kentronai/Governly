@@ -62,7 +62,7 @@ export const CustomToast: React.FC<CustomToastProps> = ({
 export const showSuccessToast = (
   message: string,
   icon: string = "✅",
-  description?: string
+  description?: string,
 ) => {
   // First remove any existing toasts to prevent stacking
   toast.remove(TOAST_ID);
@@ -81,7 +81,7 @@ export const showSuccessToast = (
       id: TOAST_ID,
       duration: 5000,
       position: "top-right",
-    }
+    },
   );
 
   // Additional safety timeout to ensure toast is removed
@@ -108,7 +108,7 @@ export const showErrorToast = (message: string, description?: string) => {
       id: TOAST_ID,
       duration: 5000,
       position: "top-right",
-    }
+    },
   );
 
   // Additional safety timeout to ensure toast is removed

@@ -1,6 +1,6 @@
-import { errorToast } from '@/lib/utils/toast';
-import { CircleX } from 'lucide-react';
-import React, { useState } from 'react';
+import { errorToast } from "@/lib/utils/toast";
+import { CircleX } from "lucide-react";
+import React, { useState } from "react";
 
 interface Props {
   files: File[] | null;
@@ -19,120 +19,141 @@ const FileUploader = ({
   maxFiles = 50,
   maxTotalSizeMB = 100,
 }: Props) => {
-  const allowedFormats = ['.pdf', '.txt', '.zip'];
+  const allowedFormats = [".pdf", ".txt", ".zip"];
   const [dragActive, setDragActive] = useState<boolean>(false);
 
   const validateFileTypes = (fileList: File[]): boolean => {
     // Check if all files have allowed extensions
-    const invalidFiles = fileList.filter(file => {
-      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    const invalidFiles = fileList.filter((file) => {
+      const extension = "." + file.name.split(".").pop()?.toLowerCase();
       return !allowedFormats.includes(extension);
     });
-    
+
     if (invalidFiles.length > 0) {
-      const extensions = invalidFiles.map(file => '.' + file.name.split('.').pop()?.toLowerCase());
-      errorToast({ message: `Unsupported file format(s): ${Array.from(new Set(extensions)).join(', ')}` });
+      const extensions = invalidFiles.map(
+        (file) => "." + file.name.split(".").pop()?.toLowerCase(),
+      );
+      errorToast({
+        message: `Unsupported file format(s): ${Array.from(new Set(extensions)).join(", ")}`,
+      });
       return false;
     }
-    
+
     return true;
   };
 
   // New function to validate total file size
-  const validateTotalFileSize = (newFiles: File[], existingFiles: File[] = []): boolean => {
+  const validateTotalFileSize = (
+    newFiles: File[],
+    existingFiles: File[] = [],
+  ): boolean => {
     const maxSizeBytes = maxTotalSizeMB * 1024 * 1024; // Convert MB to bytes
-    
+
     // Calculate total size of all files (new + existing)
-    const newFilesSize = Array.from(newFiles).reduce((total, file) => total + file.size, 0);
-    const existingFilesSize = existingFiles.reduce((total, file) => total + file.size, 0);
+    const newFilesSize = Array.from(newFiles).reduce(
+      (total, file) => total + file.size,
+      0,
+    );
+    const existingFilesSize = existingFiles.reduce(
+      (total, file) => total + file.size,
+      0,
+    );
     const totalSize = newFilesSize + existingFilesSize;
-    
+
     if (totalSize > maxSizeBytes) {
-      errorToast({ message: `You cannot upload more than ${maxTotalSizeMB} MB of files.` });
+      errorToast({
+        message: `You cannot upload more than ${maxTotalSizeMB} MB of files.`,
+      });
       return false;
     }
-    
+
     return true;
   };
 
-  const validateFiles = (fileList: FileList, existingFiles: File[] | null = files): boolean => {
+  const validateFiles = (
+    fileList: FileList,
+    existingFiles: File[] | null = files,
+  ): boolean => {
     // Create arrays from the FileList for easier processing
     const newFilesArray = Array.from(fileList);
     const existingFilesArray = existingFiles || [];
-    
+
     // First check if file types are valid
     if (!validateFileTypes(newFilesArray)) {
       return false;
     }
-    
+
     // Check total file size
     if (!validateTotalFileSize(newFilesArray, existingFilesArray)) {
       return false;
     }
-    
+
     // Check if we exceed max files when combining existing and new files
-    if (allowMulti && existingFilesArray.length + newFilesArray.length > maxFiles) {
+    if (
+      allowMulti &&
+      existingFilesArray.length + newFilesArray.length > maxFiles
+    ) {
       errorToast({ message: `Maximum ${maxFiles} files allowed` });
       return false;
     }
-    
+
     // Count ZIP files in the new selection
-    const newZipFiles = newFilesArray.filter(file => 
-      file.name.toLowerCase().endsWith('.zip')
+    const newZipFiles = newFilesArray.filter((file) =>
+      file.name.toLowerCase().endsWith(".zip"),
     );
-    
+
     // Count existing ZIP files
-    const existingZipFiles = existingFilesArray.filter(file => 
-      file.name.toLowerCase().endsWith('.zip')
+    const existingZipFiles = existingFilesArray.filter((file) =>
+      file.name.toLowerCase().endsWith(".zip"),
     );
-    
+
     // If we're trying to add more ZIP files and already have one
     if (newZipFiles.length > 0 && existingZipFiles.length > 0) {
-      errorToast({ message: 'Only one ZIP file is allowed' });
+      errorToast({ message: "Only one ZIP file is allowed" });
       return false;
     }
-    
+
     // If the new selection itself has multiple ZIP files
     if (newZipFiles.length > 1) {
-      errorToast({ message: 'Only one ZIP file is allowed' });
+      errorToast({ message: "Only one ZIP file is allowed" });
       return false;
     }
-    
+
     return true;
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
-    
+
     const newFiles = event.target.files;
-    
+
     if (allowMulti) {
       // For multi-file mode, we want to append files, not replace them
       if (!validateFiles(newFiles)) return;
-      
+
       // Combine existing files with new files
       const existingFiles = files || [];
       const combinedFiles = [...existingFiles, ...Array.from(newFiles)];
-      
+
       // Create a new DataTransfer object to convert array back to FileList
       const dataTransfer = new DataTransfer();
-      combinedFiles.forEach(file => dataTransfer.items.add(file));
-      
+      combinedFiles.forEach((file) => dataTransfer.items.add(file));
+
       uploadFiles(dataTransfer.files);
     } else {
       // For single file mode, just replace the file
       if (!validateFiles(newFiles)) return;
       uploadFiles(newFiles);
     }
-    
+
     // Clear the input to ensure onChange fires even if the same file is selected again
-    event.target.value = '';
+    event.target.value = "";
   };
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -144,22 +165,22 @@ const FileUploader = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const newFiles = e.dataTransfer.files;
-      
+
       if (allowMulti) {
         // For multi-file mode, we want to append files, not replace them
         if (!validateFiles(newFiles)) return;
-        
+
         // Combine existing files with new files
         const existingFiles = files || [];
         const combinedFiles = [...existingFiles, ...Array.from(newFiles)];
-        
+
         // Create a new DataTransfer object to convert array back to FileList
         const dataTransfer = new DataTransfer();
-        combinedFiles.forEach(file => dataTransfer.items.add(file));
-        
+        combinedFiles.forEach((file) => dataTransfer.items.add(file));
+
         uploadFiles(dataTransfer.files);
       } else {
         // For single file mode, just replace the file
@@ -171,14 +192,14 @@ const FileUploader = ({
 
   const removeFile = (index: number) => {
     if (!files) return;
-    
+
     const newFiles = [...files];
     newFiles.splice(index, 1);
-    
+
     // Create a new DataTransfer object to convert array back to FileList
     const dataTransfer = new DataTransfer();
-    newFiles.forEach(file => dataTransfer.items.add(file));
-    
+    newFiles.forEach((file) => dataTransfer.items.add(file));
+
     uploadFiles(dataTransfer.files.length > 0 ? dataTransfer.files : null);
   };
 
@@ -194,15 +215,17 @@ const FileUploader = ({
   };
 
   // Calculate total size of all files
-  const totalSize = files ? files.reduce((total, file) => total + file.size, 0) : 0;
+  const totalSize = files
+    ? files.reduce((total, file) => total + file.size, 0)
+    : 0;
 
   return (
     <div>
       <div
         className={`cursor-pointer border border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-gray-50 min-h-52 transition duration-200 
-          ${files && files.length > 0 && 'bg-blue-50 hover:bg-blue-50'} 
-          ${error && 'bg-red-50 hover:bg-red-100 border-red-200'}
-          ${dragActive && 'bg-blue-100 border-blue-400'}`}
+          ${files && files.length > 0 && "bg-blue-50 hover:bg-blue-50"} 
+          ${error && "bg-red-50 hover:bg-red-100 border-red-200"}
+          ${dragActive && "bg-blue-100 border-blue-400"}`}
         onDragEnter={handleDrag}
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
@@ -214,14 +237,15 @@ const FileUploader = ({
           className="hidden"
           onChange={handleFileChange}
           multiple={allowMulti}
-          accept={allowedFormats.join(', ')}
+          accept={allowedFormats.join(", ")}
         />
         {files && files.length > 0 ? (
           <>
             <div className="w-full">
               <div className="mb-2 text-center">
                 <p className="font-medium">
-                  {files.length} {files.length === 1 ? 'file' : 'files'} selected
+                  {files.length} {files.length === 1 ? "file" : "files"}{" "}
+                  selected
                 </p>
                 <p className="text-sm text-gray-500">
                   Total size: {formatFileSize(totalSize)} / {maxTotalSizeMB} MB
@@ -229,12 +253,17 @@ const FileUploader = ({
               </div>
               <div className="max-h-40 overflow-y-auto">
                 {files.map((file, index) => (
-                  <div key={index} className="flex justify-between items-center py-1 px-2 my-1 bg-white rounded border border-gray-200">
+                  <div
+                    key={index}
+                    className="flex justify-between items-center py-1 px-2 my-1 bg-white rounded border border-gray-200"
+                  >
                     <div className="flex flex-col truncate max-w-xs">
                       <span className="truncate">{file.name}</span>
-                      <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
+                      <span className="text-xs text-gray-500">
+                        {formatFileSize(file.size)}
+                      </span>
                     </div>
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         removeFile(index);
@@ -251,13 +280,13 @@ const FileUploader = ({
               htmlFor="fileInput"
               className="mt-4 underline text-blue-500 text-sm"
             >
-              {allowMulti ? 'Add more files' : 'Change file'}
+              {allowMulti ? "Add more files" : "Change file"}
             </label>
           </>
         ) : (
           <>
             <label htmlFor="fileInput" className="text-gray-600 text-md">
-              Drag & drop your {allowMulti ? 'files' : 'file'} here or{' '}
+              Drag & drop your {allowMulti ? "files" : "file"} here or{" "}
               <span className="text-blue-500">click</span> to upload
             </label>
             <p className="mt-2 text-gray-600 text-md">

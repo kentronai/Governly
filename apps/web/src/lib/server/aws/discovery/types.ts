@@ -43,7 +43,8 @@ export type DiscoveredResourceType =
   | "crewai_deployment"
   | "crewai_crew"
   | "crewai_agent"
-  | "crewai_task";
+  | "crewai_task"
+  | "github_repository";
 
 export interface RawDiscoveredResource {
   resourceType: DiscoveredResourceType;

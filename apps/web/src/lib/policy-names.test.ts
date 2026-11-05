@@ -47,9 +47,7 @@ describe("migration 0042_rename_eu_ai_act_policy", () => {
     );
     const entries: { idx: number; tag: string; when: number }[] =
       journal.entries;
-    const entry = entries.find(
-      (e) => e.tag === "0042_rename_eu_ai_act_policy",
-    );
+    const entry = entries.find((e) => e.tag === "0042_rename_eu_ai_act_policy");
     const previous = entries.find(
       (e) => e.tag === "0041_clear_integration_creator_owners",
     );

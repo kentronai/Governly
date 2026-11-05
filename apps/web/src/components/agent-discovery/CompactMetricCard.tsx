@@ -10,6 +10,7 @@ export function CompactMetricCard({
   loading = false,
   description,
   uppercaseLabel = false,
+  className,
 }: {
   label: string;
   /** Strings are accepted for pre-formatted values (percentages, currency, "12 ms"). */
@@ -19,12 +20,14 @@ export function CompactMetricCard({
   loading?: boolean;
   description?: string;
   uppercaseLabel?: boolean;
+  /** Layout only, e.g. "w-full" to fill a grid cell. */
+  className?: string;
 }) {
   const displayValue = loading && value === undefined ? null : value;
 
   return (
     <Card
-      className="h-[68px] w-[160px] min-w-0 gap-0 overflow-hidden py-0"
+      className={cn("min-h-[68px] w-[160px] min-w-0 gap-0 overflow-hidden py-0", className)}
       title={description}
       aria-label={`${label}: ${displayValue === null ? "loading" : displayValue === undefined ? "unavailable" : displayValue}${description ? `. ${description}` : ""}`}
     >
@@ -32,7 +35,7 @@ export function CompactMetricCard({
         <div className="min-w-0 pr-8">
           <p
             className={cn(
-              "truncate text-xs font-medium leading-4 text-muted-foreground",
+              "text-xs font-medium leading-4 text-muted-foreground",
               uppercaseLabel && "uppercase tracking-wide",
             )}
           >

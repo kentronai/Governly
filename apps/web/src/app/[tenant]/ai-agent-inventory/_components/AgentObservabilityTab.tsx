@@ -46,9 +46,12 @@ const toLabel = (v?: string | null) =>
 export default function AgentObservabilityTab({
   tenant,
   agentId,
+  deployed = true,
 }: {
   tenant: string;
   agentId: string;
+  /** False when the agent is stopped/undeployed: there is nothing to trace. */
+  deployed?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -78,20 +81,18 @@ export default function AgentObservabilityTab({
   if (!data.connected) {
     return (
       <Card className="shadow-sm border">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <Boxes className="h-8 w-8 text-muted-foreground" />
-          <div className="space-y-1">
-            <p className="font-medium">Runtime observability is unavailable</p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Connect a LangSmith workspace from Admin → Integrations to start
-              viewing this agent&apos;s execution traces.
-            </p>
-          </div>
-          <Button asChild size="sm">
-            <Link href={`/${tenant}/admin/integrations`}>
-              Connect from Admin → Integrations
-            </Link>
-          </Button>
+        <CardContent className="flex flex-col items-start gap-2 py-4 text-sm">
+          <p className="font-medium">Execution traces (LangSmith) — not connected</p>
+          <p className="text-muted-foreground">
+            {deployed
+              ? "Optional. Connect LangSmith to see this agent's runs here; the detected observability above does not depend on it."
+              : "This agent is not running, so there are no runs to trace. Connecting LangSmith will not change that."}
+          </p>
+          {deployed ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/${tenant}/admin/integrations`}>Connect LangSmith</Link>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     );

@@ -2,47 +2,55 @@
  * Server actions for Compliance Policies (Application-level Policy Center)
  */
 
-'use server';
+"use server";
 
-import { db, applicationPolicyCenter, policyCenter, tenants } from '@db';
-import { eq, and } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
-import { revalidatePath } from 'next/cache';
-import { createAuditEvent } from '@/lib/server/audit';
-import { evaluateApplicationCompliancePolicy } from '@/lib/server/compliance/evaluation-engine';
+import { db, applicationPolicyCenter, policyCenter, tenants } from "@db";
+import { eq, and } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { createAuditEvent } from "@/lib/server/audit";
+import { evaluateApplicationCompliancePolicy } from "@/lib/server/compliance/evaluation-engine";
 
 /**
  * Get compliance policies for an application
  */
-const ADMIN_ORG_ROLES = ['org:admin', 'admin', 'org:owner'];
+const ADMIN_ORG_ROLES = ["org:admin", "admin", "org:owner"];
 
 export const getApplicationCompliancePolicies = async (
   tenantSlugOrId: string,
-  applicationId: string
+  applicationId: string,
 ) => {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   // Try to find tenant by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   // Verify tenant matches orgId
   if (tenantId !== orgId) {
-    throw new Error('Access denied');
+    throw new Error("Access denied");
   }
 
   try {
     const orgActivePolicies = await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.tenantId, orgId),
-        eq(policyCenter.isActive, true)
+        eq(policyCenter.isActive, true),
       ),
     });
 
@@ -50,7 +58,7 @@ export const getApplicationCompliancePolicies = async (
       await db.query.applicationPolicyCenter.findMany({
         where: and(
           eq(applicationPolicyCenter.applicationId, applicationId),
-          eq(applicationPolicyCenter.tenantId, orgId)
+          eq(applicationPolicyCenter.tenantId, orgId),
         ),
       });
 
@@ -61,7 +69,7 @@ export const getApplicationCompliancePolicies = async (
       applicationActivepolicies.map(async (assignment) => {
         if (!assignment.isActive) return assignment;
         const definition = orgActivePolicies.find(
-          (entry) => entry.parentPolicyId === assignment.policyId
+          (entry) => entry.parentPolicyId === assignment.policyId,
         );
         if (!definition) return assignment;
         try {
@@ -75,33 +83,40 @@ export const getApplicationCompliancePolicies = async (
               applicabilityRules: definition.applicabilityRules,
             },
           });
-          const [updated] = await db.update(applicationPolicyCenter).set({
-            applicabilityStatus: evaluation.applicabilityStatus,
-            complianceStatus: evaluation.complianceStatus,
-            coverageScore: evaluation.coverageScore.toFixed(2),
-            evaluation,
-            gaps: evaluation.gaps,
-            evidence: evaluation.evidence,
-            evaluatedAt: evaluation.evaluatedAt,
-          }).where(eq(applicationPolicyCenter.id, assignment.id)).returning();
+          const [updated] = await db
+            .update(applicationPolicyCenter)
+            .set({
+              applicabilityStatus: evaluation.applicabilityStatus,
+              complianceStatus: evaluation.complianceStatus,
+              coverageScore: evaluation.coverageScore.toFixed(2),
+              evaluation,
+              gaps: evaluation.gaps,
+              evidence: evaluation.evidence,
+              evaluatedAt: evaluation.evaluatedAt,
+            })
+            .where(eq(applicationPolicyCenter.id, assignment.id))
+            .returning();
           return updated;
         } catch (error) {
-          console.error(`Automatic compliance evaluation failed for ${assignment.policyId}:`, error);
+          console.error(
+            `Automatic compliance evaluation failed for ${assignment.policyId}:`,
+            error,
+          );
           return assignment;
         }
-      })
+      }),
     );
     applicationActivepolicies = refreshedAssignments;
 
     const policies = orgActivePolicies.map((policy) => {
       const assignment = applicationActivepolicies.find(
-        (entry) => entry.policyId === policy.parentPolicyId
+        (entry) => entry.policyId === policy.parentPolicyId,
       );
       return {
         ...policy,
         isActive: assignment?.isActive ?? false,
-        applicabilityStatus: assignment?.applicabilityStatus ?? 'not_evaluated',
-        complianceStatus: assignment?.complianceStatus ?? 'not_evaluated',
+        applicabilityStatus: assignment?.applicabilityStatus ?? "not_evaluated",
+        complianceStatus: assignment?.complianceStatus ?? "not_evaluated",
         coverageScore: Number(assignment?.coverageScore ?? 0),
         evaluation: assignment?.evaluation ?? {},
         gaps: assignment?.gaps ?? [],
@@ -116,7 +131,7 @@ export const getApplicationCompliancePolicies = async (
       message: `Policies Status for application ${applicationId}`,
     };
   } catch (error) {
-    console.error('Error getting compliance policies:', error);
+    console.error("Error getting compliance policies:", error);
     throw new Error(`Failed to get policies for application ${applicationId}`);
   }
 };
@@ -128,34 +143,46 @@ export const updateApplicationCompliancePolicy = async (
   tenantSlugOrId: string,
   applicationId: string,
   policyId: string,
-  isActive: boolean
+  isActive: boolean,
 ) => {
   const { userId, orgId, orgRole } = await auth();
   if (!userId || !orgId) {
-    return { success: false as const, error: 'Authentication required' };
+    return { success: false as const, error: "Authentication required" };
   }
 
   // Try to find tenant by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length) return { success: false as const, error: 'Tenant not found' };
+  if (!tenantRow.length)
+    return { success: false as const, error: "Tenant not found" };
   const tenantId = tenantRow[0].id;
 
   // Verify tenant matches orgId
   if (tenantId !== orgId) {
-    return { success: false as const, error: 'Access denied' };
+    return { success: false as const, error: "Access denied" };
   }
 
   try {
     // Verify policy exists and is enabled by platform
     const verify = await db.query.policyCenter.findFirst({
-      where: and(eq(policyCenter.id, policyId), eq(policyCenter.disable, false)),
+      where: and(
+        eq(policyCenter.id, policyId),
+        eq(policyCenter.disable, false),
+      ),
     });
 
     if (!verify) {
-      throw new Error('Policy is either doesn\'t exist or is disabled');
+      throw new Error("Policy is either doesn't exist or is disabled");
     }
 
     // Check if the organisation admin has enabled it
@@ -167,14 +194,19 @@ export const updateApplicationCompliancePolicy = async (
     });
 
     if (!isEnabled) {
-      throw new Error('Policy is not enabled by admin');
+      throw new Error("Policy is not enabled by admin");
     }
     // Organization-enabled policies apply to every application; only an
     // organization admin may opt a single application out.
-    if (!isActive && isEnabled.isActive && !ADMIN_ORG_ROLES.includes(orgRole ?? '')) {
+    if (
+      !isActive &&
+      isEnabled.isActive &&
+      !ADMIN_ORG_ROLES.includes(orgRole ?? "")
+    ) {
       return {
         success: false as const,
-        error: 'Only organization admins can turn off this policy for an application. Ask an admin to do it.',
+        error:
+          "Only organization admins can turn off this policy for an application. Ask an admin to do it.",
       };
     }
 
@@ -195,7 +227,7 @@ export const updateApplicationCompliancePolicy = async (
       where: and(
         eq(applicationPolicyCenter.applicationId, applicationId),
         eq(applicationPolicyCenter.policyId, policyId),
-        eq(applicationPolicyCenter.tenantId, orgId)
+        eq(applicationPolicyCenter.tenantId, orgId),
       ),
     });
 
@@ -239,8 +271,8 @@ export const updateApplicationCompliancePolicy = async (
           and(
             eq(applicationPolicyCenter.applicationId, applicationId),
             eq(applicationPolicyCenter.policyId, policyId),
-            eq(applicationPolicyCenter.tenantId, orgId)
-          )
+            eq(applicationPolicyCenter.tenantId, orgId),
+          ),
         )
         .returning();
 
@@ -251,8 +283,8 @@ export const updateApplicationCompliancePolicy = async (
       await createAuditEvent({
         tenantId: orgId,
         actorUserId: userId,
-        action: 'compliance_policy.updated',
-        targetType: 'compliance_policy',
+        action: "compliance_policy.updated",
+        targetType: "compliance_policy",
         targetId: policyId,
         metadata: {
           applicationId,
@@ -263,7 +295,10 @@ export const updateApplicationCompliancePolicy = async (
         },
       });
     } catch (e) {
-      console.error('Failed to write audit event (compliance_policy.updated):', e);
+      console.error(
+        "Failed to write audit event (compliance_policy.updated):",
+        e,
+      );
     }
 
     revalidatePath(`/${tenantRow[0].slug}/applications/${applicationId}`);
@@ -274,11 +309,14 @@ export const updateApplicationCompliancePolicy = async (
       evaluation,
     };
   } catch (error) {
-    console.error('Error updating compliance policy:', error);
+    console.error("Error updating compliance policy:", error);
     // Returned, not thrown: production builds strip thrown server-action messages.
     return {
       success: false as const,
-      error: error instanceof Error ? error.message : 'Failed to update policy status',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update policy status",
     };
   }
 };
@@ -287,32 +325,44 @@ export const updateApplicationCompliancePolicy = async (
 export const evaluateApplicationCompliancePolicyAction = async (
   tenantSlugOrId: string,
   applicationId: string,
-  policyId: string
+  policyId: string,
 ) => {
   const { userId, orgId } = await auth();
-  if (!userId || !orgId) throw new Error('Authentication required');
+  if (!userId || !orgId) throw new Error("Authentication required");
 
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length || tenantRow[0].id !== orgId) throw new Error('Access denied');
+  if (!tenantRow.length || tenantRow[0].id !== orgId)
+    throw new Error("Access denied");
 
   const [definition, assignment] = await Promise.all([
     db.query.policyCenter.findFirst({
-      where: and(eq(policyCenter.id, policyId), eq(policyCenter.disable, false)),
+      where: and(
+        eq(policyCenter.id, policyId),
+        eq(policyCenter.disable, false),
+      ),
     }),
     db.query.applicationPolicyCenter.findFirst({
       where: and(
         eq(applicationPolicyCenter.applicationId, applicationId),
         eq(applicationPolicyCenter.policyId, policyId),
         eq(applicationPolicyCenter.tenantId, orgId),
-        eq(applicationPolicyCenter.isActive, true)
+        eq(applicationPolicyCenter.isActive, true),
       ),
     }),
   ]);
-  if (!definition) throw new Error('Compliance policy not found');
-  if (!assignment) throw new Error('Enable this policy before evaluating it');
+  if (!definition) throw new Error("Compliance policy not found");
+  if (!assignment) throw new Error("Enable this policy before evaluating it");
 
   const evaluation = await evaluateApplicationCompliancePolicy({
     tenantId: orgId,
@@ -325,21 +375,24 @@ export const evaluateApplicationCompliancePolicyAction = async (
     },
   });
 
-  await db.update(applicationPolicyCenter).set({
-    applicabilityStatus: evaluation.applicabilityStatus,
-    complianceStatus: evaluation.complianceStatus,
-    coverageScore: evaluation.coverageScore.toFixed(2),
-    evaluation,
-    gaps: evaluation.gaps,
-    evidence: evaluation.evidence,
-    evaluatedAt: evaluation.evaluatedAt,
-  }).where(eq(applicationPolicyCenter.id, assignment.id));
+  await db
+    .update(applicationPolicyCenter)
+    .set({
+      applicabilityStatus: evaluation.applicabilityStatus,
+      complianceStatus: evaluation.complianceStatus,
+      coverageScore: evaluation.coverageScore.toFixed(2),
+      evaluation,
+      gaps: evaluation.gaps,
+      evidence: evaluation.evidence,
+      evaluatedAt: evaluation.evaluatedAt,
+    })
+    .where(eq(applicationPolicyCenter.id, assignment.id));
 
   await createAuditEvent({
     tenantId: orgId,
     actorUserId: userId,
-    action: 'compliance_policy.evaluated',
-    targetType: 'compliance_policy',
+    action: "compliance_policy.evaluated",
+    targetType: "compliance_policy",
     targetId: policyId,
     metadata: {
       applicationId,

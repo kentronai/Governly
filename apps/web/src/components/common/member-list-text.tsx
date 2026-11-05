@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface Props {
   members: string[];
@@ -18,7 +18,7 @@ const MemberListText = ({ members }: Props) => {
           className="ml-2 text-blue-500 cursor-pointer text-xs"
           onClick={() => setShowMore((prev) => !prev)}
         >
-          {showMore ? 'Show less' : 'Show more'}
+          {showMore ? "Show less" : "Show more"}
         </span>
       )}
     </>

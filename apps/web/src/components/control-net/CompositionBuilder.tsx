@@ -76,7 +76,7 @@ export function CompositionBuilder({
   // Filter out already-added guardrails from dropdown
   const addedKeys = new Set(value.map((node) => node.guardrailKey));
   const availableOptions = availableGuardrails.filter(
-    (g) => !addedKeys.has(g.key)
+    (g) => !addedKeys.has(g.key),
   );
 
   const toggleParamExpansion = (nodeId: string) => {
@@ -93,7 +93,7 @@ export function CompositionBuilder({
     if (!selectedGuardrail) return;
 
     const guardrail = availableGuardrails.find(
-      (g) => g.key === selectedGuardrail
+      (g) => g.key === selectedGuardrail,
     );
     if (!guardrail) return;
 
@@ -126,7 +126,7 @@ export function CompositionBuilder({
   const updateNodeParam = (
     nodeId: string,
     paramKey: string,
-    paramValue: any
+    paramValue: any,
   ) => {
     onChange(
       value.map((node) => {
@@ -137,7 +137,7 @@ export function CompositionBuilder({
           };
         }
         return node;
-      })
+      }),
     );
   };
 
@@ -207,7 +207,7 @@ export function CompositionBuilder({
                       <div className="flex items-center gap-2">
                         {(() => {
                           const selected = availableGuardrails.find(
-                            (g) => g.key === selectedGuardrail
+                            (g) => g.key === selectedGuardrail,
                           );
                           if (!selected) return null;
                           const IconComponent = getGuardrailIcon(selected.key);
@@ -280,7 +280,7 @@ export function CompositionBuilder({
           <CardContent className="space-y-2">
             {value.map((node, index) => {
               const guardrail = availableGuardrails.find(
-                (g) => g.key === node.guardrailKey
+                (g) => g.key === node.guardrailKey,
               );
               const isExpanded = expandedParams.has(node.id);
               const hasCustomParams =
@@ -408,7 +408,7 @@ export function CompositionBuilder({
                                           updateNodeParam(
                                             node.id,
                                             paramKey,
-                                            val
+                                            val,
                                           )
                                         }
                                       >
@@ -465,7 +465,7 @@ export function CompositionBuilder({
                                           updateNodeParam(
                                             node.id,
                                             paramKey,
-                                            val
+                                            val,
                                           )
                                         }
                                       >
@@ -493,7 +493,7 @@ export function CompositionBuilder({
                                     getNumericParamConfig(
                                       node.guardrailKey,
                                       paramKey,
-                                      paramValue
+                                      paramValue,
                                     );
                                   return (
                                     <div key={paramKey} className="space-y-2">
@@ -517,14 +517,14 @@ export function CompositionBuilder({
                                           // fails guard validation - keep the
                                           // last valid number instead.
                                           const parsed = parseFloat(
-                                            e.target.value
+                                            e.target.value,
                                           );
                                           updateNodeParam(
                                             node.id,
                                             paramKey,
                                             Number.isNaN(parsed)
                                               ? paramValue
-                                              : parsed
+                                              : parsed,
                                           );
                                         }}
                                         className="font-mono"
@@ -553,7 +553,7 @@ export function CompositionBuilder({
                                           updateNodeParam(
                                             node.id,
                                             paramKey,
-                                            e.target.checked
+                                            e.target.checked,
                                           )
                                         }
                                         className="h-4 w-4 rounded border-gray-300"
@@ -615,7 +615,7 @@ export function CompositionBuilder({
                                             updateNodeParam(
                                               node.id,
                                               paramKey,
-                                              items
+                                              items,
                                             );
                                           }
                                         }}
@@ -646,7 +646,7 @@ export function CompositionBuilder({
                                         updateNodeParam(
                                           node.id,
                                           paramKey,
-                                          e.target.value
+                                          e.target.value,
                                         )
                                       }
                                       className="font-mono text-sm"
@@ -654,7 +654,7 @@ export function CompositionBuilder({
                                     />
                                   </div>
                                 );
-                              }
+                              },
                             )}
                           </div>
                         );

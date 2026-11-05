@@ -2,11 +2,11 @@
  * Server actions for Global AI Policies
  */
 
-'use server';
+"use server";
 
-import { db, globalAiPolicies } from '@db';
-import { eq, desc, and, sql, or, ilike } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { db, globalAiPolicies } from "@db";
+import { eq, desc, and, sql, or, ilike } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 export interface GetGlobalAiPoliciesOptions {
   region?: string;
@@ -21,11 +21,11 @@ export interface GetGlobalAiPoliciesOptions {
  * Get global AI policies with optional filters, search, and pagination
  */
 export const getGlobalAiPolicies = async (
-  options?: GetGlobalAiPoliciesOptions
+  options?: GetGlobalAiPoliciesOptions,
 ) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   try {
@@ -38,7 +38,7 @@ export const getGlobalAiPolicies = async (
 
     // Build where conditions
     const whereConditions = [];
-    
+
     // Filter conditions
     if (region) {
       whereConditions.push(eq(globalAiPolicies.region, region));
@@ -58,8 +58,8 @@ export const getGlobalAiPolicies = async (
           ilike(globalAiPolicies.policyName, searchTerm),
           ilike(globalAiPolicies.shortName, searchTerm),
           ilike(globalAiPolicies.country, searchTerm),
-          ilike(globalAiPolicies.summary, searchTerm)
-        )
+          ilike(globalAiPolicies.summary, searchTerm),
+        ),
       );
     }
 
@@ -93,8 +93,8 @@ export const getGlobalAiPolicies = async (
       },
     };
   } catch (error) {
-    console.error('Error fetching global AI policies:', error);
-    throw new Error('Failed to fetch global AI policies');
+    console.error("Error fetching global AI policies:", error);
+    throw new Error("Failed to fetch global AI policies");
   }
 };
 
@@ -104,12 +104,12 @@ export const getGlobalAiPolicies = async (
 export const getGlobalAiPolicyById = async (id: string) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   try {
     if (!id) {
-      throw new Error('Invalid policy ID');
+      throw new Error("Invalid policy ID");
     }
 
     const policy = await db
@@ -119,7 +119,7 @@ export const getGlobalAiPolicyById = async (id: string) => {
       .limit(1);
 
     if (policy.length === 0) {
-      throw new Error('Policy not found');
+      throw new Error("Policy not found");
     }
 
     return {
@@ -127,7 +127,7 @@ export const getGlobalAiPolicyById = async (id: string) => {
       data: policy[0],
     };
   } catch (error) {
-    console.error('Error fetching global AI policy:', error);
+    console.error("Error fetching global AI policy:", error);
     throw error;
   }
 };

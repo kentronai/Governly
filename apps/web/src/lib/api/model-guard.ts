@@ -1,6 +1,6 @@
 /**
  * ModelGuard API integration
- * 
+ *
  * Provides functions to interact with the ModelGuard service for model scanning
  */
 
@@ -67,21 +67,25 @@ export interface ScanReportResponse {
  */
 export async function scanModel(
   authFetch: (url: string, options?: RequestInit) => Promise<Response>,
-  request: ScanRequest
+  request: ScanRequest,
 ): Promise<ScanResponse> {
-  const response = await authFetch('/modelguard/scan/model', {
-    method: 'POST',
+  const response = await authFetch("/modelguard/scan/model", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
   });
 
   if (!response.ok) {
-    let errorMessage = 'Scan failed';
+    let errorMessage = "Scan failed";
     try {
       const errorData = await response.json();
-      errorMessage = errorData.detail || errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+      errorMessage =
+        errorData.detail ||
+        errorData.error ||
+        errorData.message ||
+        `HTTP ${response.status}: ${response.statusText}`;
     } catch (e) {
       errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     }
@@ -95,13 +99,13 @@ export async function scanModel(
  * Get supported model formats
  */
 export async function getSupportedFormats(
-  authFetch: (url: string, options?: RequestInit) => Promise<Response>
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>,
 ): Promise<SupportedFormatsResponse> {
-  const response = await authFetch('/modelguard/scan/formats');
+  const response = await authFetch("/modelguard/scan/formats");
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to get supported formats');
+    throw new Error(errorData.error || "Failed to get supported formats");
   }
 
   return response.json();
@@ -112,13 +116,13 @@ export async function getSupportedFormats(
  */
 export async function getScanResults(
   authFetch: (url: string, options?: RequestInit) => Promise<Response>,
-  scanId: string
+  scanId: string,
 ): Promise<ScanReportResponse> {
   const response = await authFetch(`/modelguard/reports/${scanId}`);
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to get scan results');
+    throw new Error(errorData.error || "Failed to get scan results");
   }
 
   return response.json();
@@ -129,15 +133,15 @@ export async function getScanResults(
  */
 export async function exportJsonReport(
   authFetch: (url: string, options?: RequestInit) => Promise<Response>,
-  scanId: string
+  scanId: string,
 ): Promise<Blob> {
   const response = await authFetch(`/modelguard/reports/${scanId}/json`, {
-    method: 'POST'
+    method: "POST",
   });
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to export JSON report');
+    throw new Error(errorData.error || "Failed to export JSON report");
   }
 
   return response.blob();
@@ -148,15 +152,15 @@ export async function exportJsonReport(
  */
 export async function exportSarifReport(
   authFetch: (url: string, options?: RequestInit) => Promise<Response>,
-  scanId: string
+  scanId: string,
 ): Promise<Blob> {
   const response = await authFetch(`/modelguard/reports/${scanId}/sarif`, {
-    method: 'POST'
+    method: "POST",
   });
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to export SARIF report');
+    throw new Error(errorData.error || "Failed to export SARIF report");
   }
 
   return response.blob();
@@ -167,13 +171,13 @@ export async function exportSarifReport(
  */
 export async function getScanSummary(
   authFetch: (url: string, options?: RequestInit) => Promise<Response>,
-  scanId: string
+  scanId: string,
 ): Promise<any> {
   const response = await authFetch(`/modelguard/reports/${scanId}/summary`);
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to get scan summary');
+    throw new Error(errorData.error || "Failed to get scan summary");
   }
 
   return response.json();
@@ -184,7 +188,7 @@ export async function getScanSummary(
  */
 export function downloadBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -199,7 +203,8 @@ export function downloadBlob(blob: Blob, filename: string) {
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
@@ -216,12 +221,18 @@ export function formatDuration(ms: number): string {
  */
 export function getSeverityColor(severity: string): string {
   switch (severity.toLowerCase()) {
-    case 'critical': return 'text-red-600 bg-red-50 border-red-200';
-    case 'high': return 'text-orange-600 bg-orange-50 border-orange-200';
-    case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
-    case 'info': return 'text-gray-600 bg-gray-50 border-gray-200';
-    default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    case "critical":
+      return "text-red-600 bg-red-50 border-red-200";
+    case "high":
+      return "text-orange-600 bg-orange-50 border-orange-200";
+    case "medium":
+      return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    case "low":
+      return "text-blue-600 bg-blue-50 border-blue-200";
+    case "info":
+      return "text-gray-600 bg-gray-50 border-gray-200";
+    default:
+      return "text-gray-600 bg-gray-50 border-gray-200";
   }
 }
 
@@ -230,9 +241,13 @@ export function getSeverityColor(severity: string): string {
  */
 export function getApprovalStatusColor(status: string): string {
   switch (status.toLowerCase()) {
-    case 'approved': return 'text-green-600 bg-green-50 border-green-200';
-    case 'rejected': return 'text-red-600 bg-red-50 border-red-200';
-    case 'pending_review': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    case "approved":
+      return "text-green-600 bg-green-50 border-green-200";
+    case "rejected":
+      return "text-red-600 bg-red-50 border-red-200";
+    case "pending_review":
+      return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    default:
+      return "text-gray-600 bg-gray-50 border-gray-200";
   }
 }

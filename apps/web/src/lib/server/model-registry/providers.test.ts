@@ -201,7 +201,9 @@ describe("model provider registry", () => {
   it("exposes implemented execution adapters", () => {
     expect(isExecutableModelProvider("openai")).toBe(true);
     expect(isExecutableModelProvider("gemini")).toBe(true);
-    expect(isExecutableModelProvider("anthropic")).toBe(false);
+    expect(isExecutableModelProvider("anthropic")).toBe(true);
+    expect(isExecutableModelProvider("openrouter")).toBe(true);
+    expect(isExecutableModelProvider("bedrock")).toBe(false);
     expect(getModelProviderAdapter("OPENAI")).toBeInstanceOf(
       OpenAIProviderAdapter,
     );

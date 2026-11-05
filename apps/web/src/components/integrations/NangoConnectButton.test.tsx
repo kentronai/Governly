@@ -11,6 +11,8 @@ describe("resolveNangoUrls", () => {
     );
 
     expect(resolved.apiUrl).toBe("https://app.kentron.ai/nango-api");
-    expect(resolved.connectBaseUrl).toBe("https://app.kentron.ai/nango-connect");
+    expect(resolved.connectBaseUrl).toBe(
+      "https://app.kentron.ai/nango-connect",
+    );
   });
 });

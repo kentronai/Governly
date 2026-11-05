@@ -1,6 +1,11 @@
-import axios from 'axios';
-import config from '../../config/config';
-import { AddUseCaseWithRisksData, AIRisk, ProjectRisk, UseCase } from '@/types/useCase';
+import axios from "axios";
+import config from "../../config/config";
+import {
+  AddUseCaseWithRisksData,
+  AIRisk,
+  ProjectRisk,
+  UseCase,
+} from "@/types/useCase";
 
 export interface GetAllUseCasesParams {
   iProjectId: string;
@@ -39,7 +44,10 @@ export interface GetAllUseCasesRes {
   };
 }
 
-export interface UpdateUseCaseReq extends Partial<Omit<AddUseCaseWithRisksData, 'aExistingRiskIds' | 'aNewRisks'>> {
+export interface UpdateUseCaseReq
+  extends Partial<
+    Omit<AddUseCaseWithRisksData, "aExistingRiskIds" | "aNewRisks">
+  > {
   iUseCaseId: string;
 }
 
@@ -84,18 +92,15 @@ export interface GetAIRisksParams {
 
 // Get all use cases with filtering, pagination, and search
 export const GetAllUseCases = async (params: GetAllUseCasesParams) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    search,
-    iProjectId
-  } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/use-case/list/${iProjectId}/v1`);
-  endpoint.searchParams.set('page', page.toString());
-  endpoint.searchParams.set('limit', limit.toString());
-  
-  if (search) endpoint.searchParams.set('search', search);
+  const { page = 1, limit = 10, search, iProjectId } = params;
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/use-case/list/${iProjectId}/v1`,
+  );
+  endpoint.searchParams.set("page", page.toString());
+  endpoint.searchParams.set("limit", limit.toString());
+
+  if (search) endpoint.searchParams.set("search", search);
 
   try {
     const response = await axios.get(endpoint.href);
@@ -106,11 +111,13 @@ export const GetAllUseCases = async (params: GetAllUseCasesParams) => {
 };
 
 // Get Use Case details by ID
-export const GetUseCaseDetails = async (params : GetUseCaseDetailsParams): Promise<UseCaseDetailsRes> => {
+export const GetUseCaseDetails = async (
+  params: GetUseCaseDetailsParams,
+): Promise<UseCaseDetailsRes> => {
   const { iProjectId, iUseCaseId } = params;
   try {
     const response = await axios.get(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/use-case/${iProjectId}/${iUseCaseId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/use-case/${iProjectId}/${iUseCaseId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -119,11 +126,13 @@ export const GetUseCaseDetails = async (params : GetUseCaseDetailsParams): Promi
 };
 
 // Add new Use Case with Risks
-export const AddUseCaseWithRisks = async (useCaseData: AddUseCaseWithRisksData) => {
+export const AddUseCaseWithRisks = async (
+  useCaseData: AddUseCaseWithRisksData,
+) => {
   try {
     const response = await axios.post(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/add/use-case-with-risks/${useCaseData.iProjectId}/v1`,
-      useCaseData
+      useCaseData,
     );
     return response?.data;
   } catch (error) {
@@ -134,11 +143,11 @@ export const AddUseCaseWithRisks = async (useCaseData: AddUseCaseWithRisksData) 
 // Update Use Case (only use case fields, not risks)
 export const UpdateUseCase = async (useCaseData: UpdateUseCaseReq) => {
   const { iUseCaseId, ...updateData } = useCaseData;
-  
+
   try {
     const response = await axios.put(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/update/use-case/${useCaseData.iProjectId}/${iUseCaseId}/v1`,
-      updateData
+      updateData,
     );
     return response?.data;
   } catch (error) {
@@ -165,7 +174,10 @@ export const UpdateUseCaseWithRisks = async (data: {
   const { iUseCaseId, iProjectId } = data;
 
   try {
-    const response = await axios.put(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/update/use-case-with-risks/${iProjectId}/${iUseCaseId}/v1`, data);
+    const response = await axios.put(
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/update/use-case-with-risks/${iProjectId}/${iUseCaseId}/v1`,
+      data,
+    );
     return response?.data;
   } catch (error) {
     throw error;
@@ -177,7 +189,7 @@ export const DeleteUseCase = async (params: DeleteUseCaseParams) => {
   const { iProjectId, iUseCaseId } = params;
   try {
     const response = await axios.delete(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/use-case/${iProjectId}/${iUseCaseId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/use-case/${iProjectId}/${iUseCaseId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -186,17 +198,15 @@ export const DeleteUseCase = async (params: DeleteUseCaseParams) => {
 };
 
 export const GetAIRisksForDropdown = async (params: GetAIRisksParams) => {
-  const { 
-  search = '', 
-  limit = 20, 
-  page = 1
-  } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/ai-risks/dropdown/v1`);
-  
-  if (search) endpoint.searchParams.set('search', search);
-  if (page) endpoint.searchParams.set('page', page.toString());
-  if (limit) endpoint.searchParams.set('limit', limit.toString());
+  const { search = "", limit = 20, page = 1 } = params;
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/ai-risks/dropdown/v1`,
+  );
+
+  if (search) endpoint.searchParams.set("search", search);
+  if (page) endpoint.searchParams.set("page", page.toString());
+  if (limit) endpoint.searchParams.set("limit", limit.toString());
 
   try {
     const response = await axios.get(endpoint.href);

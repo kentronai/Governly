@@ -1,8 +1,8 @@
-import React from 'react';
-import cn from 'classnames';
-import { IoIosCheckmarkCircle } from 'react-icons/io';
-import { FaRegCircleDot } from 'react-icons/fa6';
-import { Check } from 'lucide-react';
+import React from "react";
+import cn from "classnames";
+import { IoIosCheckmarkCircle } from "react-icons/io";
+import { FaRegCircleDot } from "react-icons/fa6";
+import { Check } from "lucide-react";
 
 export interface IStep {
   label: string;
@@ -27,8 +27,8 @@ const Stepper = ({ activeStep, steps }: Props) => {
             <div
               className={` rounded-full flex items-center justify-center  ${
                 activeStep.key > step.key
-                  ? 'bg-[#3D3D3D] text-white w-5 h-5'
-                  : 'bg-white text-[#3D3D3D] w-0 h-0'
+                  ? "bg-[#3D3D3D] text-white w-5 h-5"
+                  : "bg-white text-[#3D3D3D] w-0 h-0"
               }`}
             >
               {activeStep.key > step.key ? (
@@ -40,8 +40,8 @@ const Stepper = ({ activeStep, steps }: Props) => {
             <span
               className={` text-sm font-medium ${
                 activeStep.key >= step.key
-                  ? 'text-[#3D3D3D] ml-3'
-                  : 'text-[#D1D1D1] '
+                  ? "text-[#3D3D3D] ml-3"
+                  : "text-[#D1D1D1] "
               }`}
             >
               {step.label}
@@ -50,7 +50,7 @@ const Stepper = ({ activeStep, steps }: Props) => {
           {index < steps.length - 1 && (
             <div
               className={`w-[58px] h-[1px] mx-[12px] ${
-                activeStep.key > step.key ? 'bg-[#3D3D3D]' : 'bg-[#E2E8F0]'
+                activeStep.key > step.key ? "bg-[#3D3D3D]" : "bg-[#E2E8F0]"
               }`}
             />
           )}

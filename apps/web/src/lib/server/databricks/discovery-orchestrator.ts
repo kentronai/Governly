@@ -14,6 +14,13 @@ import type {
   DiscoveredResourceType,
   RawDiscoveredResource,
 } from "@/lib/server/aws/discovery/types";
+import {
+  analyzeCodeBundle,
+  composeProfile,
+  extractSkillsFromPaths,
+  isManifestPath,
+  isSourcePath,
+} from "@/lib/server/agents/agent-profile";
 import type { CorrelatedAgent } from "@/lib/server/aws/correlation";
 import { buildCapabilityFacts } from "@/lib/server/agents/capability-engine";
 import { classifyAutonomy } from "@/lib/server/agents/autonomy-engine";
@@ -671,6 +678,23 @@ function detectAgentSourceSignals(source: string): string[] {
   );
 }
 
+// Registry-profile facts (packages, models, tools, skills) per source path,
+// filled while the source is exported for agent-signal detection below.
+const sourceFacts = new Map<string, Record<string, unknown>>();
+
+function rememberFacts(path: string, texts: Record<string, string>) {
+  const facts = analyzeCodeBundle(Object.keys(texts), texts);
+  sourceFacts.set(path, {
+    codePackages: facts.packages,
+    codeTools: facts.tools,
+    codeModelIds: facts.modelIds,
+    codeEnvKeys: facts.envKeys,
+    codeProviders: facts.providers,
+    codeApps: facts.apps,
+    codeSkills: extractSkillsFromPaths(Object.keys(texts)),
+  });
+}
+
 async function inspectWorkspaceSource(
   credentials: DatabricksCredentials,
   path: string,
@@ -691,9 +715,10 @@ async function inspectWorkspaceSource(
     if (!payload.content) return [];
     const exported = Buffer.from(payload.content, "base64");
     if (exported[0] !== 0x50 || exported[1] !== 0x4b) {
-      const directSignals = detectAgentSourceSignals(
-        exported.subarray(0, MAX_SOURCE_BYTES).toString("utf8"),
-      );
+      const text = exported.subarray(0, MAX_SOURCE_BYTES).toString("utf8");
+      rememberFacts(path.endsWith(".py") || path.endsWith(".ts") ? path : `${path}.py`, { [path.split("/").pop() ?? "source"]: text });
+      sourceFacts.set(path, sourceFacts.get(path.endsWith(".py") || path.endsWith(".ts") ? path : `${path}.py`)!);
+      const directSignals = detectAgentSourceSignals(text);
       return directSignals.length > 0 ? [{ path, signals: directSignals }] : [];
     }
     const archive = await JSZip.loadAsync(exported);
@@ -702,6 +727,15 @@ async function inspectWorkspaceSource(
     const files = Object.values(archive.files)
       .filter((file) => !file.dir && SOURCE_FILE_PATTERN.test(file.name))
       .slice(0, MAX_SOURCE_FILES);
+    const texts: Record<string, string> = {};
+    for (const file of Object.values(archive.files)) {
+      if (!file.dir && (isManifestPath(file.name) || isSourcePath(file.name) || /(^|\/)skills\/[^/]+\/SKILL\.md$/i.test(file.name))) {
+        const body = await file.async("string");
+        if (body.length <= 100_000) texts[file.name] = body;
+      }
+      if (Object.keys(texts).length >= 200) break;
+    }
+    rememberFacts(path, texts);
     for (const file of files) {
       if (bytesInspected >= MAX_SOURCE_BYTES) break;
       const source = await file.async("string");
@@ -1094,6 +1128,17 @@ function correlate(discovery: Omit<DatabricksDiscovery, "agents" | "counts">) {
           : null,
         resources: app.resources ?? [],
         sourceEvidence: app.agent_source_evidence ?? [],
+        ...(sourceFacts.get(
+          app.active_deployment?.source_code_path || app.default_source_code_path || "",
+        ) ?? {}),
+        // Last deployment and who ran it, straight from the app's deployment record.
+        ...(app.active_deployment
+          ? {
+              deployedBy: (app.active_deployment as { creator?: string }).creator,
+              deployedByAt: (app.active_deployment as { update_time?: string; create_time?: string }).update_time ??
+                (app.active_deployment as { create_time?: string }).create_time,
+            }
+          : {}),
         publicNetworkAccess: app.url ? "Enabled" : "Disabled",
         discoveryQualification:
           "Databricks App metadata, command, declared resources, or deployed source identify an AI-agent deployment.",
@@ -1308,10 +1353,21 @@ async function listApps(credentials: DatabricksCredentials, detailed = true) {
   return detailed
     ? mapWithConcurrency(summaries, 5, async (app) => {
         try {
-          return await databricksApi<DatabricksApp>(
+          const full = await databricksApi<DatabricksApp>(
             credentials,
             `/api/2.0/apps/${encodeURIComponent(app.name)}`,
           );
+          // A stopped app has no active deployment, but its deployment history
+          // still says where the code was deployed from: read the source there.
+          if (!full.active_deployment?.source_code_path && !full.default_source_code_path) {
+            const history = await databricksApi<{ app_deployments?: Array<{ source_code_path?: string }> }>(
+              credentials,
+              `/api/2.0/apps/${encodeURIComponent(app.name)}/deployments`,
+            ).catch(() => null);
+            const path = history?.app_deployments?.find((d) => d.source_code_path)?.source_code_path;
+            if (path) return { ...full, default_source_code_path: path };
+          }
+          return full;
         } catch {
           return app;
         }
@@ -1450,7 +1506,9 @@ export async function testDatabricksConnection(
     ]);
     return {
       ok: true as const,
-      workspaceHost: (credentials.hostUrl ? new URL(credentials.hostUrl).hostname : "nango-managed"),
+      workspaceHost: credentials.hostUrl
+        ? new URL(credentials.hostUrl).hostname
+        : "nango-managed",
       principal: identity.userName || identity.displayName || identity.id,
       catalogsVisible: catalogResult.length,
       servingEndpointsVisible: endpoints.length,
@@ -1764,7 +1822,9 @@ export async function runDatabricksDiscoveryScan(
   try {
     const discovery = await discoverDatabricks(connection);
     const credentials = parseCredentials(connection);
-    const workspaceHost = (credentials.hostUrl ? new URL(credentials.hostUrl).hostname : "nango-managed");
+    const workspaceHost = credentials.hostUrl
+      ? new URL(credentials.hostUrl).hostname
+      : "nango-managed";
     const now = new Date().toISOString();
     const seenExternalIds: string[] = [];
     await persistDatabricksInventory(tenantId, integrationId, discovery, now);
@@ -1800,7 +1860,9 @@ export async function runDatabricksDiscoveryScan(
         "NOT_READY",
         "NOT_DEPLOYED",
       ].includes(providerStatus);
+      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
       const values = {
+        profile,
         tenantId,
         connectionId: null,
         azureConnectionId: null,
@@ -1837,6 +1899,7 @@ export async function runDatabricksDiscoveryScan(
         lastSeenAt: now,
         syncStatus: "success" as const,
         rawMetadata: {
+          ...profileMeta,
           provider: "databricks",
           workspaceHost,
           principal:

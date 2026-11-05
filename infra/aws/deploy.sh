@@ -81,6 +81,7 @@ rsync -az --delete \
   --exclude '*.pyc' \
   --exclude '.env' \
   --exclude '.env.prod' \
+  --exclude '.env.integrations' \
   --exclude '.env.local' \
   --exclude 'infra/aws/*.pem' \
   --exclude 'infra/aws/.ec2_*' \

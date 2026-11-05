@@ -96,16 +96,20 @@ async function databricksApiViaNango<T>(
     for (const [key, value] of query.entries()) params[key] = value;
   }
   try {
-    const response = await proxy<T & { error_code?: string; message?: string }>({
-      connectionId: credentials.connectionId,
-      providerConfigKey: credentials.providerConfigKey,
-      method: "GET",
-      endpoint: path,
-      // Only override when NORIX knows the workspace URL; otherwise let the
-      // Nango databricks provider-config supply the base URL itself.
-      ...(credentials.hostUrl ? { baseUrlOverride: credentials.hostUrl } : {}),
-      params,
-    });
+    const response = await proxy<T & { error_code?: string; message?: string }>(
+      {
+        connectionId: credentials.connectionId,
+        providerConfigKey: credentials.providerConfigKey,
+        method: "GET",
+        endpoint: path,
+        // Only override when NORIX knows the workspace URL; otherwise let the
+        // Nango databricks provider-config supply the base URL itself.
+        ...(credentials.hostUrl
+          ? { baseUrlOverride: credentials.hostUrl }
+          : {}),
+        params,
+      },
+    );
     return response.data as T;
   } catch (error) {
     if (error instanceof NangoError) {

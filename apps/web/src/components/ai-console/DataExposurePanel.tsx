@@ -46,7 +46,7 @@ export function DataExposurePanel() {
                   <span
                     className={cn(
                       "flex items-center gap-1 text-xs",
-                      item.trend > 0 ? "text-risk-high" : "text-risk-low"
+                      item.trend > 0 ? "text-risk-high" : "text-risk-low",
                     )}
                   >
                     {item.trend > 0 ? (
@@ -64,7 +64,7 @@ export function DataExposurePanel() {
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-700",
-                    colorMap[item.color]
+                    colorMap[item.color],
                   )}
                   style={{ width: `${(item.count / 250) * 100}%` }}
                 />

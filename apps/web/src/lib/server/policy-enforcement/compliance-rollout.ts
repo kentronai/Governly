@@ -17,35 +17,48 @@ import { syncTenantAgentPolicyEvaluations } from "./agent-policy-sync";
 export async function rolloutTenantCompliancePolicy(
   tenantId: string,
   rootPolicyId: string,
-  isActive: boolean
+  isActive: boolean,
 ) {
   const tenantPolicy = await db.query.policyCenter.findFirst({
     where: and(
       eq(policyCenter.tenantId, tenantId),
-      eq(policyCenter.parentPolicyId, rootPolicyId)
+      eq(policyCenter.parentPolicyId, rootPolicyId),
     ),
   });
-  if (!tenantPolicy) throw new Error("Tenant compliance policy is not configured");
+  if (!tenantPolicy)
+    throw new Error("Tenant compliance policy is not configured");
 
   if (!isActive) {
     await Promise.all([
-      db.update(applicationPolicyCenter).set({ isActive: false }).where(and(
-        eq(applicationPolicyCenter.tenantId, tenantId),
-        eq(applicationPolicyCenter.policyId, rootPolicyId)
-      )),
-      db.update(agentPolicyEvaluations).set({ isActive: false, updatedAt: new Date().toISOString() }).where(and(
-        eq(agentPolicyEvaluations.tenantId, tenantId),
-        eq(agentPolicyEvaluations.policyType, "compliance"),
-        eq(agentPolicyEvaluations.policyId, rootPolicyId)
-      )),
+      db
+        .update(applicationPolicyCenter)
+        .set({ isActive: false })
+        .where(
+          and(
+            eq(applicationPolicyCenter.tenantId, tenantId),
+            eq(applicationPolicyCenter.policyId, rootPolicyId),
+          ),
+        ),
+      db
+        .update(agentPolicyEvaluations)
+        .set({ isActive: false, updatedAt: new Date().toISOString() })
+        .where(
+          and(
+            eq(agentPolicyEvaluations.tenantId, tenantId),
+            eq(agentPolicyEvaluations.policyType, "compliance"),
+            eq(agentPolicyEvaluations.policyId, rootPolicyId),
+          ),
+        ),
     ]);
     return { applicationsEvaluated: 0, agentsEvaluated: 0 };
   }
 
-  const appRows = await db.select({ id: applications.id }).from(applications).where(and(
-    eq(applications.tenantId, tenantId),
-    isNull(applications.deletedAt)
-  ));
+  const appRows = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .where(
+      and(eq(applications.tenantId, tenantId), isNull(applications.deletedAt)),
+    );
   for (const application of appRows) {
     const evaluation = await evaluateApplicationCompliancePolicy({
       tenantId,
@@ -61,7 +74,7 @@ export async function rolloutTenantCompliancePolicy(
       where: and(
         eq(applicationPolicyCenter.tenantId, tenantId),
         eq(applicationPolicyCenter.applicationId, application.id),
-        eq(applicationPolicyCenter.policyId, rootPolicyId)
+        eq(applicationPolicyCenter.policyId, rootPolicyId),
       ),
     });
     const values = {
@@ -78,22 +91,31 @@ export async function rolloutTenantCompliancePolicy(
       evaluatedAt: evaluation.evaluatedAt,
     };
     if (existing) {
-      await db.update(applicationPolicyCenter).set(values).where(eq(applicationPolicyCenter.id, existing.id));
+      await db
+        .update(applicationPolicyCenter)
+        .set(values)
+        .where(eq(applicationPolicyCenter.id, existing.id));
     } else {
       await db.insert(applicationPolicyCenter).values(values);
     }
   }
   const agentResult = await syncTenantAgentPolicyEvaluations(tenantId);
-  return { applicationsEvaluated: appRows.length, agentsEvaluated: agentResult.agentsEvaluated };
+  return {
+    applicationsEvaluated: appRows.length,
+    agentsEvaluated: agentResult.agentsEvaluated,
+  };
 }
 
 /** Apply every currently enabled tenant policy to one newly created app. */
 export async function applyActiveCompliancePoliciesToApplication(
   tenantId: string,
-  applicationId: string
+  applicationId: string,
 ) {
   const active = await db.query.policyCenter.findMany({
-    where: and(eq(policyCenter.tenantId, tenantId), eq(policyCenter.isActive, true)),
+    where: and(
+      eq(policyCenter.tenantId, tenantId),
+      eq(policyCenter.isActive, true),
+    ),
   });
   for (const policy of active) {
     const rootPolicyId = policy.parentPolicyId ?? policy.id;
@@ -111,7 +133,7 @@ export async function applyActiveCompliancePoliciesToApplication(
       where: and(
         eq(applicationPolicyCenter.tenantId, tenantId),
         eq(applicationPolicyCenter.applicationId, applicationId),
-        eq(applicationPolicyCenter.policyId, rootPolicyId)
+        eq(applicationPolicyCenter.policyId, rootPolicyId),
       ),
     });
     const values = {
@@ -127,7 +149,11 @@ export async function applyActiveCompliancePoliciesToApplication(
       evidence: evaluation.evidence,
       evaluatedAt: evaluation.evaluatedAt,
     };
-    if (existing) await db.update(applicationPolicyCenter).set(values).where(eq(applicationPolicyCenter.id, existing.id));
+    if (existing)
+      await db
+        .update(applicationPolicyCenter)
+        .set(values)
+        .where(eq(applicationPolicyCenter.id, existing.id));
     else await db.insert(applicationPolicyCenter).values(values);
   }
   return { policiesApplied: active.length };

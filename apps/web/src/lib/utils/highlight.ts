@@ -1,24 +1,34 @@
-export const highlightSearchTerms = (content: string, searchRules: any): string => {
-  if (!content || !searchRules || !searchRules.rules || searchRules.rules.length === 0) {
+export const highlightSearchTerms = (
+  content: string,
+  searchRules: any,
+): string => {
+  if (
+    !content ||
+    !searchRules ||
+    !searchRules.rules ||
+    searchRules.rules.length === 0
+  ) {
     return content;
   }
 
   // Extract search terms from the rules
-  const searchTerms = searchRules?.rules?.map((rule: any) => rule.value as string);
+  const searchTerms = searchRules?.rules?.map(
+    (rule: any) => rule.value as string,
+  );
 
   if (searchTerms.length === 0) {
     return content;
   }
 
   // Create a temporary DOM element to parse the HTML content
-  const tempElement = document.createElement('div');
+  const tempElement = document.createElement("div");
   tempElement.innerHTML = content;
 
   // Function to recursively process text nodes
   const processNode = (node: Node) => {
     // If it's a text node, highlight the search terms
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
+      const text = node.textContent || "";
       let hasMatch = false;
       let highlightedText = text;
 
@@ -27,16 +37,22 @@ export const highlightSearchTerms = (content: string, searchRules: any): string 
         if (!term) return;
 
         // Case insensitive search
-        const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const regex = new RegExp(
+          `(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+          "gi",
+        );
         if (regex.test(highlightedText)) {
           hasMatch = true;
-          highlightedText = highlightedText.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
+          highlightedText = highlightedText.replace(
+            regex,
+            '<mark class="bg-yellow-200">$1</mark>',
+          );
         }
       });
 
       // Replace the text node with the highlighted HTML if there was a match
       if (hasMatch) {
-        const span = document.createElement('span');
+        const span = document.createElement("span");
         span.innerHTML = highlightedText;
         node.parentNode?.replaceChild(span, node);
         return;
@@ -47,12 +63,12 @@ export const highlightSearchTerms = (content: string, searchRules: any): string 
     else if (node.nodeType === Node.ELEMENT_NODE) {
       // Don't highlight content inside <script>, <style>, etc.
       const tagName = (node as Element).tagName.toLowerCase();
-      if (['script', 'style', 'noscript', 'mark'].includes(tagName)) {
+      if (["script", "style", "noscript", "mark"].includes(tagName)) {
         return;
       }
 
       // Process all child nodes
-      Array.from(node.childNodes).forEach(childNode => {
+      Array.from(node.childNodes).forEach((childNode) => {
         processNode(childNode);
       });
     }
@@ -60,7 +76,7 @@ export const highlightSearchTerms = (content: string, searchRules: any): string 
 
   // Process the entire content
   Array.from(tempElement.childNodes).forEach(processNode);
-  
+
   return tempElement.innerHTML;
 };
 
@@ -68,13 +84,23 @@ export const highlightSearchTerms = (content: string, searchRules: any): string 
  * Highlights plain text with search terms
  * Used for text that's not already in HTML format
  */
-export const highlightPlainText = (text: string | string[] | any, searchRules: any): string => {
-  if (!text || !searchRules || !searchRules.rules || searchRules.rules.length === 0) {
+export const highlightPlainText = (
+  text: string | string[] | any,
+  searchRules: any,
+): string => {
+  if (
+    !text ||
+    !searchRules ||
+    !searchRules.rules ||
+    searchRules.rules.length === 0
+  ) {
     return formatTextInput(text);
   }
 
   // Extract search terms from the rules
-  const searchTerms = searchRules?.rules?.map((rule: any) => rule.value as string);
+  const searchTerms = searchRules?.rules?.map(
+    (rule: any) => rule.value as string,
+  );
 
   if (searchTerms.length === 0) {
     return formatTextInput(text);
@@ -82,21 +108,28 @@ export const highlightPlainText = (text: string | string[] | any, searchRules: a
 
   // Convert input to string format
   const textString = formatTextInput(text);
-  
+
   // Escape HTML special characters
-  let escapedText = textString?.replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  let escapedText = textString
+    ?.replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
   // Highlight each search term
   searchTerms.forEach((term: string) => {
     if (!term) return;
-    
+
     // Case insensitive search
-    const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    escapedText = escapedText.replace(regex, '<mark class="bg-yellow-200">$1</mark>');
+    const regex = new RegExp(
+      `(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "gi",
+    );
+    escapedText = escapedText.replace(
+      regex,
+      '<mark class="bg-yellow-200">$1</mark>',
+    );
   });
 
   return escapedText;
@@ -106,18 +139,18 @@ export const highlightPlainText = (text: string | string[] | any, searchRules: a
  * Helper function to format different input types to string
  */
 const formatTextInput = (text: string | string[] | any): string => {
-  if (!text) return '';
-  
+  if (!text) return "";
+
   // If it's an array, join with commas
   if (Array.isArray(text)) {
-    return text.join(', ');
+    return text.join(", ");
   }
-  
+
   // If it's already a string, return as is
-  if (typeof text === 'string') {
+  if (typeof text === "string") {
     return text;
   }
-  
+
   // For other types, convert to string
   return String(text);
 };

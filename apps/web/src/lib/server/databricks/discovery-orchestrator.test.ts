@@ -340,9 +340,9 @@ describe("Databricks discovery orchestrator", () => {
     expect(databricksDiscoveryTesting.isSampleGenieSpace(userSpace)).toBe(
       false,
     );
-    expect(
-      databricksDiscoveryTesting.isSampleGenieSpace(unreadableSpace),
-    ).toBe(false);
+    expect(databricksDiscoveryTesting.isSampleGenieSpace(unreadableSpace)).toBe(
+      false,
+    );
   });
 
   it("uses source evidence without failing when source export is unavailable", async () => {

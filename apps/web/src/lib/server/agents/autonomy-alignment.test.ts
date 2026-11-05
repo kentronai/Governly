@@ -1,19 +1,27 @@
 // Capture the update() calls so we can assert what was re-levelled.
 const updateWhereCalls: unknown[] = [];
 const setSpy = jest.fn();
-let rows: Array<{ id: string; name: string; autonomyLevel: string | null }> = [];
+let rows: Array<{ id: string; name: string; autonomyLevel: string | null }> =
+  [];
 
 jest.mock("@db", () => ({
-  agents: { tenantId: "tenantId", id: "id", name: "name", autonomyLevel: "autonomyLevel" },
+  agents: {
+    tenantId: "tenantId",
+    id: "id",
+    name: "name",
+    autonomyLevel: "autonomyLevel",
+  },
   db: {
     select: () => ({ from: () => ({ where: () => Promise.resolve(rows) }) }),
     update: () => ({
       set: (v: unknown) => {
         setSpy(v);
-        return { where: (w: unknown) => {
-          updateWhereCalls.push(w);
-          return Promise.resolve();
-        } };
+        return {
+          where: (w: unknown) => {
+            updateWhereCalls.push(w);
+            return Promise.resolve();
+          },
+        };
       },
     }),
   },
@@ -21,7 +29,10 @@ jest.mock("@db", () => ({
 
 jest.mock("drizzle-orm", () => ({ eq: (...a: unknown[]) => a }));
 
-import { agentIdentityKey, alignAutonomyByIdentity } from "./autonomy-alignment";
+import {
+  agentIdentityKey,
+  alignAutonomyByIdentity,
+} from "./autonomy-alignment";
 
 describe("agentIdentityKey", () => {
   it("collapses the same agent deployed across platforms to one identity", () => {
@@ -63,7 +74,9 @@ describe("alignAutonomyByIdentity", () => {
     // L1 and L2 are raised to L3; the L3 one is left alone.
     expect(updated).toBe(2);
     expect(setSpy).toHaveBeenCalledTimes(2);
-    expect(setSpy.mock.calls.every(([v]) => v.autonomyLevel === "L3")).toBe(true);
+    expect(setSpy.mock.calls.every(([v]) => v.autonomyLevel === "L3")).toBe(
+      true,
+    );
   });
 
   it("never lowers an agent and leaves singletons untouched", async () => {

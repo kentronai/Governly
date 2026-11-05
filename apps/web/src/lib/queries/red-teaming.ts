@@ -31,7 +31,10 @@ export const getRecentRedTeamingTests = cache(
   async (applicationId: string, limit = 10) => {
     const rows = await db.query.redTeamingTests.findMany({
       where: eq(redTeamingTests.applicationId, applicationId),
-      orderBy: [desc(redTeamingTests.testedAt), desc(redTeamingTests.createdAt)],
+      orderBy: [
+        desc(redTeamingTests.testedAt),
+        desc(redTeamingTests.createdAt),
+      ],
       limit,
     });
 

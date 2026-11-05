@@ -5,13 +5,20 @@ import {
   awsDiscoveryConnections,
   azureDiscoveryConnections,
   discoveryScans,
+  integrations,
   observabilityLogs,
+  providerModels,
   reports,
   tenants,
   withDbRetry,
 } from "@db";
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { cache } from "react";
+import {
+  policyViolations,
+  profileAutonomy,
+  readProfile,
+} from "@/lib/server/agents/agent-profile";
 
 const AUTONOMY_LEVELS = ["L1", "L2", "L3", "L4"] as const;
 const RISK_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
@@ -36,39 +43,75 @@ export const resolveAgentDiscoveryTenantId = cache(async (slugOrId: string) => {
   return bySlug.id;
 });
 
+/** Every agent's registry profile with its capability-based autonomy. */
+const getProfiles = cache(async (tenantId: string) => {
+  const rows = await withDbRetry(() =>
+    db
+      .select({
+        id: agents.id,
+        name: agents.name,
+        platform: agents.platform,
+        profile: agents.profile,
+        model: agents.model,
+        firstSeenAt: agents.firstSeenAt,
+        updatedAt: agents.updatedAt,
+      })
+      .from(agents)
+      .where(eq(agents.tenantId, tenantId)),
+  );
+  return rows.map((row) => {
+    const profile = readProfile(row.profile);
+    return { ...row, profile, autonomy: profileAutonomy(profile) };
+  });
+});
+
 export const getDashboardCards = cache(async (tenantId: string) => {
-  const [row] = await db
-    .select({
-      total: count(),
-      critical: sql<number>`count(*) filter (where ${agents.riskLevel} = 'Critical')`,
-      high: sql<number>`count(*) filter (where ${agents.riskLevel} = 'High')`,
-      withoutOwner: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
-      dormant: sql<number>`count(*) filter (where ${agents.status} = 'dormant')`,
-    })
-    .from(agents)
-    .where(eq(agents.tenantId, tenantId));
-  return Object.fromEntries(
-    Object.entries(row ?? {}).map(([key, value]) => [key, Number(value ?? 0)]),
-  ) as {
-    total: number;
-    critical: number;
-    high: number;
-    withoutOwner: number;
-    dormant: number;
+  const rows = await getProfiles(tenantId);
+  const level = (l: string) => rows.filter((r) => r.autonomy.level === l).length;
+  return {
+    total: rows.length,
+    l1: level("L1"),
+    l2: level("L2"),
+    l3: level("L3"),
+    l4: level("L4"),
+    running: rows.filter((r) => r.profile.deployed).length,
+    // Deployed before, not running now.
+    stopped: rows.filter((r) => !r.profile.deployed && r.profile.deployedAt).length,
   };
 });
 
 export const getAutonomyDistribution = cache(async (tenantId: string) => {
-  const rows = await db
-    .select({ level: agents.autonomyLevel, value: count() })
-    .from(agents)
-    .where(eq(agents.tenantId, tenantId))
-    .groupBy(agents.autonomyLevel);
-  const values = new Map(rows.map((row) => [row.level, Number(row.value)]));
+  const rows = await getProfiles(tenantId);
   return AUTONOMY_LEVELS.map((level) => ({
     level,
-    count: values.get(level) ?? 0,
+    count: rows.filter((r) => r.autonomy.level === level).length,
   }));
+});
+
+/** Governance violations on every agent's profile, newest-updated agents first. */
+export const getAgentPolicyViolations = cache(async (tenantId: string, limit = 10) => {
+  const [rows, approved] = await Promise.all([
+    getProfiles(tenantId),
+    withDbRetry(() =>
+      db
+        .select({ modelId: providerModels.modelId })
+        .from(providerModels)
+        .where(eq(providerModels.tenantId, tenantId)),
+    ),
+  ]);
+  const approvedIds = approved.map((m) => m.modelId);
+  return rows
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .flatMap((r) =>
+      policyViolations(r.profile.observability, r.profile.llms, approvedIds).map((v) => ({
+        agentId: r.id,
+        agentName: r.name,
+        platform: r.platform,
+        detectedAt: r.updatedAt,
+        ...v,
+      })),
+    )
+    .slice(0, limit);
 });
 
 export const getAutonomyStatistics = cache(async (tenantId: string) => {
@@ -159,6 +202,7 @@ export const getPlatformDistribution = cache(async (tenantId: string) => {
     databricks_apps: "Databricks Apps",
     databricks_jobs: "Databricks Jobs",
     databricks_genie: "Databricks Genie Agent",
+    github: "GitHub (code only)",
   };
   return rows.map((row) => ({
     label: labels[row.platform] ?? "Other",
@@ -178,30 +222,9 @@ export const getRiskLevelBreakdown = cache(async (tenantId: string) => {
 });
 
 export const getRecentAgents = cache(async (tenantId: string, limit = 8) =>
-  db.query.agents.findMany({
-    where: eq(agents.tenantId, tenantId),
-    orderBy: [desc(agents.firstSeenAt)],
-    limit,
-    columns: {
-      id: true,
-      name: true,
-      platform: true,
-      autonomyLevel: true,
-      autonomyReason: true,
-      autonomyConfidence: true,
-      autonomyClassifiedAt: true,
-      riskLevel: true,
-      riskScore: true,
-      riskFactors: true,
-      firstSeenAt: true,
-    },
-    with: {
-      agentRecommendations: {
-        columns: { id: true, reason: true, suggestedFix: true, severity: true },
-        limit: 1,
-      },
-    },
-  }),
+  (await getProfiles(tenantId))
+    .sort((a, b) => String(b.firstSeenAt).localeCompare(String(a.firstSeenAt)))
+    .slice(0, limit),
 );
 
 export const getDiscoveryTrend = cache(async (tenantId: string) => {
@@ -219,54 +242,34 @@ export const getDiscoveryTrend = cache(async (tenantId: string) => {
 });
 
 export const getDiscoveryJourney = cache(async (tenantId: string) => {
-  const [
-    awsConnections,
-    azureConnections,
-    latestScan,
-    autonomy,
-    ownership,
-    [ownerSources],
-    [lastExport],
-  ] = await Promise.all([
+  const [sources, scans, autonomy, profiles, [lastExport]] = await Promise.all([
+    // Every connected integration that runs agent discovery (AWS, GitHub, Databricks, …).
     db
       .select({
-        id: awsDiscoveryConnections.id,
-        name: awsDiscoveryConnections.name,
-        region: awsDiscoveryConnections.region,
-        enabled: awsDiscoveryConnections.isEnabled,
-        lastValidatedAt: awsDiscoveryConnections.lastValidatedAt,
-        error: awsDiscoveryConnections.lastValidationError,
+        id: integrations.id,
+        name: integrations.name,
+        enabled: integrations.isEnabled,
+        lastSyncAt: integrations.lastSyncAt,
+        syncStatus: integrations.syncStatus,
+        error: integrations.errorMessage,
       })
-      .from(awsDiscoveryConnections)
-      .where(eq(awsDiscoveryConnections.tenantId, tenantId))
-      .orderBy(desc(awsDiscoveryConnections.createdAt)),
-    db
-      .select({
-        id: azureDiscoveryConnections.id,
-        name: azureDiscoveryConnections.name,
-        region: azureDiscoveryConnections.subscriptionId,
-        enabled: azureDiscoveryConnections.isEnabled,
-        lastValidatedAt: azureDiscoveryConnections.lastValidatedAt,
-        error: azureDiscoveryConnections.lastValidationError,
-      })
-      .from(azureDiscoveryConnections)
-      .where(eq(azureDiscoveryConnections.tenantId, tenantId))
-      .orderBy(desc(azureDiscoveryConnections.createdAt)),
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.tenantId, tenantId),
+          eq(integrations.isEnabled, true),
+          eq(integrations.isCredentialsAdded, true),
+          sql`exists (select 1 from ${discoveryScans} where ${discoveryScans.integrationId} = ${integrations.id})`,
+        ),
+      ),
     db
       .select()
       .from(discoveryScans)
       .where(eq(discoveryScans.tenantId, tenantId))
       .orderBy(desc(discoveryScans.createdAt))
-      .limit(1),
+      .limit(200),
     getAutonomyDistribution(tenantId),
-    getOwnershipBreakdown(tenantId),
-    db
-      .select({
-        suggested: sql<number>`count(*) filter (where ${agents.ownerSource} like 'ai:%')`,
-        manual: sql<number>`count(*) filter (where ${agents.ownerSource} = 'manual')`,
-      })
-      .from(agents)
-      .where(eq(agents.tenantId, tenantId)),
+    getProfiles(tenantId),
     db
       .select({
         generatedAt: reports.generatedAt,
@@ -284,56 +287,59 @@ export const getDiscoveryJourney = cache(async (tenantId: string) => {
       .orderBy(desc(reports.generatedAt))
       .limit(1),
   ]);
-  const connections = [
-    ...awsConnections.map((item) => ({ ...item, provider: "AWS" as const })),
-    ...azureConnections.map((item) => ({
-      ...item,
-      provider: "Azure" as const,
-    })),
-  ];
-  const scan = latestScan[0] ?? null;
-  const resourceCounts =
-    scan?.resourcesScanned && typeof scan.resourcesScanned === "object"
-      ? Object.values(
-          scan.resourcesScanned as Record<string, unknown>,
-        ).reduce<number>((sum, value) => sum + Number(value || 0), 0)
-      : 0;
-  const durationMs =
-    scan?.startedAt && scan?.finishedAt
-      ? new Date(scan.finishedAt).getTime() - new Date(scan.startedAt).getTime()
-      : null;
-  const owned = ownership.find((item) => item.label === "Owned")?.count ?? 0;
-  const unowned =
-    ownership.find((item) => item.label === "Unowned")?.count ?? 0;
+  // Latest scan of each connected source.
+  const latest = sources
+    .map((src) => scans.find((scan) => scan.integrationId === src.id))
+    .filter((scan): scan is (typeof scans)[number] => Boolean(scan));
+  const resourcesScanned = latest.reduce(
+    (sum, scan) =>
+      sum +
+      Object.values((scan.resourcesScanned ?? {}) as Record<string, unknown>).reduce<number>(
+        (n, v) => n + Number(v || 0),
+        0,
+      ),
+    0,
+  );
+  const durationMs = latest.reduce(
+    (sum, scan) =>
+      sum +
+      (scan.startedAt && scan.finishedAt
+        ? new Date(scan.finishedAt).getTime() - new Date(scan.startedAt).getTime()
+        : 0),
+    0,
+  );
+  const lastScan = latest
+    .map((scan) => scan.finishedAt ?? scan.startedAt)
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+  const failed = latest.filter((scan) => scan.status === "failed");
+  const healthy = (src: (typeof sources)[number]) => src.syncStatus !== "failed" && !src.error;
   return {
     connect: {
-      connected: connections.some((item) => item.enabled && !item.error),
-      connectedAccounts: connections.length,
-      lastAuthentication:
-        connections.find((item) => item.lastValidatedAt)?.lastValidatedAt ??
-        null,
-      connections,
+      connected: sources.some(healthy),
+      connectedAccounts: sources.length,
+      lastAuthentication: sources.map((src) => src.lastSyncAt).filter(Boolean).sort().pop() ?? null,
+      connections: sources.map((src) => ({
+        id: src.id,
+        name: src.name,
+        lastSyncAt: src.lastSyncAt,
+        healthy: healthy(src),
+        error: src.error,
+      })),
     },
     discover: {
-      status: scan?.status ?? "not_started",
-      lastScan: scan?.finishedAt ?? scan?.startedAt ?? null,
-      agentsDiscovered: scan?.agentsDiscovered ?? 0,
-      resourcesScanned: resourceCounts,
-      durationMs,
-      error: scan?.errorMessage ?? null,
+      status: latest.length && failed.length < latest.length ? "completed" : latest.length ? "failed" : "not_started",
+      lastScan,
+      agentsDiscovered: profiles.length,
+      resourcesScanned,
+      durationMs: latest.length ? durationMs : null,
+      error: failed.length ? `${failed.length} source(s) failed on last scan` : null,
     },
     classify: {
       levels: autonomy,
-      classified: autonomy.reduce((sum, item) => sum + item.count, 0),
-      completed:
-        scan?.status === "completed" &&
-        autonomy.reduce((sum, item) => sum + item.count, 0) === owned + unowned,
-    },
-    own: {
-      owned,
-      unowned,
-      aiSuggested: Number(ownerSources?.suggested ?? 0),
-      manual: Number(ownerSources?.manual ?? 0),
+      classified: profiles.length,
+      completed: profiles.length > 0,
     },
     report: {
       generated: Boolean(lastExport),
@@ -376,36 +382,28 @@ export const getRecentViolations = cache(
 );
 
 export const getExecutiveDashboard = cache(async (tenantId: string) => {
-  const [
-    cards,
-    autonomy,
-    ownership,
-    credentialTypes,
-    platforms,
-    riskLevels,
-    recentAgents,
-    trend,
-    recentViolations,
-  ] = await Promise.all([
-    getDashboardCards(tenantId),
-    getAutonomyDistribution(tenantId),
-    getOwnershipBreakdown(tenantId),
-    getCredentialTypeBreakdown(tenantId),
-    getPlatformDistribution(tenantId),
-    getRiskLevelBreakdown(tenantId),
-    getRecentAgents(tenantId),
-    getDiscoveryTrend(tenantId),
-    getRecentViolations(tenantId),
-  ]);
-  return {
-    cards,
-    autonomy,
-    ownership,
-    credentialTypes,
-    platforms,
-    riskLevels,
-    recentAgents,
-    trend,
-    recentViolations,
-  };
+  const [cards, autonomy, platforms, recentAgents, trend, agentViolations, recentViolations] =
+    await Promise.all([
+      getDashboardCards(tenantId),
+      getAutonomyDistribution(tenantId),
+      getPlatformDistribution(tenantId),
+      getRecentAgents(tenantId),
+      getDiscoveryTrend(tenantId),
+      getAgentPolicyViolations(tenantId),
+      getRecentViolations(tenantId),
+    ]);
+  // Rows behind each KPI card, so a card can list exactly which agents it counts.
+  const agentList = (await getProfiles(tenantId))
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      platform: r.platform,
+      framework: r.profile.framework,
+      level: r.autonomy.level,
+      reason: r.autonomy.reason,
+      running: r.profile.deployed,
+      stopped: !r.profile.deployed && Boolean(r.profile.deployedAt),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { cards, autonomy, platforms, recentAgents, trend, agentViolations, recentViolations, agentList };
 });

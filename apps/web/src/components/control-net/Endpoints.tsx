@@ -207,7 +207,7 @@ const CreateEndpointModal: React.FC<{
                           />
                           <Label htmlFor={provider}>{provider}</Label>
                         </div>
-                      )
+                      ),
                     )}
                   </RadioGroup>
                   <Button className="bg-black hover:bg-gray-900 text-white text-sm">
@@ -246,7 +246,7 @@ const CreateEndpointModal: React.FC<{
                         <Checkbox
                           id={`input-${modality}`}
                           checked={formData.inputModality.includes(
-                            modality.toLowerCase()
+                            modality.toLowerCase(),
                           )}
                           onCheckedChange={(checked) => {
                             if (checked) {
@@ -254,14 +254,14 @@ const CreateEndpointModal: React.FC<{
                                 "inputModality",
                                 formData.inputModality +
                                   "," +
-                                  modality.toLowerCase()
+                                  modality.toLowerCase(),
                               );
                             } else {
                               handleInputChange(
                                 "inputModality",
                                 formData.inputModality
                                   .replace(modality.toLowerCase(), "")
-                                  .replace(",,", ",")
+                                  .replace(",,", ","),
                               );
                             }
                           }}

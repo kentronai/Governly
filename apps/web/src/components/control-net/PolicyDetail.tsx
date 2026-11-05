@@ -200,7 +200,7 @@ export const PolicyDetail = () => {
       setLoading(true);
       const policyData = await fetchPolicyDetails(
         tenant.slug,
-        policyId.toString()
+        policyId.toString(),
       );
       if (policyData) {
         setPolicy(policyData as PolicyDetails);

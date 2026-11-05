@@ -1,9 +1,13 @@
 // src/lib/api/tenant-utils.ts
-import { auth } from '@clerk/nextjs/server';
-import { db, tenants, users } from '@db';
-import { eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
-import { ServerAPITrackingOptions, trackServerAPICall, trackServerAPIError } from '@/lib/server-api-tracking';
+import { auth } from "@clerk/nextjs/server";
+import { db, tenants, users } from "@db";
+import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  ServerAPITrackingOptions,
+  trackServerAPICall,
+  trackServerAPIError,
+} from "@/lib/server-api-tracking";
 
 export interface TenantApiContext {
   tenant: {
@@ -20,15 +24,17 @@ export interface TenantApiContext {
  * Validate tenant access for API routes
  * Throws errors if validation fails
  */
-export async function validateTenantAccess(tenantSlug: string): Promise<TenantApiContext> {
+export async function validateTenantAccess(
+  tenantSlug: string,
+): Promise<TenantApiContext> {
   const { userId: clerkUserId, orgId } = await auth();
 
   if (!clerkUserId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   if (!orgId) {
-    throw new Error('No active organization');
+    throw new Error("No active organization");
   }
 
   // Find tenant by slug
@@ -37,12 +43,12 @@ export async function validateTenantAccess(tenantSlug: string): Promise<TenantAp
   });
 
   if (!tenant) {
-    throw new Error('Tenant not found');
+    throw new Error("Tenant not found");
   }
 
   // Verify user has access to this tenant
   if (tenant.id !== orgId) {
-    throw new Error('Access denied');
+    throw new Error("Access denied");
   }
 
   // Get user by Clerk user ID (now same as local ID)
@@ -51,7 +57,7 @@ export async function validateTenantAccess(tenantSlug: string): Promise<TenantAp
   });
 
   if (!localUser) {
-    throw new Error('User not found in local database');
+    throw new Error("User not found in local database");
   }
 
   return {
@@ -71,10 +77,16 @@ export async function validateTenantAccess(tenantSlug: string): Promise<TenantAp
  * Automatically validates tenant access and adds tracking
  */
 export function createTenantApiHandler(
-  handler: (req: NextRequest, context: TenantApiContext) => Promise<NextResponse>,
-  trackingOptions: ServerAPITrackingOptions = {}
+  handler: (
+    req: NextRequest,
+    context: TenantApiContext,
+  ) => Promise<NextResponse>,
+  trackingOptions: ServerAPITrackingOptions = {},
 ) {
-  return async (req: NextRequest, { params }: { params: Promise<{ tenant: string }> }) => {
+  return async (
+    req: NextRequest,
+    { params }: { params: Promise<{ tenant: string }> },
+  ) => {
     const startTime = Date.now();
     let response: NextResponse | undefined;
     let error: Error | undefined;
@@ -86,30 +98,39 @@ export function createTenantApiHandler(
       return response;
     } catch (err) {
       error = err instanceof Error ? err : new Error(String(err));
-      
+
       // Track error
       await trackServerAPIError(req, error, trackingOptions);
-      
+
       const message = error.message;
-      
-      if (message === 'Authentication required') {
+
+      if (message === "Authentication required") {
         response = NextResponse.json({ error: message }, { status: 401 });
-      } else if (message === 'No active organization') {
+      } else if (message === "No active organization") {
         response = NextResponse.json({ error: message }, { status: 400 });
-      } else if (message === 'Tenant not found') {
+      } else if (message === "Tenant not found") {
         response = NextResponse.json({ error: message }, { status: 404 });
-      } else if (message === 'Access denied') {
+      } else if (message === "Access denied") {
         response = NextResponse.json({ error: message }, { status: 403 });
       } else {
-        console.error('API Error:', error);
-        response = NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        console.error("API Error:", error);
+        response = NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 },
+        );
       }
-      
+
       throw err;
     } finally {
       // Track the API call
       if (response) {
-        await trackServerAPICall(req, response, startTime, error, trackingOptions);
+        await trackServerAPICall(
+          req,
+          response,
+          startTime,
+          error,
+          trackingOptions,
+        );
       }
     }
   };

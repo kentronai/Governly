@@ -1,12 +1,12 @@
-import React, { useEffect, useState, type JSX } from 'react';
-import SearchBox from './search-box';
-import { Checkbox } from '../ui/checkbox';
-import { CheckedState } from '@radix-ui/react-checkbox';
-import ListLoadingSkeleton from './list-loading-skeleton';
-import { Button } from '../ui/button';
-import { X } from 'lucide-react';
-import { Label } from '../ui/label';
-import { Switch } from '@nextui-org/react';
+import React, { useEffect, useState, type JSX } from "react";
+import SearchBox from "./search-box";
+import { Checkbox } from "../ui/checkbox";
+import { CheckedState } from "@radix-ui/react-checkbox";
+import ListLoadingSkeleton from "./list-loading-skeleton";
+import { Button } from "../ui/button";
+import { X } from "lucide-react";
+import { Label } from "../ui/label";
+import { Switch } from "@nextui-org/react";
 
 type Item<TData> = { id: string; name: string } & Partial<TData>;
 interface Props<TData extends {}> {
@@ -21,7 +21,7 @@ interface Props<TData extends {}> {
   hideSelectedItems?: boolean;
   fetchNextPage?: () => void;
   onSearchQueryUpdate?: (query: string) => void;
-  searchMode?: 'client' | 'server';
+  searchMode?: "client" | "server";
   listHeight?: number;
   // Applies only if search mode is 'client
   limitRecords?: number;
@@ -51,7 +51,7 @@ const SelectionList = <TData extends {}>({
   hideSelectedItems = false,
   fetchNextPage,
   onSearchQueryUpdate,
-  searchMode = 'client',
+  searchMode = "client",
   listHeight = 300,
   limitRecords,
   handleSearchMatching,
@@ -67,13 +67,15 @@ const SelectionList = <TData extends {}>({
   isClearFilterDisabled = false,
   buttonDisabled = false,
 }: Props<TData>) => {
-  const [infiniteScrollRef, setInfiniteScrollRef] = useState<HTMLDivElement | null>(null);
+  const [infiniteScrollRef, setInfiniteScrollRef] =
+    useState<HTMLDivElement | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAllRecords, setShowAllRecords] = useState(false);
 
   useEffect(() => {
-    if (!infiniteScrollRef || !fetchNextPage || !hasNextPage || isFetching) return;
+    if (!infiniteScrollRef || !fetchNextPage || !hasNextPage || isFetching)
+      return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -84,9 +86,9 @@ const SelectionList = <TData extends {}>({
       },
       {
         root: null,
-        rootMargin: '20px',
+        rootMargin: "20px",
         threshold: 0.1,
-      }
+      },
     );
 
     if (infiniteScrollRef) {
@@ -118,7 +120,7 @@ const SelectionList = <TData extends {}>({
     const item = items.filter(
       (item) =>
         handleSearchMatching?.(item, searchQuery.toLowerCase()) ??
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     if (item?.length === 1) {
@@ -132,7 +134,7 @@ const SelectionList = <TData extends {}>({
   const allFilteredItemsSelected = [
     ...items.slice(0, showAllRecords ? undefined : limitRecords || undefined),
   ].every((item: any) =>
-    selectedItems.some((selectedItem: any) => selectedItem.id === item.id)
+    selectedItems.some((selectedItem: any) => selectedItem.id === item.id),
   );
 
   const handleSelectAllChange = (checked: CheckedState) => {
@@ -142,11 +144,13 @@ const SelectionList = <TData extends {}>({
         ...[
           ...items.slice(
             0,
-            showAllRecords ? undefined : limitRecords || undefined
+            showAllRecords ? undefined : limitRecords || undefined,
           ),
         ].filter(
           (item) =>
-            !selectedItems.some((selectedItem: any) => selectedItem.id === item.id)
+            !selectedItems.some(
+              (selectedItem: any) => selectedItem.id === item.id,
+            ),
         ),
       ];
       onSelectedItemsChange(newSelectedItems);
@@ -156,9 +160,9 @@ const SelectionList = <TData extends {}>({
           ![
             ...items.slice(
               0,
-              showAllRecords ? undefined : limitRecords || undefined
+              showAllRecords ? undefined : limitRecords || undefined,
             ),
-          ].some((filteredItem) => filteredItem.id === item.id)
+          ].some((filteredItem) => filteredItem.id === item.id),
       );
       onSelectedItemsChange(remainingItems);
     }
@@ -177,7 +181,7 @@ const SelectionList = <TData extends {}>({
         {hideSearch === false && (
           <SearchBox
             disabled={isLoading || buttonDisabled}
-            placeholder={searchPlaceholder || ''}
+            placeholder={searchPlaceholder || ""}
             searchQuery={searchQuery}
             setSearchQuery={onSearchQueryChange}
             isLoading={isLoading}
@@ -211,7 +215,7 @@ const SelectionList = <TData extends {}>({
             className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden"
             style={{ maxHeight: `${listHeight}px` }}
           >
-            {searchMode !== 'client' && !isLoading && items.length > 0 && (
+            {searchMode !== "client" && !isLoading && items.length > 0 && (
               <div className="flex items-center gap-2 text-sm font-medium text-[#71717A] min-w-0">
                 <Checkbox
                   id="select-all"
@@ -220,30 +224,40 @@ const SelectionList = <TData extends {}>({
                   disabled={buttonDisabled}
                   className="shrink-0" // Added shrink-0
                 />
-                <label htmlFor="select-all" className="truncate min-w-0">Select all</label>
+                <label htmlFor="select-all" className="truncate min-w-0">
+                  Select all
+                </label>
               </div>
             )}
             {isLoading && items.length === 0 ? (
               <ListLoadingSkeleton />
             ) : items.length === 0 || errorMessage ? (
               <div className="flex justify-center mt-4 py-8">
-                <p>{'No records available'}</p>
+                <p>{"No records available"}</p>
               </div>
             ) : (
               [
                 ...items.slice(
                   0,
-                  showAllRecords ? undefined : limitRecords || undefined
+                  showAllRecords ? undefined : limitRecords || undefined,
                 ),
               ]
                 .filter((item) =>
-                  searchMode === 'client'
-                    ? handleSearchMatching?.(item, searchQuery.toLowerCase()) ??
-                    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-                    : true
+                  searchMode === "client"
+                    ? (handleSearchMatching?.(
+                        item,
+                        searchQuery.toLowerCase(),
+                      ) ??
+                      item.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()))
+                    : true,
                 )
                 .map((item) => (
-                  <div className="flex gap-2 items-center text-sm font-medium text-[#71717A] min-w-0" key={item.id}>
+                  <div
+                    className="flex gap-2 items-center text-sm font-medium text-[#71717A] min-w-0"
+                    key={item.id}
+                  >
                     <Checkbox
                       id={item.id}
                       checked={selectedItemsId.includes(item?.id)}
@@ -252,11 +266,13 @@ const SelectionList = <TData extends {}>({
                       className="shrink-0"
                     />
                     {label ? (
-                      <div className="min-w-0 flex-1">
-                        {label(item)}
-                      </div>
+                      <div className="min-w-0 flex-1">{label(item)}</div>
                     ) : (
-                      <label htmlFor={item.id} className="truncate min-w-0 flex-1 cursor-pointer" title={item.name}>
+                      <label
+                        htmlFor={item.id}
+                        className="truncate min-w-0 flex-1 cursor-pointer"
+                        title={item.name}
+                      >
                         {item.name}
                       </label>
                     )}
@@ -274,51 +290,52 @@ const SelectionList = <TData extends {}>({
               <div
                 ref={setInfiniteScrollRef}
                 className="w-full h-10 flex justify-center py-2"
-              >
-              </div>
+              ></div>
             )}
           </div>
         </div>
         {isClearFilterAvailable ? (
           <Button
-            size='sm'
-            variant='link'
+            size="sm"
+            variant="link"
             className="flex-1 text-sm font-medium text-[#DC2626]"
             disabled={isClearFilterDisabled}
             onClick={() => {
-              handleFilterReset?.(filterName || '');
+              handleFilterReset?.(filterName || "");
               onClose?.();
             }}
           >
             Clear All Filters
           </Button>
         ) : null}
-        {isButtonsAvailable ? (<div className="flex gap-2 w-full">
-          <Button
-            size='sm'
-            className="flex-1"
-            onClick={(e) => {
-              handleFilterApplied?.(e);
-              onClose?.();
-            }}
-          >
-            Apply
-          </Button>
-          <Button
-            size='sm'
-            className="flex-1"
-            variant='destructive'
-            onClick={() => {
-              handleFilterReset?.(filterName || '');
-              onClose?.();
-            }}
-          >
-            Reset
-          </Button>
-        </div>
+        {isButtonsAvailable ? (
+          <div className="flex gap-2 w-full">
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={(e) => {
+                handleFilterApplied?.(e);
+                onClose?.();
+              }}
+            >
+              Apply
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1"
+              variant="destructive"
+              onClick={() => {
+                handleFilterReset?.(filterName || "");
+                onClose?.();
+              }}
+            >
+              Reset
+            </Button>
+          </div>
         ) : null}
       </div>
-      {limitRecords && items.length > limitRecords &&
+      {limitRecords &&
+        items.length > limitRecords &&
         (showAllRecords ? (
           <Button
             variant="link"

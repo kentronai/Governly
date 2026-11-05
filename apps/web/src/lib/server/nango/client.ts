@@ -12,10 +12,9 @@
  * NANGO_SECRET_KEY (from the self-hosted Nango dashboard).
  */
 
-const NANGO_HOST = (process.env.NANGO_HOST ?? "http://nango-server:3003").replace(
-  /\/+$/,
-  "",
-);
+const NANGO_HOST = (
+  process.env.NANGO_HOST ?? "http://nango-server:3003"
+).replace(/\/+$/, "");
 const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY ?? "";
 
 function assertConfigured() {
@@ -105,9 +104,9 @@ export async function createConnectSession(
     cache: "no-store",
   });
 
-  const body = (await parseBody(res)) as
-    | { data?: { token?: string; expires_at?: string } }
-    | null;
+  const body = (await parseBody(res)) as {
+    data?: { token?: string; expires_at?: string };
+  } | null;
   if (!res.ok || !body?.data?.token) {
     throw new NangoError(
       "Failed to create Nango connect session",
@@ -132,7 +131,9 @@ export async function getConnection(
   providerConfigKey: string,
 ): Promise<NangoConnection> {
   assertConfigured();
-  const url = new URL(`${NANGO_HOST}/connection/${encodeURIComponent(connectionId)}`);
+  const url = new URL(
+    `${NANGO_HOST}/connection/${encodeURIComponent(connectionId)}`,
+  );
   url.searchParams.set("provider_config_key", providerConfigKey);
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -176,13 +177,11 @@ export async function getConnectionCredentials(
   raw: unknown;
 }> {
   const connection = await getConnection(connectionId, providerConfigKey);
-  const body = connection.raw as
-    | {
-        credentials?: Record<string, unknown>;
-        connection_config?: Record<string, unknown>;
-        connectionConfig?: Record<string, unknown>;
-      }
-    | null;
+  const body = connection.raw as {
+    credentials?: Record<string, unknown>;
+    connection_config?: Record<string, unknown>;
+    connectionConfig?: Record<string, unknown>;
+  } | null;
   return {
     credentials: body?.credentials ?? {},
     connectionConfig: body?.connection_config ?? body?.connectionConfig ?? {},
@@ -267,7 +266,9 @@ export async function deleteConnection(
   providerConfigKey: string,
 ): Promise<void> {
   assertConfigured();
-  const url = new URL(`${NANGO_HOST}/connection/${encodeURIComponent(connectionId)}`);
+  const url = new URL(
+    `${NANGO_HOST}/connection/${encodeURIComponent(connectionId)}`,
+  );
   url.searchParams.set("provider_config_key", providerConfigKey);
   const res = await fetch(url.toString(), {
     method: "DELETE",
@@ -321,6 +322,49 @@ export async function createConnectionWithCredentials(input: {
   return { connectionId: body?.connection_id ?? input.connectionId, raw: body };
 }
 
+/** Unique keys of the integrations (provider configs) registered in Nango. */
+export async function listIntegrationKeys(): Promise<Set<string>> {
+  assertConfigured();
+  const res = await fetch(`${NANGO_HOST}/integrations`, {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
+  const body = (await parseBody(res)) as any;
+  if (!res.ok) {
+    throw new NangoError("Failed to list Nango integrations", res.status, body);
+  }
+  return new Set<string>((body?.data ?? []).map((i: any) => i.unique_key));
+}
+
+/** Register a provider in Nango (client id/secret for OAuth providers). */
+export async function createIntegration(input: {
+  provider: string;
+  uniqueKey: string;
+  displayName?: string;
+  credentials?: Record<string, unknown>;
+}) {
+  assertConfigured();
+  const res = await fetch(`${NANGO_HOST}/integrations`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      provider: input.provider,
+      unique_key: input.uniqueKey,
+      display_name: input.displayName,
+      ...(input.credentials ? { credentials: input.credentials } : {}),
+    }),
+    cache: "no-store",
+  });
+  const body = (await parseBody(res)) as any;
+  if (!res.ok) {
+    throw new NangoError(
+      body?.error?.message || `Failed to register ${input.provider} in Nango`,
+      res.status,
+      body,
+    );
+  }
+}
+
 export interface NangoProxyInput {
   connectionId: string;
   providerConfigKey: string;
@@ -367,9 +411,7 @@ export async function proxy<T = unknown>(
     ...(input.baseUrlOverride
       ? { "Base-Url-Override": input.baseUrlOverride }
       : {}),
-    ...(input.retries !== undefined
-      ? { Retries: String(input.retries) }
-      : {}),
+    ...(input.retries !== undefined ? { Retries: String(input.retries) } : {}),
     ...(input.headers ?? {}),
   });
 

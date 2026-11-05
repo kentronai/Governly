@@ -1,4 +1,4 @@
-import { getStatusIconStyle, StatusType } from '@/lib/utils/helpers';
+import { getStatusIconStyle, StatusType } from "@/lib/utils/helpers";
 
 const StatusIcon = ({ status }: { status: StatusType }) => {
   return <div className={getStatusIconStyle(status)}></div>;

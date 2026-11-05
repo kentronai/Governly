@@ -22,7 +22,7 @@ export const getApplications = cache(async (tenantId: string) => {
     where: and(
       eq(applications.tenantId, tenantId),
       isNull(applications.deletedAt),
-      ne(applications.status, "Archived")
+      ne(applications.status, "Archived"),
     ),
     orderBy: [desc(applications.createdAt)],
   });
@@ -158,7 +158,7 @@ export const getApplicationWithDetails = cache(
       complianceAssessments: assessments.complianceAssessments,
       euAiActAssessments: assessments.euAiActAssessments,
     };
-  }
+  },
 );
 
 // Get application statistics (for dashboards)
@@ -178,7 +178,7 @@ export const getApplicationStats = cache(async (applicationId: string) => {
     .leftJoin(risks, eq(risks.applicationId, applications.id))
     .leftJoin(
       applicationPolicies,
-      eq(applicationPolicies.applicationId, applications.id)
+      eq(applicationPolicies.applicationId, applications.id),
     )
     .where(eq(applications.id, applicationId))
     .groupBy(applications.id);
@@ -224,15 +224,15 @@ export const getApplicationsWithSummary = cache(async (tenantId: string) => {
       risks: sql<number>`count(distinct ${risks.id})`.as("risks"),
       critical_risks:
         sql<number>`count(distinct case when ${risks.riskLevel} = 'Critical' then ${risks.id} end)`.as(
-          "critical_risks"
+          "critical_risks",
         ),
       mitigated_risks:
         sql<number>`count(distinct case when ${risks.mitigationStatus} = 'Completed' then ${risks.id} end)`.as(
-          "mitigated_risks"
+          "mitigated_risks",
         ),
       active_policies:
         sql<number>`count(distinct case when ${applicationPolicies.isActive} = true then ${applicationPolicies.policyId} end)`.as(
-          "active_policies"
+          "active_policies",
         ),
     })
     .from(applications)
@@ -242,14 +242,14 @@ export const getApplicationsWithSummary = cache(async (tenantId: string) => {
     .leftJoin(updatedByUser, eq(applications.updatedBy, updatedByUser.id))
     .leftJoin(
       applicationPolicies,
-      eq(applicationPolicies.applicationId, applications.id)
+      eq(applicationPolicies.applicationId, applications.id),
     )
     .where(
       and(
         eq(applications.tenantId, tenantId),
         isNull(applications.deletedAt),
-        ne(applications.status, "Archived")
-      )
+        ne(applications.status, "Archived"),
+      ),
     )
     .groupBy(
       applications.id,
@@ -258,7 +258,7 @@ export const getApplicationsWithSummary = cache(async (tenantId: string) => {
       createdByUser.email,
       updatedByUser.id,
       updatedByUser.name,
-      updatedByUser.email
+      updatedByUser.email,
     )
     .orderBy(desc(applications.createdAt));
 
@@ -292,7 +292,7 @@ export const getArchivedApplications = cache(
     tenantId: string,
     searchTerm?: string,
     page?: number,
-    pageSize?: number
+    pageSize?: number,
   ) => {
     const conditions = [
       eq(applications.tenantId, tenantId),
@@ -305,7 +305,7 @@ export const getArchivedApplications = cache(
       const term = `%${searchTerm.trim()}%`;
       const searchExpr = or(
         ilike(applications.name, term),
-        ilike(applications.description, term)
+        ilike(applications.description, term),
       );
       if (searchExpr) conditions.push(searchExpr);
     }
@@ -330,15 +330,15 @@ export const getArchivedApplications = cache(
         risks: sql<number>`count(distinct ${risks.id})`.as("risks"),
         critical_risks:
           sql<number>`count(distinct case when ${risks.riskLevel} = 'Critical' then ${risks.id} end)`.as(
-            "critical_risks"
+            "critical_risks",
           ),
         mitigated_risks:
           sql<number>`count(distinct case when ${risks.mitigationStatus} = 'Completed' then ${risks.id} end)`.as(
-            "mitigated_risks"
+            "mitigated_risks",
           ),
         active_policies:
           sql<number>`count(distinct case when ${applicationPolicies.isActive} = true then ${applicationPolicies.policyId} end)`.as(
-            "active_policies"
+            "active_policies",
           ),
       })
       .from(applications)
@@ -346,7 +346,7 @@ export const getArchivedApplications = cache(
       .leftJoin(risks, eq(risks.applicationId, applications.id))
       .leftJoin(
         applicationPolicies,
-        eq(applicationPolicies.applicationId, applications.id)
+        eq(applicationPolicies.applicationId, applications.id),
       )
       .leftJoin(users, eq(users.id, applications.updatedBy))
       .where(and(...conditions))
@@ -355,7 +355,7 @@ export const getArchivedApplications = cache(
         applications.updatedBy,
         users.id,
         users.name,
-        users.email
+        users.email,
       )
       .orderBy(desc(applications.updatedAt));
 
@@ -377,7 +377,7 @@ export const getArchivedApplications = cache(
         active_policies: Number(app.active_policies) || 0,
       },
     }));
-  }
+  },
 );
 
 // // Get archived applications with summary using DB-level pagination

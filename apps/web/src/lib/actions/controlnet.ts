@@ -46,7 +46,7 @@ export const getControlnetStats = async ({
     await db.query.applicationPolicies.findMany({
       where: and(
         eq(applicationPolicies.tenantId, tenantId),
-        eq(applicationPolicies.applicationId, applicationId)
+        eq(applicationPolicies.applicationId, applicationId),
       ),
       columns: { policyId: true },
     })
@@ -65,7 +65,7 @@ export const getControlnetStats = async ({
       .findMany({
         where: and(
           eq(applicationModels.tenantId, tenantId),
-          eq(applicationModels.applicationId, applicationId)
+          eq(applicationModels.applicationId, applicationId),
         ),
         columns: { id: true },
       })
@@ -79,7 +79,7 @@ export const getControlnetStats = async ({
       },
       where: and(
         eq(observabilityLogs.tenantId, tenantId),
-        eq(observabilityLogs.applicationId, applicationId)
+        eq(observabilityLogs.applicationId, applicationId),
       ),
       orderBy: (logs, { desc }) => [desc(logs.createdAt)],
       limit: 3,
@@ -98,8 +98,8 @@ export const getControlnetStats = async ({
           isNotNull(observabilityLogs.statusCode),
           isInferenceTrafficSql,
           eq(observabilityLogs.tenantId, tenantId),
-          eq(observabilityLogs.applicationId, applicationId)
-        )
+          eq(observabilityLogs.applicationId, applicationId),
+        ),
       )
       .then((rows) => rows[0]),
   ]);
@@ -112,8 +112,8 @@ export const getControlnetStats = async ({
               where: inArray(guardrails.id, policyGuardrailList),
               columns: { fallbackGuardrailId: true },
             })
-          ).map((ele) => ele.fallbackGuardrailId)
-        )
+          ).map((ele) => ele.fallbackGuardrailId),
+        ),
       ).length
     : 0;
 

@@ -12,6 +12,8 @@ import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
+import { runGithubDiscoveryScan } from "@/lib/server/github/discovery-orchestrator";
+import { isGithubProviderKey } from "@/lib/integrations/categories";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
 
 function authorized(request: NextRequest): boolean {
@@ -63,7 +65,13 @@ async function run(request: NextRequest) {
 
     // Run sequentially to avoid multiplying provider API rate limits and DB
     // engine work when multiple tenants are scheduled at the same time.
-    for (const integration of enabled) {
+    // GitHub last: it links each repository to the cloud agents scanned above.
+    const isGithub = (i: (typeof enabled)[number]) =>
+      isGithubProviderKey(i.nangoProviderConfigKey);
+    for (const integration of [
+      ...enabled.filter((i) => !isGithub(i)),
+      ...enabled.filter(isGithub),
+    ]) {
       try {
         const configuration = (integration.configuration ?? {}) as Record<
           string,
@@ -139,6 +147,17 @@ async function run(request: NextRequest) {
             integrationId: integration.id,
             provider: "Databricks Unity Catalog",
             ...(await runDatabricksDiscoveryScan(
+              integration.tenantId,
+              integration.id,
+              integration,
+              null,
+            )),
+          });
+        } else if (isGithub(integration) && integration.nangoConnectionId) {
+          results.push({
+            integrationId: integration.id,
+            provider: "GitHub",
+            ...(await runGithubDiscoveryScan(
               integration.tenantId,
               integration.id,
               integration,

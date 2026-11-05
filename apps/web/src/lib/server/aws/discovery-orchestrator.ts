@@ -38,6 +38,7 @@ import { assessRisk } from "../agents/risk-engine";
 import { detectOwnership } from "../agents/ownership-engine";
 import { generateRecommendations } from "../agents/recommendations-engine";
 import type { RawDiscoveredResource } from "./discovery/types";
+import { composeProfile } from "@/lib/server/agents/agent-profile";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 
 export interface RunScanResult {
@@ -191,7 +192,9 @@ export async function runDiscoveryScan(
           regionBedrock = await discoverBedrock(clients);
         } catch (error) {
           if (!isServiceUnavailableInRegion(error)) {
-            serviceWarnings.push(formatServiceWarning(region, "Bedrock", error));
+            serviceWarnings.push(
+              formatServiceWarning(region, "Bedrock", error),
+            );
           }
         }
         try {
@@ -244,6 +247,10 @@ export async function runDiscoveryScan(
             .map((r) => r.linkedRoleArn)
             .filter((a): a is string => Boolean(a)),
           ...regionLambda
+            .map((r) => r.linkedRoleArn)
+            .filter((a): a is string => Boolean(a)),
+          ...ec2Resources
+            .filter((r) => r.region === region)
             .map((r) => r.linkedRoleArn)
             .filter((a): a is string => Boolean(a)),
         ]);
@@ -347,6 +354,8 @@ export async function runDiscoveryScan(
         ),
       });
 
+      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
+
       const agentValues = {
         tenantId,
         connectionId,
@@ -355,12 +364,15 @@ export async function runDiscoveryScan(
         platform: agent.platform,
         region: agent.region,
         accountId,
+        // The profile's LLM list also covers Lambda/EC2/Step Functions agents,
+        // whose model only appears in env config or the role's invoke policy.
         model:
           typeof primaryModel?.metadata.foundationModel === "string"
             ? primaryModel.metadata.foundationModel
             : typeof primaryModel?.metadata.modelId === "string"
               ? primaryModel.metadata.modelId
-              : null,
+              : (profile.llms[0] ?? null),
+        profile,
         knowledgeBaseId: primaryKnowledgeBase?.resourceId ?? null,
         iamRoleArn:
           primaryRole?.resourceArn ?? primaryAnchor?.linkedRoleArn ?? null,
@@ -394,6 +406,7 @@ export async function runDiscoveryScan(
         lastSeenAt: nowIso,
         syncStatus: "success" as const,
         rawMetadata: {
+          ...profileMeta,
           evidenceSource:
             primaryAnchor?.metadata.evidenceSource ?? "provider_discovery",
           resourceCount: agent.resources.length,

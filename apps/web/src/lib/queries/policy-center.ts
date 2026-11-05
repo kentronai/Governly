@@ -27,11 +27,11 @@ export const getPolicyCenterPoliciesByCategory = cache(
     return await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.category, category),
-        isNull(policyCenter.parentPolicyId)
+        isNull(policyCenter.parentPolicyId),
       ),
       orderBy: (policies, { asc }) => [asc(policies.name)],
     });
-  }
+  },
 );
 
 /**
@@ -43,11 +43,11 @@ export const getPolicyCenterPoliciesByCountry = cache(
     return await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.country, country),
-        isNull(policyCenter.parentPolicyId)
+        isNull(policyCenter.parentPolicyId),
       ),
       orderBy: (policies, { asc }) => [asc(policies.name)],
     });
-  }
+  },
 );
 
 /**
@@ -57,7 +57,7 @@ export const getActivePolicyCenterPolicies = cache(async () => {
   return await db.query.policyCenter.findMany({
     where: and(
       eq(policyCenter.isActive, true),
-      isNull(policyCenter.parentPolicyId)
+      isNull(policyCenter.parentPolicyId),
     ),
     orderBy: (policies, { asc }) => [asc(policies.name)],
   });

@@ -408,7 +408,7 @@ const CreateRedTeamingTaskModal = ({
                                 <Checkbox
                                   id={`test-${index}`}
                                   checked={formData.selectedTests.includes(
-                                    test.name
+                                    test.name,
                                   )}
                                   onCheckedChange={() =>
                                     handleTestSelection(test.name)
@@ -740,7 +740,7 @@ const RedTeamingTab = ({ redTeamingTasks = [], onAddRedTeamingTask }: any) => {
             >
               {filter}
             </Button>
-          )
+          ),
         )}
       </div>
 

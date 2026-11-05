@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { IoClose } from 'react-icons/io5';
+import React, { useState } from "react";
+import { Button } from "../ui/button";
+import { IoClose } from "react-icons/io5";
 
 interface Props {
   src: string;

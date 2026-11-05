@@ -47,8 +47,8 @@ export const getDocumentation = async (input: GetDocumentationInput) => {
     .where(
       and(
         eq(applications.id, input.applicationId),
-        eq(applications.tenantId, tenantId)
-      )
+        eq(applications.tenantId, tenantId),
+      ),
     )
     .limit(1);
 
@@ -65,7 +65,7 @@ export const getDocumentation = async (input: GetDocumentationInput) => {
 
   if (input.sectionType) {
     conditions.push(
-      eq(applicationDocumentation.sectionType, input.sectionType as any)
+      eq(applicationDocumentation.sectionType, input.sectionType as any),
     );
   }
 
@@ -121,8 +121,8 @@ export const upsertDocumentation = async (input: UpsertDocumentationInput) => {
     .where(
       and(
         eq(applications.id, input.applicationId),
-        eq(applications.tenantId, tenantId)
-      )
+        eq(applications.tenantId, tenantId),
+      ),
     )
     .limit(1);
   if (!app.length) throw new Error("Application not found");
@@ -145,13 +145,13 @@ export const upsertDocumentation = async (input: UpsertDocumentationInput) => {
     type PriorityValue = (typeof PRIORITY_VALUES)[number];
 
     const normalizedStatus: StatusValue = STATUS_VALUES.includes(
-      field.status as any
+      field.status as any,
     )
       ? (field.status as StatusValue)
       : "Not started";
 
     const normalizedPriority: PriorityValue = PRIORITY_VALUES.includes(
-      field.priority as any
+      field.priority as any,
     )
       ? (field.priority as PriorityValue)
       : "medium priority";
@@ -167,8 +167,8 @@ export const upsertDocumentation = async (input: UpsertDocumentationInput) => {
           riskCondition,
           eq(applicationDocumentation.applicationId, input.applicationId),
           eq(applicationDocumentation.sectionType, input.sectionType as any),
-          eq(applicationDocumentation.fieldKey, field.fieldKey)
-        )
+          eq(applicationDocumentation.fieldKey, field.fieldKey),
+        ),
       )
       .limit(1);
 

@@ -16,6 +16,18 @@ const INTEGRATION_CATEGORIES = [
   "runtime_platforms",
   "agent_frameworks",
   "observability",
+  "developer_tools",
+  "identity_security",
+  "communication",
+  "productivity",
+  "crm_sales",
+  "marketing_analytics",
+  "customer_support",
+  "finance",
+  "hr_recruiting",
+  "ecommerce",
+  "legal",
+  "other",
 ] as const;
 
 type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];

@@ -41,7 +41,7 @@ export interface FieldSectionProps {
   onSave: (fieldKey: string) => void;
   onFileUpload: (
     fieldKey: string,
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => void;
   isDropdown?: boolean;
   dropdownOptions?: any;
@@ -178,7 +178,7 @@ const FieldSection: React.FC<FieldSectionProps> = ({
 
   const removeFile = (indexToRemove: number) => {
     const updatedFiles = field.files.filter(
-      (_, index) => index !== indexToRemove
+      (_, index) => index !== indexToRemove,
     );
     onUpdateField(fieldKey, { files: updatedFiles });
   };
@@ -240,7 +240,7 @@ const FieldSection: React.FC<FieldSectionProps> = ({
                     size="sm"
                     onClick={() => {
                       const selectedOption = dropdownOptions.find(
-                        (opt: any) => opt.value === field.content
+                        (opt: any) => opt.value === field.content,
                       );
                       if (selectedOption?.link) {
                         window.open(selectedOption.link, "_blank");
@@ -319,11 +319,7 @@ const FieldSection: React.FC<FieldSectionProps> = ({
                 )}
               </div>
 
-              <Button
-                onClick={() => onSave(fieldKey)}
-          
-                size="sm"
-              >
+              <Button onClick={() => onSave(fieldKey)} size="sm">
                 Save
               </Button>
             </div>

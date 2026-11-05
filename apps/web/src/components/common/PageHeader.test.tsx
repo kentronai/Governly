@@ -12,14 +12,19 @@ import {
 describe("PageHeader", () => {
   it("renders the title as an h1 with the standard size", () => {
     render(<PageHeader title="Applications" />);
-    const heading = screen.getByRole("heading", { level: 1, name: "Applications" });
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "Applications",
+    });
     expect(heading).toHaveClass("text-2xl", "font-bold");
     expect(heading.className).toBe(PAGE_TITLE_CLASS);
   });
 
   it("renders an optional muted description", () => {
     render(<PageHeader title="Models" description="Browse models" />);
-    expect(screen.getByText("Browse models")).toHaveClass(PAGE_DESCRIPTION_CLASS);
+    expect(screen.getByText("Browse models")).toHaveClass(
+      PAGE_DESCRIPTION_CLASS,
+    );
   });
 
   it("omits the description when not provided", () => {
@@ -29,9 +34,14 @@ describe("PageHeader", () => {
 
   it("renders right-aligned actions", () => {
     render(
-      <PageHeader title="Models" actions={<button type="button">Add Model</button>} />,
+      <PageHeader
+        title="Models"
+        actions={<button type="button">Add Model</button>}
+      />,
     );
-    expect(screen.getByRole("button", { name: "Add Model" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add Model" }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -93,7 +103,10 @@ describe("pages using the standard header", () => {
 
   it.each([
     ["applications/_components/ApplicationsList.tsx", "Applications"],
-    ["model-registry/_components/ModelRegistryList.tsx", "Organization Approved Models"],
+    [
+      "model-registry/_components/ModelRegistryList.tsx",
+      "Organization Approved Models",
+    ],
   ])("%s renders its title through <PageHeader>", (file, title) => {
     const source = fs.readFileSync(path.join(APP_DIR, file), "utf8");
     expect(source).toContain(`<PageHeader`);

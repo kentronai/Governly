@@ -188,6 +188,9 @@ services:
       - "8080" # Internal only
     env_file:
       - .env
+      # Optional: provider client ids/secrets, see .env.integrations.example
+      - path: .env.integrations
+        required: false
     environment:
       # Force Next.js standalone server to bind to all interfaces, not the
       # container's auto-assigned hostname (which makes localhost:8080 from
@@ -234,6 +237,29 @@ services:
             --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
             http://web:8080/api/cron/agent-discovery || true
           sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
+        done
+
+  # AI Radar scheduler. Polls hourly; the endpoint itself only starts a sweep
+  # when the last one is older than RADAR_INTERVAL_HOURS (default 72 = every
+  # 3 days), so restarts/redeploys never trigger an early run.
+  ai-radar-scheduler:
+    image: alpine:3.20
+    container_name: controlnet-ai-radar-scheduler
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:?AGENT_DISCOVERY_CRON_SECRET must be configured}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          wget -qO- --timeout=60 \
+            --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
+            http://web:8080/api/cron/ai-radar || true
+          sleep 3600
         done
 
   # ------------------------------------------------------------------

@@ -172,7 +172,9 @@ const DatasetsTab: React.FC<DatasetsTabProps> = ({ datasets }) => {
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-1 text-gray-500">
                     <FileText size={14} />
-                    <span>{dataset.recordCount.toLocaleString("en-US")} records</span>
+                    <span>
+                      {dataset.recordCount.toLocaleString("en-US")} records
+                    </span>
                   </div>
                   <span className="text-gray-500">{dataset.size}</span>
                 </div>

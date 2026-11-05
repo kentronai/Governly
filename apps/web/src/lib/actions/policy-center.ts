@@ -2,13 +2,13 @@
  * Server actions for Policy Center
  */
 
-'use server';
+"use server";
 
-import { db, policyCenter, applicationPolicyCenter } from '@db';
-import { eq, and, isNull, ilike, or } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
-import { revalidatePath } from 'next/cache';
-import { rolloutTenantCompliancePolicy } from '@/lib/server/policy-enforcement/compliance-rollout';
+import { db, policyCenter, applicationPolicyCenter } from "@db";
+import { eq, and, isNull, ilike, or } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { rolloutTenantCompliancePolicy } from "@/lib/server/policy-enforcement/compliance-rollout";
 
 export interface GetPolicyCenterPoliciesOptions {
   category?: string;
@@ -23,26 +23,33 @@ export interface GetPolicyCenterPoliciesOptions {
  * Get policy center policies with filters
  */
 export const getPolicyCenterPoliciesAction = async (
-  options?: GetPolicyCenterPoliciesOptions
+  options?: GetPolicyCenterPoliciesOptions,
 ) => {
   const { orgId } = await auth();
   if (!orgId || orgId === null) {
-    throw new Error('Authentication Failed');
+    throw new Error("Authentication Failed");
   }
 
   const { category, country, state, active, search, type } = options || {};
-  const filters = [isNull(policyCenter.parentPolicyId), isNull(policyCenter.tenantId)];
+  const filters = [
+    isNull(policyCenter.parentPolicyId),
+    isNull(policyCenter.tenantId),
+  ];
   if (category) filters.push(eq(policyCenter.category, category));
   if (country) filters.push(eq(policyCenter.country, country));
   if (type) filters.push(eq(policyCenter.type, type));
-  if (state === 'federal') filters.push(isNull(policyCenter.state));
+  if (state === "federal") filters.push(isNull(policyCenter.state));
   else if (state) filters.push(eq(policyCenter.state, state));
   if (search?.trim()) {
     const term = `%${search.trim()}%`;
-    filters.push(or(
-      ilike(policyCenter.name, term), ilike(policyCenter.description, term),
-      ilike(policyCenter.country, term), ilike(policyCenter.governingAuthority, term)
-    )!);
+    filters.push(
+      or(
+        ilike(policyCenter.name, term),
+        ilike(policyCenter.description, term),
+        ilike(policyCenter.country, term),
+        ilike(policyCenter.governingAuthority, term),
+      )!,
+    );
   }
 
   const policies = await db.query.policyCenter.findMany({
@@ -54,7 +61,7 @@ export const getPolicyCenterPoliciesAction = async (
     await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.tenantId, orgId),
-        eq(policyCenter.isActive, true)
+        eq(policyCenter.isActive, true),
       ),
     })
   ).map((ele) => ele.parentPolicyId) as string[];
@@ -66,8 +73,8 @@ export const getPolicyCenterPoliciesAction = async (
     };
   });
 
-  if (active === 'enabled') data = data.filter((policy) => policy.isActive);
-  if (active === 'disabled') data = data.filter((policy) => !policy.isActive);
+  if (active === "enabled") data = data.filter((policy) => policy.isActive);
+  if (active === "disabled") data = data.filter((policy) => !policy.isActive);
 
   return {
     success: true,
@@ -94,7 +101,7 @@ export const createPolicyCenterPolicy = async (input: {
 }) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   try {
@@ -121,8 +128,8 @@ export const createPolicyCenterPolicy = async (input: {
       data: newPolicy[0],
     };
   } catch (error) {
-    console.error('Error creating policy center policy:', error);
-    throw new Error('Failed to create policy center policy');
+    console.error("Error creating policy center policy:", error);
+    throw new Error("Failed to create policy center policy");
   }
 };
 
@@ -132,7 +139,7 @@ export const createPolicyCenterPolicy = async (input: {
 export const getPolicyCenterPolicyById = async (id: string) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   try {
@@ -143,7 +150,7 @@ export const getPolicyCenterPolicyById = async (id: string) => {
       .limit(1);
 
     if (policy.length === 0) {
-      throw new Error('Policy not found');
+      throw new Error("Policy not found");
     }
 
     return {
@@ -151,7 +158,7 @@ export const getPolicyCenterPolicyById = async (id: string) => {
       data: policy[0],
     };
   } catch (error) {
-    console.error('Error fetching policy center policy:', error);
+    console.error("Error fetching policy center policy:", error);
     throw error;
   }
 };
@@ -161,11 +168,11 @@ export const getPolicyCenterPolicyById = async (id: string) => {
  */
 export const updatePolicyCenterPolicyStatus = async (
   id: string,
-  isActive: boolean
+  isActive: boolean,
 ) => {
   const { orgId } = await auth();
   if (!orgId || orgId === null) {
-    throw new Error('Authentication Failed');
+    throw new Error("Authentication Failed");
   }
 
   try {
@@ -174,81 +181,100 @@ export const updatePolicyCenterPolicyStatus = async (
     });
 
     if (!verify) {
-      throw new Error('Policy is either doesn\'t exist or is disabled');
+      throw new Error("Policy is either doesn't exist or is disabled");
     }
 
     let exist = await db.query.policyCenter.findFirst({
       where: and(
         eq(policyCenter.parentPolicyId, id),
-        eq(policyCenter.tenantId, orgId)
+        eq(policyCenter.tenantId, orgId),
       ),
     });
 
     if (!exist) {
       const [newPolicy] = await db.transaction(async (tx) => {
-        const [created] = await tx.insert(policyCenter).values({
-          name: verify.name,
-          description: verify.description,
-          category: verify.category,
-          country: verify.country,
-          state: verify.state,
-          projectsCompliant: verify.projectsCompliant,
-          totalProjects: verify.totalProjects,
-          tags: verify.tags,
-          icon: verify.icon,
-          color: verify.color,
-          type: verify.type,
-          fullDescription: verify.fullDescription,
-          purpose: verify.purpose,
-          scope: verify.scope,
-          requirements: verify.requirements,
-          riskCategories: verify.riskCategories,
-          industriesAffected: verify.industriesAffected,
-          governingAuthority: verify.governingAuthority,
-          effectiveDate: verify.effectiveDate,
-          version: verify.version,
-          legalStatus: verify.legalStatus,
-          officialUrl: verify.officialUrl,
-          references: verify.references,
-          controlMappings: verify.controlMappings,
-          applicabilityRules: verify.applicabilityRules,
-          disable: verify.disable,
-          metadata: verify.metadata,
-          parentPolicyId: verify.id,
-          tenantId: orgId,
-          isActive,
-        }).returning();
+        const [created] = await tx
+          .insert(policyCenter)
+          .values({
+            name: verify.name,
+            description: verify.description,
+            category: verify.category,
+            country: verify.country,
+            state: verify.state,
+            projectsCompliant: verify.projectsCompliant,
+            totalProjects: verify.totalProjects,
+            tags: verify.tags,
+            icon: verify.icon,
+            color: verify.color,
+            type: verify.type,
+            fullDescription: verify.fullDescription,
+            purpose: verify.purpose,
+            scope: verify.scope,
+            requirements: verify.requirements,
+            riskCategories: verify.riskCategories,
+            industriesAffected: verify.industriesAffected,
+            governingAuthority: verify.governingAuthority,
+            effectiveDate: verify.effectiveDate,
+            version: verify.version,
+            legalStatus: verify.legalStatus,
+            officialUrl: verify.officialUrl,
+            references: verify.references,
+            controlMappings: verify.controlMappings,
+            applicabilityRules: verify.applicabilityRules,
+            disable: verify.disable,
+            metadata: verify.metadata,
+            parentPolicyId: verify.id,
+            tenantId: orgId,
+            isActive,
+          })
+          .returning();
         if (!isActive) {
-          await tx.update(applicationPolicyCenter).set({ isActive: false }).where(and(
-            eq(applicationPolicyCenter.tenantId, orgId), eq(applicationPolicyCenter.policyId, id)
-          ));
+          await tx
+            .update(applicationPolicyCenter)
+            .set({ isActive: false })
+            .where(
+              and(
+                eq(applicationPolicyCenter.tenantId, orgId),
+                eq(applicationPolicyCenter.policyId, id),
+              ),
+            );
         }
         return [created];
       });
       exist = newPolicy;
     } else {
       exist = await db.transaction(async (tx) => {
-        const [updated] = await tx.update(policyCenter).set({ isActive }).where(eq(policyCenter.id, exist!.id)).returning();
+        const [updated] = await tx
+          .update(policyCenter)
+          .set({ isActive })
+          .where(eq(policyCenter.id, exist!.id))
+          .returning();
         if (!isActive) {
-          await tx.update(applicationPolicyCenter).set({ isActive: false }).where(and(
-            eq(applicationPolicyCenter.tenantId, orgId), eq(applicationPolicyCenter.policyId, id)
-          ));
+          await tx
+            .update(applicationPolicyCenter)
+            .set({ isActive: false })
+            .where(
+              and(
+                eq(applicationPolicyCenter.tenantId, orgId),
+                eq(applicationPolicyCenter.policyId, id),
+              ),
+            );
         }
         return updated;
       });
     }
 
     const rollout = await rolloutTenantCompliancePolicy(orgId, id, isActive);
-    revalidatePath('/[tenant]/admin/settings/policy-center', 'page');
+    revalidatePath("/[tenant]/admin/settings/policy-center", "page");
 
     return {
-      policy:exist,
+      policy: exist,
       success: true,
       message: `Status updated for policy ${id}`,
       rollout,
     };
   } catch (error) {
-    console.error('Error updating policy center policy:', error);
+    console.error("Error updating policy center policy:", error);
     throw error;
   }
 };
@@ -260,14 +286,14 @@ export const getActivePolicies = async () => {
   const { orgId } = await auth();
 
   if (!orgId || orgId === null) {
-    throw new Error('Authentication Failed');
+    throw new Error("Authentication Failed");
   }
 
   try {
     const orgActivePolicies = await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.tenantId, orgId),
-        eq(policyCenter.isActive, true)
+        eq(policyCenter.isActive, true),
       ),
     });
 
@@ -276,7 +302,7 @@ export const getActivePolicies = async () => {
       active: orgActivePolicies,
     };
   } catch (error) {
-    console.error('[ACTIVE POLICY] Error:', error);
-    throw new Error('Failed to fetch active policies');
+    console.error("[ACTIVE POLICY] Error:", error);
+    throw new Error("Failed to fetch active policies");
   }
 };

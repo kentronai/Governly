@@ -1,34 +1,38 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Settings, Shield, FileText, Database, Target } from "lucide-react"
-import RedTeamingTab, { type RedTeamingTask } from "./RedTeaming"
-import PoliciesTab from "./Polices"
-import EndpointsTab from "./Endpoints"
-import GuardrailsComponent from "./Guardrails"
-import DatasetsTab, { Dataset } from "./Datasets"
+import type React from "react";
+import { useState } from "react";
+import { Settings, Shield, FileText, Database, Target } from "lucide-react";
+import RedTeamingTab, { type RedTeamingTask } from "./RedTeaming";
+import PoliciesTab from "./Polices";
+import EndpointsTab from "./Endpoints";
+import GuardrailsComponent from "./Guardrails";
+import DatasetsTab, { Dataset } from "./Datasets";
 
 // Disabled Tab Component
-const DisabledTab: React.FC<{ tabName: string; icon: React.ReactNode }> = ({ tabName, icon }) => {
+const DisabledTab: React.FC<{ tabName: string; icon: React.ReactNode }> = ({
+  tabName,
+  icon,
+}) => {
   return (
     <div className="p-6 flex flex-col items-center justify-center min-h-96">
       <div className="text-gray-400 mb-4">{icon}</div>
       <h2 className="text-xl font-semibold text-gray-400 mb-2">{tabName}</h2>
       <p className="text-gray-500 text-center max-w-md">
-        This feature is coming soon. Complete the previous steps to unlock this functionality.
+        This feature is coming soon. Complete the previous steps to unlock this
+        functionality.
       </p>
     </div>
-  )
-}
+  );
+};
 
 // Main Dashboard Component
 const AIManagementDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0)
-  const [endpoints, setEndpoints] = useState<any>([])
-  const [policies, setPolicies] = useState<any>([])
-  const [redTeamingTasks, setRedTeamingTasks] = useState<RedTeamingTask[]>([])
-  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const [activeTab, setActiveTab] = useState(0);
+  const [endpoints, setEndpoints] = useState<any>([]);
+  const [policies, setPolicies] = useState<any>([]);
+  const [redTeamingTasks, setRedTeamingTasks] = useState<RedTeamingTask[]>([]);
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
 
   // Tab configuration
   const tabs = [
@@ -57,7 +61,7 @@ const AIManagementDashboard: React.FC = () => {
       icon: <Target size={16} />,
       enabled: endpoints.length > 0 && policies.length > 0,
     },
-  ]
+  ];
 
   const handleAddEndpoint = (endpointData?: any) => {
     const newEndpoint: any = endpointData || {
@@ -65,22 +69,25 @@ const AIManagementDashboard: React.FC = () => {
       name: `gpt-4o-ebay-${endpoints.length + 1}`,
       modelName: "gpt-4o",
       type: "foundationModels",
-      lastModified: new Date().toLocaleDateString("en-US") + " & " + new Date().toLocaleTimeString("en-US"),
-    }
+      lastModified:
+        new Date().toLocaleDateString("en-US") +
+        " & " +
+        new Date().toLocaleTimeString("en-US"),
+    };
 
     if (!endpointData) {
-      newEndpoint.id = `endpoint-${Date.now()}`
+      newEndpoint.id = `endpoint-${Date.now()}`;
     } else {
       const finalEndpoint: any = {
         id: `endpoint-${Date.now()}`,
         ...endpointData,
-      }
-      setEndpoints([...endpoints, finalEndpoint])
-      return
+      };
+      setEndpoints([...endpoints, finalEndpoint]);
+      return;
     }
 
-    setEndpoints([...endpoints, newEndpoint])
-  }
+    setEndpoints([...endpoints, newEndpoint]);
+  };
 
   const handleAddRedTeamingTask = () => {
     const newTask: RedTeamingTask = {
@@ -89,21 +96,37 @@ const AIManagementDashboard: React.FC = () => {
       model: "gpt-4o",
       testPercentage: 10,
       testType: "Bias Test",
-      dateRun: new Date().toLocaleDateString("en-US") + " & " + new Date().toLocaleTimeString("en-US"),
+      dateRun:
+        new Date().toLocaleDateString("en-US") +
+        " & " +
+        new Date().toLocaleTimeString("en-US"),
       riskScore: (Math.random() * 50 + 10).toFixed(2) + "%",
       status: Math.random() > 0.5 ? "Finished" : "Running",
-    }
-    setRedTeamingTasks([...redTeamingTasks, newTask])
-  }
+    };
+    setRedTeamingTasks([...redTeamingTasks, newTask]);
+  };
 
   const handleAddDataset = () => {
-    const datasetTypes: Dataset["type"][] = ["training", "validation", "test", "production"]
-    const sampleTags = ["nlp", "classification", "sentiment", "customer-support", "ecommerce", "multilingual"]
-    const statuses: Dataset["status"][] = ["active", "processing", "archived"]
+    const datasetTypes: Dataset["type"][] = [
+      "training",
+      "validation",
+      "test",
+      "production",
+    ];
+    const sampleTags = [
+      "nlp",
+      "classification",
+      "sentiment",
+      "customer-support",
+      "ecommerce",
+      "multilingual",
+    ];
+    const statuses: Dataset["status"][] = ["active", "processing", "archived"];
 
-    const randomType = datasetTypes[Math.floor(Math.random() * datasetTypes.length)]
-    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)]
-    const randomTags = sampleTags.slice(0, Math.floor(Math.random() * 3) + 1)
+    const randomType =
+      datasetTypes[Math.floor(Math.random() * datasetTypes.length)];
+    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+    const randomTags = sampleTags.slice(0, Math.floor(Math.random() * 3) + 1);
 
     const newDataset: Dataset = {
       id: `dataset-${Date.now()}`,
@@ -115,38 +138,55 @@ const AIManagementDashboard: React.FC = () => {
       lastUpdated: new Date().toLocaleDateString("en-US"),
       tags: randomTags,
       status: randomStatus,
-    }
-    setDatasets([...datasets, newDataset])
-  }
+    };
+    setDatasets([...datasets, newDataset]);
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 0:
-        return <EndpointsTab endpoints={endpoints} onAddEndpoint={handleAddEndpoint} />
+        return (
+          <EndpointsTab
+            endpoints={endpoints}
+            onAddEndpoint={handleAddEndpoint}
+          />
+        );
       case 1:
-        return tabs[1].enabled ? <GuardrailsComponent /> : <DisabledTab tabName="Guardrails" icon={<Shield size={48} />} />
+        return tabs[1].enabled ? (
+          <GuardrailsComponent />
+        ) : (
+          <DisabledTab tabName="Guardrails" icon={<Shield size={48} />} />
+        );
       case 2:
         return tabs[2].enabled ? (
           <PoliciesTab />
         ) : (
           <DisabledTab tabName="Policies" icon={<FileText size={48} />} />
-        )
+        );
       case 3:
         return tabs[3].enabled ? (
           <DatasetsTab datasets={datasets} onAddDataset={handleAddDataset} />
         ) : (
           <DisabledTab tabName="Datasets" icon={<Database size={48} />} />
-        )
+        );
       case 4:
         return tabs[4].enabled ? (
-          <RedTeamingTab redTeamingTasks={redTeamingTasks} onAddRedTeamingTask={handleAddRedTeamingTask} />
+          <RedTeamingTab
+            redTeamingTasks={redTeamingTasks}
+            onAddRedTeamingTask={handleAddRedTeamingTask}
+          />
         ) : (
           <DisabledTab tabName="Red Teaming" icon={<Target size={48} />} />
-        )
+        );
       default:
-        return <EndpointsTab endpoints={endpoints} onAddEndpoint={handleAddEndpoint} />
+        return (
+          <EndpointsTab
+            endpoints={endpoints}
+            onAddEndpoint={handleAddEndpoint}
+          />
+        );
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -157,15 +197,18 @@ const AIManagementDashboard: React.FC = () => {
             <button
               key={tab.name}
               onClick={() => tab.enabled && setActiveTab(index)}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === index
-                ? "border-black text-black bg-white"
-                : tab.enabled
-                  ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  : "border-transparent text-gray-300 cursor-not-allowed"
-                }`}
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === index
+                  ? "border-black text-black bg-white"
+                  : tab.enabled
+                    ? "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    : "border-transparent text-gray-300 cursor-not-allowed"
+              }`}
               disabled={!tab.enabled}
             >
-              <span className={tab.enabled ? "" : "opacity-50"}>{tab.icon}</span>
+              <span className={tab.enabled ? "" : "opacity-50"}>
+                {tab.icon}
+              </span>
               <span>{tab.name}</span>
             </button>
           ))}
@@ -175,7 +218,7 @@ const AIManagementDashboard: React.FC = () => {
       {/* Tab Content */}
       <div className="bg-gray-50 min-h-screen">{renderTabContent()}</div>
     </div>
-  )
-}
+  );
+};
 
-export default AIManagementDashboard
+export default AIManagementDashboard;

@@ -132,7 +132,7 @@ import { formatTimestamp } from "@/lib/utils/dateTime";
 import { PageTitle } from "@/components/common/PageHeader";
 const fetchPolicies = async (
   tenantSlug: string,
-  applicationId: string
+  applicationId: string,
 ): Promise<Policy[]> => {
   try {
     const data = await fetchApplicationPolicies(tenantSlug, applicationId);
@@ -164,7 +164,7 @@ const createPolicyAPI = async (
   authAxios: (url: string, config?: any) => Promise<any>,
   tenant: TenantInfo,
   data: PolicyFormData,
-  applicationId: string
+  applicationId: string,
 ): Promise<BackendPolicy | null> => {
   try {
     // Build guardrails array from form data
@@ -257,7 +257,7 @@ const createPolicyAPI = async (
 
 const deletePolicyAPI = async (
   tenantSlug: string,
-  id: string
+  id: string,
 ): Promise<boolean> => {
   try {
     const { deletePolicy } = await import("@/lib/api/policies");
@@ -525,7 +525,7 @@ const CreatePolicyModal: React.FC<{
 
   const handleGuardrailToggle = (
     guardrailId: string,
-    phase: "input" | "output"
+    phase: "input" | "output",
   ) => {
     const field = phase === "input" ? "inputGuardrails" : "outputGuardrails";
     const currentList = formData[field];
@@ -545,7 +545,7 @@ const CreatePolicyModal: React.FC<{
 
   const validateStep1 = (): boolean => {
     const hasNameAndDescription = Boolean(
-      formData.name.trim() && formData.description.trim()
+      formData.name.trim() && formData.description.trim(),
     );
     const hasPolicyContent =
       Boolean(formData.ai_system_policy_prompt.trim()) ||
@@ -830,7 +830,7 @@ const CreatePolicyModal: React.FC<{
                           </div>
                           <div className="text-xs text-green-600 mt-1">
                             {(formData.uploadedFile.size / 1024 / 1024).toFixed(
-                              2
+                              2,
                             )}{" "}
                             MB
                           </div>
@@ -1052,7 +1052,7 @@ const CreatePolicyModal: React.FC<{
                           onChange={(e) =>
                             handleInputChange(
                               "customInputExpression",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           className="font-mono text-sm"
@@ -1125,7 +1125,7 @@ const CreatePolicyModal: React.FC<{
                           onChange={(e) =>
                             handleInputChange(
                               "customOutputExpression",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           className="font-mono text-sm"
@@ -1260,7 +1260,7 @@ const PoliciesTab = () => {
         authAxios,
         tenant,
         data,
-        applicationId
+        applicationId,
       );
 
       if (created) {
@@ -1274,7 +1274,7 @@ const PoliciesTab = () => {
 
       // Use utility function to parse and display user-friendly error message
       const errorMessage = getUserFriendlyErrorMessage(
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error ? error : new Error(String(error)),
       );
       alert(errorMessage);
     }
@@ -1286,7 +1286,7 @@ const PoliciesTab = () => {
     try {
       const policyData = (await fetchPolicyDetails(
         tenant.slug,
-        policyId
+        policyId,
       )) as PolicyDetails;
       setPolicy(policyData);
       setShowPolicyDetailsModal(true);
@@ -1309,12 +1309,22 @@ const PoliciesTab = () => {
   const handleMakeDefault = async (policyId: string) => {
     if (!tenant?.slug || !applicationId) return;
     try {
-      const { makeApplicationPolicyDefault } = await import("@/lib/api/policies");
-      await makeApplicationPolicyDefault(tenant.slug, String(applicationId), policyId);
+      const { makeApplicationPolicyDefault } = await import(
+        "@/lib/api/policies"
+      );
+      await makeApplicationPolicyDefault(
+        tenant.slug,
+        String(applicationId),
+        policyId,
+      );
       await loadPolicies();
       successToast("Default runtime policy updated", "Policy", "selected");
     } catch (error) {
-      errorToast(error instanceof Error ? error.message : "Failed to select default policy");
+      errorToast(
+        error instanceof Error
+          ? error.message
+          : "Failed to select default policy",
+      );
     }
   };
 
@@ -1417,7 +1427,7 @@ const PoliciesTab = () => {
         <Button
           onClick={() =>
             router.push(
-              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/create-new-policy`
+              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/create-new-policy`,
             )
           }
         >
@@ -1437,9 +1447,7 @@ const PoliciesTab = () => {
               </TableHead> */}
               {/* <TableHead>Status</TableHead> */}
               <TableHead>Created</TableHead>
-              <TableHead className="w-[100px]">
-                Actions
-              </TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1466,7 +1474,7 @@ const PoliciesTab = () => {
                       className="flex items-center gap-2  hover:text-blue-600 hover:underline transition-colors"
                       onClick={() =>
                         router.push(
-                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`
+                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`,
                         )
                       }
                     >
@@ -1493,9 +1501,7 @@ const PoliciesTab = () => {
                       (policy as any).isActive
                     )}
                   </TableCell> */}
-                  <TableCell>
-                    {formatTimestamp(policy.createdAt)}
-                  </TableCell>
+                  <TableCell>{formatTimestamp(policy.createdAt)}</TableCell>
                   <TableCell>
                     <DropdownMenu
                       open={openDropdownId === policy.id}
@@ -1513,7 +1519,7 @@ const PoliciesTab = () => {
                         <DropdownMenuItem
                           onClick={() =>
                             router.push(
-                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`
+                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`,
                             )
                           }
                         >
@@ -1531,7 +1537,7 @@ const PoliciesTab = () => {
                         <DropdownMenuItem
                           onClick={() =>
                             router.push(
-                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`
+                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`,
                             )
                           }
                         >
@@ -1542,7 +1548,7 @@ const PoliciesTab = () => {
                           className="text-red-500"
                           onClick={handleDropdownAction(
                             () => handleDeletePolicy(policy.id, policy.name),
-                            policy.id
+                            policy.id,
                           )}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />

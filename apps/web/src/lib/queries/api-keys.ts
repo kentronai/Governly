@@ -49,7 +49,7 @@ export const getActiveApiKeys = cache(async (tenantId: string) => {
     where: and(
       eq(apiKeys.tenantId, tenantId),
       eq(apiKeys.isActive, true),
-      isNull(apiKeys.revokedAt)
+      isNull(apiKeys.revokedAt),
     ),
     orderBy: [desc(apiKeys.createdAt)],
   });

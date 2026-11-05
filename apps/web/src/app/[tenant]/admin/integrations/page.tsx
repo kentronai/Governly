@@ -9,6 +9,7 @@ import {
   Info,
   Loader2,
   MoreHorizontal,
+  RefreshCw,
   Search,
   X,
 } from "lucide-react";
@@ -53,6 +54,42 @@ import type { Integration } from "@/lib/api/integrations";
 import { NangoConnectButton } from "@/components/integrations/NangoConnectButton";
 
 import { PageTitle } from "@/components/common/PageHeader";
+import providerCatalog from "@/lib/integrations/provider-catalog.json";
+import { isGithubProviderKey, tabOf } from "@/lib/integrations/categories";
+
+// Every Nango provider we have not built a NORIX connector for yet. Rendered as
+// "Coming soon" cards; live integrations (DB-backed) take precedence by name.
+const COMING_SOON_PAGE_SIZE = 120;
+const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Logos come from Nango's public template-logo set, keyed by provider key.
+const LOCAL_LOGOS: Record<string, string> = {
+  claude: "/logos/anthropic-claude.svg",
+};
+const providerLogoUrl = (key: string) =>
+  LOCAL_LOGOS[key] ?? `https://app.nango.dev/images/template-logos/${key}.svg`;
+const catalogKeyByName = new Map(
+  providerCatalog.map((p) => [normalizeName(p.name), p.key]),
+);
+
+const categoryLabel = (value: string) => CATEGORY_LABELS[value] ?? value;
+// Plain <img>: Nango's host isn't in next/image remotePatterns. Falls back to
+// the generic icon when a provider has no logo.
+function CatalogLogo({ providerKey }: { providerKey: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <Blocks className="h-5 w-5" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={providerLogoUrl(providerKey)}
+      alt=""
+      loading="lazy"
+      className="h-5 w-5 object-contain"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+
 // Provider errors can be long (AWS repeats one IAM error per region). Reduce
 // them to a headline, the distinct missing permissions and affected regions.
 function summarizeIssue(message: string) {
@@ -92,7 +129,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   runtime_platforms: "Runtime Platforms",
   agent_frameworks: "Agent Frameworks",
   observability: "Observability & Tracing",
+  developer_tools: "Developer Tools",
+  identity_security: "Identity & Security",
+  communication: "Communication",
+  productivity: "Productivity & Content",
+  crm_sales: "CRM & Sales",
+  marketing_analytics: "Marketing & Analytics",
+  customer_support: "Customer Support",
+  finance: "Finance & Payments",
+  hr_recruiting: "HR & Recruiting",
+  ecommerce: "E-Commerce",
+  legal: "Legal",
+  other: "Other",
 };
+
 
 const CLOUD_PROVIDERS = new Set(["AWS", "Azure", "Google Cloud"]);
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
@@ -130,6 +180,17 @@ const NANGO_PROVIDERS: Record<string, { providerConfigKey: string }> = {
   [CREWAI]: { providerConfigKey: "crewai" },
   [LANGSMITH]: { providerConfigKey: "langsmith" },
 };
+
+// Built-in discovery providers are mapped above; env-enabled providers carry
+// their Nango key on the row (see lib/server/nango/env-integrations.ts).
+const nangoKeyFor = (integration: Integration): string | undefined =>
+  NANGO_PROVIDERS[integration.name]?.providerConfigKey ??
+  (integration.configuration?.nangoProviderKey as string | undefined);
+
+// Any GitHub flavour (PAT / OAuth / App) discovers agents from repositories.
+const isDiscoveryIntegration = (integration: Integration) =>
+  DISCOVERY_INTEGRATIONS.has(integration.name) ||
+  isGithubProviderKey(nangoKeyFor(integration));
 
 type AwsMethod = "iam_role" | "access_key" | "cross_account";
 
@@ -225,6 +286,8 @@ function IntegrationLogo({ integration }: { integration: Integration }) {
       />
     );
   }
+  const catalogKey = catalogKeyByName.get(normalizeName(integration.name));
+  if (catalogKey) return <CatalogLogo providerKey={catalogKey} />;
   return CLOUD_PROVIDERS.has(integration.name) ? (
     <Cloud className="h-5 w-5" />
   ) : (
@@ -330,12 +393,23 @@ export default function IntegrationsPage() {
     }
   }, [integrations]);
 
+  const tabCounts = useMemo(() => {
+    const live = new Set(integrations.map((i) => normalizeName(i.name)));
+    const counts = new Map<string, number>();
+    const add = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
+    integrations.forEach((i) => add(i.category));
+    providerCatalog
+      .filter((p) => !live.has(normalizeName(p.name)))
+      .forEach((p) => add(tabOf(p.category)));
+    return counts;
+  }, [integrations]);
+
   const categories = useMemo(
     () =>
-      Object.keys(CATEGORY_LABELS).filter((value) =>
-        integrations.some((integration) => integration.category === value),
+      Object.keys(CATEGORY_LABELS).filter(
+        (value) => (tabCounts.get(value) ?? 0) > 0,
       ),
-    [integrations],
+    [tabCounts],
   );
 
   const filtered = useMemo(() => {
@@ -360,6 +434,31 @@ export default function IntegrationsPage() {
       )
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [integrations, category, status, search]);
+
+  const [comingSoonLimit, setComingSoonLimit] = useState(COMING_SOON_PAGE_SIZE);
+  const comingSoon = useMemo(() => {
+    const live = new Set(integrations.map((i) => normalizeName(i.name)));
+    const query = search.trim().toLowerCase();
+    if (status === "enabled") return [];
+    return providerCatalog
+      .filter((p) => category === "all" || tabOf(p.category) === category)
+      .filter((p) => !live.has(normalizeName(p.name)))
+      .filter((p) => !query || p.name.toLowerCase().includes(query));
+  }, [integrations, category, status, search]);
+
+  const totalCount =
+    integrations.length +
+    providerCatalog.filter(
+      (p) =>
+        !integrations.some((i) => normalizeName(i.name) === normalizeName(p.name)),
+    ).length;
+
+  // Trim the batch so live + coming-soon cards fill whole rows at every grid
+  // width (1/2/3/4 columns -> multiples of 12), except on the final batch.
+  const comingSoonShown =
+    comingSoon.length > comingSoonLimit
+      ? comingSoonLimit - (filtered.length % 12)
+      : comingSoon.length;
 
   const openCredentials = (integration: Integration) => {
     setSelected(integration);
@@ -392,6 +491,7 @@ export default function IntegrationsPage() {
         tenantSlugOrId: tenant.id,
         integrationId: integration.id,
         providerName: integration.name,
+        providerConfigKey: nangoKeyFor(integration),
         connectionId,
       });
       if (result?.status === "failed") {
@@ -401,7 +501,9 @@ export default function IntegrationsPage() {
         "",
         "",
         "",
-        `${integration.name} connected — ${result?.agentsDiscovered ?? 0} agents discovered`,
+        isDiscoveryIntegration(integration)
+          ? `${integration.name} connected — ${result?.agentsDiscovered ?? 0} agents discovered`
+          : `${integration.name} connected`,
       );
     } catch (error) {
       errorToast(
@@ -793,7 +895,7 @@ export default function IntegrationsPage() {
             onClick={() => setCategory("all")}
           >
             All
-            <Badge variant="secondary">{integrations.length}</Badge>
+            <Badge variant="secondary">{totalCount}</Badge>
           </Button>
           {categories.map((value) => (
             <Button
@@ -807,13 +909,7 @@ export default function IntegrationsPage() {
               onClick={() => setCategory(value)}
             >
               {CATEGORY_LABELS[value]}
-              <Badge variant="secondary">
-                {
-                  integrations.filter(
-                    (integration) => integration.category === value,
-                  ).length
-                }
-              </Badge>
+              <Badge variant="secondary">{tabCounts.get(value)}</Badge>
             </Button>
           ))}
         </div>
@@ -864,6 +960,24 @@ export default function IntegrationsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="w-52 space-y-1.5">
+                <Label className="text-sm">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map(
+                      (value) => (
+                        <SelectItem key={value} value={value}>
+                          {categoryLabel(value)}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 variant="ghost"
                 className="h-9"
@@ -890,7 +1004,7 @@ export default function IntegrationsPage() {
             <AlertTitle>Integrations could not be loaded</AlertTitle>
             <AlertDescription>{loadError}</AlertDescription>
           </Alert>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && comingSoon.length === 0 ? (
           <Card className="items-center py-12 text-center shadow-none">
             <CardHeader>
               <CardTitle>No integrations found</CardTitle>
@@ -964,17 +1078,12 @@ export default function IntegrationsPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    {running === integration.id || testing === integration.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : null}
                     {!connected ? (
-                      NANGO_PROVIDERS[integration.name] ? (
+                      nangoKeyFor(integration) ? (
                         <NangoConnectButton
                           tenant={tenant?.id ?? ""}
                           integrationId={integration.id}
-                          providerConfigKey={
-                            NANGO_PROVIDERS[integration.name].providerConfigKey
-                          }
+                          providerConfigKey={nangoKeyFor(integration)!}
                           size="sm"
                           variant="outline"
                           className="h-8"
@@ -997,15 +1106,28 @@ export default function IntegrationsPage() {
                       )
                     ) : (
                       <>
-                      {DISCOVERY_INTEGRATIONS.has(integration.name) ? (
+                      {isDiscoveryIntegration(integration) ? (
                         <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
                           disabled={running === integration.id}
+                          aria-label={
+                            integration.name === LANGSMITH
+                              ? `Sync ${integration.name}`
+                              : `Discover ${integration.name}`
+                          }
+                          title={integration.name === LANGSMITH ? "Sync" : "Discover"}
                           onClick={() => void runDiscovery(integration)}
                         >
-                          {integration.name === LANGSMITH ? "Sync" : "Discover"}
+                          <RefreshCw
+                            className={cn(
+                              "h-4 w-4",
+                              (running === integration.id ||
+                                testing === integration.id) &&
+                                "animate-spin",
+                            )}
+                          />
                         </Button>
                       ) : null}
                       {/* modal={false}: menu items open dialogs; a modal menu leaves pointer-events locked on body */}
@@ -1055,8 +1177,38 @@ export default function IntegrationsPage() {
                 </Card>
               );
             })}
+            {comingSoon.slice(0, comingSoonShown).map((provider) => (
+              <Card
+                key={provider.key}
+                className="flex-row items-center gap-3 px-3 py-3 opacity-70 shadow-none"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                  <CatalogLogo providerKey={provider.key} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="truncate text-sm font-semibold">
+                    {provider.name}
+                  </CardTitle>
+                  <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
+                    {categoryLabel(tabOf(provider.category))}
+                  </p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  Coming soon
+                </Badge>
+              </Card>
+            ))}
           </div>
         )}
+        {comingSoon.length > comingSoonShown ? (
+          <Button
+            variant="outline"
+            className="mx-auto"
+            onClick={() => setComingSoonLimit((n) => n + COMING_SOON_PAGE_SIZE)}
+          >
+            Show more ({comingSoon.length - comingSoonShown} remaining)
+          </Button>
+        ) : null}
       </div>
 
       <Dialog open={!!issueFor} onOpenChange={(open) => !open && setIssueFor(null)}>

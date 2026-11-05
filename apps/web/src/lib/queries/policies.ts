@@ -60,7 +60,7 @@ function extractGuardrailIdsFromYaml(yamlContent: string | null): string[] {
  * Extract composition from YAML using regex
  */
 function extractCompositionFromYaml(
-  yamlContent: string | null
+  yamlContent: string | null,
 ): YamlComposition | null {
   if (!yamlContent) {
     return null;
@@ -245,7 +245,7 @@ export const getPoliciesWithSummary = cache(async (tenantId: string) => {
           hasComposition: !!composition,
         },
       };
-    })
+    }),
   );
 
   return policiesWithSummary;
@@ -321,10 +321,7 @@ export const searchPolicies = cache(
       where: and(
         eq(policies.tenantId, tenantId),
         isNull(policies.deletedAt),
-        or(
-          ilike(policies.name, term),
-          ilike(policies.description, term)
-        )
+        or(ilike(policies.name, term), ilike(policies.description, term)),
       ),
       with: {
         user_createdBy: {
@@ -337,7 +334,7 @@ export const searchPolicies = cache(
       },
       orderBy: [desc(policies.createdAt)],
     });
-  }
+  },
 );
 
 // Get policies by status
@@ -347,7 +344,7 @@ export const getPoliciesByStatus = cache(
       where: and(
         eq(policies.tenantId, tenantId),
         eq(policies.status, status as any),
-        isNull(policies.deletedAt)
+        isNull(policies.deletedAt),
       ),
       with: {
         user_createdBy: {
@@ -360,7 +357,7 @@ export const getPoliciesByStatus = cache(
       },
       orderBy: [desc(policies.createdAt)],
     });
-  }
+  },
 );
 
 // Get active policies only

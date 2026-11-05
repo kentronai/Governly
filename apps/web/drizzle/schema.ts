@@ -132,6 +132,10 @@ export const provider = pgEnum("provider", [
   "huggingface",
   "gemini",
   "custom",
+  "openrouter",
+  "mistral",
+  "xai",
+  "deepseek",
 ]);
 export const providerModelStatus = pgEnum("provider_model_status", [
   "available",
@@ -220,6 +224,7 @@ export const agentPlatform = pgEnum("agent_platform", [
   "databricks_jobs",
   "databricks_genie",
   "crewai",
+  "github",
 ]);
 export const agentResourceType = pgEnum("agent_resource_type", [
   "bedrock_agent",
@@ -267,6 +272,7 @@ export const agentResourceType = pgEnum("agent_resource_type", [
   "crewai_crew",
   "crewai_agent",
   "crewai_task",
+  "github_repository",
 ]);
 export const autonomyLevel = pgEnum("autonomy_level", ["L1", "L2", "L3", "L4"]);
 export const agentStatus = pgEnum("agent_status", [
@@ -3131,6 +3137,9 @@ export const agents = pgTable(
       .notNull(),
     syncStatus: syncStatus("sync_status").default("success").notNull(),
     rawMetadata: jsonb("raw_metadata").default({}).notNull(),
+    // Registry profile (applications access, developer, deployer, deployed,
+    // observability, framework, LLMs, skills, packages) — see agent-profile.ts.
+    profile: jsonb().default({}).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -3537,10 +3546,11 @@ export const langsmithRuns = pgTable(
   ],
 );
 
-export const euAiActControls = pgTable(
-  "eu_ai_act_controls",
+export const frameworkControls = pgTable(
+  "framework_controls",
   {
     tenantId: text("tenant_id").notNull(),
+    framework: text().default("eu-ai-act").notNull(),
     controlKey: text("control_key").notNull(),
     data: jsonb().default({}).notNull(),
     updatedBy: text("updated_by"),
@@ -3548,5 +3558,124 @@ export const euAiActControls = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [primaryKey({ columns: [table.tenantId, table.controlKey] })],
+  (table) => [
+    primaryKey({
+      columns: [table.tenantId, table.framework, table.controlKey],
+    }),
+  ],
 );
+
+/** Catalog frameworks (src/lib/frameworks/catalog.ts) a tenant has enabled. */
+export const tenantFrameworks = pgTable(
+  "tenant_frameworks",
+  {
+    tenantId: text("tenant_id").notNull(),
+    slug: text().notNull(),
+    enabledBy: text("enabled_by"),
+    enabledAt: timestamp("enabled_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.slug] })],
+);
+
+/** BYOK: a tenant's own LLM provider API key, encrypted via lib/server/crypto. */
+export const tenantLlmKeys = pgTable(
+  "tenant_llm_keys",
+  {
+    tenantId: text("tenant_id").notNull(),
+    provider: text().notNull(),
+    modelId: text("model_id").notNull(),
+    keyEncrypted: text("key_encrypted").notNull(),
+    keyLast4: text("key_last4").notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.tenantId, table.provider, table.modelId],
+    }),
+  ],
+);
+
+/** AI Radar coverage registry: one row per monitored jurisdiction (absent = unmonitored). */
+export const radarCoverage = pgTable(
+  "radar_coverage",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    jurisdictionName: text("jurisdiction_name").notNull(),
+    tier: integer().default(2).notNull(),
+    instrumentsTracked: text("instruments_tracked"),
+    primarySourceUrls: text("primary_source_urls").array().default([]).notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    lastVerifiedDate: date("last_verified_date"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("radar_coverage_jurisdiction_unique").on(table.jurisdictionName),
+    check("radar_coverage_tier_check", sql`${table.tier} IN (1, 2, 3)`),
+  ],
+);
+
+/** Last-seen content hash per source page; a changed hash wakes the model. */
+export const radarSourceSnapshots = pgTable(
+  "radar_source_snapshots",
+  {
+    coverageId: uuid("coverage_id")
+      .notNull()
+      .references(() => radarCoverage.id, { onDelete: "cascade" }),
+    url: text().notNull(),
+    contentHash: text("content_hash"),
+    lastFetchedAt: timestamp("last_fetched_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    lastChangedAt: timestamp("last_changed_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    lastStatus: text("last_status").default("ok").notNull(),
+    lastError: text("last_error"),
+  },
+  (table) => [primaryKey({ columns: [table.coverageId, table.url] })],
+);
+
+export const radarRuns = pgTable("radar_runs", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  trigger: text().notNull(),
+  status: text().default("running").notNull(),
+  model: text(),
+  triggeredBy: text("triggered_by"),
+  sourcesChecked: integer("sources_checked").default(0).notNull(),
+  sourcesChanged: integer("sources_changed").default(0).notNull(),
+  updatesApplied: integer("updates_applied").default(0).notNull(),
+  updatesRejected: integer("updates_rejected").default(0).notNull(),
+  health: jsonb().default({}).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true, mode: "string" }),
+});
+
+/** A change the agent applied. Always carries its primary-source URL + verbatim quote. */
+export const radarUpdates = pgTable("radar_updates", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  runId: uuid("run_id"),
+  coverageId: uuid("coverage_id"),
+  jurisdiction: text().notNull(),
+  policyId: uuid("policy_id"),
+  changeType: text("change_type").notNull(),
+  title: text().notNull(),
+  summary: text().notNull(),
+  changes: jsonb().default({}).notNull(),
+  effectiveDate: date("effective_date"),
+  sourceUrl: text("source_url").notNull(),
+  sourceQuote: text("source_quote").notNull(),
+  detectedAt: timestamp("detected_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+});

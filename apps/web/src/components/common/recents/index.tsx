@@ -35,7 +35,6 @@ import {
   isPolicyCheck,
 } from "@/lib/observability-outcome";
 
-
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -243,7 +242,9 @@ export default function RecentEndpointsTable({
                           {decision ? (
                             <Badge
                               variant={
-                                decision === "block" ? "destructive" : "secondary"
+                                decision === "block"
+                                  ? "destructive"
+                                  : "secondary"
                               }
                             >
                               {toLabel(decision)}
@@ -266,9 +267,7 @@ export default function RecentEndpointsTable({
                         {hideApplicationName === true ? (
                           <></>
                         ) : (
-                          <TableCell>
-                            {ele.applicationName}
-                          </TableCell>
+                          <TableCell>{ele.applicationName}</TableCell>
                         )}
                         <TableCell>
                           {ele.agentName ?? "Application traffic"}
@@ -351,8 +350,12 @@ export default function RecentEndpointsTable({
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground block">Agent</span>
-                                  <span>{ele.agentName ?? "Not attributed"}</span>
+                                  <span className="text-muted-foreground block">
+                                    Agent
+                                  </span>
+                                  <span>
+                                    {ele.agentName ?? "Not attributed"}
+                                  </span>
                                 </div>
                                 {routing ? (
                                   <div className="col-span-2">
@@ -457,8 +460,10 @@ export default function RecentEndpointsTable({
                                           const guard = results?.violated_guard;
                                           const evidence = guard?.evidence;
                                           const categories = [
-                                            ...(evidence?.detected_categories ?? []),
-                                            ...(evidence?.detected_entities ?? []),
+                                            ...(evidence?.detected_categories ??
+                                              []),
+                                            ...(evidence?.detected_entities ??
+                                              []),
                                           ];
                                           if (
                                             guard?.score == null &&
@@ -495,17 +500,21 @@ export default function RecentEndpointsTable({
                                                 </span>
                                                 <div className="flex flex-wrap gap-1 mt-1">
                                                   {categories.length === 0 ? (
-                                                    <span className="text-xs">N/A</span>
+                                                    <span className="text-xs">
+                                                      N/A
+                                                    </span>
                                                   ) : (
-                                                    categories.map((category) => (
-                                                      <Badge
-                                                        key={category}
-                                                        variant="destructive"
-                                                        className="text-xs"
-                                                      >
-                                                        {category}
-                                                      </Badge>
-                                                    ))
+                                                    categories.map(
+                                                      (category) => (
+                                                        <Badge
+                                                          key={category}
+                                                          variant="destructive"
+                                                          className="text-xs"
+                                                        >
+                                                          {category}
+                                                        </Badge>
+                                                      ),
+                                                    )
                                                   )}
                                                 </div>
                                               </div>
@@ -529,10 +538,12 @@ export default function RecentEndpointsTable({
                                     ...g,
                                     phase: "input" as const,
                                   })),
-                                  ...(results?.output_guards ?? []).map((g) => ({
-                                    ...g,
-                                    phase: "output" as const,
-                                  })),
+                                  ...(results?.output_guards ?? []).map(
+                                    (g) => ({
+                                      ...g,
+                                      phase: "output" as const,
+                                    }),
+                                  ),
                                 ];
                                 const violatedRuleId =
                                   results?.violated_rule?.rule_id ??
@@ -568,7 +579,8 @@ export default function RecentEndpointsTable({
                                                   {guard.name ?? guard.id}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground truncate">
-                                                  {guard.description ?? guard.id}
+                                                  {guard.description ??
+                                                    guard.id}
                                                 </div>
                                               </div>
                                               <div className="flex shrink-0 gap-1">
@@ -590,7 +602,8 @@ export default function RecentEndpointsTable({
                                                 >
                                                   {isViolated
                                                     ? "violated"
-                                                    : (guard.status ?? "passed")}
+                                                    : (guard.status ??
+                                                      "passed")}
                                                 </Badge>
                                               </div>
                                             </div>

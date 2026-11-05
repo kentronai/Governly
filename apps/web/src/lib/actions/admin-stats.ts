@@ -2,11 +2,11 @@
  * Server actions for Admin Dashboard Statistics
  */
 
-'use server';
+"use server";
 
-import { db, applications, memberships, users, tenants } from '@db';
-import { eq, and, sql, isNull, ne } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { db, applications, memberships, users, tenants } from "@db";
+import { eq, and, sql, isNull, ne } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 /**
  * Get admin dashboard statistics for a tenant.
@@ -16,7 +16,7 @@ export async function getAdminStats(tenantSlug: string) {
   try {
     const { userId, orgId } = await auth();
     if (!userId || !orgId) {
-      throw new Error('Authentication required');
+      throw new Error("Authentication required");
     }
 
     // Get tenant by slug
@@ -27,14 +27,14 @@ export async function getAdminStats(tenantSlug: string) {
       .limit(1);
 
     if (!tenantRow.length) {
-      throw new Error('Tenant not found');
+      throw new Error("Tenant not found");
     }
 
     const tenantId = tenantRow[0].id;
 
     // Verify tenant matches orgId
     if (tenantId !== orgId) {
-      throw new Error('Unauthorized access to tenant');
+      throw new Error("Unauthorized access to tenant");
     }
 
     // Get count of active applications (not archived and not deleted)
@@ -45,8 +45,8 @@ export async function getAdminStats(tenantSlug: string) {
         and(
           eq(applications.tenantId, tenantId),
           isNull(applications.deletedAt),
-          ne(applications.status, "Archived")
-        )
+          ne(applications.status, "Archived"),
+        ),
       );
 
     // Get count of active users (users with membership records)
@@ -64,10 +64,11 @@ export async function getAdminStats(tenantSlug: string) {
       },
     };
   } catch (error) {
-    console.error('Error fetching admin stats:', error);
+    console.error("Error fetching admin stats:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch admin stats',
+      error:
+        error instanceof Error ? error.message : "Failed to fetch admin stats",
       data: {
         activeApplicationsCount: 0,
         activeUsersCount: 0,
@@ -75,4 +76,3 @@ export async function getAdminStats(tenantSlug: string) {
     };
   }
 }
-

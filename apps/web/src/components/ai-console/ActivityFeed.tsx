@@ -53,7 +53,7 @@ export function ActivityFeed() {
                 className={cn(
                   "w-full text-left p-3 rounded-lg border border-transparent transition-all duration-200",
                   "hover:bg-accent hover:border-border",
-                  " animate-fade-in"
+                  " animate-fade-in",
                 )}
                 style={{ animationDelay: `${i * 50}ms` }}
               >
@@ -97,7 +97,7 @@ export function ActivityFeed() {
                   <div
                     className={cn(
                       "p-1.5 rounded-md",
-                      severityConfig[selectedEvent.severity].bg
+                      severityConfig[selectedEvent.severity].bg,
                     )}
                   >
                     {(() => {
@@ -106,7 +106,7 @@ export function ActivityFeed() {
                         <Icon
                           className={cn(
                             "w-4 h-4",
-                            severityConfig[selectedEvent.severity].color
+                            severityConfig[selectedEvent.severity].color,
                           )}
                         />
                       );

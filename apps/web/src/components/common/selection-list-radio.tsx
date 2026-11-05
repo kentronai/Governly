@@ -1,9 +1,9 @@
-import React, { useState, useEffect, type JSX } from 'react';
-import SearchBox from './search-box';
-import ListLoadingSkeleton from './list-loading-skeleton';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { useDebounce } from '@/hooks/useDebounce';
-import { User } from 'lucide-react';
+import React, { useState, useEffect, type JSX } from "react";
+import SearchBox from "./search-box";
+import ListLoadingSkeleton from "./list-loading-skeleton";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { useDebounce } from "@/hooks/useDebounce";
+import { User } from "lucide-react";
 
 type Item = { id: string; name: string; type?: string };
 interface Props<TData extends {}> {
@@ -19,7 +19,7 @@ interface Props<TData extends {}> {
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   onSearchQueryUpdate?: (query: string) => void;
-  searchMode?: 'client' | 'server';
+  searchMode?: "client" | "server";
   listHeight?: number;
   isRemovePadding?: boolean;
   buttonDisabled?: boolean;
@@ -38,7 +38,7 @@ const SingleSelectionList = <TData extends {}>({
   fetchNextPage,
   hasNextPage,
   onSearchQueryUpdate,
-  searchMode = 'client',
+  searchMode = "client",
   listHeight = 310,
   isRemovePadding = false,
   buttonDisabled = false,
@@ -46,12 +46,13 @@ const SingleSelectionList = <TData extends {}>({
   const [infiniteScrollRef, setInfiniteScrollRef] =
     React.useState<HTMLDivElement | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
-    if (!infiniteScrollRef || !fetchNextPage || !hasNextPage || isFetching) return;
-  
+    if (!infiniteScrollRef || !fetchNextPage || !hasNextPage || isFetching)
+      return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
@@ -61,22 +62,22 @@ const SingleSelectionList = <TData extends {}>({
       },
       {
         root: null,
-        rootMargin: '20px',
+        rootMargin: "20px",
         threshold: 0.1,
-      }
+      },
     );
-  
+
     if (infiniteScrollRef) {
       observer.observe(infiniteScrollRef);
     }
-  
+
     return () => {
       observer.disconnect();
     };
   }, [infiniteScrollRef, fetchNextPage, hasNextPage, isFetching]);
 
   useEffect(() => {
-    if (searchMode === 'server') {
+    if (searchMode === "server") {
       onSearchQueryUpdate?.(debouncedSearchQuery);
     }
   }, [debouncedSearchQuery, onSearchQueryUpdate, searchMode]);
@@ -85,10 +86,12 @@ const SingleSelectionList = <TData extends {}>({
     setSearchQuery(query);
   };
 
-  const filteredItems = searchMode === 'client' 
-    ? items.filter(item => 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : items;
+  const filteredItems =
+    searchMode === "client"
+      ? items.filter((item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : items;
 
   return (
     <div className="flex flex-col gap-3 mt-2">
@@ -96,7 +99,7 @@ const SingleSelectionList = <TData extends {}>({
         <div className="px-0.5">
           <SearchBox
             disabled={isLoading}
-            placeholder={searchPlaceholder || ''}
+            placeholder={searchPlaceholder || ""}
             searchQuery={searchQuery}
             setSearchQuery={onSearchQueryChange}
             isLoading={isLoading}
@@ -105,7 +108,7 @@ const SingleSelectionList = <TData extends {}>({
       )}
       <div className="relative flex flex-col">
         {children}
-        <div 
+        <div
           className="flex flex-col bg-white rounded-md overflow-y-auto"
           style={{ maxHeight: `${listHeight}px` }}
         >
@@ -126,8 +129,13 @@ const SingleSelectionList = <TData extends {}>({
               className="flex flex-col text-[#18181B] accent-black"
             >
               {filteredItems.map((option) => (
-                <div key={option.id} className="hover:bg-[#F9FAFB] transition-colors duration-150">
-                  <div className={`flex items-center ${isRemovePadding ? 'py-[1px]' : 'px-3 py-[1px]'}`}>
+                <div
+                  key={option.id}
+                  className="hover:bg-[#F9FAFB] transition-colors duration-150"
+                >
+                  <div
+                    className={`flex items-center ${isRemovePadding ? "py-[1px]" : "px-3 py-[1px]"}`}
+                  >
                     <RadioGroupItem
                       value={option.id}
                       id={option.id}
@@ -138,8 +146,14 @@ const SingleSelectionList = <TData extends {}>({
                       {label ? (
                         label(option)
                       ) : (
-                        <label htmlFor={option.id} className="flex items-center gap-1">
-                          {option.name} {option.type === "personal" && <User size={14} className="text-[#71717A]" />}
+                        <label
+                          htmlFor={option.id}
+                          className="flex items-center gap-1"
+                        >
+                          {option.name}{" "}
+                          {option.type === "personal" && (
+                            <User size={14} className="text-[#71717A]" />
+                          )}
                         </label>
                       )}
                     </div>
@@ -150,8 +164,8 @@ const SingleSelectionList = <TData extends {}>({
           )}
 
           {hasNextPage && (
-            <div 
-              ref={setInfiniteScrollRef} 
+            <div
+              ref={setInfiniteScrollRef}
               className="w-full h-10 flex justify-center py-2"
             >
               {isFetching && <ListLoadingSkeleton />}

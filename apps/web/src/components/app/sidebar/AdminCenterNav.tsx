@@ -4,7 +4,94 @@ import { ChevronDown, ShieldCheck } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./NavItem";
-import { adminHref, getVisibleAdminNav, isAdminRoute } from "./adminNav";
+import {
+  adminHref,
+  flattenNavItems,
+  getVisibleAdminNav,
+  isAdminRoute,
+  type AdminNavItem,
+} from "./adminNav";
+
+const isActiveHref = (pathname: string, href: string, exact = false) =>
+  pathname === href || (!exact && pathname.startsWith(`${href}/`));
+
+function AdminNavLink({
+  item,
+  tenant,
+  pathname,
+}: {
+  item: AdminNavItem;
+  tenant: string;
+  pathname: string;
+}) {
+  const Icon = item.icon;
+  const href = adminHref(tenant, item.path!);
+  return (
+    <NavItem
+      href={href}
+      icon={<Icon className="h-4 w-4" />}
+      isActive={isActiveHref(pathname, href, item.exact)}
+      className="py-1.5 text-foreground/80"
+    >
+      {item.label}
+    </NavItem>
+  );
+}
+
+/** Parent row that opens/closes its children, like the Admin Center toggle. */
+function AdminNavFolder({
+  item,
+  tenant,
+  pathname,
+}: {
+  item: AdminNavItem;
+  tenant: string;
+  pathname: string;
+}) {
+  const children = item.children ?? [];
+  const containsActive = flattenNavItems(children).some((child) =>
+    isActiveHref(pathname, adminHref(tenant, child.path!), child.exact),
+  );
+  const [open, setOpen] = useState(containsActive);
+  useEffect(() => {
+    if (containsActive) setOpen(true);
+  }, [containsActive]);
+  const Icon = item.icon;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-muted/60"
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="flex-1">{item.label}</span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      <div
+        hidden={!open}
+        role="group"
+        aria-label={item.label}
+        className="ml-5 mt-1 space-y-1 border-l pl-2"
+      >
+        {children.map((child) => (
+          <AdminNavLink
+            key={child.path}
+            item={child}
+            tenant={tenant}
+            pathname={pathname}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface AdminCenterNavProps {
   tenant: string;
@@ -26,8 +113,9 @@ export function AdminCenterNav({ tenant, pathname }: AdminCenterNavProps) {
 
   const groups = getVisibleAdminNav({
     govIQEnabled: Boolean(tenantInfo?.govIQEnabled),
-    euAiAct: Boolean(policyStatus?.euAiAct),
     iso42001: Boolean(policyStatus?.iso42001),
+    activePolicyNames: policyStatus?.activePolicyNames ?? [],
+    enabledFrameworkSlugs: policyStatus?.enabledFrameworkSlugs ?? [],
   });
 
   return (
@@ -67,24 +155,27 @@ export function AdminCenterNav({ tenant, pathname }: AdminCenterNavProps) {
             className="space-y-1"
           >
             {group.title && (
-              <p className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+              <p className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {group.title}
               </p>
             )}
-            {group.items.map(({ label, path, icon: Icon }) => {
-              const href = adminHref(tenant, path);
-              return (
-                <NavItem
-                  key={path}
-                  href={href}
-                  icon={<Icon className="h-3.5 w-3.5" />}
-                  isActive={pathname === href || pathname.startsWith(`${href}/`)}
-                  className="py-1.5 text-xs"
-                >
-                  {label}
-                </NavItem>
-              );
-            })}
+            {group.items.map((item) =>
+              item.children ? (
+                <AdminNavFolder
+                  key={item.label}
+                  item={item}
+                  tenant={tenant}
+                  pathname={pathname}
+                />
+              ) : (
+                <AdminNavLink
+                  key={item.path}
+                  item={item}
+                  tenant={tenant}
+                  pathname={pathname}
+                />
+              ),
+            )}
           </div>
         ))}
       </div>

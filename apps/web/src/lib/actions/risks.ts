@@ -216,7 +216,7 @@ export const getRiskByUseCase = async (useCaseId: string) => {
 export const getRisksByApplication = async (
   tenantSlugOrId: string,
   applicationId: string,
-  useCaseId?: string
+  useCaseId?: string,
 ) => {
   const { userId } = await auth();
 
@@ -245,7 +245,7 @@ export const getRisksByApplication = async (
     where: and(
       eq(applications.id, applicationId),
       eq(applications.tenantId, tenantId),
-      isNull(applications.deletedAt)
+      isNull(applications.deletedAt),
     ),
   });
 

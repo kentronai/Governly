@@ -29,6 +29,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Pagination from "@/components/common/pagination";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadarAgentCard } from "@/components/ai-radar/RadarAgentCard";
+import { RadarUpdates } from "@/components/ai-radar/RadarUpdates";
+import { RadarCoverage } from "@/components/ai-radar/RadarCoverage";
 
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
@@ -56,6 +61,9 @@ const AIPolicyUpdate = () => {
   const [pageSize, setPageSize] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  // Bumped when a Radar run finishes so the Updates tab and table reload.
+  const [updatesKey, setUpdatesKey] = useState(0);
+  const onRunFinished = useCallback(() => setUpdatesKey((k) => k + 1), []);
 
   // Filter options (fetched once on mount)
   const [filterOptions, setFilterOptions] = useState<{
@@ -135,7 +143,7 @@ const AIPolicyUpdate = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, debouncedSearchTerm, filters]);
+  }, [page, pageSize, debouncedSearchTerm, filters, updatesKey]);
 
   // Fetch policies when dependencies change
   useEffect(() => {
@@ -358,12 +366,25 @@ const AIPolicyUpdate = () => {
     <>
       {/* Header */}
       <div className="flex flex-col p-5">
-        <div className="flex w-full justify-between items-center">
-          <div className="text-xl font-semibold font-sans  leading-[100%] mt-4">
-            AI Radar
-          </div>
-        </div>
+        <PageHeader
+          title="AI Radar"
+          description="Monitors AI laws, regulations and enforcement across covered jurisdictions every 3 days. Every update is backed by a primary source."
+        />
+        <RadarAgentCard onRunFinished={onRunFinished} />
 
+        <Tabs defaultValue="policies" className="mt-6">
+          <TabsList>
+            <TabsTrigger value="policies">Regulations</TabsTrigger>
+            <TabsTrigger value="updates">Updates</TabsTrigger>
+            <TabsTrigger value="coverage">Coverage</TabsTrigger>
+          </TabsList>
+          <TabsContent value="updates" className="mt-4">
+            <RadarUpdates refreshKey={updatesKey} />
+          </TabsContent>
+          <TabsContent value="coverage" className="mt-4">
+            <RadarCoverage />
+          </TabsContent>
+          <TabsContent value="policies">
         {/* Search and Filter Controls */}
         <div className="flex justify-start items-center gap-4 mt-6">
           <div className="relative w-[343px]">
@@ -492,6 +513,8 @@ const AIPolicyUpdate = () => {
             />
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Policy Detail Modal */}

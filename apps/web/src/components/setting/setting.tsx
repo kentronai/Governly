@@ -37,7 +37,19 @@ import Pagination from "@/components/common/pagination";
 
 // Icons
 import { IoShareSocial } from "react-icons/io5";
-import { MoreHorizontal, Search, Loader2, Pencil, Trash2, RefreshCw, AlertTriangle, ShieldCheck, Power, Plus, Eye } from "lucide-react";
+import {
+  MoreHorizontal,
+  Search,
+  Loader2,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  ShieldCheck,
+  Power,
+  Plus,
+  Eye,
+} from "lucide-react";
 
 // API & Utilities
 import { useDebounce } from "@/hooks/useDebounce";
@@ -75,9 +87,29 @@ interface PolicyPack {
   coverageScore?: number;
   evaluation?: {
     summary?: string;
-    controls?: Array<{ key: string; title: string; status: string; reason: string; mappedField?: string; mappedRoute?: string; requiredEvidence?: string[]; guidance?: string; priority?: "high" | "medium" | "low" }>;
+    controls?: Array<{
+      key: string;
+      title: string;
+      status: string;
+      reason: string;
+      mappedField?: string;
+      mappedRoute?: string;
+      requiredEvidence?: string[];
+      guidance?: string;
+      priority?: "high" | "medium" | "low";
+    }>;
   };
-  gaps?: Array<{ key: string; title: string; status: string; reason: string; mappedField?: string; mappedRoute?: string; requiredEvidence?: string[]; guidance?: string; priority?: "high" | "medium" | "low" }>;
+  gaps?: Array<{
+    key: string;
+    title: string;
+    status: string;
+    reason: string;
+    mappedField?: string;
+    mappedRoute?: string;
+    requiredEvidence?: string[];
+    guidance?: string;
+    priority?: "high" | "medium" | "low";
+  }>;
   evaluatedAt?: string | null;
 }
 
@@ -105,7 +137,7 @@ const formatPermissionText = (permission: string): string => {
 
 const isWorkspaceCreator = (
   userName: string,
-  workspaceDetails: any
+  workspaceDetails: any,
 ): boolean => {
   return (
     workspaceDetails?.created_by?.username?.toLowerCase() ===
@@ -117,7 +149,7 @@ const canShowMemberActions = (
   member: Member,
   userProfile: any,
   workspaceDetails: any,
-  hasWritePermission: boolean
+  hasWritePermission: boolean,
 ): boolean => {
   return (
     hasWritePermission &&
@@ -270,7 +302,7 @@ const TableContent: FC<{
           member,
           userProfile,
           workspaceDetails,
-          hasWritePermission
+          hasWritePermission,
         );
 
         return (
@@ -319,8 +351,13 @@ const Settings: FC<SettingsProps> = ({
   const queryClient = useQueryClient();
   const { slug } = useParams();
   const [selectedPolicies, setSelectedPolicies] = useState<PolicyPack[]>([]);
-  const [evaluatingPolicyId, setEvaluatingPolicyId] = useState<string | null>(null);
-  const [evidenceDialog, setEvidenceDialog] = useState<{ mode: "add" | "view"; policyId: string } | null>(null);
+  const [evaluatingPolicyId, setEvaluatingPolicyId] = useState<string | null>(
+    null,
+  );
+  const [evidenceDialog, setEvidenceDialog] = useState<{
+    mode: "add" | "view";
+    policyId: string;
+  } | null>(null);
   const { refreshApplicationPolicyStatus, applicationPolicy: policiesData } =
     useTenant();
 
@@ -358,8 +395,8 @@ const Settings: FC<SettingsProps> = ({
     // Optimistically update UI
     setSelectedPolicies((prevPolicies) =>
       prevPolicies.map((p) =>
-        p.id === policyId ? { ...p, isActive: newActiveState } : p
-      )
+        p.id === policyId ? { ...p, isActive: newActiveState } : p,
+      ),
     );
 
     try {
@@ -371,78 +408,104 @@ const Settings: FC<SettingsProps> = ({
         tenant,
         applicationId,
         policy.parentPolicyId,
-        newActiveState
+        newActiveState,
       );
 
       if (!result.success) {
         // Revert on error
         setSelectedPolicies((prevPolicies) =>
           prevPolicies.map((p) =>
-            p.id === policyId ? { ...p, isActive: isCurrentlyActive } : p
-          )
+            p.id === policyId ? { ...p, isActive: isCurrentlyActive } : p,
+          ),
         );
-        errorToast("error" in result && result.error ? result.error : "Failed to update policy status");
+        errorToast(
+          "error" in result && result.error
+            ? result.error
+            : "Failed to update policy status",
+        );
         return;
       }
       refreshApplicationPolicyStatus();
       const evaluation = result.evaluation;
       if (evaluation) {
-        setSelectedPolicies((current) => current.map((item) =>
-          item.id === policyId
-            ? {
-                ...item,
-                complianceStatus: evaluation.complianceStatus,
-                applicabilityStatus: evaluation.applicabilityStatus,
-                coverageScore: evaluation.coverageScore,
-                evaluation,
-                gaps: evaluation.gaps,
-                evaluatedAt: evaluation.evaluatedAt,
-              }
-            : item
-        ));
+        setSelectedPolicies((current) =>
+          current.map((item) =>
+            item.id === policyId
+              ? {
+                  ...item,
+                  complianceStatus: evaluation.complianceStatus,
+                  applicabilityStatus: evaluation.applicabilityStatus,
+                  coverageScore: evaluation.coverageScore,
+                  evaluation,
+                  gaps: evaluation.gaps,
+                  evaluatedAt: evaluation.evaluatedAt,
+                }
+              : item,
+          ),
+        );
       }
       successToast(
         `Policy ${newActiveState ? "enabled" : "disabled"} successfully`,
         "Policy",
-        "updated"
+        "updated",
       );
     } catch (error) {
       // Revert on error
       setSelectedPolicies((prevPolicies) =>
         prevPolicies.map((p) =>
-          p.id === policyId ? { ...p, isActive: isCurrentlyActive } : p
-        )
+          p.id === policyId ? { ...p, isActive: isCurrentlyActive } : p,
+        ),
       );
       errorToast("Error updating policy status");
     }
   };
 
-  const handleEvaluate = async (policy: PolicyPack, { silent = false } = {}) => {
-    if (!tenant || !applicationId || Array.isArray(tenant) || Array.isArray(applicationId) || !policy.parentPolicyId) {
+  const handleEvaluate = async (
+    policy: PolicyPack,
+    { silent = false } = {},
+  ) => {
+    if (
+      !tenant ||
+      !applicationId ||
+      Array.isArray(tenant) ||
+      Array.isArray(applicationId) ||
+      !policy.parentPolicyId
+    ) {
       errorToast("Invalid application or policy");
       return;
     }
     setEvaluatingPolicyId(policy.id);
     try {
-      const { evaluateApplicationCompliancePolicy } = await import("@/lib/api/compliance-policies");
-      const result = await evaluateApplicationCompliancePolicy(tenant, applicationId, policy.parentPolicyId);
-      setSelectedPolicies((current) => current.map((item) =>
-        item.id === policy.id
-          ? {
-              ...item,
-              complianceStatus: result.evaluation.complianceStatus,
-              applicabilityStatus: result.evaluation.applicabilityStatus,
-              coverageScore: result.evaluation.coverageScore,
-              evaluation: result.evaluation,
-              gaps: result.evaluation.gaps,
-              evaluatedAt: result.evaluation.evaluatedAt,
-            }
-          : item
-      ));
+      const { evaluateApplicationCompliancePolicy } = await import(
+        "@/lib/api/compliance-policies"
+      );
+      const result = await evaluateApplicationCompliancePolicy(
+        tenant,
+        applicationId,
+        policy.parentPolicyId,
+      );
+      setSelectedPolicies((current) =>
+        current.map((item) =>
+          item.id === policy.id
+            ? {
+                ...item,
+                complianceStatus: result.evaluation.complianceStatus,
+                applicabilityStatus: result.evaluation.applicabilityStatus,
+                coverageScore: result.evaluation.coverageScore,
+                evaluation: result.evaluation,
+                gaps: result.evaluation.gaps,
+                evaluatedAt: result.evaluation.evaluatedAt,
+              }
+            : item,
+        ),
+      );
       refreshApplicationPolicyStatus();
-      if (!silent) successToast("Compliance evidence re-evaluated", "Policy", "checked");
+      if (!silent)
+        successToast("Compliance evidence re-evaluated", "Policy", "checked");
     } catch (error) {
-      errorToast(error instanceof Error ? error.message : "Compliance evaluation failed");
+      errorToast(
+        error instanceof Error ? error.message : "Compliance evaluation failed",
+      );
     } finally {
       setEvaluatingPolicyId(null);
     }
@@ -473,22 +536,35 @@ const Settings: FC<SettingsProps> = ({
       );
     }
     if (!policy.gaps?.length) {
-      return <p className="text-sm text-muted-foreground">Enable the policy and run a check to calculate compliance.</p>;
+      return (
+        <p className="text-sm text-muted-foreground">
+          Enable the policy and run a check to calculate compliance.
+        </p>
+      );
     }
     return (
       <div className="space-y-2">
-        <p className="text-sm font-medium">Open control gaps ({policy.gaps.length})</p>
+        <p className="text-sm font-medium">
+          Open control gaps ({policy.gaps.length})
+        </p>
         <div className="divide-y rounded-lg border">
           {policy.gaps.map((gap) => (
-            <div key={gap.key} className="flex items-start justify-between gap-3 p-3">
+            <div
+              key={gap.key}
+              className="flex items-start justify-between gap-3 p-3"
+            >
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-sm font-medium">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
                   {gap.title}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">{gap.reason}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {gap.reason}
+                </p>
               </div>
-              <Badge variant="outline" className="shrink-0">{toLabel(gap.priority ?? "medium")}</Badge>
+              <Badge variant="outline" className="shrink-0">
+                {toLabel(gap.priority ?? "medium")}
+              </Badge>
             </div>
           ))}
         </div>
@@ -498,7 +574,10 @@ const Settings: FC<SettingsProps> = ({
 
   // Open gaps first, so the add form preselects a control that still needs evidence.
   const evidenceControls = (policy: PolicyPack) => {
-    const all = [...(policy.gaps ?? []), ...(policy.evaluation?.controls ?? [])];
+    const all = [
+      ...(policy.gaps ?? []),
+      ...(policy.evaluation?.controls ?? []),
+    ];
     const seen = new Set<string>();
     return all
       .filter((control) => !seen.has(control.key) && seen.add(control.key))
@@ -513,7 +592,9 @@ const Settings: FC<SettingsProps> = ({
       <TableRow key={policy.id}>
         <TableCell>
           <div className="flex items-center gap-2">
-            <div className={`w-7 h-7 rounded-full ${policy.color} flex items-center justify-center text-xs font-semibold shrink-0`}>
+            <div
+              className={`w-7 h-7 rounded-full ${policy.color} flex items-center justify-center text-xs font-semibold shrink-0`}
+            >
               {policy.icon}
             </div>
             <span className="font-medium">{policy.name}</span>
@@ -525,7 +606,14 @@ const Settings: FC<SettingsProps> = ({
         </TableCell>
         <TableCell>
           {policy.type && (
-            <Badge className={cn("border", policy.type === "Mandatory" ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500")}>
+            <Badge
+              className={cn(
+                "border",
+                policy.type === "Mandatory"
+                  ? "bg-red-500/10 text-red-500"
+                  : "bg-blue-500/10 text-blue-500",
+              )}
+            >
               {policy.type}
             </Badge>
           )}
@@ -539,17 +627,34 @@ const Settings: FC<SettingsProps> = ({
             "Disabled"
           )}
         </TableCell>
-        <TableCell>{policy.isActive && status !== "not_applicable" ? `${score.toFixed(0)}%` : "—"}</TableCell>
-        <TableCell>{policy.isActive ? policy.gaps?.length ?? 0 : "—"}</TableCell>
         <TableCell>
-          {policy.evaluatedAt ? new Date(policy.evaluatedAt).toLocaleString() : "—"}
+          {policy.isActive && status !== "not_applicable"
+            ? `${score.toFixed(0)}%`
+            : "—"}
+        </TableCell>
+        <TableCell>
+          {policy.isActive ? (policy.gaps?.length ?? 0) : "—"}
+        </TableCell>
+        <TableCell>
+          {policy.evaluatedAt
+            ? new Date(policy.evaluatedAt).toLocaleString()
+            : "—"}
         </TableCell>
         <TableCell className="text-right">
           {/* modal={false}: the menu opens Dialogs; a modal menu leaves pointer-events locked on body */}
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${policy.name}`}>
-                {evaluatingPolicyId === policy.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label={`Actions for ${policy.name}`}
+              >
+                {evaluatingPolicyId === policy.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-4 w-4" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -561,15 +666,21 @@ const Settings: FC<SettingsProps> = ({
                 {policy.isActive ? "Disable" : "Enable"}
               </DropdownMenuItem>
               <DropdownMenuItem
-                disabled={!policy.isActive || !hasWorkspaceDetailsWritePermission}
-                onSelect={() => setEvidenceDialog({ mode: "add", policyId: policy.id })}
+                disabled={
+                  !policy.isActive || !hasWorkspaceDetailsWritePermission
+                }
+                onSelect={() =>
+                  setEvidenceDialog({ mode: "add", policyId: policy.id })
+                }
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add evidence
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!policy.isActive}
-                onSelect={() => setEvidenceDialog({ mode: "view", policyId: policy.id })}
+                onSelect={() =>
+                  setEvidenceDialog({ mode: "view", policyId: policy.id })
+                }
               >
                 <Eye className="h-4 w-4 mr-2" />
                 View evidence
@@ -585,7 +696,9 @@ const Settings: FC<SettingsProps> = ({
     ? selectedPolicies.find((p) => p.id === evidenceDialog.policyId)
     : undefined;
   const canManageEvidence =
-    !!dialogPolicy?.parentPolicyId && typeof tenant === "string" && typeof applicationId === "string";
+    !!dialogPolicy?.parentPolicyId &&
+    typeof tenant === "string" &&
+    typeof applicationId === "string";
 
   // Early return if no read permission
   if (!hasWorkspaceDetailsReadPermission) return null;
@@ -597,7 +710,9 @@ const Settings: FC<SettingsProps> = ({
         <div>
           <h2 className="text-xl font-semibold  mb-2">Policy Management</h2>
           <p className="text-muted-foreground text-sm">
-            Assign regulations to this application and verify every mapped control against live Norix evidence. Missing evidence fails closed and appears as a gap.
+            Assign regulations to this application and verify every mapped
+            control against live Norix evidence. Missing evidence fails closed
+            and appears as a gap.
           </p>
         </div>
 
@@ -650,7 +765,9 @@ const Settings: FC<SettingsProps> = ({
                     applicationId={applicationId as string}
                     policyId={dialogPolicy.parentPolicyId!}
                     controls={evidenceControls(dialogPolicy)}
-                    onChanged={() => handleEvaluate(dialogPolicy, { silent: true })}
+                    onChanged={() =>
+                      handleEvaluate(dialogPolicy, { silent: true })
+                    }
                   />
                 )}
               </div>
@@ -659,9 +776,18 @@ const Settings: FC<SettingsProps> = ({
               <Button
                 variant="outline"
                 onClick={() => dialogPolicy && handleEvaluate(dialogPolicy)}
-                disabled={!dialogPolicy || evaluatingPolicyId === dialogPolicy.id || !hasWorkspaceDetailsWritePermission}
+                disabled={
+                  !dialogPolicy ||
+                  evaluatingPolicyId === dialogPolicy.id ||
+                  !hasWorkspaceDetailsWritePermission
+                }
               >
-                <RefreshCw className={cn("h-4 w-4 mr-2", evaluatingPolicyId === dialogPolicy?.id && "animate-spin")} />
+                <RefreshCw
+                  className={cn(
+                    "h-4 w-4 mr-2",
+                    evaluatingPolicyId === dialogPolicy?.id && "animate-spin",
+                  )}
+                />
                 Re-check
               </Button>
             </DialogFooter>
@@ -670,7 +796,8 @@ const Settings: FC<SettingsProps> = ({
 
         {!selectedPolicies.length && (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No organization policies are enabled. Enable them in Admin Center → Compliance → Regulations first.
+            No organization policies are enabled. Enable them in Admin Center →
+            Compliance → Regulations first.
           </div>
         )}
       </div>

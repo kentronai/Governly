@@ -22,6 +22,8 @@ import { runAzureDiscoveryScan } from "@/lib/server/azure/discovery-orchestrator
 import { runGoogleCloudDiscoveryScan } from "@/lib/server/gcp/discovery-orchestrator";
 import { runDatabricksDiscoveryScan } from "@/lib/server/databricks/discovery-orchestrator";
 import { runCrewAIDiscoveryScan } from "@/lib/server/crewai/discovery-orchestrator";
+import { runGithubDiscoveryScan } from "@/lib/server/github/discovery-orchestrator";
+import { isGithubProviderKey } from "@/lib/integrations/categories";
 import { alignAutonomyByIdentity } from "@/lib/server/agents/autonomy-alignment";
 
 export async function refreshAgentInventory(tenantSlugOrId: string) {
@@ -59,9 +61,12 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
   let agentsDiscovered = 0;
   const providers: string[] = [];
 
-  for (const integration of enabled) {
+  const scan = async (integration: (typeof enabled)[number]) => {
     try {
-      const config = (integration.configuration ?? {}) as Record<string, string>;
+      const config = (integration.configuration ?? {}) as Record<
+        string,
+        string
+      >;
       let result: { agentsDiscovered?: number } | null = null;
 
       if (integration.name === "AWS" && config.awsConnectionId) {
@@ -117,6 +122,16 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
           userId,
         );
       } else if (
+        isGithubProviderKey(integration.nangoProviderConfigKey) &&
+        integration.nangoConnectionId
+      ) {
+        result = await runGithubDiscoveryScan(
+          tenantId,
+          integration.id,
+          integration,
+          userId,
+        );
+      } else if (
         integration.name === "CrewAI" &&
         (integration.credentialsEncrypted || integration.nangoConnectionId)
       ) {
@@ -135,7 +150,15 @@ export async function refreshAgentInventory(tenantSlugOrId: string) {
     } catch {
       // A single provider failing must not abort the whole refresh.
     }
-  }
+  };
+
+  // Providers are independent, so scan them concurrently — the refresh takes
+  // as long as the slowest provider, not the sum. GitHub runs after, because it
+  // links each repository to the cloud agent it is the source of.
+  const isGithub = (i: (typeof enabled)[number]) =>
+    isGithubProviderKey(i.nangoProviderConfigKey);
+  await Promise.all(enabled.filter((i) => !isGithub(i)).map(scan));
+  for (const integration of enabled.filter(isGithub)) await scan(integration);
 
   // Post-discovery normalization: consistent autonomy. Owners come only from
   // provider evidence (Owner/Email/Team tags); the user who connected an

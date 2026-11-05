@@ -1,16 +1,7 @@
 "use server";
 
 import { db, observabilityLogs, applicationPolicies } from "@db";
-import {
-  and,
-  eq,
-  desc,
-  isNotNull,
-  sql,
-  ilike,
-  gte,
-  or,
-} from "drizzle-orm";
+import { and, eq, desc, isNotNull, sql, ilike, gte, or } from "drizzle-orm";
 
 import {
   isAllowedSql,
@@ -31,7 +22,10 @@ export interface RecentEndpointsPaginatedResponse {
   prev: number | null;
   next: number | null;
 
-  data: (typeof observabilityLogs.$inferSelect & { applicationName: string; agentName: string | null })[];
+  data: (typeof observabilityLogs.$inferSelect & {
+    applicationName: string;
+    agentName: string | null;
+  })[];
 }
 
 export const getApplicationRecentEndpoints = async ({
@@ -68,7 +62,7 @@ export const getApplicationRecentEndpoints = async ({
     filters.push(isErrorSql);
   }
   // If show === "all", don't filter by status code
-  
+
   if (search && search.trim() !== "") {
     const term = `%${search.trim()}%`;
 
@@ -76,8 +70,8 @@ export const getApplicationRecentEndpoints = async ({
       or(
         ilike(observabilityLogs.path, term),
         ilike(observabilityLogs.method, term),
-        ilike(sql`CAST(${observabilityLogs.requestPayload} AS TEXT)`, term)
-      )
+        ilike(sql`CAST(${observabilityLogs.requestPayload} AS TEXT)`, term),
+      ),
     );
   }
 
@@ -102,7 +96,11 @@ export const getApplicationRecentEndpoints = async ({
 
   return {
     data: logs.map((ele) => {
-      return { ...ele, applicationName: ele.application?.name ?? "Unknown", agentName: ele.agent?.name ?? null };
+      return {
+        ...ele,
+        applicationName: ele.application?.name ?? "Unknown",
+        agentName: ele.agent?.name ?? null,
+      };
     }),
     page,
     limit,
@@ -151,8 +149,8 @@ export const getTenantRecentEndpoints = async ({
       or(
         ilike(observabilityLogs.path, term),
         ilike(observabilityLogs.method, term),
-        ilike(sql`CAST(${observabilityLogs.requestPayload} AS TEXT)`, term)
-      )
+        ilike(sql`CAST(${observabilityLogs.requestPayload} AS TEXT)`, term),
+      ),
     );
   }
 
@@ -177,7 +175,11 @@ export const getTenantRecentEndpoints = async ({
 
   return {
     data: logs.map((ele) => {
-      return { ...ele, applicationName: ele.application?.name ?? "Unknown", agentName: ele.agent?.name ?? null };
+      return {
+        ...ele,
+        applicationName: ele.application?.name ?? "Unknown",
+        agentName: ele.agent?.name ?? null,
+      };
     }),
     page,
     limit,
@@ -249,7 +251,7 @@ export const getApplicationGraphStats = async ({
       where: and(
         ...baseFilters,
         isBlockedSql,
-        isNotNull(observabilityLogs.guardrailResults)
+        isNotNull(observabilityLogs.guardrailResults),
       ),
     }),
     // Daily passed/blocked breakdown
@@ -274,16 +276,17 @@ export const getApplicationGraphStats = async ({
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
     const results = log.guardrailResults as any;
-    const violatedGuard = results?.violated_guard || results?._summary?.violation;
+    const violatedGuard =
+      results?.violated_guard || results?._summary?.violation;
     const ruleId = violatedGuard?.rule_id || violatedGuard?.rule_id;
 
-    if (ruleId && typeof ruleId === 'string') {
-      const category = ruleId.split('.')[0];
+    if (ruleId && typeof ruleId === "string") {
+      const category = ruleId.split(".")[0];
       if (category) {
         const normalizedCategory = category.toLowerCase();
         categoryCounts.set(
           normalizedCategory,
-          (categoryCounts.get(normalizedCategory) || 0) + 1
+          (categoryCounts.get(normalizedCategory) || 0) + 1,
         );
       }
     }
@@ -363,7 +366,7 @@ export const getTenantGraphStats = async ({
       where: and(
         ...baseFilters,
         isBlockedSql,
-        isNotNull(observabilityLogs.guardrailResults)
+        isNotNull(observabilityLogs.guardrailResults),
       ),
     }),
     // Daily passed/blocked breakdown
@@ -388,16 +391,17 @@ export const getTenantGraphStats = async ({
   const categoryCounts = new Map<string, number>();
   for (const log of blockedLogs) {
     const results = log.guardrailResults as any;
-    const violatedGuard = results?.violated_guard || results?._summary?.violation;
+    const violatedGuard =
+      results?.violated_guard || results?._summary?.violation;
     const ruleId = violatedGuard?.rule_id || violatedGuard?.rule_id;
 
-    if (ruleId && typeof ruleId === 'string') {
-      const category = ruleId.split('.')[0];
+    if (ruleId && typeof ruleId === "string") {
+      const category = ruleId.split(".")[0];
       if (category) {
         const normalizedCategory = category.toLowerCase();
         categoryCounts.set(
           normalizedCategory,
-          (categoryCounts.get(normalizedCategory) || 0) + 1
+          (categoryCounts.get(normalizedCategory) || 0) + 1,
         );
       }
     }

@@ -46,7 +46,9 @@ function resolveNangoUrls(
   const normalize = (url: string | undefined) => {
     if (!url) return "";
     if (/^https?:\/\/localhost(:\d+)?(\/|$)/i.test(url)) {
-      return currentOrigin ? `${currentOrigin}${url.replace(/^https?:\/\/localhost(:\d+)?/i, "")}` : url;
+      return currentOrigin
+        ? `${currentOrigin}${url.replace(/^https?:\/\/localhost(:\d+)?/i, "")}`
+        : url;
     }
     return url;
   };
@@ -60,7 +62,8 @@ function resolveNangoUrls(
   };
 }
 
-const { apiUrl: API_URL, connectBaseUrl: CONNECT_BASE_URL } = resolveNangoUrls();
+const { apiUrl: API_URL, connectBaseUrl: CONNECT_BASE_URL } =
+  resolveNangoUrls();
 
 export { resolveNangoUrls };
 
@@ -141,8 +144,11 @@ export function NangoConnectButton({
       } else if (data.type === "connect") {
         setSessionToken(null);
         successToast("", "", "", "Account connected");
-        const connectionId = data.payload?.connectionId ?? data.payload?.connection_id;
-        onConnected?.(typeof connectionId === "string" ? connectionId : undefined);
+        const connectionId =
+          data.payload?.connectionId ?? data.payload?.connection_id;
+        onConnected?.(
+          typeof connectionId === "string" ? connectionId : undefined,
+        );
       } else if (data.type === "close") {
         setSessionToken(null);
       }
@@ -207,8 +213,15 @@ export function NangoConnectButton({
           (children ?? "Connect with Nango")
         )}
       </Button>
-      <Dialog open={!!sessionToken} onOpenChange={(open) => !open && setSessionToken(null)}>
-        <DialogContent className="h-[640px] max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-md">
+      <Dialog
+        open={!!sessionToken}
+        onOpenChange={(open) => !open && setSessionToken(null)}
+      >
+        {/* The Connect UI draws its own close button; ours would be a second ✕. */}
+        <DialogContent
+          showCloseButton={false}
+          className="h-[640px] max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-md"
+        >
           <DialogTitle className="sr-only">Connect account</DialogTitle>
           <DialogDescription className="sr-only">
             Enter the credentials for this provider.

@@ -18,14 +18,14 @@ function getKey(): Buffer {
     throw new Error(
       "AWS_CREDENTIALS_ENCRYPTION_KEY is not set. Generate one with " +
         "`openssl rand -base64 32` and set it in the environment before " +
-        "storing AWS credentials."
+        "storing AWS credentials.",
     );
   }
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {
     throw new Error(
       "AWS_CREDENTIALS_ENCRYPTION_KEY must decode to exactly 32 bytes " +
-        "(base64 of a 256-bit key)."
+        "(base64 of a 256-bit key).",
     );
   }
   return key;
@@ -57,7 +57,7 @@ export function decryptSecret(payload: string): string {
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     key,
-    Buffer.from(ivB64, "base64")
+    Buffer.from(ivB64, "base64"),
   );
   decipher.setAuthTag(Buffer.from(authTagB64, "base64"));
   const plaintext = Buffer.concat([

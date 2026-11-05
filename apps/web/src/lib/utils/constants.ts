@@ -1,79 +1,79 @@
 // Locally defined: `Filters` was imported from ../../types, which no longer
 // exports it. It is simply the set of supported filter keys below.
 export type Filters =
-  | 'classifiers'
-  | 'components'
-  | 'filetypes'
-  | 'participants'
-  | 'types'
-  | 'systemmsg';
+  | "classifiers"
+  | "components"
+  | "filetypes"
+  | "participants"
+  | "types"
+  | "systemmsg";
 
 export const URL_REGEX = /(<https?:\/\/[^\s>]+>)/g;
 
 export const supportedFilters: Filters[] = [
-  'classifiers',
-  'components',
-  'filetypes',
-  'participants',
-  'types',
-  'systemmsg',
+  "classifiers",
+  "components",
+  "filetypes",
+  "participants",
+  "types",
+  "systemmsg",
 ];
 
 export const auditTypeEntityOptions = [
-  'application',
-  'api_key',
-  'model_info',
-  'integration',
-  'policy',
-  'provider_model',
-  'risk',
-  'stakeholder',
-  'use_case',
-  'user',
+  "application",
+  "api_key",
+  "model_info",
+  "integration",
+  "policy",
+  "provider_model",
+  "risk",
+  "stakeholder",
+  "use_case",
+  "user",
 ].map((item) => {
   // Convert snake_case to Title Case for display
   const label = item
-    .split('_')
+    .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .join(" ");
   return { id: item, label };
 });
 
 export const combinators = [
   {
-    name: 'and',
-    label: 'AND',
+    name: "and",
+    label: "AND",
   },
   {
-    name: 'or',
-    label: 'OR',
+    name: "or",
+    label: "OR",
   },
 ];
 
 export const connectorGroups = {
-  google: 'Google Workspace',
-  gmail: 'Gmail',
-  google_drive: 'Google Drive',
-  drive: 'Drive',
-  shared_drive: 'Shared Drive',
-  jira: 'Jira',
-  confluence: 'Confluence',
-  slack: 'Slack Enterprise',
-  public_channels: 'Public Channels',
-  private_channels: 'Private Channels',
-  group_messages: 'Group Messages',
-  direct_messages: 'Direct Messages',
-  mpim: 'MPIM',
-  im: 'IM',
-  teams: 'Microsoft Teams',
-  zendesk: 'Zendesk',
-  zoom: 'Zoom',
-  onedrive: 'OneDrive',
-  files: 'Files',
-  team_chats: 'Team Chats',
-  meetings: 'Meetings',
-  box: 'Box',
-  microsoft_outlook: 'Microsoft Outlook'
+  google: "Google Workspace",
+  gmail: "Gmail",
+  google_drive: "Google Drive",
+  drive: "Drive",
+  shared_drive: "Shared Drive",
+  jira: "Jira",
+  confluence: "Confluence",
+  slack: "Slack Enterprise",
+  public_channels: "Public Channels",
+  private_channels: "Private Channels",
+  group_messages: "Group Messages",
+  direct_messages: "Direct Messages",
+  mpim: "MPIM",
+  im: "IM",
+  teams: "Microsoft Teams",
+  zendesk: "Zendesk",
+  zoom: "Zoom",
+  onedrive: "OneDrive",
+  files: "Files",
+  team_chats: "Team Chats",
+  meetings: "Meetings",
+  box: "Box",
+  microsoft_outlook: "Microsoft Outlook",
 };
 
 export const getConnectorName = {
@@ -92,6 +92,6 @@ export const getConnectorName = {
   zoom: "zoom",
   meetings: "meetings",
   team_chats: "team_chats",
-  box: 'box',
-  microsoft_outlook: 'microsoft_outlook'
+  box: "box",
+  microsoft_outlook: "microsoft_outlook",
 };

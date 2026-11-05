@@ -57,7 +57,7 @@ export function ClientOnboardingForm({ onSuccess }: ClientOnboardingFormProps) {
 
   const handleMetadataChange = (
     field: keyof FormData["metadata"],
-    value: string
+    value: string,
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -98,7 +98,9 @@ export function ClientOnboardingForm({ onSuccess }: ClientOnboardingFormProps) {
     } catch (error) {
       console.error("Error creating organization:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create organization"
+        error instanceof Error
+          ? error.message
+          : "Failed to create organization",
       );
     } finally {
       setIsLoading(false);

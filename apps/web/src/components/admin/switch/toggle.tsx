@@ -1,5 +1,5 @@
-import React, { FC } from 'react';
-import './ToggleSwitch.css';
+import React, { FC } from "react";
+import "./ToggleSwitch.css";
 
 interface ToggleSwitchProps {
   label: string;

@@ -1,8 +1,8 @@
-'use client';
-import React, { useContext, useEffect, useState } from 'react';
-import { BsQuestionCircle, BsFillChatLeftTextFill } from 'react-icons/bs';
-import Link from 'next/link';
-import './admin.css';
+"use client";
+import React, { useContext, useEffect, useState } from "react";
+import { BsQuestionCircle, BsFillChatLeftTextFill } from "react-icons/bs";
+import Link from "next/link";
+import "./admin.css";
 import {
   Dropdown,
   DropdownTrigger,
@@ -10,15 +10,15 @@ import {
   DropdownItem,
   Button,
   Avatar,
-} from '@nextui-org/react';
-import { ServerLogout } from '@/lib/api/auth';
+} from "@nextui-org/react";
+import { ServerLogout } from "@/lib/api/auth";
 // Removed DataContext dependency - using local state instead
-import { GoBell } from 'react-icons/go';
-import { useRouter } from 'next/navigation';
-import { toast } from 'react-hot-toast';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteCookie } from 'cookies-next';
-import { useSearchStore } from '../search/data-factory/store';
+import { GoBell } from "react-icons/go";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteCookie } from "cookies-next";
+import { useSearchStore } from "../search/data-factory/store";
 
 const Header = () => {
   const queryClient = useQueryClient();
@@ -26,7 +26,7 @@ const Header = () => {
 
   const [isPopupVisible, setPopupVisible] = useState(false);
   // Local state for modal management instead of context
-  const [openModal, setOpenModal] = useState<string>('');
+  const [openModal, setOpenModal] = useState<string>("");
   const { userData: userProfile } = useSearchStore();
   const router = useRouter();
   function capitalize(str: string) {
@@ -38,24 +38,24 @@ const Header = () => {
   };
 
   const handleSupportClick = () => {
-    setOpenModal('feedback');
+    setOpenModal("feedback");
   };
 
   const { mutate: logout } = useMutation({
     mutationFn: () => ServerLogout(),
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['userData'] });
+      queryClient.removeQueries({ queryKey: ["userData"] });
       setUserData({} as LoggedInUserProfile);
-      deleteCookie('accessToken');
-      deleteCookie('refreshToken');
-      deleteCookie('userRole');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('project-tab');
-      localStorage.removeItem('selectedModel');
-      localStorage.removeItem('selectedProject');
-      localStorage.removeItem('selectedLLMModel');
-      localStorage.removeItem('logout-event');
+      deleteCookie("accessToken");
+      deleteCookie("refreshToken");
+      deleteCookie("userRole");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("project-tab");
+      localStorage.removeItem("selectedModel");
+      localStorage.removeItem("selectedProject");
+      localStorage.removeItem("selectedLLMModel");
+      localStorage.removeItem("logout-event");
       if ("BroadcastChannel" in window) {
         const channel = new BroadcastChannel("auth");
         channel.postMessage({ type: "LOGOUT" });
@@ -63,11 +63,15 @@ const Header = () => {
       }
       localStorage.setItem("logout-event", Date.now().toString());
       sessionStorage.clear();
-      window.location.href = '/';
+      window.location.href = "/";
     },
     onError: (error: any) => {
-      toast.error(error?.message || error?.response?.data?.detail || error?.response?.data?.message);
-    }
+      toast.error(
+        error?.message ||
+          error?.response?.data?.detail ||
+          error?.response?.data?.message,
+      );
+    },
   });
 
   return (
@@ -95,9 +99,9 @@ const Header = () => {
             <Avatar
               size="md"
               classNames={{
-                name: 'font-bold text-lg',
+                name: "font-bold text-lg",
               }}
-              name={userProfile?.name ? userProfile?.name[0] : ''}
+              name={userProfile?.name ? userProfile?.name[0] : ""}
             />
           </DropdownTrigger>
 
@@ -113,9 +117,9 @@ const Header = () => {
                 <Avatar
                   size="md"
                   classNames={{
-                    name: 'font-bold text-lg',
+                    name: "font-bold text-lg",
                   }}
-                  name={userProfile?.name ? userProfile?.name[0] : ''}
+                  name={userProfile?.name ? userProfile?.name[0] : ""}
                 />
                 <p className="flex flex-col h-[4vh] text-black flex-1">
                   <p className="flex w-full mx-2 items-center font-bold">
@@ -133,20 +137,14 @@ const Header = () => {
             >
               <div className="flex h-full w-full py-1">
                 <p className="flex w-full mx-2 items-center font-bold">
-                  {userProfile?.role === 'globaladmin'
-                    ? 'Global Admin'
-                    : capitalize(userProfile?.role ?? '')}
+                  {userProfile?.role === "globaladmin"
+                    ? "Global Admin"
+                    : capitalize(userProfile?.role ?? "")}
                 </p>
               </div>
             </DropdownItem>
-            <DropdownItem
-              className="flex text-black h-[3vh] p-2"
-              key="edit"
-            >
-              <p
-                onClick={() => logout()}
-                className="flex h-full items-center"
-              >
+            <DropdownItem className="flex text-black h-[3vh] p-2" key="edit">
+              <p onClick={() => logout()} className="flex h-full items-center">
                 Sign Out
               </p>
             </DropdownItem>

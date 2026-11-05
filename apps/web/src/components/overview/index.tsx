@@ -1,14 +1,21 @@
 "use client";
 
-
-import { FileText, User, Calendar, Users, Target, AlertTriangle, ShieldCheck } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { useState, useEffect, useMemo } from "react"
-import { useParams } from "next/navigation"
-import { formatDate } from "@/lib/utils/date"
-import ApplicationStatus from "@/components/applications/ApplicationStatus"
+import {
+  FileText,
+  User,
+  Calendar,
+  Users,
+  Target,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useState, useEffect, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { formatDate } from "@/lib/utils/date";
+import ApplicationStatus from "@/components/applications/ApplicationStatus";
 import { useTenant } from "@/contexts/TenantContext";
 import { getApplicationDetails } from "@/lib/actions/applications";
 
@@ -43,7 +50,14 @@ interface PolicyPack {
   coverageScore?: number;
   evaluatedAt?: string | null;
   gaps?: Array<{ key: string; title: string; reason: string; status: string }>;
-  evaluation?: { controls?: Array<{ key: string; status: string; priority?: "high" | "medium" | "low"; evidence?: Array<{ source?: string }> }> };
+  evaluation?: {
+    controls?: Array<{
+      key: string;
+      status: string;
+      priority?: "high" | "medium" | "low";
+      evidence?: Array<{ source?: string }>;
+    }>;
+  };
 }
 
 interface ApplicationDetails {
@@ -97,21 +111,49 @@ export default function OverviewPage() {
 
   const { applicationPolicy } = useTenant();
   const assignedPolicies = useMemo(
-    () => ((applicationPolicy ?? []) as PolicyPack[]).filter((policy) => policy.isActive),
-    [applicationPolicy]
+    () =>
+      ((applicationPolicy ?? []) as PolicyPack[]).filter(
+        (policy) => policy.isActive,
+      ),
+    [applicationPolicy],
   );
   const complianceMetrics = useMemo(() => {
-    const applicable = assignedPolicies.filter((policy) => policy.complianceStatus !== "not_applicable");
-    const controls = applicable.flatMap((policy) => policy.evaluation?.controls ?? []);
-    const completed = controls.filter((control) => control.status === "verified").length;
+    const applicable = assignedPolicies.filter(
+      (policy) => policy.complianceStatus !== "not_applicable",
+    );
+    const controls = applicable.flatMap(
+      (policy) => policy.evaluation?.controls ?? [],
+    );
+    const completed = controls.filter(
+      (control) => control.status === "verified",
+    ).length;
     const remaining = Math.max(0, controls.length - completed);
-    const missingEvidence = controls.filter((control) => control.status !== "verified" && !(control.evidence?.length)).length;
-    const highPriority = controls.filter((control) => control.status !== "verified" && control.priority === "high").length;
-    const average = applicable.length ? applicable.reduce((sum, policy) => sum + Number(policy.coverageScore ?? 0), 0) / applicable.length : 0;
-    const framework = (needle: RegExp) => applicable.find((policy) => needle.test(policy.name))?.coverageScore ?? 0;
-    return { average, missingControls: remaining, missingEvidence, highPriority, completed, remaining, iso: framework(/ISO\/IEC 42001/i), eu: framework(/EU AI Act/i), nist: framework(/NIST AI/i) };
+    const missingEvidence = controls.filter(
+      (control) => control.status !== "verified" && !control.evidence?.length,
+    ).length;
+    const highPriority = controls.filter(
+      (control) => control.status !== "verified" && control.priority === "high",
+    ).length;
+    const average = applicable.length
+      ? applicable.reduce(
+          (sum, policy) => sum + Number(policy.coverageScore ?? 0),
+          0,
+        ) / applicable.length
+      : 0;
+    const framework = (needle: RegExp) =>
+      applicable.find((policy) => needle.test(policy.name))?.coverageScore ?? 0;
+    return {
+      average,
+      missingControls: remaining,
+      missingEvidence,
+      highPriority,
+      completed,
+      remaining,
+      iso: framework(/ISO\/IEC 42001/i),
+      eu: framework(/EU AI Act/i),
+      nist: framework(/NIST AI/i),
+    };
   }, [assignedPolicies]);
-
 
   // Fetch application details
   useEffect(() => {
@@ -120,7 +162,7 @@ export default function OverviewPage() {
         setLoading(true);
         const data = await getApplicationDetails(
           params.tenant as string,
-          params.applicationId as string
+          params.applicationId as string,
         );
         setApplicationDetails(data as unknown as ApplicationDetails);
       } catch (err) {
@@ -128,7 +170,7 @@ export default function OverviewPage() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to fetch application details"
+            : "Failed to fetch application details",
         );
       } finally {
         setLoading(false);
@@ -142,7 +184,7 @@ export default function OverviewPage() {
 
   // Format team members for display
   const formatTeamMembers = (
-    stakeholders: ApplicationDetails["stakeholders"]
+    stakeholders: ApplicationDetails["stakeholders"],
   ) => {
     if (!stakeholders || stakeholders.length === 0) {
       return "No members have been assigned to the project";
@@ -187,19 +229,19 @@ export default function OverviewPage() {
   // Project Overview Data - now dynamic
   const projectData = applicationDetails
     ? {
-      owner: applicationDetails.owner.name,
-      lastUpdated: formatDate(applicationDetails.lastUpdated.date),
-      lastUpdatedBy: applicationDetails.lastUpdated.by.name,
-      goal: formatGoal(applicationDetails.useCases),
-      teamMembers: formatTeamMembers(applicationDetails.stakeholders),
-    }
+        owner: applicationDetails.owner.name,
+        lastUpdated: formatDate(applicationDetails.lastUpdated.date),
+        lastUpdatedBy: applicationDetails.lastUpdated.by.name,
+        goal: formatGoal(applicationDetails.useCases),
+        teamMembers: formatTeamMembers(applicationDetails.stakeholders),
+      }
     : {
-      owner: "Loading...",
-      lastUpdated: "Loading...",
-      lastUpdatedBy: "Loading...",
-      goal: "Loading...",
-      teamMembers: "Loading...",
-    };
+        owner: "Loading...",
+        lastUpdated: "Loading...",
+        lastUpdatedBy: "Loading...",
+        goal: "Loading...",
+        teamMembers: "Loading...",
+      };
 
   // Risk Data
   const risks = [
@@ -266,7 +308,8 @@ export default function OverviewPage() {
               {applicationDetails?.application.name || "AI Compliance Checker"}
             </PageTitle>
             <p className="text-gray-600">
-              {applicationDetails?.application.description || "No description available"}
+              {applicationDetails?.application.description ||
+                "No description available"}
             </p>
           </div>
           {/* <ApplicationStatus
@@ -372,54 +415,123 @@ export default function OverviewPage() {
         <section className="my-5 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Compliance evidence status</h2>
-              <p className="text-sm text-muted-foreground">Live results from assigned policy controls—not estimated completion values.</p>
+              <h2 className="text-lg font-semibold">
+                Compliance evidence status
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Live results from assigned policy controls—not estimated
+                completion values.
+              </p>
             </div>
           </div>
           {assignedPolicies.length ? (
-            <><div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-9">{[
-              ["Overall", complianceMetrics.average, "%"], ["ISO 42001", complianceMetrics.iso, "%"], ["EU AI Act", complianceMetrics.eu, "%"], ["NIST", complianceMetrics.nist, "%"],
-              ["Missing Controls", complianceMetrics.missingControls, ""], ["Missing Evidence", complianceMetrics.missingEvidence, ""], ["High Priority", complianceMetrics.highPriority, ""], ["Completed", complianceMetrics.completed, ""], ["Remaining", complianceMetrics.remaining, ""],
-            ].map(([label, value, suffix]) => <div key={String(label)} className="rounded-lg border bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{Number(value).toFixed(suffix ? 0 : 0)}{suffix}</p></div>)}</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {assignedPolicies.map((policy) => {
-                const status = policy.complianceStatus ?? "not_evaluated";
-                const score = Number(policy.coverageScore ?? 0);
-                const gaps = policy.gaps ?? [];
-                return (
-                  <Card key={policy.id} className={status === "non_compliant" ? "border-red-500/30" : ""}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <CardTitle className="text-base">{policy.name}</CardTitle>
-                        <Badge variant="outline" className="capitalize">{status.replaceAll("_", " ")}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {status === "not_applicable" ? (
-                        <p className="text-sm text-muted-foreground">This catalog entry does not apply to AI compliance.</p>
-                      ) : (
-                        <>
-                          <div className="flex items-end justify-between"><span className="text-sm text-muted-foreground">Verified evidence coverage</span><span className="text-2xl font-semibold">{score.toFixed(0)}%</span></div>
-                          <Progress value={score} />
-                        </>
-                      )}
-                      {gaps.length ? (
-                        <div className="space-y-2 rounded-md bg-red-500/5 p-3">
-                          {gaps.slice(0, 3).map((gap) => (
-                            <p key={gap.key} className="flex gap-2 text-xs text-red-700 dark:text-red-300"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{gap.title}: {gap.reason}</p>
-                          ))}
-                          {gaps.length > 3 && <p className="text-xs text-muted-foreground">+{gaps.length - 3} additional gap(s)</p>}
+            <>
+              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
+                {[
+                  ["Overall", complianceMetrics.average, "%"],
+                  ["ISO 42001", complianceMetrics.iso, "%"],
+                  ["EU AI Act", complianceMetrics.eu, "%"],
+                  ["NIST", complianceMetrics.nist, "%"],
+                  ["Missing Controls", complianceMetrics.missingControls, ""],
+                  ["Missing Evidence", complianceMetrics.missingEvidence, ""],
+                  ["High Priority", complianceMetrics.highPriority, ""],
+                  ["Completed", complianceMetrics.completed, ""],
+                  ["Remaining", complianceMetrics.remaining, ""],
+                ].map(([label, value, suffix]) => (
+                  <div
+                    key={String(label)}
+                    className="rounded-lg border bg-card p-3"
+                  >
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {Number(value).toFixed(suffix ? 0 : 0)}
+                      {suffix}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {assignedPolicies.map((policy) => {
+                  const status = policy.complianceStatus ?? "not_evaluated";
+                  const score = Number(policy.coverageScore ?? 0);
+                  const gaps = policy.gaps ?? [];
+                  return (
+                    <Card
+                      key={policy.id}
+                      className={
+                        status === "non_compliant" ? "border-red-500/30" : ""
+                      }
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <CardTitle className="text-base">
+                            {policy.name}
+                          </CardTitle>
+                          <Badge variant="outline" className="capitalize">
+                            {status.replaceAll("_", " ")}
+                          </Badge>
                         </div>
-                      ) : status === "compliant" ? (
-                        <p className="flex gap-2 text-sm text-emerald-600"><ShieldCheck className="h-4 w-4" />All mapped controls have evidence.</p>
-                      ) : null}
-                      {policy.evaluatedAt && <p className="text-xs text-muted-foreground">Last checked {new Date(policy.evaluatedAt).toLocaleString()}</p>}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div></>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {status === "not_applicable" ? (
+                          <p className="text-sm text-muted-foreground">
+                            This catalog entry does not apply to AI compliance.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="flex items-end justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                Verified evidence coverage
+                              </span>
+                              <span className="text-2xl font-semibold">
+                                {score.toFixed(0)}%
+                              </span>
+                            </div>
+                            <Progress value={score} />
+                          </>
+                        )}
+                        {gaps.length ? (
+                          <div className="space-y-2 rounded-md bg-red-500/5 p-3">
+                            {gaps.slice(0, 3).map((gap) => (
+                              <p
+                                key={gap.key}
+                                className="flex gap-2 text-xs text-red-700 dark:text-red-300"
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                {gap.title}: {gap.reason}
+                              </p>
+                            ))}
+                            {gaps.length > 3 && (
+                              <p className="text-xs text-muted-foreground">
+                                +{gaps.length - 3} additional gap(s)
+                              </p>
+                            )}
+                          </div>
+                        ) : status === "compliant" ? (
+                          <p className="flex gap-2 text-sm text-emerald-600">
+                            <ShieldCheck className="h-4 w-4" />
+                            All mapped controls have evidence.
+                          </p>
+                        ) : null}
+                        {policy.evaluatedAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Last checked{" "}
+                            {new Date(policy.evaluatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
           ) : (
-            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No compliance policy is assigned to this application. Assign one in Application Settings.</CardContent></Card>
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                No compliance policy is assigned to this application. Assign one
+                in Application Settings.
+              </CardContent>
+            </Card>
           )}
         </section>
 

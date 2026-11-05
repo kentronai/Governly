@@ -8,6 +8,7 @@ import { db, integrations, tenants } from "@db";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { createAuditEvent } from "@/lib/server/audit";
+import { ensureEnvIntegrations } from "@/lib/server/nango/env-integrations";
 import { encryptSecret } from "@/lib/server/crypto";
 
 export interface CreateIntegrationInput {
@@ -194,6 +195,7 @@ export const getIntegrationsWithCatalog = async (tenantSlugOrId: string) => {
 
   const tenant = await resolveTenant(tenantSlugOrId);
   await ensureDefaultCatalogEntries(tenant.id, userId);
+  await ensureEnvIntegrations(tenant.id, userId);
 
   const integrationsList = await db
     .select()

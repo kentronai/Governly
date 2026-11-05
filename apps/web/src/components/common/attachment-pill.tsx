@@ -22,9 +22,7 @@ interface Props {
   filetype: string;
   file: string | null;
   isDownloaded?: boolean;
-  onDownloadRequest?: (
-    showPreview?: boolean,
-  ) => Promise<{
+  onDownloadRequest?: (showPreview?: boolean) => Promise<{
     success: boolean;
     fileUrl: string | null;
     showPreview: boolean;

@@ -38,6 +38,8 @@ import {
   testCrewAIIntegrationConnection,
   triggerCrewAIDiscovery,
 } from "@/lib/actions/crewai-integration";
+import { triggerGithubDiscovery } from "@/lib/actions/github-integration";
+import { isGithubProviderKey } from "@/lib/integrations/categories";
 import {
   createLangSmithConnection,
   deleteLangSmithConnection,
@@ -322,6 +324,12 @@ async function runDiscovery(body: Body) {
     body.configuration ??
     {};
 
+  // GitHub rows are env-enabled providers (their name varies by flavour), so
+  // they are recognised by the Nango provider key stored on the row.
+  if (isGithubProviderKey(latest?.nangoProviderConfigKey)) {
+    return triggerGithubDiscovery(tenant, integrationId);
+  }
+
   // Make sure a Nango-backed provider has its connection reference recorded
   // before discovery reads it — reconciling from Nango when the webhook hasn't
   // (or won't) land. AWS/Azure keep their own discovery-connection rows, so
@@ -398,7 +406,11 @@ export async function POST(request: NextRequest) {
     if (action === "nangoConnected") {
       const integrationId = requiredString(body, "integrationId");
       const providerName = requiredString(body, "providerName");
-      const providerConfigKey = PROVIDER_NAME_TO_CONFIG_KEY[providerName];
+      const knownKey = PROVIDER_NAME_TO_CONFIG_KEY[providerName];
+      // Env-enabled providers have no built-in discovery: just record the connection.
+      const providerConfigKey =
+        knownKey ??
+        (typeof body.providerConfigKey === "string" ? body.providerConfigKey.trim() : "");
       if (!providerConfigKey) {
         throw new Error(`Unsupported Nango provider: ${providerName}`);
       }
@@ -414,6 +426,14 @@ export async function POST(request: NextRequest) {
         providerConfigKey,
         hintConnectionId,
       );
+      if (isGithubProviderKey(providerConfigKey)) {
+        return NextResponse.json(
+          await triggerGithubDiscovery(tenant, integrationId),
+        );
+      }
+      if (!knownKey) {
+        return NextResponse.json({ status: "completed", agentsDiscovered: 0 });
+      }
       if (providerName === "AWS") {
         const { awsConnectionId } = await syncAwsConnectionFromNango(
           tenant,

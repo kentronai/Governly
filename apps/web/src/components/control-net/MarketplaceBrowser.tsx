@@ -98,7 +98,7 @@ export function MarketplaceBrowser({
     const matchesSearch =
       (g.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
       (g.description?.toLowerCase() || "").includes(
-        searchQuery.toLowerCase()
+        searchQuery.toLowerCase(),
       ) ||
       (g.key?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     const matchesCategory =
@@ -222,7 +222,7 @@ export function MarketplaceBrowser({
           .sort(
             (a, b) =>
               (b.enableInstall === true ? 1 : 0) -
-              (a.enableInstall === true ? 1 : 0)
+              (a.enableInstall === true ? 1 : 0),
           )
           .map((guardrail) => {
             const isInstalled = installedIds.includes(guardrail.id);
@@ -280,7 +280,7 @@ export function MarketplaceBrowser({
                         >
                           {compliance.name}
                         </Badge>
-                      )
+                      ),
                     )}
                   </div>
                 </CardHeader>

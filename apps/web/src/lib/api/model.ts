@@ -1,5 +1,5 @@
-import axios from 'axios';
-import config from '../../config/config';
+import axios from "axios";
+import config from "../../config/config";
 
 export interface GetAllVendors {
   page: number;
@@ -23,7 +23,8 @@ export interface GetAllModelsRes {
 export interface AddModelReq {
   sVendor: string;
   sModel: string;
-}``
+}
+``;
 
 export interface UpdateModelReq extends AddModelReq {
   iModelId: string;
@@ -31,11 +32,13 @@ export interface UpdateModelReq extends AddModelReq {
 
 export const GetAllVendors = async () => {
   // const { page, page_size, search } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/vendor/list/v1`);
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/vendor/list/v1`,
+  );
   // endpoint.searchParams.set('page', page.toString());
   // endpoint.searchParams.set('limit', page_size.toString());
-  
+
   // if (search) endpoint.searchParams.set('search', search);
 
   try {
@@ -49,12 +52,14 @@ export const GetAllVendors = async () => {
 // Get all projects with filtering, pagination, and search
 export const GetAllModels = async (params: GetAllModels) => {
   const { page, page_size, search } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/models/list/v1`);
-  endpoint.searchParams.set('page', page.toString());
-  endpoint.searchParams.set('limit', page_size.toString());
-  
-  if (search) endpoint.searchParams.set('search', search);
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/models/list/v1`,
+  );
+  endpoint.searchParams.set("page", page.toString());
+  endpoint.searchParams.set("limit", page_size.toString());
+
+  if (search) endpoint.searchParams.set("search", search);
 
   try {
     const response = await axios.get(endpoint.href);
@@ -68,7 +73,7 @@ export const GetAllModels = async (params: GetAllModels) => {
 export const GetModelDetails = async (iModelId: string) => {
   try {
     const response = await axios.get(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/model/${iModelId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/model/${iModelId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -81,7 +86,7 @@ export const AddModel = async (projectData: AddModelReq) => {
   try {
     const response = await axios.post(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/add/model/v1`,
-      projectData
+      projectData,
     );
     return response?.data;
   } catch (error) {
@@ -94,7 +99,7 @@ export const UpdateModel = async (projectData: UpdateModelReq) => {
   try {
     const response = await axios.put(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/update/model/${projectData.iModelId}/v1`,
-      projectData
+      projectData,
     );
     return response?.data;
   } catch (error) {
@@ -106,7 +111,7 @@ export const UpdateModel = async (projectData: UpdateModelReq) => {
 export const DeleteModel = async (iModelId: string) => {
   try {
     const response = await axios.delete(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/model/${iModelId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/model/${iModelId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -117,16 +122,18 @@ export const DeleteModel = async (iModelId: string) => {
 // Export all projects
 export const ExportAllModels = async (params: GetAllModels) => {
   const { page, page_size, search } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/model/export/v1`);
-  endpoint.searchParams.set('page', page.toString());
-  endpoint.searchParams.set('limit', page_size.toString());
-  
-  if (search) endpoint.searchParams.set('search', search);
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/model/export/v1`,
+  );
+  endpoint.searchParams.set("page", page.toString());
+  endpoint.searchParams.set("limit", page_size.toString());
+
+  if (search) endpoint.searchParams.set("search", search);
 
   try {
     const response = await axios.get(endpoint.href, {
-      responseType: 'blob'
+      responseType: "blob",
     });
     return response?.data;
   } catch (error) {

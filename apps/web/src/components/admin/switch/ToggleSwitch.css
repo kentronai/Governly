@@ -35,13 +35,13 @@
   box-sizing: border-box;
 }
 .inner:before {
-  content: 'Enable';
+  content: "Enable";
   padding-left: 10px;
   background-color: #6528f7;
   color: #fff;
 }
 .inner:after {
-  content: 'Disable';
+  content: "Disable";
   padding-right: 10px;
   background-color: #bbb;
   color: #fff;

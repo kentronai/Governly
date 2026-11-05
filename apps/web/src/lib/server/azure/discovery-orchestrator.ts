@@ -1,3 +1,4 @@
+import { composeProfile } from "@/lib/server/agents/agent-profile";
 import { and, eq } from "drizzle-orm";
 import {
   agentRecommendations,
@@ -172,7 +173,9 @@ export async function runAzureDiscoveryScan(
           eq(agents.externalAgentId, agent.externalAgentId),
         ),
       });
+      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
       const values = {
+        profile,
         tenantId,
         connectionId: null,
         azureConnectionId: connectionId,
@@ -209,6 +212,7 @@ export async function runAzureDiscoveryScan(
         lastSeenAt: now,
         syncStatus: "success" as const,
         rawMetadata: {
+          ...profileMeta,
           resourceCount: agent.resources.length,
           provider: "azure",
         },
@@ -229,19 +233,17 @@ export async function runAzureDiscoveryScan(
         .delete(agentResources)
         .where(eq(agentResources.agentId, agentId));
       if (agent.resources.length)
-        await db
-          .insert(agentResources)
-          .values(
-            agent.resources.map((resource) => ({
-              tenantId,
-              agentId,
-              resourceType: resource.resourceType,
-              resourceArn: resource.resourceArn,
-              resourceName: resource.resourceName,
-              region: resource.region,
-              rawData: resource.metadata,
-            })),
-          );
+        await db.insert(agentResources).values(
+          agent.resources.map((resource) => ({
+            tenantId,
+            agentId,
+            resourceType: resource.resourceType,
+            resourceArn: resource.resourceArn,
+            resourceName: resource.resourceName,
+            region: resource.region,
+            rawData: resource.metadata,
+          })),
+        );
       await db
         .delete(agentRecommendations)
         .where(
@@ -251,18 +253,16 @@ export async function runAzureDiscoveryScan(
           ),
         );
       if (recommendations.length)
-        await db
-          .insert(agentRecommendations)
-          .values(
-            recommendations.map((item) => ({
-              tenantId,
-              agentId,
-              recommendationType: item.recommendationType,
-              reason: item.reason,
-              severity: item.severity,
-              suggestedFix: item.suggestedFix,
-            })),
-          );
+        await db.insert(agentRecommendations).values(
+          recommendations.map((item) => ({
+            tenantId,
+            agentId,
+            recommendationType: item.recommendationType,
+            reason: item.reason,
+            severity: item.severity,
+            suggestedFix: item.suggestedFix,
+          })),
+        );
       await syncAgentPolicyEvaluations(tenantId, agentId);
     }
     const resourceCounts = resources.reduce<Record<string, number>>(

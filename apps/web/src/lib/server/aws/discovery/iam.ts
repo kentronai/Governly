@@ -15,6 +15,7 @@ import {
   GetPolicyVersionCommand,
 } from "@aws-sdk/client-iam";
 import type { AwsClientBundle } from "../client-factory";
+import { extractModelIds } from "../../agents/agent-profile";
 import type { RawDiscoveredResource } from "./types";
 
 interface PolicyStatement {
@@ -29,15 +30,26 @@ function asArray(value: string | string[] | undefined): string[] {
 }
 
 function actionsFromDocument(doc: unknown): string[] {
-  const statements: PolicyStatement[] =
-    (doc as { Statement?: PolicyStatement | PolicyStatement[] })?.Statement
-      ? Array.isArray((doc as { Statement: PolicyStatement | PolicyStatement[] }).Statement)
-        ? ((doc as { Statement: PolicyStatement[] }).Statement)
-        : [(doc as { Statement: PolicyStatement }).Statement]
-      : [];
+  const statements: PolicyStatement[] = (
+    doc as { Statement?: PolicyStatement | PolicyStatement[] }
+  )?.Statement
+    ? Array.isArray(
+        (doc as { Statement: PolicyStatement | PolicyStatement[] }).Statement,
+      )
+      ? (doc as { Statement: PolicyStatement[] }).Statement
+      : [(doc as { Statement: PolicyStatement }).Statement]
+    : [];
   return statements
     .filter((s) => s.Effect === "Allow")
     .flatMap((s) => asArray(s.Action));
+}
+
+function resourcesFromDocument(doc: unknown): string[] {
+  const raw = (doc as { Statement?: PolicyStatement | PolicyStatement[] })?.Statement;
+  const statements = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return statements
+    .filter((s) => s.Effect === "Allow")
+    .flatMap((s) => asArray(s.Resource));
 }
 
 function roleArnToName(arn: string): string | null {
@@ -47,7 +59,7 @@ function roleArnToName(arn: string): string | null {
 
 export async function discoverIamRoles(
   clients: AwsClientBundle,
-  roleArns: Set<string>
+  roleArns: Set<string>,
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   const { iam, region } = clients;
@@ -59,30 +71,35 @@ export async function discoverIamRoles(
     try {
       const role = await iam.send(new GetRoleCommand({ RoleName: roleName }));
       const allActions: string[] = [];
+      const allResourceArns: string[] = [];
 
       // Inline policies
       const inline = await iam.send(
-        new ListRolePoliciesCommand({ RoleName: roleName })
+        new ListRolePoliciesCommand({ RoleName: roleName }),
       );
       for (const policyName of inline.PolicyNames ?? []) {
         const detail = await iam.send(
-          new GetRolePolicyCommand({ RoleName: roleName, PolicyName: policyName })
+          new GetRolePolicyCommand({
+            RoleName: roleName,
+            PolicyName: policyName,
+          }),
         );
         if (detail.PolicyDocument) {
           const doc = JSON.parse(decodeURIComponent(detail.PolicyDocument));
           allActions.push(...actionsFromDocument(doc));
+          allResourceArns.push(...resourcesFromDocument(doc));
         }
       }
 
       // Attached managed policies
       const attached = await iam.send(
-        new ListAttachedRolePoliciesCommand({ RoleName: roleName })
+        new ListAttachedRolePoliciesCommand({ RoleName: roleName }),
       );
       for (const policy of attached.AttachedPolicies ?? []) {
         if (!policy.PolicyArn) continue;
         try {
           const policyMeta = await iam.send(
-            new GetPolicyCommand({ PolicyArn: policy.PolicyArn })
+            new GetPolicyCommand({ PolicyArn: policy.PolicyArn }),
           );
           const versionId = policyMeta.Policy?.DefaultVersionId;
           if (!versionId) continue;
@@ -90,13 +107,14 @@ export async function discoverIamRoles(
             new GetPolicyVersionCommand({
               PolicyArn: policy.PolicyArn,
               VersionId: versionId,
-            })
+            }),
           );
           if (version.PolicyVersion?.Document) {
             const doc = JSON.parse(
-              decodeURIComponent(version.PolicyVersion.Document)
+              decodeURIComponent(version.PolicyVersion.Document),
             );
             allActions.push(...actionsFromDocument(doc));
+            allResourceArns.push(...resourcesFromDocument(doc));
           }
         } catch {
           // an inaccessible managed policy shouldn't fail the whole role
@@ -107,7 +125,7 @@ export async function discoverIamRoles(
       const hasWildcardAction = lowerActions.includes("*");
       const hasAdminPolicy =
         (attached.AttachedPolicies ?? []).some(
-          (p) => p.PolicyName === "AdministratorAccess"
+          (p) => p.PolicyName === "AdministratorAccess",
         ) || hasWildcardAction;
       const hasWrite = lowerActions.some((a) => /:(put|create|update)/.test(a));
       const hasDelete = lowerActions.some((a) => /:delete/.test(a));
@@ -127,7 +145,10 @@ export async function discoverIamRoles(
           const principal = s.Principal?.AWS;
           const principals = Array.isArray(principal) ? principal : [principal];
           return principals.some(
-            (p: string) => typeof p === "string" && p !== "*" && /^\d{12}$|arn:aws:iam::\d{12}/.test(p)
+            (p: string) =>
+              typeof p === "string" &&
+              p !== "*" &&
+              /^\d{12}$|arn:aws:iam::\d{12}/.test(p),
           );
         });
       } catch {
@@ -149,7 +170,18 @@ export async function discoverIamRoles(
           hasInvoke,
           hasCrossAccountTrust,
           actionCount: allActions.length,
-          lastUsedDate: role.Role?.RoleLastUsed?.LastUsedDate?.toISOString?.() ?? null,
+          // Registry profile: which services the role can reach and which
+          // Bedrock models its policies allow it to invoke.
+          actionServices: Array.from(
+            new Set(
+              lowerActions
+                .map((a) => a.split(":")[0])
+                .filter((svc) => svc && svc !== "*"),
+            ),
+          ),
+          bedrockModels: extractModelIds(allResourceArns.join(" ")),
+          lastUsedDate:
+            role.Role?.RoleLastUsed?.LastUsedDate?.toISOString?.() ?? null,
         },
       });
     } catch {

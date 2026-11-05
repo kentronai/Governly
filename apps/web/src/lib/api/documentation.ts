@@ -45,7 +45,7 @@ export interface DocumentationResponse {
 export async function fetchDocumentation(
   tenant: string,
   applicationId: string,
-  sectionType: DocumentationSectionType
+  sectionType: DocumentationSectionType,
 ): Promise<DocumentationResponse> {
   const url = `/api/tenants/${tenant}/applications/${applicationId}/documentation?sectionType=${sectionType}`;
 
@@ -96,7 +96,7 @@ export async function saveDocumentation(
   tenant: string,
   applicationId: string,
   sectionType: DocumentationSectionType,
-  fields: DocumentationField[]
+  fields: DocumentationField[],
 ): Promise<void> {
   const url = `/api/tenants/${tenant}/applications/${applicationId}/documentation`;
   const requestBody = {

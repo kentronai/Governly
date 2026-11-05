@@ -2,15 +2,15 @@
  * Server actions for Policies
  */
 
-'use server';
+"use server";
 
-import { db, policies, tenants, applicationPolicies, agents } from '@db';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
-import { revalidatePath } from 'next/cache';
-import { createAuditEvent } from '@/lib/server/audit';
-import { getPolicyWithDetails } from '@/lib/queries/policies';
-import { syncAgentPolicyEvaluations } from '@/lib/server/policy-enforcement/agent-policy-sync';
+import { db, policies, tenants, applicationPolicies, agents } from "@db";
+import { eq, and, isNull, inArray } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { createAuditEvent } from "@/lib/server/audit";
+import { getPolicyWithDetails } from "@/lib/queries/policies";
+import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 
 export interface UpdatePolicyInput {
   id: string;
@@ -20,21 +20,25 @@ export interface UpdatePolicyInput {
 
 export const getPolicyById = async (tenantSlug: string, id: string) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   const policy = await db.query.policies.findFirst({
     where: and(
       eq(policies.id, id),
       eq(policies.tenantId, tenantId),
-      isNull(policies.deletedAt)
+      isNull(policies.deletedAt),
     ),
   });
 
-  if (!policy) throw new Error('Policy not found');
+  if (!policy) throw new Error("Policy not found");
 
   return {
     id: policy.id,
@@ -63,102 +67,113 @@ export const getPolicyById = async (tenantSlug: string, id: string) => {
 
 export const updatePolicy = async (input: UpdatePolicyInput) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, input.tenantSlug)).limit(1);
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, input.tenantSlug))
+    .limit(1);
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   const existingPolicy = await db.query.policies.findFirst({
     where: and(
       eq(policies.id, input.id),
       eq(policies.tenantId, tenantId),
-      isNull(policies.deletedAt)
+      isNull(policies.deletedAt),
     ),
   });
 
-  if (!existingPolicy) throw new Error('Policy not found');
+  if (!existingPolicy) throw new Error("Policy not found");
 
   const { id, tenantSlug, ...updateData } = input;
 
-  const updatedPolicy = await db.update(policies)
+  const updatedPolicy = await db
+    .update(policies)
     .set({
       ...updateData,
       updatedBy: userId,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(
-      eq(policies.id, id),
-      eq(policies.tenantId, tenantId)
-    ))
+    .where(and(eq(policies.id, id), eq(policies.tenantId, tenantId)))
     .returning();
 
   try {
     await createAuditEvent({
       tenantId,
       actorUserId: userId,
-      action: 'policy.updated',
-      targetType: 'policy',
+      action: "policy.updated",
+      targetType: "policy",
       targetId: id,
       metadata: { update: updateData },
     });
   } catch (e) {
-    console.error('Failed to write audit event (policy.updated):', e);
+    console.error("Failed to write audit event (policy.updated):", e);
   }
 
   return {
     success: true,
     data: updatedPolicy[0],
-    message: 'Policy updated successfully',
+    message: "Policy updated successfully",
   };
 };
 
 export const deletePolicy = async (tenantSlug: string, id: string) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   const existingPolicy = await db.query.policies.findFirst({
     where: and(
       eq(policies.id, id),
       eq(policies.tenantId, tenantId),
-      isNull(policies.deletedAt)
+      isNull(policies.deletedAt),
     ),
   });
 
-  if (!existingPolicy) throw new Error('Policy not found');
+  if (!existingPolicy) throw new Error("Policy not found");
 
-  await db.delete(policies)
-    .where(and(
-      eq(policies.id, id),
-      eq(policies.tenantId, tenantId)
-    ));
+  await db
+    .delete(policies)
+    .where(and(eq(policies.id, id), eq(policies.tenantId, tenantId)));
 
   try {
     await createAuditEvent({
       tenantId,
       actorUserId: userId,
-      action: 'policy.deleted',
-      targetType: 'policy',
+      action: "policy.deleted",
+      targetType: "policy",
       targetId: id,
     });
   } catch (e) {
-    console.error('Failed to write audit event (policy.deleted):', e);
+    console.error("Failed to write audit event (policy.deleted):", e);
   }
 
-  return { success: true, message: 'Policy deleted successfully' };
+  return { success: true, message: "Policy deleted successfully" };
 };
 
 // Get policy details with guardrails (from YAML and database)
-export const getPolicyDetails = async (tenantSlug: string, policyId: string) => {
+export const getPolicyDetails = async (
+  tenantSlug: string,
+  policyId: string,
+) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
-  const tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  const tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   // Use the query function which already handles YAML parsing and guardrail fetching
@@ -166,7 +181,7 @@ export const getPolicyDetails = async (tenantSlug: string, policyId: string) => 
 
   // Verify policy belongs to tenant
   if (policy.tenantId !== tenantId) {
-    throw new Error('Policy not found');
+    throw new Error("Policy not found");
   }
 
   // Transform to match frontend interface
@@ -191,27 +206,32 @@ export const getPolicyDetails = async (tenantSlug: string, policyId: string) => 
 // Get all policies for a tenant
 export const getTenantPolicies = async (tenantSlugOrId: string) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
   // Try to find tenant by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   // Get tenant-scoped policies (excluding deleted ones)
   const policiesList = await db.query.policies.findMany({
-    where: and(
-      eq(policies.tenantId, tenantId),
-      isNull(policies.deletedAt)
-    ),
+    where: and(eq(policies.tenantId, tenantId), isNull(policies.deletedAt)),
     orderBy: (policies, { desc }) => [desc(policies.createdAt)],
   });
 
   // Transform policies to match frontend interface
-  const transformedPolicies = policiesList.map(policy => {
+  const transformedPolicies = policiesList.map((policy) => {
     // Count rules from YAML if present
     let rulesCount = 0;
     if (policy.yaml) {
@@ -243,23 +263,34 @@ export const getTenantPolicies = async (tenantSlugOrId: string) => {
 };
 
 // Get policies for a specific application
-export const getApplicationPolicies = async (tenantSlugOrId: string, applicationId: string) => {
+export const getApplicationPolicies = async (
+  tenantSlugOrId: string,
+  applicationId: string,
+) => {
   const { userId } = await auth();
-  if (!userId) throw new Error('Authentication required');
+  if (!userId) throw new Error("Authentication required");
 
   // Try to find tenant by ID first, then by slug
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length) throw new Error('Tenant not found');
+  if (!tenantRow.length) throw new Error("Tenant not found");
   const tenantId = tenantRow[0].id;
 
   // Get application policies
   const appPolicies = await db.query.applicationPolicies.findMany({
     where: and(
       eq(applicationPolicies.applicationId, applicationId),
-      eq(applicationPolicies.tenantId, tenantId)
+      eq(applicationPolicies.tenantId, tenantId),
     ),
   });
 
@@ -268,7 +299,7 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
     return {
       success: true,
       data: [],
-      message: 'No policies linked to this application',
+      message: "No policies linked to this application",
     };
   }
 
@@ -276,7 +307,7 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
     where: and(
       eq(policies.tenantId, tenantId),
       isNull(policies.deletedAt),
-      inArray(policies.id, policyIds)
+      inArray(policies.id, policyIds),
     ),
     orderBy: (policies, { desc }) => [desc(policies.createdAt)],
   });
@@ -324,51 +355,70 @@ export const getApplicationPolicies = async (tenantSlugOrId: string, application
 export const setApplicationDefaultPolicy = async (
   tenantSlugOrId: string,
   applicationId: string,
-  policyId: string
+  policyId: string,
 ) => {
   const { userId, orgId } = await auth();
-  if (!userId || !orgId) throw new Error('Authentication required');
+  if (!userId || !orgId) throw new Error("Authentication required");
 
-  let tenantRow = await db.select().from(tenants).where(eq(tenants.id, tenantSlugOrId)).limit(1);
+  let tenantRow = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.id, tenantSlugOrId))
+    .limit(1);
   if (!tenantRow.length) {
-    tenantRow = await db.select().from(tenants).where(eq(tenants.slug, tenantSlugOrId)).limit(1);
+    tenantRow = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.slug, tenantSlugOrId))
+      .limit(1);
   }
-  if (!tenantRow.length || tenantRow[0].id !== orgId) throw new Error('Access denied');
+  if (!tenantRow.length || tenantRow[0].id !== orgId)
+    throw new Error("Access denied");
 
   const assignment = await db.query.applicationPolicies.findFirst({
     where: and(
       eq(applicationPolicies.tenantId, orgId),
       eq(applicationPolicies.applicationId, applicationId),
-      eq(applicationPolicies.policyId, policyId)
+      eq(applicationPolicies.policyId, policyId),
     ),
   });
-  if (!assignment) throw new Error('Policy is not linked to this application');
+  if (!assignment) throw new Error("Policy is not linked to this application");
 
   await db.transaction(async (tx) => {
-    await tx.update(applicationPolicies).set({ isDefault: false }).where(and(
-      eq(applicationPolicies.tenantId, orgId),
-      eq(applicationPolicies.applicationId, applicationId)
-    ));
-    await tx.update(applicationPolicies).set({ isDefault: true, isActive: true }).where(
-      eq(applicationPolicies.id, assignment.id)
-    );
+    await tx
+      .update(applicationPolicies)
+      .set({ isDefault: false })
+      .where(
+        and(
+          eq(applicationPolicies.tenantId, orgId),
+          eq(applicationPolicies.applicationId, applicationId),
+        ),
+      );
+    await tx
+      .update(applicationPolicies)
+      .set({ isDefault: true, isActive: true })
+      .where(eq(applicationPolicies.id, assignment.id));
   });
 
   await createAuditEvent({
     tenantId: orgId,
     actorUserId: userId,
-    action: 'runtime_policy.default_selected',
-    targetType: 'policy',
+    action: "runtime_policy.default_selected",
+    targetType: "policy",
     targetId: policyId,
     metadata: { applicationId },
   });
-  const linkedAgents = await db.select({ id: agents.id }).from(agents).where(and(
-    eq(agents.tenantId, orgId),
-    eq(agents.applicationId, applicationId)
-  ));
+  const linkedAgents = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(eq(agents.tenantId, orgId), eq(agents.applicationId, applicationId)),
+    );
   for (const agent of linkedAgents) {
     await syncAgentPolicyEvaluations(orgId, agent.id);
   }
-  revalidatePath(`/${tenantRow[0].slug}/applications/${applicationId}/control-net/policies`);
+  revalidatePath(
+    `/${tenantRow[0].slug}/applications/${applicationId}/control-net/policies`,
+  );
   return { success: true, agentsEvaluated: linkedAgents.length };
 };

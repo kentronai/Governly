@@ -65,7 +65,7 @@ export const EUComplianceTrackingProvider = ({
     // Priority 1: Category filter (if selected)
     if (category.trim() !== "") {
       filtered = filtered.filter(
-        (item) => item.category.toLowerCase() === category.toLowerCase()
+        (item) => item.category.toLowerCase() === category.toLowerCase(),
       );
     }
 
@@ -75,7 +75,7 @@ export const EUComplianceTrackingProvider = ({
       filtered = filtered.filter(
         (item) =>
           item.title.toLowerCase().includes(query) ||
-          item.description.toLowerCase().includes(query)
+          item.description.toLowerCase().includes(query),
       );
     }
 

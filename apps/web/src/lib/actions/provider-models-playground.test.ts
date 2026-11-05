@@ -41,8 +41,7 @@ describe("getProviderModelsForPlayground", () => {
         displayName: "Google Gemini 3.6 Flash",
         provider: "gemini",
         availabilityStatus: "available",
-        modelUrl:
-          "https://generativelanguage.googleapis.com/v1beta/openai",
+        modelUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
         isSelected: true,
         connectionStatus: "ready",
       },

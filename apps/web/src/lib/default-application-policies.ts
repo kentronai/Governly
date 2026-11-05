@@ -8,7 +8,9 @@
 export const DEFAULT_APPLICATION_POLICY_VERSION = "v1";
 
 export type DefaultApplicationPolicyProfile =
-  "standard" | "strict" | "development";
+  | "standard"
+  | "strict"
+  | "development";
 
 export interface DefaultPolicyGuard {
   key: string;

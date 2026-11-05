@@ -45,7 +45,7 @@ export function GovernancePanel() {
 
   const updateStatus = (id: string, status: PolicyTool["status"]) => {
     setPolicies((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status } : p))
+      prev.map((p) => (p.id === id ? { ...p, status } : p)),
     );
   };
 

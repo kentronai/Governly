@@ -132,7 +132,7 @@ export default function Pagination({
                 onClick={() => handlePageChange(page - 1)}
                 aria-disabled={page <= 1 || isLoading}
                 className={cn(
-                  (page <= 1 || isLoading) && "pointer-events-none opacity-50"
+                  (page <= 1 || isLoading) && "pointer-events-none opacity-50",
                 )}
               />
             </PaginationItem>
@@ -151,7 +151,7 @@ export default function Pagination({
                     {p}
                   </PaginationLink>
                 </PaginationItem>
-              )
+              ),
             )}
 
             <PaginationItem>
@@ -160,7 +160,7 @@ export default function Pagination({
                 aria-disabled={page >= totalPages || isLoading}
                 className={cn(
                   (page >= totalPages || isLoading) &&
-                    "pointer-events-none opacity-50"
+                    "pointer-events-none opacity-50",
                 )}
               />
             </PaginationItem>

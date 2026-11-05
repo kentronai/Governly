@@ -309,6 +309,48 @@
       "when": 1786800000000,
       "tag": "0043_eu_ai_act_controls",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1786900000000,
+      "tag": "0044_framework_controls",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0045_tenant_frameworks",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1787100000000,
+      "tag": "0046_tenant_llm_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0047_agent_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1787300000000,
+      "tag": "0048_model_catalog_refresh",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1787400000000,
+      "tag": "0049_ai_radar",
+      "breakpoints": true
     }
   ]
 }

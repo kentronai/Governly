@@ -222,7 +222,9 @@ export async function saveDatabricksWorkspaceUrl(input: {
       updatedBy: userId,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(integrations.id, input.id), eq(integrations.tenantId, tenantId)))
+    .where(
+      and(eq(integrations.id, input.id), eq(integrations.tenantId, tenantId)),
+    )
     .returning();
   return updated;
 }

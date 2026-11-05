@@ -1,13 +1,7 @@
-import React from 'react';
-import Link from 'next/link';
-import { 
-  MoreHorizontal, 
-  Archive, 
-  Trash2, 
-  Pencil, 
-  Network 
-} from 'lucide-react';
-import { GoDotFill } from 'react-icons/go';
+import React from "react";
+import Link from "next/link";
+import { MoreHorizontal, Archive, Trash2, Pencil, Network } from "lucide-react";
+import { GoDotFill } from "react-icons/go";
 
 import {
   Table,
@@ -16,19 +10,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 
-import { Workspace } from '@/types';
-import { getStatusLabel, getStatusStyle } from '@/lib/utils/helpers';
-import { checkWorkspacePermissions } from '@/lib/utils/roleBasedPermissions';
-import ListSkeleton from '../common/ListSkeleton';
+import { Workspace } from "@/types";
+import { getStatusLabel, getStatusStyle } from "@/lib/utils/helpers";
+import { checkWorkspacePermissions } from "@/lib/utils/roleBasedPermissions";
+import ListSkeleton from "../common/ListSkeleton";
 
 interface Policy {
   id: string;
@@ -66,29 +60,27 @@ const WorkspaceTableWithActions: React.FC<WorkspaceTableWithActionsProps> = ({
   setSelectedComponents,
 }) => {
   const isDeletionActive = allPolicies.find(
-    (item: Policy) => item.policy_name === 'Workspace Deletion'
+    (item: Policy) => item.policy_name === "Workspace Deletion",
   )?.is_active;
 
   const handleWorkspaceClick = (workspace: Workspace) => {
     setSelectedSources([]);
     setSelectedComponents([]);
-    localStorage.setItem('selectedUser', JSON.stringify(workspace));
-    localStorage.setItem('tab', 'home');
+    localStorage.setItem("selectedUser", JSON.stringify(workspace));
+    localStorage.setItem("tab", "home");
   };
 
   const handleDropdownAction = (action: () => void) => {
     return (e: React.MouseEvent) => {
       e.preventDefault();
-      document.body.style.pointerEvents = 'auto';
+      document.body.style.pointerEvents = "auto";
       action();
     };
   };
 
   const renderTableContent = () => {
     if (isLoading) {
-      return (
-        <ListSkeleton columns={6} />
-      );
+      return <ListSkeleton columns={6} />;
     }
 
     if (!workspaces.length) {
@@ -96,7 +88,9 @@ const WorkspaceTableWithActions: React.FC<WorkspaceTableWithActionsProps> = ({
         <TableRow>
           <TableCell colSpan={6} className="text-center py-12">
             <div className="flex flex-col items-center justify-center gap-2">
-              <p className="text-lg font-medium text-gray-500">No data available</p>
+              <p className="text-lg font-medium text-gray-500">
+                No data available
+              </p>
             </div>
           </TableCell>
         </TableRow>
@@ -167,7 +161,7 @@ const WorkspaceTableWithActions: React.FC<WorkspaceTableWithActionsProps> = ({
 
               <DropdownMenuItem
                 disabled={!checkWorkspacePermissions(workspace, userProfile)}
-                className={isDeletionActive ? 'text-red-500' : 'text-black'}
+                className={isDeletionActive ? "text-red-500" : "text-black"}
                 onClick={handleDropdownAction(() => {
                   if (isDeletionActive) {
                     onDeleteWorkspace(workspace.id);
@@ -203,10 +197,7 @@ const WorkspaceTableWithActions: React.FC<WorkspaceTableWithActionsProps> = ({
           <TableHead>Status</TableHead>
           <TableHead>Storage Used (GB)</TableHead>
           <TableHead>
-            <div
-              className="flex items-center cursor-pointer"
-              onClick={onSort}
-            >
+            <div className="flex items-center cursor-pointer" onClick={onSort}>
               Last Modified
             </div>
           </TableHead>

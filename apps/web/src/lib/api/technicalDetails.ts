@@ -1,5 +1,5 @@
-import instanceAxios from '@/axios/instanceAxios';
-import config from '../../config/config';
+import instanceAxios from "@/axios/instanceAxios";
+import config from "../../config/config";
 
 export interface TechnicalDetail {
   _id: string;
@@ -54,14 +54,18 @@ export interface UpdateTechnicalDetailReq extends AddTechnicalDetailReq {
 }
 
 // Get all technical details with filtering, pagination, and search
-export const GetAllTechnicalDetails = async (params: GetAllTechnicalDetailsParams) => {
+export const GetAllTechnicalDetails = async (
+  params: GetAllTechnicalDetailsParams,
+) => {
   const { page, page_size, search } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-details/list/v1`);
-  endpoint.searchParams.set('page', page.toString());
-  endpoint.searchParams.set('limit', page_size.toString());
-  
-  if (search) endpoint.searchParams.set('search', search);
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-details/list/v1`,
+  );
+  endpoint.searchParams.set("page", page.toString());
+  endpoint.searchParams.set("limit", page_size.toString());
+
+  if (search) endpoint.searchParams.set("search", search);
 
   try {
     const response = await instanceAxios.get(endpoint.href);
@@ -75,7 +79,7 @@ export const GetAllTechnicalDetails = async (params: GetAllTechnicalDetailsParam
 export const GetTechnicalDetailDetails = async (TechDetailsId: string) => {
   try {
     const response = await instanceAxios.get(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-detail/${TechDetailsId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-detail/${TechDetailsId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -84,11 +88,13 @@ export const GetTechnicalDetailDetails = async (TechDetailsId: string) => {
 };
 
 // Add new technical detail
-export const AddTechnicalDetail = async (technicalDetailData: AddTechnicalDetailReq) => {
+export const AddTechnicalDetail = async (
+  technicalDetailData: AddTechnicalDetailReq,
+) => {
   try {
     const response = await instanceAxios.post(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/add/technical-details/v1`,
-      technicalDetailData
+      technicalDetailData,
     );
     return response?.data;
   } catch (error) {
@@ -97,11 +103,13 @@ export const AddTechnicalDetail = async (technicalDetailData: AddTechnicalDetail
 };
 
 // Update technical detail
-export const UpdateTechnicalDetail = async (technicalDetailData: UpdateTechnicalDetailReq) => {
+export const UpdateTechnicalDetail = async (
+  technicalDetailData: UpdateTechnicalDetailReq,
+) => {
   try {
     const response = await instanceAxios.put(
       `${config.NEXT_PUBLIC_BASE_URL_AI}/user/update/technical-details/${technicalDetailData.TechDetailsId}/v1`,
-      technicalDetailData
+      technicalDetailData,
     );
     return response?.data;
   } catch (error) {
@@ -113,7 +121,7 @@ export const UpdateTechnicalDetail = async (technicalDetailData: UpdateTechnical
 export const DeleteTechnicalDetail = async (TechDetailsId: string) => {
   try {
     const response = await instanceAxios.delete(
-      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/technical-details/${TechDetailsId}/v1`
+      `${config.NEXT_PUBLIC_BASE_URL_AI}/user/delete/technical-details/${TechDetailsId}/v1`,
     );
     return response?.data;
   } catch (error) {
@@ -122,18 +130,22 @@ export const DeleteTechnicalDetail = async (TechDetailsId: string) => {
 };
 
 // Export all technical details
-export const ExportAllTechnicalDetails = async (params: GetAllTechnicalDetailsParams) => {
+export const ExportAllTechnicalDetails = async (
+  params: GetAllTechnicalDetailsParams,
+) => {
   const { page, page_size, search } = params;
-  
-  const endpoint = new URL(`${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-details/export/v1`);
-  endpoint.searchParams.set('page', page.toString());
-  endpoint.searchParams.set('limit', page_size.toString());
-  
-  if (search) endpoint.searchParams.set('search', search);
+
+  const endpoint = new URL(
+    `${config.NEXT_PUBLIC_BASE_URL_AI}/user/technical-details/export/v1`,
+  );
+  endpoint.searchParams.set("page", page.toString());
+  endpoint.searchParams.set("limit", page_size.toString());
+
+  if (search) endpoint.searchParams.set("search", search);
 
   try {
     const response = await instanceAxios.get(endpoint.href, {
-      responseType: 'blob'
+      responseType: "blob",
     });
     return response?.data;
   } catch (error) {

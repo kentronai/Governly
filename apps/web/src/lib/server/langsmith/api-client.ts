@@ -311,7 +311,10 @@ export async function langsmithApi<T>(
           : {}),
         ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
       },
-      body: method === "POST" && data !== undefined ? JSON.stringify(data) : undefined,
+      body:
+        method === "POST" && data !== undefined
+          ? JSON.stringify(data)
+          : undefined,
       cache: "no-store",
       signal: controller.signal,
     });

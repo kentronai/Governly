@@ -43,7 +43,7 @@ const formSchema = z
           const allowedTypes = ["application/pdf"];
           return allowedTypes.includes(file[0].type);
         },
-        { message: "Only one PDF file is allowed" }
+        { message: "Only one PDF file is allowed" },
       ),
     status: z.enum(["Draft", "In Review", "Approved", "Rejected", "Pending"], {
       message: "Please select a valid enum",
@@ -61,7 +61,7 @@ const formSchema = z
     {
       message: "Either Document URL or Document File is required",
       path: ["documentUrl"],
-    }
+    },
   );
 
 export default function Form({

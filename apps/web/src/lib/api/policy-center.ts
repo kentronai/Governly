@@ -15,7 +15,7 @@ export interface GetPolicyCenterPoliciesOptions {
  * Fetch policy center policies with filters
  */
 export async function fetchPolicyCenterPolicies(
-  options?: GetPolicyCenterPoliciesOptions
+  options?: GetPolicyCenterPoliciesOptions,
 ) {
   try {
     const result =
@@ -71,12 +71,12 @@ export async function fetchPolicyCenterPolicyById(id: string) {
  */
 export async function updatePolicyCenterPolicyStatus(
   id: string,
-  isActive: boolean
+  isActive: boolean,
 ) {
   try {
     const result = await policyCenterActions.updatePolicyCenterPolicyStatus(
       id,
-      isActive
+      isActive,
     );
     const user = await auth();
     if (!user || user === null) return;

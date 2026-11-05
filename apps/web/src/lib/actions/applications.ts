@@ -25,7 +25,10 @@ import {
 } from "@/lib/default-application-policies";
 import { eq, and, sql, isNull, or, ilike, inArray } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
-import { fetchClerkIdentity, PLACEHOLDER_EMAIL_SUFFIX } from "@/lib/server/user-identity";
+import {
+  fetchClerkIdentity,
+  PLACEHOLDER_EMAIL_SUFFIX,
+} from "@/lib/server/user-identity";
 import { revalidatePath } from "next/cache";
 import {
   getApplicationsWithSummary,
@@ -90,7 +93,8 @@ export const createApplication = async (input: CreateApplicationInput) => {
       // surfaces as the owner / last-updated-by / stakeholder on the overview.
       const identity = await fetchClerkIdentity(userId);
       const clerkName = identity?.name ?? null;
-      const clerkEmail = identity?.email || `${userId}${PLACEHOLDER_EMAIL_SUFFIX}`;
+      const clerkEmail =
+        identity?.email || `${userId}${PLACEHOLDER_EMAIL_SUFFIX}`;
 
       const [syncedUser] = await tx
         .insert(users)
@@ -169,7 +173,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
     // transaction. Any policy/link failure rolls back the application and its
     // stakeholder, preventing partially-created applications.
     const defaultPolicyNames = DEFAULT_APPLICATION_POLICIES.map(
-      (definition) => definition.name
+      (definition) => definition.name,
     );
     const existingPolicyLinks = await tx
       .select({ policyName: applicationPolicies.policyName })
@@ -179,16 +183,16 @@ export const createApplication = async (input: CreateApplicationInput) => {
           eq(applicationPolicies.applicationId, application.id),
           eq(
             applicationPolicies.policyVersion,
-            DEFAULT_APPLICATION_POLICY_VERSION
+            DEFAULT_APPLICATION_POLICY_VERSION,
           ),
-          inArray(applicationPolicies.policyName, defaultPolicyNames)
-        )
+          inArray(applicationPolicies.policyName, defaultPolicyNames),
+        ),
       );
     const existingPolicyNames = new Set(
-      existingPolicyLinks.map((link) => link.policyName)
+      existingPolicyLinks.map((link) => link.policyName),
     );
     const missingDefinitions = DEFAULT_APPLICATION_POLICIES.filter(
-      (definition) => !existingPolicyNames.has(definition.name)
+      (definition) => !existingPolicyNames.has(definition.name),
     );
 
     const createdPolicies = missingDefinitions.length
@@ -218,7 +222,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
               },
               createdBy: userId,
               updatedBy: userId,
-            }))
+            })),
           )
           .returning({ id: policies.id, name: policies.name })
       : [];
@@ -228,7 +232,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
     }
 
     const createdPolicyByName = new Map(
-      createdPolicies.map((policy) => [policy.name, policy.id])
+      createdPolicies.map((policy) => [policy.name, policy.id]),
     );
 
     if (missingDefinitions.length > 0) {
@@ -245,7 +249,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
           isDefault: definition.isDefault,
           priority: definition.priority,
           createdBy: userId,
-        }))
+        })),
       );
     }
 
@@ -255,8 +259,8 @@ export const createApplication = async (input: CreateApplicationInput) => {
     const guardKeys = [
       ...new Set(
         missingDefinitions.flatMap((definition) =>
-          definition.guards.map((guard) => guard.key)
-        )
+          definition.guards.map((guard) => guard.key),
+        ),
       ),
     ];
 
@@ -274,10 +278,10 @@ export const createApplication = async (input: CreateApplicationInput) => {
             inArray(guardrails.key, guardKeys),
             or(
               eq(guardrails.tenantId, input.tenantId),
-              isNull(guardrails.tenantId)
+              isNull(guardrails.tenantId),
             ),
-            isNull(guardrails.deletedAt)
-          )
+            isNull(guardrails.deletedAt),
+          ),
         );
 
       const catalogGuardByKey = new Map<
@@ -286,7 +290,10 @@ export const createApplication = async (input: CreateApplicationInput) => {
       >();
       for (const guard of catalogGuards) {
         const current = catalogGuardByKey.get(guard.key);
-        if (!current || (current.tenantId === null && guard.tenantId !== null)) {
+        if (
+          !current ||
+          (current.tenantId === null && guard.tenantId !== null)
+        ) {
           catalogGuardByKey.set(guard.key, guard);
         }
       }
@@ -304,7 +311,8 @@ export const createApplication = async (input: CreateApplicationInput) => {
               guardrailId: catalogGuard.id,
               phase: "input",
               params: {
-                ...((catalogGuard.defaultParams as Record<string, unknown>) || {}),
+                ...((catalogGuard.defaultParams as Record<string, unknown>) ||
+                  {}),
                 ...(guard.params || {}),
               },
               orderIndex,
@@ -327,7 +335,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
   revalidatePath(`/${tenantSlug}/applications`);
   revalidatePath(`/${tenantSlug}/policies`);
   revalidatePath(
-    `/${tenantSlug}/applications/${application.id}/control-net/policies`
+    `/${tenantSlug}/applications/${application.id}/control-net/policies`,
   );
 
   // Audit: application created
@@ -346,7 +354,10 @@ export const createApplication = async (input: CreateApplicationInput) => {
 
   // Organization-level compliance policies are true defaults: a new
   // application is evaluated immediately and does not require another toggle.
-  await applyActiveCompliancePoliciesToApplication(input.tenantId, application.id);
+  await applyActiveCompliancePoliciesToApplication(
+    input.tenantId,
+    application.id,
+  );
 
   return {
     application,
@@ -441,7 +452,7 @@ export const archiveApplication = async (id: string, tenantId: string) => {
 export const updateStatusApplication = async (
   id: string,
   tenant: string,
-  status: "Not Started" | "In Progress" | "Completed" | "Archived"
+  status: "Not Started" | "In Progress" | "Completed" | "Archived",
 ) => {
   const { userId, orgId } = await auth();
 
@@ -479,7 +490,7 @@ export const updateStatusApplication = async (
   } catch (e) {
     console.error(
       "Failed to write audit event (application.status_updated):",
-      e
+      e,
     );
   }
 
@@ -491,7 +502,7 @@ export const getApplications = async (
   tenantSlug: string,
   page?: number,
   pageSize?: number,
-  search?: string
+  search?: string,
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
@@ -523,8 +534,8 @@ export const getApplications = async (
       (app) =>
         app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (app.description?.toLowerCase() || "").includes(
-          searchTerm.toLowerCase()
-        )
+          searchTerm.toLowerCase(),
+        ),
     );
     total = filtered.length;
     const offset = (pageNum - 1) * limit;
@@ -651,7 +662,7 @@ export const getArchivedApplicationsAction = async (
   tenantSlug: string,
   page?: number,
   pageSize?: number,
-  search?: string
+  search?: string,
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
@@ -685,7 +696,7 @@ export const getArchivedApplicationsAction = async (
     const term = `%${searchTerm}%`;
     const searchCondition = or(
       ilike(applications.name, term),
-      ilike(applications.description, term)
+      ilike(applications.description, term),
     );
     if (searchCondition) {
       countConditions.push(searchCondition);
@@ -705,7 +716,7 @@ export const getArchivedApplicationsAction = async (
     tenantId,
     searchTerm,
     pageNum,
-    limit
+    limit,
   );
 
   return {
@@ -735,7 +746,7 @@ export const getArchivedApplicationsAction = async (
 // Get single application by ID (simple query)
 export const getApplicationById = async (
   tenantSlugOrId: string,
-  applicationId: string
+  applicationId: string,
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
@@ -761,7 +772,7 @@ export const getApplicationById = async (
     where: and(
       eq(applications.id, applicationId),
       eq(applications.tenantId, tenantId),
-      isNull(applications.deletedAt)
+      isNull(applications.deletedAt),
     ),
     columns: {
       id: true,
@@ -785,7 +796,7 @@ export const getApplicationById = async (
 // Get application details for overview page
 export const getApplicationDetails = async (
   tenantSlugOrId: string,
-  applicationId: string
+  applicationId: string,
 ) => {
   const { userId, orgId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
@@ -815,7 +826,7 @@ export const getApplicationDetails = async (
   const result = await db.query.applications.findFirst({
     where: and(
       eq(applications.id, applicationId),
-      eq(applications.tenantId, tenantId)
+      eq(applications.tenantId, tenantId),
     ),
     columns: {
       id: true,
@@ -913,5 +924,4 @@ export const getApplicationDetails = async (
       kpis: useCase.kpis,
     })),
   };
-
 };

@@ -29,7 +29,9 @@ export const MODEL_ID_HINT =
  * Returns an error message when `modelId` cannot be a provider API identifier,
  * or `null` when it is acceptable.
  */
-export function validateModelId(modelId: string | null | undefined): string | null {
+export function validateModelId(
+  modelId: string | null | undefined,
+): string | null {
   const value = (modelId ?? "").trim();
 
   if (!value) {

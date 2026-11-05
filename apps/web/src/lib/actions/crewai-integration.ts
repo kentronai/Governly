@@ -159,7 +159,10 @@ export async function testCrewAIIntegrationConnection(
   return result;
 }
 
-export async function triggerCrewAIDiscovery(tenantSlugOrId: string, id: string) {
+export async function triggerCrewAIDiscovery(
+  tenantSlugOrId: string,
+  id: string,
+) {
   const { tenantId, userId } = await context(tenantSlugOrId);
   const row = await connection(tenantId, id);
   const result = await runCrewAIDiscoveryScan(tenantId, id, row, userId);
@@ -182,7 +185,10 @@ export async function triggerCrewAIDiscovery(tenantSlugOrId: string, id: string)
   return result;
 }
 
-export async function deleteCrewAIConnection(tenantSlugOrId: string, id: string) {
+export async function deleteCrewAIConnection(
+  tenantSlugOrId: string,
+  id: string,
+) {
   const { tenantId, userId } = await context(tenantSlugOrId);
   const row = await connection(tenantId, id);
   // Best-effort: remove the credential from the Nango vault too.

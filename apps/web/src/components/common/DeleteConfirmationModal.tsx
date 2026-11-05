@@ -69,7 +69,9 @@ export function DeleteConfirmationModal({
               ? operation === "archive"
                 ? "Archiving..."
                 : "Deleting..."
-              : operation === "archive" ? "Archive" : "Delete"}
+              : operation === "archive"
+                ? "Archive"
+                : "Delete"}
           </Button>
         </div>
       </DialogContent>

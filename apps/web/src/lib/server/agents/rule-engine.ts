@@ -10,7 +10,10 @@ import { db, agentRules } from "@db";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { cache } from "react";
 
-export type Facts = Record<string, string | number | boolean | null | undefined>;
+export type Facts = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
 
 export type ConditionOperator =
   | "eq"
@@ -27,7 +30,11 @@ export type ConditionOperator =
 // conditions for compound logic — still plain JSON data, no code change
 // required to express "hasAdminRole AND hasCrossAccountPermissions".
 export type RuleCondition =
-  | { field: string; operator: ConditionOperator; value?: string | number | boolean | (string | number)[] }
+  | {
+      field: string;
+      operator: ConditionOperator;
+      value?: string | number | boolean | (string | number)[];
+    }
   | { all: RuleCondition[] }
   | { any: RuleCondition[] };
 
@@ -49,7 +56,7 @@ export const getRulesForEngine = cache(
       where: and(
         eq(agentRules.engineType, engineType),
         eq(agentRules.isEnabled, true),
-        or(isNull(agentRules.tenantId), eq(agentRules.tenantId, tenantId))
+        or(isNull(agentRules.tenantId), eq(agentRules.tenantId, tenantId)),
       ),
       orderBy: (t, { asc }) => [asc(t.priority)],
     });
@@ -63,7 +70,7 @@ export const getRulesForEngine = cache(
       }
     }
     return Array.from(byKey.values());
-  }
+  },
 );
 
 function matches(condition: RuleCondition, facts: Facts): boolean {
@@ -82,15 +89,34 @@ function matches(condition: RuleCondition, facts: Facts): boolean {
     case "neq":
       return actual !== condition.value;
     case "gt":
-      return typeof actual === "number" && typeof condition.value === "number" && actual > condition.value;
+      return (
+        typeof actual === "number" &&
+        typeof condition.value === "number" &&
+        actual > condition.value
+      );
     case "gte":
-      return typeof actual === "number" && typeof condition.value === "number" && actual >= condition.value;
+      return (
+        typeof actual === "number" &&
+        typeof condition.value === "number" &&
+        actual >= condition.value
+      );
     case "lt":
-      return typeof actual === "number" && typeof condition.value === "number" && actual < condition.value;
+      return (
+        typeof actual === "number" &&
+        typeof condition.value === "number" &&
+        actual < condition.value
+      );
     case "lte":
-      return typeof actual === "number" && typeof condition.value === "number" && actual <= condition.value;
+      return (
+        typeof actual === "number" &&
+        typeof condition.value === "number" &&
+        actual <= condition.value
+      );
     case "in":
-      return Array.isArray(condition.value) && (condition.value as (string | number)[]).some((v) => v === actual);
+      return (
+        Array.isArray(condition.value) &&
+        (condition.value as (string | number)[]).some((v) => v === actual)
+      );
     default:
       return false;
   }
@@ -99,7 +125,7 @@ function matches(condition: RuleCondition, facts: Facts): boolean {
 export async function evaluateRules(
   tenantId: string,
   engineType: "capability" | "autonomy" | "risk",
-  facts: Facts
+  facts: Facts,
 ): Promise<EvaluatedRule[]> {
   const rules = await getRulesForEngine(tenantId, engineType);
   const matched: EvaluatedRule[] = [];

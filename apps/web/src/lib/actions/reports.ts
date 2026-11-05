@@ -2,11 +2,11 @@
  * Server actions for Reports
  */
 
-'use server';
+"use server";
 
-import { db, tenants, applications, useCases, risks } from '@db';
-import { eq, and, isNull, sql, ne } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { db, tenants, applications, useCases, risks } from "@db";
+import { eq, and, isNull, sql, ne } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 
 /**
  * Get summary metrics for reports dashboard
@@ -14,13 +14,17 @@ import { auth } from '@clerk/nextjs/server';
 export const getSummaryMetrics = async (tenantSlug: string) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   // Get tenant ID from slug
-  const tenant = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
+  const tenant = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
   if (!tenant.length) {
-    throw new Error('Tenant not found');
+    throw new Error("Tenant not found");
   }
 
   const tenantId = tenant[0].id;
@@ -35,8 +39,8 @@ export const getSummaryMetrics = async (tenantSlug: string) => {
       and(
         eq(applications.tenantId, tenantId),
         isNull(applications.deletedAt),
-        ne(applications.status, "Archived")
-      )
+        ne(applications.status, "Archived"),
+      ),
     );
 
   // Get total number of use cases
@@ -52,8 +56,8 @@ export const getSummaryMetrics = async (tenantSlug: string) => {
         eq(applications.tenantId, tenantId),
         isNull(useCases.deletedAt),
         isNull(applications.deletedAt),
-        sql`${applications.status} != 'Archived'`
-      )
+        sql`${applications.status} != 'Archived'`,
+      ),
     );
 
   // Get count by AI system type (agentPatterns)
@@ -70,23 +74,24 @@ export const getSummaryMetrics = async (tenantSlug: string) => {
         eq(applications.tenantId, tenantId),
         isNull(useCases.deletedAt),
         isNull(applications.deletedAt),
-        sql`${applications.status} != 'Archived'`
-      )
+        sql`${applications.status} != 'Archived'`,
+      ),
     )
     .groupBy(sql`unnest(${useCases.agentPatterns})`);
 
   // Format the response
   const systemTypeCounts = {
-    'In-house ML': 0,
-    'GenAI': 0,
-    '3rd Party': 0,
-    'Agent': 0,
+    "In-house ML": 0,
+    GenAI: 0,
+    "3rd Party": 0,
+    Agent: 0,
   };
 
   // Populate the data from the query results
   useCasesBySystemType.forEach((item) => {
     if (item.systemType in systemTypeCounts) {
-      systemTypeCounts[item.systemType as keyof typeof systemTypeCounts] = item.count;
+      systemTypeCounts[item.systemType as keyof typeof systemTypeCounts] =
+        item.count;
     }
   });
 
@@ -106,13 +111,17 @@ export const getSummaryMetrics = async (tenantSlug: string) => {
 export const getUseCasesByRisk = async (tenantSlug: string) => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   // Get tenant ID from slug
-  const tenant = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).limit(1);
+  const tenant = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
   if (!tenant.length) {
-    throw new Error('Tenant not found');
+    throw new Error("Tenant not found");
   }
 
   const tenantId = tenant[0].id;
@@ -132,8 +141,8 @@ export const getUseCasesByRisk = async (tenantSlug: string) => {
         eq(useCases.tenantId, tenantId),
         eq(applications.tenantId, tenantId),
         isNull(useCases.deletedAt),
-        isNull(applications.deletedAt)
-      )
+        isNull(applications.deletedAt),
+      ),
     )
     .groupBy(risks.riskLevel);
 
@@ -149,8 +158,8 @@ export const getUseCasesByRisk = async (tenantSlug: string) => {
         eq(useCases.tenantId, tenantId),
         eq(applications.tenantId, tenantId),
         isNull(useCases.deletedAt),
-        isNull(applications.deletedAt)
-      )
+        isNull(applications.deletedAt),
+      ),
     );
 
   // Get use cases without risks
@@ -167,8 +176,8 @@ export const getUseCasesByRisk = async (tenantSlug: string) => {
         eq(applications.tenantId, tenantId),
         isNull(useCases.deletedAt),
         isNull(applications.deletedAt),
-        sql`${risks.id} IS NULL`
-      )
+        sql`${risks.id} IS NULL`,
+      ),
     );
 
   // Format the response to match the frontend expectations
@@ -177,13 +186,15 @@ export const getUseCasesByRisk = async (tenantSlug: string) => {
     High: 0,
     Medium: 0,
     Low: 0,
-    'No Risk': useCasesWithoutRisks[0]?.count || 0,
+    "No Risk": useCasesWithoutRisks[0]?.count || 0,
   };
 
   // Populate the data from the query results
   useCasesByRisk.forEach((item) => {
     if (item.riskLevel in riskClassificationData) {
-      riskClassificationData[item.riskLevel as keyof typeof riskClassificationData] = item.useCaseCount;
+      riskClassificationData[
+        item.riskLevel as keyof typeof riskClassificationData
+      ] = item.useCaseCount;
     }
   });
 
@@ -193,10 +204,12 @@ export const getUseCasesByRisk = async (tenantSlug: string) => {
       riskClassification: riskClassificationData,
       totalUseCases: totalUseCases[0]?.totalCount || 0,
       summary: {
-        withRisks: Object.values(riskClassificationData).reduce((sum, count) =>
-          riskClassificationData['No Risk'] === count ? sum : sum + count, 0
+        withRisks: Object.values(riskClassificationData).reduce(
+          (sum, count) =>
+            riskClassificationData["No Risk"] === count ? sum : sum + count,
+          0,
         ),
-        withoutRisks: riskClassificationData['No Risk'],
+        withoutRisks: riskClassificationData["No Risk"],
       },
     },
   };

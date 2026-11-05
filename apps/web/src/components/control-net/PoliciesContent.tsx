@@ -1,13 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import PoliciesTab from './Polices';
+import { useState } from "react";
+import PoliciesTab from "./Polices";
 
 interface PoliciesContentProps {
   initialPolicies: any[];
 }
 
-export default function PoliciesContent({ initialPolicies }: PoliciesContentProps) {
+export default function PoliciesContent({
+  initialPolicies,
+}: PoliciesContentProps) {
   const [policies, setPolicies] = useState<any[]>(initialPolicies);
 
   const handleAddPolicy = (policyData?: any) => {
@@ -21,4 +23,3 @@ export default function PoliciesContent({ initialPolicies }: PoliciesContentProp
 
   return <PoliciesTab />;
 }
-

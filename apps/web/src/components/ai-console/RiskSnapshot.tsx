@@ -59,7 +59,7 @@ export function RiskSnapshot() {
           <div
             className={cn(
               "p-2 rounded-lg",
-              riskBg[summaryStats.complianceRisk]
+              riskBg[summaryStats.complianceRisk],
             )}
           >
             <Shield
@@ -71,7 +71,7 @@ export function RiskSnapshot() {
         <div
           className={cn(
             "text-2xl font-bold capitalize",
-            riskColors[summaryStats.complianceRisk]
+            riskColors[summaryStats.complianceRisk],
           )}
         >
           {summaryStats.complianceRisk}

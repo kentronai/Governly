@@ -10,7 +10,7 @@ import type { RawDiscoveredResource } from "./types";
 
 export async function discoverSecretsManagerSecrets(
   clients: AwsClientBundle,
-  referencedSecretIds: Set<string>
+  referencedSecretIds: Set<string>,
 ): Promise<RawDiscoveredResource[]> {
   if (referencedSecretIds.size === 0) return [];
   const resources: RawDiscoveredResource[] = [];
@@ -19,12 +19,15 @@ export async function discoverSecretsManagerSecrets(
   let nextToken: string | undefined;
   do {
     const page = await secretsManager.send(
-      new ListSecretsCommand({ NextToken: nextToken })
+      new ListSecretsCommand({ NextToken: nextToken }),
     );
     for (const secret of page.SecretList ?? []) {
       if (!secret.Name || !secret.ARN) continue;
       const isReferenced = Array.from(referencedSecretIds).some(
-        (ref) => secret.Name === ref || secret.ARN === ref || secret.ARN?.includes(ref)
+        (ref) =>
+          secret.Name === ref ||
+          secret.ARN === ref ||
+          secret.ARN?.includes(ref),
       );
       if (!isReferenced) continue;
 
@@ -35,7 +38,7 @@ export async function discoverSecretsManagerSecrets(
         resourceName: secret.Name,
         region,
         tags: Object.fromEntries(
-          (secret.Tags ?? []).map((t) => [t.Key ?? "", t.Value ?? ""])
+          (secret.Tags ?? []).map((t) => [t.Key ?? "", t.Value ?? ""]),
         ),
         createdAt: secret.CreatedDate?.toISOString?.() ?? null,
         lastUpdatedAt: secret.LastChangedDate?.toISOString?.() ?? null,

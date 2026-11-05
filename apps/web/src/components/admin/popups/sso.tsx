@@ -1,5 +1,5 @@
-'use client';
-import { GrFormClose } from 'react-icons/gr';
+"use client";
+import { GrFormClose } from "react-icons/gr";
 
 interface SsoPopupProps {
   onClose: () => void;
@@ -36,7 +36,7 @@ const SsoPopup: React.FC<SsoPopupProps> = ({ onClose }) => {
 
           <div className="flex w-full mx-6 my-2">
             <span className="flex text-sm 2xl:text-base h-full items-center">
-              SAML 2.0 Endpoint URL{' '}
+              SAML 2.0 Endpoint URL{" "}
             </span>
             <span className="flex h-full items-center text-[#8D8D8D] text-xs 2xl:text-sm mx-2">
               *
@@ -84,7 +84,7 @@ const SsoPopup: React.FC<SsoPopupProps> = ({ onClose }) => {
 
           <div className="flex w-full mx-6 my-2">
             <span className="flex text-sm 2xl:text-base h-full items-center">
-              Public (X.509) Certificate{' '}
+              Public (X.509) Certificate{" "}
             </span>
             <span className="flex h-full items-center text-[#8D8D8D] text-xs 2xl:text-sm mx-2">
               *

@@ -44,6 +44,7 @@ export interface CorrelatedAgent {
     | "databricks_genie"
     | "kubernetes"
     | "crewai"
+    | "github"
     | "other";
   region: string;
   discoverySource: RawDiscoveredResource["resourceType"];
@@ -208,13 +209,16 @@ export function correlateAgents(
   }
 
   for (const instance of ec2Instances) {
+    const role = instance.linkedRoleArn
+      ? iamRoles.find((r) => r.resourceArn === instance.linkedRoleArn)
+      : undefined;
     agents.push({
       externalAgentId: `${instance.region}:${instance.resourceId}`,
       name: instance.resourceName,
       platform: "aws_ec2",
       region: instance.region,
       discoverySource: "ec2_instance",
-      resources: [instance],
+      resources: role ? [instance, role] : [instance],
     });
   }
 

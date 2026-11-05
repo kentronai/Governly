@@ -23,6 +23,7 @@ import { assessRisk } from "@/lib/server/agents/risk-engine";
 import { detectOwnership } from "@/lib/server/agents/ownership-engine";
 import { generateRecommendations } from "@/lib/server/agents/recommendations-engine";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
+import { composeProfile } from "@/lib/server/agents/agent-profile";
 import type { CorrelatedAgent } from "@/lib/server/aws/correlation";
 import type { RawDiscoveredResource } from "@/lib/server/aws/discovery/types";
 import {
@@ -152,7 +153,10 @@ function isCrewActive(crew: CrewAICrewRaw): boolean {
  * endpoint. Tool/permission evidence is not exposed by the crews listing, so
  * classification stays at the evidence-backed floor rather than inventing it.
  */
-function toCorrelatedAgent(crew: CrewAICrewRaw, baseHost: string): CorrelatedAgent {
+function toCorrelatedAgent(
+  crew: CrewAICrewRaw,
+  baseHost: string,
+): CorrelatedAgent {
   const externalAgentId = String(
     crew.uuid ?? crew.id ?? crew.name ?? crypto.randomUUID(),
   );
@@ -249,7 +253,9 @@ export async function runCrewAIDiscoveryScan(
         ),
       });
       const providerInactive = !isCrewActive(crew);
+      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
       const values = {
+        profile,
         tenantId,
         connectionId: null,
         azureConnectionId: null,
@@ -286,6 +292,7 @@ export async function runCrewAIDiscoveryScan(
         lastSeenAt: now,
         syncStatus: "success" as const,
         rawMetadata: {
+          ...profileMeta,
           provider: "crewai",
           baseHost: discovery.baseHost,
           resourceCount: agent.resources.length,

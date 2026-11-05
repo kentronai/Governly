@@ -30,7 +30,7 @@ function levelForScore(score: number): RiskResult["level"] {
 
 export async function assessRisk(
   tenantId: string,
-  facts: CapabilityFacts
+  facts: CapabilityFacts,
 ): Promise<RiskResult> {
   const matched = await evaluateRules(tenantId, "risk", facts);
 

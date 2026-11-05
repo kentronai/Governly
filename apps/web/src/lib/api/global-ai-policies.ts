@@ -1,6 +1,6 @@
 // lib/api/global-ai-policies.ts
 
-import * as globalAiPolicyActions from '@/lib/actions/global-ai-policies';
+import * as globalAiPolicyActions from "@/lib/actions/global-ai-policies";
 
 export interface GetGlobalAiPoliciesOptions {
   region?: string;
@@ -15,7 +15,7 @@ export interface GetGlobalAiPoliciesOptions {
  * Fetch global AI policies with optional filters, search, and pagination
  */
 export async function fetchGlobalAiPolicies(
-  options?: GetGlobalAiPoliciesOptions
+  options?: GetGlobalAiPoliciesOptions,
 ) {
   try {
     const result = await globalAiPolicyActions.getGlobalAiPolicies(options);
@@ -24,7 +24,7 @@ export async function fetchGlobalAiPolicies(
       pagination: result.pagination,
     };
   } catch (error) {
-    console.error('Error fetching global AI policies:', error);
+    console.error("Error fetching global AI policies:", error);
     throw error;
   }
 }
@@ -37,7 +37,7 @@ export async function fetchGlobalAiPolicyById(id: string) {
     const result = await globalAiPolicyActions.getGlobalAiPolicyById(id);
     return result.data;
   } catch (error) {
-    console.error('Error fetching global AI policy:', error);
+    console.error("Error fetching global AI policy:", error);
     throw error;
   }
 }

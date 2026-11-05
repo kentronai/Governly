@@ -1,6 +1,6 @@
-import React from 'react';
-import { Avatar } from '@nextui-org/react';
-import { getNameInitials, stringToHexCode } from '@/lib/utils/helpers';
+import React from "react";
+import { Avatar } from "@nextui-org/react";
+import { getNameInitials, stringToHexCode } from "@/lib/utils/helpers";
 
 interface Props {
   name: string;
@@ -14,7 +14,7 @@ const UserAvatar = ({ name, rounded }: Props) => {
     <Avatar
       name={getNameInitials(name)}
       size="sm"
-      radius={rounded ? 'full' : 'sm'}
+      radius={rounded ? "full" : "sm"}
       style={{ backgroundColor: avatarColor }}
     />
   );

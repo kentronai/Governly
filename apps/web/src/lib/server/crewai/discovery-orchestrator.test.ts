@@ -19,7 +19,11 @@ function chain(returnValue: unknown = []) {
 const findFirstMock = jest.fn(async () => null);
 
 jest.mock("@db", () => ({
-  agents: { integrationId: "integrationId", externalAgentId: "externalAgentId", id: "id" },
+  agents: {
+    integrationId: "integrationId",
+    externalAgentId: "externalAgentId",
+    id: "id",
+  },
   agentResources: {},
   agentRecommendations: { agentId: "agentId", status: "status" },
   discoveryScans: { id: "id" },
@@ -53,7 +57,12 @@ jest.mock("@/lib/server/agents/capability-engine", () => ({
   buildCapabilityFacts: () => ({ isDormant: false }),
 }));
 jest.mock("@/lib/server/agents/autonomy-engine", () => ({
-  classifyAutonomy: async () => ({ level: "L2", reason: "r", evidence: [], confidence: 0.6 }),
+  classifyAutonomy: async () => ({
+    level: "L2",
+    reason: "r",
+    evidence: [],
+    confidence: 0.6,
+  }),
 }));
 jest.mock("@/lib/server/agents/risk-engine", () => ({
   assessRisk: async () => ({ score: 40, level: "Medium", factors: [] }),
@@ -123,7 +132,9 @@ describe("parseCrewAICredentials", () => {
     expect(() =>
       parseCrewAICredentials({
         ...connection,
-        credentialsEncrypted: JSON.stringify({ baseUrl: "https://app.crewai.com" }),
+        credentialsEncrypted: JSON.stringify({
+          baseUrl: "https://app.crewai.com",
+        }),
       }),
     ).toThrow(/access token is missing/i);
   });
@@ -171,7 +182,12 @@ describe("discoverCrewAI", () => {
 describe("runCrewAIDiscoveryScan", () => {
   it("persists an active crew and returns a completed result", async () => {
     crewaiApiMock.mockResolvedValueOnce([onlineCrew]);
-    const r = await runCrewAIDiscoveryScan("tenant-1", "int-1", connection, "user-1");
+    const r = await runCrewAIDiscoveryScan(
+      "tenant-1",
+      "int-1",
+      connection,
+      "user-1",
+    );
     expect(r.status).toBe("completed");
     expect(r.agentsDiscovered).toBe(1);
     expect(r.resourcesScanned).toEqual({ crewai_crew: 1 });
@@ -179,16 +195,31 @@ describe("runCrewAIDiscoveryScan", () => {
 
   it("marks a failed-state crew inactive but still completes", async () => {
     crewaiApiMock.mockResolvedValueOnce([
-      { ...onlineCrew, status: "Failed", state: "Failed", error_message: "boom" },
+      {
+        ...onlineCrew,
+        status: "Failed",
+        state: "Failed",
+        error_message: "boom",
+      },
     ]);
-    const r = await runCrewAIDiscoveryScan("tenant-1", "int-1", connection, null);
+    const r = await runCrewAIDiscoveryScan(
+      "tenant-1",
+      "int-1",
+      connection,
+      null,
+    );
     expect(r.status).toBe("completed");
     expect(r.agentsDiscovered).toBe(1);
   });
 
   it("returns failed when discovery throws", async () => {
     crewaiApiMock.mockRejectedValueOnce(new Error("network down"));
-    const r = await runCrewAIDiscoveryScan("tenant-1", "int-1", connection, null);
+    const r = await runCrewAIDiscoveryScan(
+      "tenant-1",
+      "int-1",
+      connection,
+      null,
+    );
     expect(r.status).toBe("failed");
     expect(r.errorMessage).toMatch(/network down/i);
   });

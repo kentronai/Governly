@@ -83,7 +83,7 @@ export default function BulkUploadDialog({
         "",
         "",
         "",
-        `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`
+        `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`,
       );
       setCsvText("");
       onOpenChange(false);
@@ -91,7 +91,7 @@ export default function BulkUploadDialog({
     } catch (error) {
       console.error("Error uploading CSV:", error);
       errorToast(
-        error instanceof Error ? error.message : "Failed to upload CSV"
+        error instanceof Error ? error.message : "Failed to upload CSV",
       );
     } finally {
       setUploading(false);
@@ -121,7 +121,7 @@ export default function BulkUploadDialog({
         "",
         "",
         "",
-        `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`
+        `Success! Uploaded ${result.uploaded} prompts via native LanceDB SDK. Computed ${result.centroids_computed} centroids. Total: ${result.stats.total_examples} examples.`,
       );
       setJsonText("");
       onOpenChange(false);
@@ -129,7 +129,7 @@ export default function BulkUploadDialog({
     } catch (error) {
       console.error("Error uploading JSON:", error);
       errorToast(
-        error instanceof Error ? error.message : "Failed to upload JSON"
+        error instanceof Error ? error.message : "Failed to upload JSON",
       );
     } finally {
       setUploading(false);
@@ -147,13 +147,13 @@ export default function BulkUploadDialog({
         "",
         result.synced === 0
           ? "No prompts found in database to sync"
-          : `Success! Synced ${result.synced} prompts and computed ${result.centroids_computed} centroids`
+          : `Success! Synced ${result.synced} prompts and computed ${result.centroids_computed} centroids`,
       );
       onSuccess();
     } catch (error) {
       console.error("Error syncing from database:", error);
       errorToast(
-        error instanceof Error ? error.message : "Failed to sync from database"
+        error instanceof Error ? error.message : "Failed to sync from database",
       );
     } finally {
       setSyncing(false);
@@ -186,7 +186,7 @@ export default function BulkUploadDialog({
           { prompt: "You're an idiot", risk_category: "toxicity", severity: 6 },
         ],
         null,
-        2
+        2,
       );
 
       const blob = new Blob([json], { type: "application/json" });

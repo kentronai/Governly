@@ -3,13 +3,16 @@
  * or Step Function — the "scheduled AI workflows" the spec asks for.
  */
 
-import { ListRulesCommand, ListTargetsByRuleCommand } from "@aws-sdk/client-eventbridge";
+import {
+  ListRulesCommand,
+  ListTargetsByRuleCommand,
+} from "@aws-sdk/client-eventbridge";
 import type { AwsClientBundle } from "../client-factory";
 import type { RawDiscoveredResource } from "./types";
 
 export async function discoverEventBridgeRules(
   clients: AwsClientBundle,
-  aiTargetArns: Set<string>
+  aiTargetArns: Set<string>,
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   const { eventBridge, region } = clients;
@@ -17,18 +20,22 @@ export async function discoverEventBridgeRules(
 
   let nextToken: string | undefined;
   do {
-    const page = await eventBridge.send(new ListRulesCommand({ NextToken: nextToken }));
+    const page = await eventBridge.send(
+      new ListRulesCommand({ NextToken: nextToken }),
+    );
     for (const rule of page.Rules ?? []) {
       if (!rule.Name) continue;
 
       let matchedTargets: string[] = [];
       try {
         const targets = await eventBridge.send(
-          new ListTargetsByRuleCommand({ Rule: rule.Name })
+          new ListTargetsByRuleCommand({ Rule: rule.Name }),
         );
         matchedTargets = (targets.Targets ?? [])
           .map((t) => t.Arn)
-          .filter((arn): arn is string => Boolean(arn) && aiTargetArns.has(arn!));
+          .filter(
+            (arn): arn is string => Boolean(arn) && aiTargetArns.has(arn!),
+          );
       } catch {
         // best-effort
       }

@@ -140,7 +140,7 @@ export default function Stats() {
                 const diffMs = now.getTime() - timestamp.getTime();
                 const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
                 const diffMinutes = Math.floor(
-                  (diffMs % (1000 * 60 * 60)) / (1000 * 60)
+                  (diffMs % (1000 * 60 * 60)) / (1000 * 60),
                 );
 
                 const timeAgo =

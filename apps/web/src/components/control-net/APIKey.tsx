@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
-import { Copy, Trash2, Plus } from 'lucide-react';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Copy, Trash2, Plus } from "lucide-react";
 
 import { PageTitle } from "@/components/common/PageHeader";
 const ApiKeysPage = () => {
@@ -18,18 +18,18 @@ const ApiKeysPage = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error("Failed to copy text: ", err);
     }
   };
 
   const handleDelete = () => {
     // Handle delete functionality
-    console.log('Delete API key');
+    console.log("Delete API key");
   };
 
   const handleGenerateNew = () => {
     // Handle generate new API key
-    console.log('Generate new API key');
+    console.log("Generate new API key");
   };
 
   return (
@@ -52,7 +52,10 @@ const ApiKeysPage = () => {
           <CardContent className="p-6">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="secret-key" className="text-sm font-medium text-black mb-2 block">
+                <Label
+                  htmlFor="secret-key"
+                  className="text-sm font-medium text-black mb-2 block"
+                >
                   secret_key
                 </Label>
                 <div className="flex items-center space-x-3">
@@ -72,7 +75,7 @@ const ApiKeysPage = () => {
                     className="border-gray-200 hover:bg-gray-50 text-black"
                   >
                     <Copy className="w-4 h-4 mr-1" />
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? "Copied!" : "Copy"}
                   </Button>
 
                   <Button

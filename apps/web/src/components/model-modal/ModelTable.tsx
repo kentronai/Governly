@@ -1,7 +1,7 @@
-import React from 'react';
-import Link from 'next/link';
-import { Archive, MoreHorizontal, Pencil, Trash2, Network } from 'lucide-react';
-import { GoDotFill } from 'react-icons/go';
+import React from "react";
+import Link from "next/link";
+import { Archive, MoreHorizontal, Pencil, Trash2, Network } from "lucide-react";
+import { GoDotFill } from "react-icons/go";
 
 import {
   Table,
@@ -10,18 +10,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
-import { Policy, Workspace } from '@/types';
-import { checkWorkspacePermissions } from '@/lib/utils/roleBasedPermissions';
-import { getStatusLabel, getStatusStyle } from '@/lib/utils/helpers';
+import { Policy, Workspace } from "@/types";
+import { checkWorkspacePermissions } from "@/lib/utils/roleBasedPermissions";
+import { getStatusLabel, getStatusStyle } from "@/lib/utils/helpers";
 
 interface WorkspaceTableProps {
   workspaces: Workspace[];
@@ -49,14 +49,13 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
   setSelectedSources,
   setSelectedComponents,
   isLoading,
-  onSort
+  onSort,
 }) => {
-
   const handleWorkspaceClick = (workspace: Workspace) => {
     setSelectedSources([]);
     setSelectedComponents([]);
-    localStorage.setItem('selectedUser', JSON.stringify(workspace));
-    localStorage.setItem('tab', 'home');
+    localStorage.setItem("selectedUser", JSON.stringify(workspace));
+    localStorage.setItem("tab", "home");
   };
 
   const handleDropdownAction = (action: () => void, workspaceId: string) => {
@@ -68,7 +67,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
       onDropdownOpenChange(false, workspaceId);
 
       // Reset pointer events
-      document.body.style.pointerEvents = 'auto';
+      document.body.style.pointerEvents = "auto";
 
       // Execute the action after a small delay to ensure dropdown closes smoothly
       setTimeout(() => {
@@ -96,7 +95,9 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
         <TableRow>
           <TableCell colSpan={6} className="text-center py-12">
             <div className="flex flex-col items-center justify-center gap-2">
-              <p className="text-lg font-medium text-gray-500">No data available</p>
+              <p className="text-lg font-medium text-gray-500">
+                No data available
+              </p>
             </div>
           </TableCell>
         </TableRow>
@@ -122,7 +123,9 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
         </TableCell>
 
         <TableCell className="font-sm font-normal font-sans">
-          <div className={`inline-flex items-center px-[9px] py-[2px] rounded-full font-semibold leading-normal transition-colors duration-200 ${getStatusStyle(workspace?.status as any)}`}>
+          <div
+            className={`inline-flex items-center px-[9px] py-[2px] rounded-full font-semibold leading-normal transition-colors duration-200 ${getStatusStyle(workspace?.status as any)}`}
+          >
             <GoDotFill size={15} />
             {getStatusLabel(workspace.status)}
           </div>
@@ -155,7 +158,10 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
             <DropdownMenuContent align="end" className="w-32">
               <DropdownMenuItem
                 disabled={!checkWorkspacePermissions(workspace, userProfile)}
-                onClick={handleDropdownAction(() => onEditWorkspace(workspace), workspace.id)}
+                onClick={handleDropdownAction(
+                  () => onEditWorkspace(workspace),
+                  workspace.id,
+                )}
               >
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
@@ -175,7 +181,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
-      </TableRow >
+      </TableRow>
     ));
   };
 
@@ -196,7 +202,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
                 <span className="ml-1 text-xs">↕</span>
               </div>
             ) : (
-              'Last Modified'
+              "Last Modified"
             )}
           </TableHead>
           <TableHead>Last Modified By</TableHead>

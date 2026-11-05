@@ -32,15 +32,21 @@ jest.mock("@clerk/nextjs/server", () => ({
 jest.mock("@db", () => ({
   db: {
     query: {
-      memberships: { findFirst: (...args: unknown[]) => mockFindFirst(...args) },
+      memberships: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
       users: { findFirst: jest.fn() },
     },
     insert: jest.fn(() => ({
       values: jest.fn(() => ({
-        onConflictDoUpdate: jest.fn(() => ({ returning: jest.fn(async () => [{}]) })),
+        onConflictDoUpdate: jest.fn(() => ({
+          returning: jest.fn(async () => [{}]),
+        })),
       })),
     })),
-    update: jest.fn(() => ({ set: jest.fn(() => ({ where: jest.fn(async () => undefined) })) })),
+    update: jest.fn(() => ({
+      set: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
+    })),
     delete: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
   },
   users: {},
@@ -55,12 +61,19 @@ import { updateUser } from "./users";
 
 const mockedAuth = auth as unknown as jest.Mock;
 
-const ADMIN_IN_ORG_1 = { userId: "user_admin", orgId: "org_1", orgRole: "org:admin" };
+const ADMIN_IN_ORG_1 = {
+  userId: "user_admin",
+  orgId: "org_1",
+  orgRole: "org:admin",
+};
 
 describe("updateUser authorization", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFindFirst.mockResolvedValue({ userId: "user_target", tenantId: "org_1" });
+    mockFindFirst.mockResolvedValue({
+      userId: "user_target",
+      tenantId: "org_1",
+    });
     mockGetUser.mockResolvedValue({ firstName: "Existing", lastName: "User" });
   });
 
@@ -80,7 +93,10 @@ describe("updateUser authorization", () => {
   it("ignores a forged tenantId argument pointing at a different org", async () => {
     mockedAuth.mockResolvedValue(ADMIN_IN_ORG_1);
     // Target belongs to the admin's real org (org_1), not the forged one.
-    mockFindFirst.mockResolvedValue({ userId: "user_target", tenantId: "org_1" });
+    mockFindFirst.mockResolvedValue({
+      userId: "user_target",
+      tenantId: "org_1",
+    });
 
     // Caller passes tenantId "org_2" (someone else's org) — must be ignored,
     // not trusted, and the membership check must still run against org_1.

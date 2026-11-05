@@ -37,7 +37,7 @@ export const getObservabilityStats = cache(
         where: and(
           eq(applications.tenantId, tenantId),
           isNull(applications.deletedAt),
-          ne(applications.status, "Archived")
+          ne(applications.status, "Archived"),
         ),
         columns: { id: true },
       })
@@ -81,8 +81,8 @@ export const getObservabilityStats = cache(
           and(
             eq(observabilityLogs.tenantId, tenantId),
             isNotNull(observabilityLogs.statusCode),
-            isInferenceTrafficSql
-          )
+            isInferenceTrafficSql,
+          ),
         )
         .then((rows) => rows[0]),
     ]);
@@ -95,8 +95,8 @@ export const getObservabilityStats = cache(
                 where: inArray(guardrails.id, policyGuardrailList),
                 columns: { fallbackGuardrailId: true },
               })
-            ).map((ele) => ele.fallbackGuardrailId)
-          )
+            ).map((ele) => ele.fallbackGuardrailId),
+          ),
         ).length
       : 0;
 
@@ -118,5 +118,5 @@ export const getObservabilityStats = cache(
       averageLatency,
       logs: [],
     };
-  }
+  },
 );

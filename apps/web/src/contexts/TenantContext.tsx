@@ -3,10 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
-import {
-  ISO_42001_POLICY_NAME,
-  isEuAiActPolicyName,
-} from "@/lib/policy-names";
+import { ISO_42001_POLICY_NAME, isEuAiActPolicyName } from "@/lib/policy-names";
 
 export interface TenantInfo {
   slug: string;
@@ -22,6 +19,10 @@ interface PolicyStatus {
   euAiAct: boolean;
   iso42001: boolean;
   allActivePolicies: string[];
+  /** Names of the tenant's enabled policies (drives framework tabs). */
+  activePolicyNames: string[];
+  /** Catalog frameworks enabled under Admin Center → Frameworks. */
+  enabledFrameworkSlugs: string[];
 }
 
 interface TenantContextType {
@@ -82,6 +83,8 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
     euAiAct: false,
     iso42001: false,
     allActivePolicies: [],
+    activePolicyNames: [],
+    enabledFrameworkSlugs: [],
   });
   const { data: applicationPolicy, refetch: refreshApplicationPolicyStatus } =
     useQuery({
@@ -95,7 +98,7 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
         );
         const policies = await fetchApplicationCompliancePolicies(
           tenant.slug,
-          applicationId
+          applicationId,
         );
         return policies as PolicyPack[];
       },
@@ -116,16 +119,25 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
       const { fetchActivePolicies } = await import("@/lib/api/policy-center");
       const active = await fetchActivePolicies();
       const activePolicy = active.map(
-        (ele: any) => ele.parentPolicyId as string
+        (ele: any) => ele.parentPolicyId as string,
       );
       const activePolicyNames: string[] = active.map(
-        (ele: any) => ele.name as string
+        (ele: any) => ele.name as string,
       );
+
+      const { getEnabledCatalogFrameworks } = await import(
+        "@/lib/actions/framework-controls"
+      );
+      const enabledFrameworkSlugs = tenant
+        ? await getEnabledCatalogFrameworks(tenant.slug).catch(() => [])
+        : [];
 
       setPolicyStatus({
         euAiAct: activePolicyNames.some(isEuAiActPolicyName),
         iso42001: activePolicyNames.includes(ISO_42001_POLICY_NAME),
         allActivePolicies: activePolicy,
+        activePolicyNames,
+        enabledFrameworkSlugs,
       });
       setActivePolicy(activePolicy);
     } catch (error) {

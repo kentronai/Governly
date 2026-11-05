@@ -48,7 +48,7 @@ export function useAuthAxios() {
 
   return async function authAxios<T = any>(
     url: string,
-    config: AxiosRequestConfig = {}
+    config: AxiosRequestConfig = {},
   ): Promise<AxiosResponse<T>> {
     const token = await getToken();
 
@@ -58,7 +58,7 @@ export function useAuthAxios() {
 
     if (!tenant?.id) {
       throw new Error(
-        "No tenant context available. Must be used within tenant routes."
+        "No tenant context available. Must be used within tenant routes.",
       );
     }
 
@@ -110,7 +110,7 @@ export function useAuthAxios() {
           includeUserId: true,
         });
         return Promise.reject(error);
-      }
+      },
     );
 
     // Set up response interceptor for error handling and tracking
@@ -142,7 +142,7 @@ export function useAuthAxios() {
         // Log error for debugging
         console.error("Axios request failed:", error);
         return Promise.reject(error);
-      }
+      },
     );
 
     return axiosInstance.request<T>({
@@ -169,7 +169,7 @@ export function useAuthAxiosInstance() {
 
     if (!tenant?.id) {
       throw new Error(
-        "No tenant context available. Must be used within tenant routes."
+        "No tenant context available. Must be used within tenant routes.",
       );
     }
 
@@ -225,10 +225,10 @@ export function useAuthAxiosInstance() {
           {
             includeTenantId: true,
             includeUserId: true,
-          }
+          },
         );
         return Promise.reject(error);
-      }
+      },
     );
 
     // Set up response interceptor for error handling and tracking
@@ -265,13 +265,13 @@ export function useAuthAxiosInstance() {
           {
             includeTenantId: true,
             includeUserId: true,
-          }
+          },
         );
 
         // Log error for debugging
         console.error("Axios request failed:", error);
         return Promise.reject(error);
-      }
+      },
     );
 
     return instance;

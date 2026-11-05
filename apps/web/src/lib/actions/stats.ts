@@ -47,7 +47,7 @@ export const getControlnetStats = async ({
     await db.query.applicationPolicies.findMany({
       where: and(
         eq(applicationPolicies.tenantId, tenantId),
-        eq(applicationPolicies.applicationId, applicationId)
+        eq(applicationPolicies.applicationId, applicationId),
       ),
     })
   ).map((ele) => ele.policyId);
@@ -65,7 +65,7 @@ export const getControlnetStats = async ({
     await db.query.applicationModels.findMany({
       where: and(
         eq(applicationModels.tenantId, tenantId),
-        eq(applicationModels.applicationId, applicationId)
+        eq(applicationModels.applicationId, applicationId),
       ),
     })
   ).length;
@@ -92,7 +92,7 @@ export const getControlnetStats = async ({
     },
     where: and(
       eq(observabilityLogs.tenantId, tenantId),
-      eq(observabilityLogs.applicationId, applicationId)
+      eq(observabilityLogs.applicationId, applicationId),
     ),
     orderBy: (logs, { desc }) => [desc(logs.createdAt)],
     limit: 3,
@@ -110,7 +110,7 @@ export const getControlnetStats = async ({
     },
     where: and(
       eq(observabilityLogs.tenantId, tenantId),
-      eq(observabilityLogs.applicationId, applicationId)
+      eq(observabilityLogs.applicationId, applicationId),
     ),
     orderBy: (logs, { desc }) => [desc(logs.createdAt)],
   });
@@ -127,13 +127,17 @@ export const getControlnetStats = async ({
     );
   }).length;
 
-  const logsWithLatency = allLogs.filter((log) => log.latencyMs != null && log.latencyMs > 0);
+  const logsWithLatency = allLogs.filter(
+    (log) => log.latencyMs != null && log.latencyMs > 0,
+  );
   const totalLatency = logsWithLatency.reduce(
     (sum, log) => sum + log.latencyMs!,
-    0
+    0,
   );
   const averageLatency =
-    logsWithLatency.length > 0 ? Math.round(totalLatency / logsWithLatency.length) : 0;
+    logsWithLatency.length > 0
+      ? Math.round(totalLatency / logsWithLatency.length)
+      : 0;
 
   const recentEndpoints = allLogs.slice(0, 10).map((log) => {
     const result = log.guardrailResults as any;

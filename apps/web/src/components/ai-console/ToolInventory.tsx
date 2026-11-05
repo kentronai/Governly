@@ -26,7 +26,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -46,7 +45,7 @@ const riskColors: Record<RiskLevel, string> = {
 export function ToolInventory() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | "all">(
-    "all"
+    "all",
   );
 
   const filteredTools = aiTools.filter((tool) => {
@@ -150,7 +149,7 @@ export function ToolInventory() {
                       variant="secondary"
                       className={cn(
                         "rounded-md px-2 py-1",
-                        approvalColors[tool.approvalStatus]
+                        approvalColors[tool.approvalStatus],
                       )}
                     >
                       {toLabel(tool.approvalStatus)}
@@ -163,19 +162,15 @@ export function ToolInventory() {
                       <div
                         className={cn(
                           "w-2 h-2 rounded-full",
-                          riskColors[tool.riskRating]
+                          riskColors[tool.riskRating],
                         )}
                       />
-                      <span>
-                        {toLabel(tool.riskRating)}
-                      </span>
+                      <span>{toLabel(tool.riskRating)}</span>
                     </div>
                   </TableCell>
 
                   {/* Last Used */}
-                  <TableCell>
-                    {tool.lastUsed}
-                  </TableCell>
+                  <TableCell>{tool.lastUsed}</TableCell>
                 </TableRow>
               ))
             ) : (
