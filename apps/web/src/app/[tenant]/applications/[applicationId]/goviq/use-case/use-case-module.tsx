@@ -255,15 +255,21 @@ export default function UseCaseModule({
     return getUseCasesForFunction(formData.function);
   }, [formData.function]);
 
-  // Clear useCase if it's not in the filtered list when function changes
+  // When the function changes, drop a use case that was picked from the list but belongs
+  // to another function. Runs on function changes only, and never touches a custom
+  // (typed) use case, which is not in any list.
+  const previousFunction = useRef(formData.function);
   useEffect(() => {
-    if (formData.function && formData.useCase) {
-      const validUseCases = getUseCasesForFunction(formData.function);
-      if (!validUseCases.includes(formData.useCase)) {
-        setFormData((prev) => ({ ...prev, useCase: "" }));
-      }
-    }
-  }, [formData.function, formData.useCase]);
+    if (previousFunction.current === formData.function) return;
+    previousFunction.current = formData.function;
+    setFormData((prev) =>
+      prev.useCase &&
+      USE_CASE_OPTIONS.includes(prev.useCase) &&
+      !getUseCasesForFunction(prev.function).includes(prev.useCase)
+        ? { ...prev, useCase: "" }
+        : prev,
+    );
+  }, [formData.function]);
 
   // Memoize use case IDs to prevent infinite loops
   const useCaseIds = useMemo(

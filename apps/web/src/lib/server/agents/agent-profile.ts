@@ -1012,6 +1012,22 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
     TAG_FIRST(tags, ["deployedby", "deployed-by", "deployer", "deployed_by"]) ??
     ((trail?.deployedBy as string | undefined) ?? null);
 
+  // An EC2 box is redeployed in place (rsync + compose), which AWS never records: its launch
+  // time is not a deploy time, so a deploy tag wins and a launch-only date is labelled as such.
+  const taggedDeployAt = TAG_FIRST(tags, ["deployed-at", "deployed_at", "deployedat", "last-deployed", "last_deployed"]);
+  const deployCandidates = [
+    taggedDeployAt && Number.isFinite(Date.parse(taggedDeployAt)) ? taggedDeployAt : null,
+    ...res.map((r) => (typeof r.metadata.codeImagePushedAt === "string" ? r.metadata.codeImagePushedAt : null)),
+    ...res.map((r) => (typeof r.metadata.deployedByAt === "string" ? r.metadata.deployedByAt : null)),
+    anchor?.lastUpdatedAt ?? anchor?.createdAt ?? null,
+  ].filter((d): d is string => Boolean(d));
+  const deployedAtOut =
+    deployCandidates.sort((a, b) => Date.parse(a) - Date.parse(b)).pop() ?? null;
+  const launchOnly =
+    agent.platform === "aws_ec2" &&
+    !taggedDeployAt &&
+    !res.some((r) => typeof r.metadata.codeImagePushedAt === "string");
+
   const developer = TAG_FIRST(tags, [
     "developer", "author", "createdby", "created-by", "created_by", "creator", "builtby", "built-by", "aws:createdby",
   ]);
@@ -1046,18 +1062,13 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
     developer: developerOut,
     deployer: deployerOut,
     deployed,
-    // Last deployment, whether or not it is running now: the newest of the
-    // image push and the resource's launch/update time.
-    deployedAt:
-      [
-        ...res.map((r) => (typeof r.metadata.codeImagePushedAt === "string" ? r.metadata.codeImagePushedAt : null)),
-        ...res.map((r) => (typeof r.metadata.deployedByAt === "string" ? r.metadata.deployedByAt : null)),
-        anchor?.lastUpdatedAt ?? anchor?.createdAt ?? null,
-      ]
-        .filter((d): d is string => Boolean(d))
-        .sort((a, b) => Date.parse(a) - Date.parse(b))
-        .pop() ?? null,
-    deployedOn: deployed ? `${providerLabel} ${agent.region}` : null,
+    // Last deployment, whether or not it is running now: the newest of an explicit
+    // `deployed-at` tag (stamped by deploy.sh), the image push and the resource's
+    // launch/update time.
+    deployedAt: deployedAtOut,
+    deployedOn: deployed
+      ? `${providerLabel} ${agent.region}${launchOnly ? " · instance launch time, tag it deployed-at for deploy time" : ""}`
+      : null,
     observability,
     framework,
     llms: llmsOut,

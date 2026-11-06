@@ -158,6 +158,34 @@ describe("aws profile + merge", () => {
     expect(p.repository).toBe("acme/support-agent");
   });
 
+  it("EC2: a deployed-at tag is the deploy time; launch time alone is labelled as launch", () => {
+    const ec2 = (tags: Record<string, string>): CorrelatedAgent => ({
+      externalAgentId: "us-east-1:i-1",
+      name: "box",
+      platform: "aws_ec2",
+      region: "us-east-1",
+      discoverySource: "ec2_instance",
+      resources: [
+        {
+          resourceType: "ec2_instance",
+          resourceId: "i-1",
+          resourceArn: "arn:i-1",
+          resourceName: "box",
+          region: "us-east-1",
+          tags,
+          createdAt: "2026-11-01T23:06:00Z",
+          metadata: { state: "running" },
+        },
+      ],
+    });
+    const plain = buildCloudProfile(ec2({}));
+    expect(plain.deployedAt).toBe("2026-11-01T23:06:00Z");
+    expect(plain.deployedOn).toContain("instance launch time");
+    const tagged = buildCloudProfile(ec2({ "deployed-at": "2026-11-06T07:00:00Z" }));
+    expect(tagged.deployedAt).toBe("2026-11-06T07:00:00Z");
+    expect(tagged.deployedOn).not.toContain("instance launch time");
+  });
+
   it("merge keeps cloud scalars and unions repo lists", () => {
     const merged = mergeProfiles(buildCloudProfile(agent), buildRepoProfile(repo()));
     expect(merged.deployer).toBe("ci-bot");

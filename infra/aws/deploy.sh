@@ -106,6 +106,17 @@ info "Starting all services..."
 $SSH "cd ${REMOTE_DIR} && (sudo docker compose up -d 2>&1 || docker compose up -d 2>&1)"
 success "Services started"
 
+# ── Stamp the deploy time on the instance ────────────────────────────────────
+# AWS only knows when the instance launched, not when this script last ran. The
+# Agent Registry reads the `deployed-at` tag for "Last Deployed".
+# Best-effort: a missing aws CLI or permission must never fail a deploy.
+(
+  export AWS_PROFILE="${AWS_PROFILE:-kentron-new}" AWS_REGION="${AWS_REGION:-us-east-1}" AWS_DEFAULT_REGION="${AWS_REGION:-us-east-1}"
+  INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=ip-address,Values=${EC2_IP}" \
+    --query "Reservations[].Instances[].InstanceId" --output text)
+  aws ec2 create-tags --resources "${INSTANCE_ID}" --tags "Key=deployed-at,Value=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+) >/dev/null 2>&1 && success "Deploy time tagged on the instance" || warn "Could not tag deploy time (optional)"
+
 # ── Wait for Postgres ────────────────────────────────────────────────────────
 info "Waiting for PostgreSQL to be healthy..."
 for i in $(seq 1 30); do
