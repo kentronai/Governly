@@ -141,7 +141,14 @@ export function RadarUpdates({
                     <p className="text-sm text-muted-foreground">{shortSummary(u.summary)}</p>
                   </TableCell>
                   <TableCell className="whitespace-nowrap align-top">
-                    {format(new Date(u.publishedDate ?? u.detectedAt), "MMM dd, yyyy")}
+                    {u.publishedDate ? (
+                      format(new Date(u.publishedDate), "MMM dd, yyyy")
+                    ) : (
+                      // The source gives no publication date: say so instead of showing when we found it.
+                      <span className="text-muted-foreground" title={`Found ${format(new Date(u.detectedAt), "MMM dd, yyyy")}`}>
+                        Not stated
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="align-top">
                     <DropdownMenu>
@@ -197,8 +204,10 @@ export function RadarUpdates({
                 </div>
                 <dl className="grid grid-cols-2 gap-3">
                   {[
-                    ["Jurisdiction", [selected.jurisdiction, selected.region].filter(Boolean).join(" · ")],
-                    ["Published", selected.publishedDate && format(new Date(selected.publishedDate), "MMM dd, yyyy")],
+                    ["Region", selected.region],
+                    ["Jurisdiction", [selected.jurisdiction, selected.country !== selected.jurisdiction ? selected.country : null].filter(Boolean).join(" · ")],
+                    ["Type", `${instrumentKind(selected)} (${instrumentKind(selected) === "Regulation" ? "mandatory" : "voluntary"})`],
+                    ["Published", selected.publishedDate ? format(new Date(selected.publishedDate), "MMM dd, yyyy") : "Not stated by the source"],
                     [
                       "Effective",
                       (selected.effectiveDate ?? selected.policyEffectiveDate) &&
@@ -242,7 +251,7 @@ export function RadarUpdates({
                     className="mt-2 inline-flex items-center gap-1 break-all text-blue-500 hover:underline"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" />
-                    {host(selected.sourceUrl)} — open official source
+                    Open the official document · {host(selected.sourceUrl)}
                   </a>
                 </div>
               </div>
