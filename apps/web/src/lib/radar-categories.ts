@@ -71,8 +71,12 @@ export const instrumentKind = (u: {
 };
 
 /** Whole sentences up to ~max chars, so table rows stay short but never end mid-thought. */
+/** Feeds sometimes leak a CMS byline ("Anonymous (not verified) Mon, 10/19/2026 - 09:37"); drop it. */
+export const cleanSummary = (text: string): string =>
+  text.replace(/Anonymous \(not verified\)\s*(\w{3},\s*)?\d{1,2}\/\d{1,2}\/\d{4}\s*-\s*\d{1,2}:\d{2}/gi, "").replace(/\s+/g, " ").trim();
+
 export const shortSummary = (text: string, max = 220): string => {
-  const t = text.replace(/\s+/g, " ").trim();
+  const t = cleanSummary(text);
   if (t.length <= max) return t;
   let out = "";
   for (const s of t.match(/[^.!?]+[.!?]+(\s|$)/g) ?? []) {

@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import Pagination from "@/components/common/pagination";
 import { getRadarUpdates, type RadarUpdateFilters } from "@/lib/actions/ai-radar";
-import { instrumentKind, shortSummary } from "@/lib/radar-categories";
+import { cleanSummary, instrumentKind, shortSummary } from "@/lib/radar-categories";
 import { errorToast } from "@/lib/utils/toast";
 
 type Page = Awaited<ReturnType<typeof getRadarUpdates>>;
@@ -215,7 +215,7 @@ export function RadarUpdates({
                     ))}
                 </dl>
                 {[
-                  ["Description", selected.policySummary ?? selected.summary],
+                  ["Description", cleanSummary(selected.policySummary ?? selected.summary)],
                   ["Who is affected", selected.whoIsAffected],
                   ["Compliance requirements", selected.complianceRequirements],
                   ["Enforcement", selected.enforcementDetails],
@@ -229,8 +229,11 @@ export function RadarUpdates({
                   ))}
                 <div>
                   <h3 className="mb-1 font-medium">Source evidence</h3>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Verified: this passage appears word for word on the official source below.
+                  </p>
                   <blockquote className="border-l-2 pl-3 italic text-muted-foreground">
-                    “{selected.sourceQuote}”
+                    “{cleanSummary(selected.sourceQuote)}”
                   </blockquote>
                   <a
                     href={selected.sourceUrl}

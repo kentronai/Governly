@@ -22,4 +22,9 @@ describe("parseFeed", () => {
 
     expect(parseFeed("<html><body>hi</body></html>", "text/html", "https://x.gov")).toBeNull();
   });
+
+  it("drops a CMS byline like 'Anonymous (not verified) Mon, 10/19/2026 - 09:37' from the snippet", () => {
+    const json = JSON.stringify({ results: [{ title: "AI standard", link: "/x", description: "Intro. Anonymous (not verified) Mon, 10/19/2026 - 09:37 The Commission published it." }] });
+    expect(parseFeed(json, "application/json", "https://a.eu/api")?.[0].snippet).toBe("Intro. The Commission published it.");
+  });
 });

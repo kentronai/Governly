@@ -1,3 +1,4 @@
+import { cleanSummary } from "@/lib/radar-categories";
 import { htmlToText } from "./text";
 
 /** One dated entry from an official feed or API (newest-first listings). */
@@ -39,7 +40,7 @@ function parseXmlFeed(xml: string, base: string): FeedItem[] {
         url: new URL(link.replace(/&amp;/g, "&"), base).href,
         date: isoDate(tag(e, ["pubDate", "published", "dc:date", "updated"])),
         // Twice: feeds escape their HTML, so the first pass only decodes it.
-        snippet: htmlToText(htmlToText(tag(e, ["description", "summary", "content"]))).slice(0, 1500),
+        snippet: cleanSummary(htmlToText(htmlToText(tag(e, ["description", "summary", "content"])))).slice(0, 1500),
       });
     } catch {
       // entry without a usable link: skip
@@ -77,7 +78,7 @@ function parseJsonFeed(body: string, base: string): FeedItem[] | null {
       title,
       url: url ? new URL(url, base).href : "",
       date: isoDate(str(r, ["publication_date", "public_timestamp", "published", "date", "dataApresentacao"])),
-      snippet: str(r, ["abstract", "description", "ementa", "summary"]).slice(0, 1500),
+      snippet: cleanSummary(str(r, ["abstract", "description", "ementa", "summary"])).slice(0, 1500),
     };
   });
   return items.filter((i) => i.title && i.url);
