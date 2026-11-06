@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import Pagination from "@/components/common/pagination";
 import { getRadarUpdates, type RadarUpdateFilters } from "@/lib/actions/ai-radar";
+import { instrumentKind, shortSummary } from "@/lib/radar-categories";
 import { errorToast } from "@/lib/utils/toast";
 
 type Page = Awaited<ReturnType<typeof getRadarUpdates>>;
@@ -127,7 +128,7 @@ export function RadarUpdates({
                   </TableCell>
                   <TableCell className="align-top">
                     <Badge variant="outline" className="whitespace-nowrap">
-                      {u.instrumentType ?? label(u.changeType)}
+                      {instrumentKind(u)}
                     </Badge>
                   </TableCell>
                   <TableCell className="align-top">
@@ -137,7 +138,7 @@ export function RadarUpdates({
                     </div>
                   </TableCell>
                   <TableCell className="min-w-[280px] max-w-[420px] whitespace-normal break-words align-top">
-                    <p className="text-sm text-muted-foreground">{u.summary}</p>
+                    <p className="text-sm text-muted-foreground">{shortSummary(u.summary)}</p>
                   </TableCell>
                   <TableCell className="whitespace-nowrap align-top">
                     {format(new Date(u.publishedDate ?? u.detectedAt), "MMM dd, yyyy")}
@@ -185,6 +186,10 @@ export function RadarUpdates({
               </DialogHeader>
               <div className="space-y-4 text-sm">
                 <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">
+                    {instrumentKind(selected)} ·{" "}
+                    {instrumentKind(selected) === "Regulation" ? "mandatory" : "voluntary"}
+                  </Badge>
                   {selected.instrumentType && <Badge variant="outline">{selected.instrumentType}</Badge>}
                   {selected.status && <Badge variant="outline">{label(selected.status)}</Badge>}
                   {selected.category && <Badge variant="outline">{selected.category}</Badge>}

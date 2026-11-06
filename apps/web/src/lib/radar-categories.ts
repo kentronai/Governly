@@ -58,3 +58,27 @@ export const INSTRUMENT_TYPES = [
   "Consultation",
   "Enforcement action",
 ] as const;
+
+/** Regulation = mandatory (law, bill, order, enforcement); Framework = voluntary (standard, guidance, strategy). */
+export const instrumentKind = (u: {
+  instrumentType?: string | null;
+  category?: string | null;
+  title: string;
+}): "Regulation" | "Framework" => {
+  if (u.instrumentType) return ["Standard", "Guidance", "Strategy / policy", "Consultation"].includes(u.instrumentType) ? "Framework" : "Regulation";
+  if (u.category === "Standards & frameworks" || u.category === "AI ethics & principles") return "Framework";
+  return /standard|framework|guidance|guideline|code of practice|principles|strategy/i.test(u.title) ? "Framework" : "Regulation";
+};
+
+/** Whole sentences up to ~max chars, so table rows stay short but never end mid-thought. */
+export const shortSummary = (text: string, max = 220): string => {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  let out = "";
+  for (const s of t.match(/[^.!?]+[.!?]+(\s|$)/g) ?? []) {
+    if ((out + s).length > max) break;
+    out += s;
+  }
+  // ponytail: a single sentence longer than max is cut at a word boundary.
+  return out.trim() || t.slice(0, max).replace(/\s+\S*$/, "") + "…";
+};
