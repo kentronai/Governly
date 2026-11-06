@@ -64,13 +64,11 @@ export async function saveLlmKey(
     updatedBy: userId,
     updatedAt: new Date().toISOString(),
   };
-  await db
-    .insert(tenantLlmKeys)
-    .values({ tenantId, provider, modelId, ...values })
-    .onConflictDoUpdate({
-      target: [tenantLlmKeys.tenantId, tenantLlmKeys.provider, tenantLlmKeys.modelId],
-      set: values,
-    });
+  // One key per tenant: saving replaces whatever key was there before.
+  await db.transaction(async (tx) => {
+    await tx.delete(tenantLlmKeys).where(eq(tenantLlmKeys.tenantId, tenantId));
+    await tx.insert(tenantLlmKeys).values({ tenantId, provider, modelId, ...values });
+  });
   await createAuditEvent({
     tenantId,
     actorUserId: userId,

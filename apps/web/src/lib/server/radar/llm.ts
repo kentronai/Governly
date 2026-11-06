@@ -62,13 +62,21 @@ async function radarModelCandidates(tenantId?: string): Promise<RadarModel[]> {
  * The first configured model whose key actually works, or null. AI is optional:
  * without it the agent still runs (search + change detection, no model analysis).
  */
-export async function pickRadarModel(tenantId?: string): Promise<RadarModel | null> {
+export async function pickRadarModel(
+  tenantId?: string,
+  /** Filled with why each candidate was rejected, so the run can tell the admin. */
+  failures: string[] = [],
+): Promise<RadarModel | null> {
   for (const model of await radarModelCandidates(tenantId)) {
     try {
       await radarChat(model, 'Reply with the JSON {"ok":true}', "ping");
       return model;
-    } catch {
-      // rejected key, unknown model, quota: try the next one
+    } catch (error) {
+      // rejected key, unknown model, quota: record why, try the next one
+      const reason = (error instanceof Error ? error.message : String(error))
+        .replaceAll(model.apiKey, "***")
+        .slice(0, 300);
+      failures.push(`${model.provider}/${model.modelId}: ${reason}`);
     }
   }
   return null;

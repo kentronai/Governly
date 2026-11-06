@@ -14,6 +14,11 @@ import { str } from "./helpers";
  * on any member is copied to all the others (see `mirrorWrites`).
  * Keep at most one leaf per framework in a group; add groups as mappings are agreed.
  */
+const SHARED_MANAGEMENT_CLAUSES = [
+  "4.1", "4.2", "4.3", "4.4", "5.2", "6.1.1", "6.2", "6.3", "7.1", "7.3",
+  "7.4", "7.5", "8.1", "9.1", "9.2", "9.3", "10.1", "10.2",
+];
+
 export const EQUIVALENT_CONTROLS = [
   // Governance, people and regulators
   [
@@ -147,6 +152,29 @@ export const EQUIVALENT_CONTROLS = [
   ], // privacy and data protection
   ["hipaa-security:3.1", "pci-dss-lite:4.1"], // access control
   ["hipaa-security:3.3", "pci-dss-lite:2.2"], // transmission encryption
+  // ISO/IEC 42001 and 27001 share the Annex SL clause structure: the same clause asks
+  // for the same thing. The AI/security-specific risk and impact clauses are left unlinked.
+  ...SHARED_MANAGEMENT_CLAUSES.map((key) => [
+    `iso-42001:${key}`,
+    `iso-27001:${key}`,
+  ]),
+  ["iso-42001:5.1", "iso-27001:5.1", "nist-ai-rmf:2.3"], // leadership and executive accountability
+  [
+    "iso-42001:5.3",
+    "iso-27001:5.3",
+    "soc-2-type-ii:1.3",
+    "nist-ai-rmf:2.1",
+  ], // roles and responsibilities
+  ["iso-42001:7.2", "iso-27001:7.2", "nist-ai-rmf:2.2"], // competence and training
+  // GDPR and CCPA ask for the same data-subject and security duties.
+  ["gdpr:2.2", "ccpa:1.1"], // access / right to know
+  ["gdpr:2.3", "ccpa:1.2"], // erasure / right to delete
+  ["gdpr:3.2", "ccpa:2.2"], // records of processing / data inventory
+  ["gdpr:3.3", "ccpa:3.1"], // security of processing / reasonable security
+  ["gdpr:3.4", "ccpa:3.2"], // breach notification
+  // DORA and SOC 2 system operations.
+  ["dora:2.1", "soc-2-type-ii:5.2"], // incident detection / security monitoring
+  ["dora:3.1", "soc-2-type-ii:5.1"], // vulnerability assessment / vulnerability management
 ];
 
 /** One thing a control can be answered against: a subcontrol, or a flat requirement. */
@@ -215,92 +243,96 @@ const peersOf = (id: string) =>
 
 /**
  * Kentron control library for the enabled frameworks: regulations first, then
- * frameworks, each in framework order. A control shared by a regulation and a
- * framework sits under the regulation.
+ * frameworks, each in framework order and each numbered on its own.
  * Numbered KN0001… per section, KN0001.1… per requirement and KN0001.1.1… per
- * subcontrol. Equivalent leaves merge into the row of the first enabled
- * framework that has them; mapped frameworks that are not enabled still show
- * in `members`, because filling the row completes them too.
+ * subcontrol. Equivalent leaves of the same kind merge into the row of the first
+ * enabled framework that has them; mapped frameworks that are not enabled (or of
+ * the other kind) still show in `members`, because filling the row completes them too.
  */
 export function buildControls(
   enabled: FrameworkDefinition[],
 ): ControlSection[] {
-  const placed = new Set<string>();
   const sections: ControlSection[] = [];
-  let no = 0;
-  const ordered = [
-    ...enabled.filter((f) => f.kind === "regulation"),
-    ...enabled.filter((f) => f.kind === "framework"),
-  ];
-  for (const framework of ordered) {
-    for (const section of framework.sections) {
-      const drafts: {
-        requirement: FrameworkRequirement;
-        leaves: { primary: ControlMember; members: ControlMember[] }[];
-      }[] = [];
-      for (const requirement of section.requirements) {
-        const leaves = [];
-        for (const primary of leavesOf(framework, requirement)) {
-          if (placed.has(idOf(primary))) continue;
-          const others = peersOf(idOf(primary))
-            .map((id) => nodes.get(id))
-            .filter((m): m is ControlMember => !!m);
-          const members = [primary, ...others];
-          members.forEach((m) => placed.add(idOf(m)));
-          leaves.push({ primary, members });
+  // Regulations and frameworks are separate lists, each numbered from 1
+  // (KN0001, row 1) and each merging only with controls of its own kind. A
+  // mapped control of the other kind still shows in `members`, so saving here
+  // updates it too, but it keeps its own row in its own list.
+  for (const kind of ["regulation", "framework"] as const) {
+    const placed = new Set<string>();
+    let kindSections = 0;
+    let no = 0;
+    for (const framework of enabled.filter((f) => f.kind === kind)) {
+      for (const section of framework.sections) {
+        const drafts: {
+          requirement: FrameworkRequirement;
+          leaves: { primary: ControlMember; members: ControlMember[] }[];
+        }[] = [];
+        for (const requirement of section.requirements) {
+          const leaves = [];
+          for (const primary of leavesOf(framework, requirement)) {
+            if (placed.has(idOf(primary))) continue;
+            const others = peersOf(idOf(primary))
+              .map((id) => nodes.get(id))
+              .filter((m): m is ControlMember => !!m);
+            const members = [primary, ...others];
+            members
+              .filter((m) => m.framework.kind === kind)
+              .forEach((m) => placed.add(idOf(m)));
+            leaves.push({ primary, members });
+          }
+          if (leaves.length) drafts.push({ requirement, leaves });
         }
-        if (leaves.length) drafts.push({ requirement, leaves });
-      }
-      if (!drafts.length) continue;
+        if (!drafts.length) continue;
 
-      const code = `KN${String(sections.length + 1).padStart(4, "0")}`;
-      const sectionNo = ++no;
-      const controls: Control[] = [];
-      drafts.forEach(({ requirement, leaves }, i) => {
-        const reqCode = `${code}.${i + 1}`;
-        const heading = `${reqCode} ${requirement.title}`;
-        if (!requirement.subcontrols.length) {
+        const code = `KN${String(++kindSections).padStart(4, "0")}`;
+        const sectionNo = ++no;
+        const controls: Control[] = [];
+        drafts.forEach(({ requirement, leaves }, i) => {
+          const reqCode = `${code}.${i + 1}`;
+          const heading = `${reqCode} ${requirement.title}`;
+          if (!requirement.subcontrols.length) {
+            controls.push({
+              code: reqCode,
+              no: ++no,
+              title: requirement.title,
+              description: requirement.description,
+              nested: requirement.nested,
+              parent: false,
+              heading,
+              ...leaves[0],
+            });
+            return;
+          }
           controls.push({
             code: reqCode,
             no: ++no,
             title: requirement.title,
             description: requirement.description,
-            nested: requirement.nested,
-            parent: false,
+            parent: true,
             heading,
-            ...leaves[0],
+            primary: { framework, requirement },
+            members: [],
           });
-          return;
-        }
-        controls.push({
-          code: reqCode,
-          no: ++no,
-          title: requirement.title,
-          description: requirement.description,
-          parent: true,
-          heading,
-          primary: { framework, requirement },
-          members: [],
+          leaves.forEach((leaf, j) =>
+            controls.push({
+              code: `${reqCode}.${j + 1}`,
+              no: ++no,
+              title: leaf.primary.sub!.title,
+              description: leaf.primary.sub!.description,
+              parent: false,
+              heading,
+              ...leaf,
+            }),
+          );
         });
-        leaves.forEach((leaf, j) =>
-          controls.push({
-            code: `${reqCode}.${j + 1}`,
-            no: ++no,
-            title: leaf.primary.sub!.title,
-            description: leaf.primary.sub!.description,
-            parent: false,
-            heading,
-            ...leaf,
-          }),
-        );
-      });
-      sections.push({
-        kind: framework.kind,
-        code,
-        no: sectionNo,
-        title: section.title,
-        controls,
-      });
+        sections.push({
+          kind,
+          code,
+          no: sectionNo,
+          title: section.title,
+          controls,
+        });
+      }
     }
   }
   return sections;

@@ -1,4 +1,4 @@
-import { FRAMEWORKS, getFramework } from "@/lib/frameworks";
+import { FRAMEWORKS, enabledFrameworks, getFramework } from "@/lib/frameworks";
 import {
   EQUIVALENT_CONTROLS,
   buildControls,
@@ -91,22 +91,114 @@ describe("buildControls", () => {
     );
   });
 
-  it("covers every leaf of every enabled framework exactly once", () => {
-    const leaves = FRAMEWORKS.flatMap((f) =>
-      f.sections.flatMap((s) =>
-        s.requirements.flatMap((r) =>
-          r.subcontrols.length
-            ? r.subcontrols.map((c) => `${f.slug}:${c.key}`)
-            : [`${f.slug}:${r.key}`],
+  it("covers every leaf of every enabled framework exactly once per kind", () => {
+    for (const kind of ["regulation", "framework"] as const) {
+      const leaves = FRAMEWORKS.filter((f) => f.kind === kind).flatMap((f) =>
+        f.sections.flatMap((s) =>
+          s.requirements.flatMap((r) =>
+            r.subcontrols.length
+              ? r.subcontrols.map((c) => `${f.slug}:${c.key}`)
+              : [`${f.slug}:${r.key}`],
+          ),
         ),
-      ),
-    );
-    const placed = buildControls(FRAMEWORKS)
+      );
+      const placed = buildControls(FRAMEWORKS)
+        .filter((s) => s.kind === kind)
+        .flatMap((s) => s.controls)
+        .flatMap((c) => c.members)
+        .filter((m) => m.framework.kind === kind)
+        .map((m) => `${m.framework.slug}:${m.sub?.key ?? m.requirement.key}`);
+      expect(new Set(placed).size).toBe(placed.length);
+      expect([...placed].sort()).toEqual([...leaves].sort());
+    }
+  });
+
+  it("numbers regulations and frameworks separately, each from 1", () => {
+    const sections = buildControls(FRAMEWORKS);
+    for (const kind of ["regulation", "framework"] as const) {
+      const own = sections.filter((s) => s.kind === kind);
+      expect(own[0].code).toBe("KN0001");
+      expect(own[0].no).toBe(1);
+      expect(own[0].controls[0].no).toBe(2);
+      const nos = own.flatMap((s) => [s.no, ...s.controls.map((c) => c.no)]);
+      expect(nos).toEqual(nos.map((_, i) => i + 1));
+      const codes = own.map((s) => s.code);
+      expect(new Set(codes).size).toBe(codes.length);
+    }
+  });
+
+  it("keeps a mapped control of the other kind in members but not in this list", () => {
+    const aiEthics = getFramework("ai-ethics-governance")!;
+    const sections = buildControls([eu, aiEthics]);
+    const own = sections.filter((s) => s.kind === "framework");
+    const governance = own
       .flatMap((s) => s.controls)
-      .flatMap((c) => c.members)
-      .map((m) => `${m.framework.slug}:${m.sub?.key ?? m.requirement.key}`);
-    expect(new Set(placed).size).toBe(placed.length);
-    expect([...placed].sort()).toEqual([...leaves].sort());
+      .find((c) => c.primary.requirement.key === "3.1")!;
+    expect(governance.primary.framework.slug).toBe("ai-ethics-governance");
+    expect(governance.members.map((m) => m.framework.slug)).toContain(
+      "eu-ai-act",
+    );
+  });
+});
+
+describe("EQUIVALENT_CONTROLS groups", () => {
+  it("puts each control in one group, with at most one control per framework", () => {
+    const ids = EQUIVALENT_CONTROLS.flat();
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const group of EQUIVALENT_CONTROLS) {
+      const slugs = group.map((id) => id.split(":")[0]);
+      expect(new Set(slugs).size).toBe(slugs.length);
+    }
+  });
+});
+
+describe("enabledFrameworks", () => {
+  it("enables a regulation only from the Regulations library and a framework only from the Frameworks library", () => {
+    const slugs = (names: string[], fw: string[]) =>
+      enabledFrameworks(names, fw).map((f) => f.slug);
+    expect(slugs(["GDPR"], [])).toEqual(["gdpr"]);
+    expect(slugs([], ["gdpr"])).toEqual([]);
+    expect(slugs([], ["iso-42001", "nist-ai-rmf"])).toEqual([
+      "iso-42001",
+      "nist-ai-rmf",
+    ]);
+    // A policy that shares a framework's name does not switch the framework on.
+    expect(slugs(["ISO/IEC 42001", "FTC AI Guidance"], [])).toEqual([]);
+  });
+});
+
+describe("mirrorWrites for ISO, NIST, GDPR and CCPA", () => {
+  it("saving an ISO 42001 clause fills ISO 27001 and, for roles, NIST and SOC 2", () => {
+    expect(
+      mirrorWrites("iso-42001", {
+        "5.3": { implementation: "<p>RACI</p>", status: "Done" },
+      }),
+    ).toEqual({
+      "iso-27001": { "5.3": { implementation: "<p>RACI</p>", status: "Done" } },
+      "soc-2-type-ii": {
+        "1.3": { implementation: "<p>RACI</p>", status: "Done" },
+      },
+      "nist-ai-rmf": {
+        "2.1": { implementation: "<p>RACI</p>", status: "Done" },
+      },
+    });
+  });
+
+  it("saving NIST GOVERN 2.2 fills the training clause in both ISO standards", () => {
+    const out = mirrorWrites("nist-ai-rmf", {
+      "2.2": { evidence: "<p>records</p>" },
+    });
+    expect(Object.keys(out).sort()).toEqual(["iso-27001", "iso-42001"]);
+    expect(out["iso-42001"]["7.2"]).toEqual({ evidence: "<p>records</p>" });
+  });
+
+  it("saving a GDPR article fills the matching CCPA requirement, and back", () => {
+    expect(
+      mirrorWrites("gdpr", { "3.4": { status: "Done" } }),
+    ).toEqual({ ccpa: { "3.2": { status: "Done" } } });
+    expect(
+      mirrorWrites("ccpa", { "1.2": { status: "Done" } }),
+    ).toEqual({ gdpr: { "2.3": { status: "Done" } } });
   });
 });
 

@@ -393,6 +393,13 @@
       "when": 1788000000000,
       "tag": "0055_laws_to_regulations_guidance_to_frameworks",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1788100000000,
+      "tag": "0056_one_llm_key_per_tenant",
+      "breakpoints": true
     }
   ]
 }

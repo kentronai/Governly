@@ -19,6 +19,7 @@ type RunHealth = {
   sourceErrors?: unknown[];
   modelErrors?: { jurisdiction?: string; error?: string }[];
   fatal?: string;
+  modelSetup?: string[];
   rejected?: unknown[];
   searchError?: string;
 };
@@ -151,9 +152,16 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
           />
         </div>
         {run && !run.model && !unavailable && (
-          <p className="text-sm text-muted-foreground">
-            No AI model was available for the last run. Add an API key under Admin Center → BYOK to enable AI analysis.
-          </p>
+          health.modelSetup?.length ? (
+            <div className="flex items-start gap-2 text-sm text-yellow-600">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Your saved API key could not be used, so AI analysis was skipped. {health.modelSetup[0]}</span>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No API key is set. Add one under Admin Center → BYOK to enable AI analysis.
+            </p>
+          )
         )}
         {unavailable ? (
           <div className="flex items-start gap-2 text-sm text-red-500">

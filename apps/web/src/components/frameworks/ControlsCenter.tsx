@@ -168,12 +168,16 @@ export function ControlsCenter() {
         )
       : c.members.some(leafDone);
 
-  const gauges = policies.map((f) => {
-    const keys = f.sections.flatMap((s) => s.requirements.flatMap(controlKeys));
-    const done = keys.filter((k) => isDone(saved[f.slug] ?? {}, k)).length;
-    return { slug: f.slug, name: f.navLabel, done, total: keys.length };
-  });
-  const rows = sections.flatMap((s) => s.controls.filter((c) => !c.parent));
+  const gauges = policies
+    .filter((f) => f.kind === kind)
+    .map((f) => {
+      const keys = f.sections.flatMap((s) =>
+        s.requirements.flatMap(controlKeys),
+      );
+      const done = keys.filter((k) => isDone(saved[f.slug] ?? {}, k)).length;
+      return { slug: f.slug, name: f.navLabel, done, total: keys.length };
+    });
+  const rows = kindSections.flatMap((s) => s.controls.filter((c) => !c.parent));
   const rowsDone = rows.filter(controlDone).length;
 
   return (

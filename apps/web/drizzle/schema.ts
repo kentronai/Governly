@@ -3598,6 +3598,8 @@ export const tenantLlmKeys = pgTable(
     primaryKey({
       columns: [table.tenantId, table.provider, table.modelId],
     }),
+    // One key per tenant (migration 0056).
+    uniqueIndex("tenant_llm_keys_one_per_tenant").on(table.tenantId),
   ],
 );
 

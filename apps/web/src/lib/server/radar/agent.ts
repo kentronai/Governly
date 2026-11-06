@@ -113,6 +113,8 @@ type Health = {
   searchError?: string;
   sourceErrors: { jurisdiction: string; url: string; error: string }[];
   modelErrors: { jurisdiction: string; error: string }[];
+  /** Why the saved BYOK / env models could not be used (empty when none was configured). */
+  modelSetup: string[];
   rejected: { jurisdiction: string; title: string; reason: string }[];
 };
 type Stats = {
@@ -211,7 +213,8 @@ export async function startRadarRun(opts: {
     .limit(1);
   if (busy) throw new RadarBusyError();
 
-  const model = await pickRadarModel(opts.tenantId);
+  const modelSetup: string[] = [];
+  const model = await pickRadarModel(opts.tenantId, modelSetup);
   const [run] = await db
     .insert(radarRuns)
     .values({
@@ -223,7 +226,7 @@ export async function startRadarRun(opts: {
 
   // Fire and forget: a full sweep outlives any HTTP request. Progress and the
   // outcome land on the radar_runs row.
-  void executeRun(run.id, model).catch((error) =>
+  void executeRun(run.id, model, modelSetup).catch((error) =>
     db
       .update(radarRuns)
       .set({
@@ -236,7 +239,7 @@ export async function startRadarRun(opts: {
   return { runId: run.id };
 }
 
-async function executeRun(runId: string, model: RadarModel | null) {
+async function executeRun(runId: string, model: RadarModel | null, modelSetup: string[]) {
   // Tier 1 first, so a partial run still covers what matters most.
   const coverage = await db
     .select()
@@ -260,6 +263,7 @@ async function executeRun(runId: string, model: RadarModel | null) {
     noPrimarySources: [],
     sourceErrors: [],
     modelErrors: [],
+    modelSetup,
     rejected: [],
   };
 

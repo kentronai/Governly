@@ -110,7 +110,7 @@ export function RadarUpdates({
             <TableBody>
               {result.data.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="max-w-[320px] align-top">
+                  <TableCell className="min-w-[240px] max-w-[320px] whitespace-normal break-words align-top">
                     <div className="flex flex-col gap-1">
                       <span className="font-medium">
                         {u.title}
@@ -136,8 +136,8 @@ export function RadarUpdates({
                       {u.region && <span className="text-xs text-muted-foreground">{u.region}</span>}
                     </div>
                   </TableCell>
-                  <TableCell className="max-w-[420px] align-top">
-                    <p className="line-clamp-3 text-sm text-muted-foreground">{u.summary}</p>
+                  <TableCell className="min-w-[280px] max-w-[420px] whitespace-normal break-words align-top">
+                    <p className="text-sm text-muted-foreground">{u.summary}</p>
                   </TableCell>
                   <TableCell className="whitespace-nowrap align-top">
                     {format(new Date(u.publishedDate ?? u.detectedAt), "MMM dd, yyyy")}

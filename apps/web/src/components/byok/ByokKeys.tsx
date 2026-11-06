@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, CheckCircle2, ChevronsUpDown, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  Loader2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -25,9 +34,11 @@ import {
 } from "@/components/ui/select";
 import { useTenant } from "@/contexts/TenantContext";
 import {
+  deleteLlmKey,
   getOpenRouterModels,
   listLlmKeys,
   saveLlmKey,
+  testLlmKey,
 } from "@/lib/actions/llm-keys";
 import { LLM_PROVIDERS, getLlmProvider } from "@/lib/llm-providers";
 import { cn } from "@/lib/utils";
@@ -35,19 +46,28 @@ import { errorToast, infoToast } from "@/lib/utils/toast";
 
 type Model = { id: string; label: string };
 type SavedKey = { provider: string; modelId: string; keyLast4: string; updatedAt: string };
+type KeyCheck = { status: "checking" | "ready" | "error"; message?: string };
 
-/** Admin Center → BYOK: pick a provider, then a model, then add your own key. */
+/**
+ * Admin Center → BYOK. A tenant has ONE provider, model and key: it is shown once saved,
+ * edited with the pencil, removed with the bin. Saving a new one replaces the old.
+ */
 export function ByokKeys() {
   const { tenant } = useTenant();
-  const [saved, setSaved] = useState<SavedKey[]>([]);
+  const [saved, setSaved] = useState<SavedKey | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [check, setCheck] = useState<KeyCheck | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const [provider, setProvider] = useState("");
   const [models, setModels] = useState<Model[]>([]);
   const [modelId, setModelId] = useState("");
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [query, setQuery] = useState("");
 
   /** Model list for a provider; `keep` (a saved or custom id) is always included. */
   const showProvider = (slug: string, keep?: string) => {
@@ -60,39 +80,65 @@ export function ByokKeys() {
         .catch(() => undefined); // keep the short fallback list
   };
 
-  /** Show a saved key: its provider and model are selected again, key masked. */
-  const showSaved = (k: SavedKey) => {
-    setProvider(k.provider);
-    setModelId(k.modelId);
-    setApiKey("");
-    setEditing(false);
-    showProvider(k.provider, k.modelId);
-  };
+  /** Ask the provider whether the saved key still works, so a dead key is visible here. */
+  const verify = useCallback(
+    async (key: SavedKey) => {
+      if (!tenant) return;
+      setCheck({ status: "checking" });
+      try {
+        const res = await testLlmKey(tenant.slug, key.provider, key.modelId);
+        setCheck(
+          res.status === "ready"
+            ? { status: "ready" }
+            : { status: "error", message: res.message },
+        );
+      } catch {
+        setCheck({ status: "error", message: "Could not verify the key." });
+      }
+    },
+    [tenant],
+  );
 
   const load = useCallback(async () => {
     if (!tenant) return;
     const rows = await listLlmKeys(tenant.slug);
-    setSaved(rows);
-    return rows;
-  }, [tenant]);
+    const latest =
+      [...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+    setSaved(latest);
+    setLoaded(true);
+    if (latest) {
+      setProvider(latest.provider);
+      setModelId(latest.modelId);
+      showProvider(latest.provider, latest.modelId);
+      void verify(latest);
+    }
+    return latest;
+  }, [tenant, verify]);
 
-  // Coming back to this page shows the most recently saved key instead of an empty form.
   useEffect(() => {
-    load()
-      .then((rows) => {
-        const latest = rows?.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-        if (latest) showSaved(latest);
-      })
-      .catch(errorToast);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load().catch(errorToast);
   }, [load]);
 
   const pickProvider = (slug: string) => {
     setProvider(slug);
     setModelId("");
     setApiKey("");
-    setEditing(false);
     showProvider(slug);
+  };
+
+  const startEdit = () => {
+    setApiKey("");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    if (saved) {
+      setProvider(saved.provider);
+      setModelId(saved.modelId);
+      showProvider(saved.provider, saved.modelId);
+    }
+    setApiKey("");
+    setEditing(false);
   };
 
   const save = async () => {
@@ -101,8 +147,8 @@ export function ByokKeys() {
       await saveLlmKey(tenant!.slug, provider, modelId, apiKey);
       setApiKey("");
       setEditing(false);
-      await load();
       infoToast("API key saved");
+      await load();
     } catch (e) {
       errorToast(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -110,9 +156,26 @@ export function ByokKeys() {
     }
   };
 
-  const current = saved.find(
-    (k) => k.provider === provider && k.modelId === modelId,
-  );
+  const remove = async () => {
+    if (!saved || !tenant) return;
+    setDeleting(true);
+    try {
+      await deleteLlmKey(tenant.slug, saved.provider, saved.modelId);
+      infoToast("API key deleted");
+      setSaved(null);
+      setCheck(null);
+      setProvider("");
+      setModelId("");
+      setModels([]);
+      setConfirmDelete(false);
+    } catch (e) {
+      errorToast(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const showForm = loaded && (!saved || editing);
   const selected = models.find((m) => m.id === modelId);
 
   return (
@@ -120,113 +183,148 @@ export function ByokKeys() {
       <div className="w-full max-w-md space-y-6">
         <PageHeader
           title="Bring Your Own Key"
-          description="Choose a provider and model, then add your API key."
+          description="One provider, model and API key at a time. Saving a new key replaces the old one."
         />
         <Card>
           <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
-              <Label>Provider</Label>
-              <Select value={provider} onValueChange={pickProvider}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {LLM_PROVIDERS.map((p) => (
-                    <SelectItem key={p.slug} value={p.slug}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Model</Label>
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    disabled={!provider}
-                    className="w-full justify-between font-normal"
-                  >
-                    <span className="truncate">
-                      {selected?.label ??
-                        (provider ? "Select a model" : "Select a provider first")}
-                    </span>
-                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command>
-                    <CommandInput
-                      placeholder="Search or type a model id..."
-                      value={query}
-                      onValueChange={setQuery}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No model found.</CommandEmpty>
-                      <CommandGroup>
-                        {query.trim() && !models.some((m) => m.id === query.trim()) && (
-                          <CommandItem
-                            forceMount
-                            value={`custom ${query}`}
-                            onSelect={() => {
-                              const id = query.trim();
-                              setModels((list) => [{ id, label: id }, ...list]);
-                              setModelId(id);
-                              setApiKey("");
-                              setEditing(false);
-                              setQuery("");
-                              setOpen(false);
-                            }}
-                          >
-                            <span className="truncate">Use custom model “{query.trim()}”</span>
-                          </CommandItem>
-                        )}
-                        {models.map((m) => (
-                          <CommandItem
-                            key={m.id}
-                            value={`${m.label} ${m.id}`}
-                            onSelect={() => {
-                              setModelId(m.id);
-                              setApiKey("");
-                              setEditing(false);
-                              setQuery("");
-                              setOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                modelId === m.id ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                            <span className="truncate">{m.label}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {current && !editing ? (
-              <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm text-green-600">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Key saved (•••• {current.keyLast4})
-                </p>
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  Change key
-                </Button>
-              </div>
-            ) : (
+            {!loaded ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : saved && !editing ? (
               <>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {getLlmProvider(saved.provider)?.label ?? saved.provider}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">{saved.modelId}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">•••• {saved.keyLast4}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="icon" aria-label="Edit key" onClick={startEdit}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete key"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+                {check?.status === "checking" && (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Checking the key…
+                  </p>
+                )}
+                {check?.status === "ready" && (
+                  <p className="flex items-center gap-2 text-sm text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Key saved and working
+                  </p>
+                )}
+                {check?.status === "error" && (
+                  <p className="flex items-start gap-2 text-sm text-red-500">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Key saved, but it is not working: {check.message}</span>
+                  </p>
+                )}
+              </>
+            ) : showForm ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Provider</Label>
+                  <Select value={provider} onValueChange={pickProvider}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LLM_PROVIDERS.map((p) => (
+                        <SelectItem key={p.slug} value={p.slug}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        disabled={!provider}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className="truncate">
+                          {selected?.label ??
+                            (provider ? "Select a model" : "Select a provider first")}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput
+                          placeholder="Search or type a model id..."
+                          value={query}
+                          onValueChange={setQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No model found.</CommandEmpty>
+                          <CommandGroup>
+                            {query.trim() && !models.some((m) => m.id === query.trim()) && (
+                              <CommandItem
+                                forceMount
+                                value={`custom ${query}`}
+                                onSelect={() => {
+                                  const id = query.trim();
+                                  setModels((list) => [{ id, label: id }, ...list]);
+                                  setModelId(id);
+                                  setApiKey("");
+                                  setQuery("");
+                                  setOpen(false);
+                                }}
+                              >
+                                <span className="truncate">
+                                  Use custom model “{query.trim()}”
+                                </span>
+                              </CommandItem>
+                            )}
+                            {models.map((m) => (
+                              <CommandItem
+                                key={m.id}
+                                value={`${m.label} ${m.id}`}
+                                onSelect={() => {
+                                  setModelId(m.id);
+                                  setApiKey("");
+                                  setQuery("");
+                                  setOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    modelId === m.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <span className="truncate">{m.label}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="byok-key">API key</Label>
                   <Input
@@ -247,39 +345,26 @@ export function ByokKeys() {
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save
                 </Button>
-                {current && (
-                  <Button variant="ghost" className="w-full" onClick={() => setEditing(false)}>
+                {saved && (
+                  <Button variant="ghost" className="w-full" onClick={cancelEdit}>
                     Cancel
                   </Button>
                 )}
               </>
-            )}
+            ) : null}
           </CardContent>
         </Card>
-        {saved.length > 0 && (
-          <Card>
-            <CardContent className="space-y-1 pt-6">
-              <Label>Saved keys</Label>
-              {saved.map((k) => (
-                <button
-                  key={`${k.provider}/${k.modelId}`}
-                  type="button"
-                  onClick={() => showSaved(k)}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
-                    k.provider === provider && k.modelId === modelId && "bg-muted",
-                  )}
-                >
-                  <span className="truncate">
-                    {getLlmProvider(k.provider)?.label ?? k.provider} · {k.modelId}
-                  </span>
-                  <span className="text-muted-foreground">•••• {k.keyLast4}</span>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={remove}
+        isLoading={deleting}
+        title="Delete this API key?"
+        itemName={saved ? `${getLlmProvider(saved.provider)?.label ?? saved.provider} · ${saved.modelId}` : "this key"}
+        itemType="API key"
+      />
     </div>
   );
 }

@@ -46,17 +46,19 @@ export const getFramework = (slug: string) =>
   FRAMEWORKS.find((f) => f.slug === slug);
 
 /**
- * Frameworks the tenant has enabled: a policy from the Regulations library
- * (matched by name) or a framework from the Frameworks library (matched by slug).
+ * Frameworks the tenant has enabled. A regulation is enabled from the Regulations
+ * library (a policy, matched by name); a framework from the Frameworks library
+ * (matched by slug). Each kind only ever follows its own library, so a policy of
+ * the same name can't switch on a framework, or the reverse.
  */
 export const enabledFrameworks = (
   activePolicyNames: string[],
   enabledFrameworkSlugs: string[] = [],
 ) =>
-  FRAMEWORKS.filter(
-    (f) =>
-      enabledFrameworkSlugs.includes(f.slug) ||
-      f.policyNames.some((name) => activePolicyNames.includes(name)),
+  FRAMEWORKS.filter((f) =>
+    f.kind === "regulation"
+      ? f.policyNames.some((name) => activePolicyNames.includes(name))
+      : enabledFrameworkSlugs.includes(f.slug),
   );
 
 export const frameworkPath = (slug: string) =>

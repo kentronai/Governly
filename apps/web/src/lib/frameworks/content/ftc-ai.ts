@@ -8,7 +8,8 @@ export const ftcAi: FrameworkDefinition = {
   name: "FTC AI Guidance",
   navLabel: "FTC AI Guidance",
   kind: "framework",
-  policyNames: ["FTC AI Guidance"],
+  // Enabled from the Frameworks library (tenant_frameworks), not as a policy.
+  policyNames: [],
   description:
     "How the US Federal Trade Commission expects businesses to market, build and operate AI fairly and truthfully under existing consumer-protection law.",
   source: {

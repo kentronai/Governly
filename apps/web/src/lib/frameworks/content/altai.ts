@@ -10,7 +10,8 @@ export const altai: FrameworkDefinition = {
   name: "Assessment List for Trustworthy AI",
   navLabel: "Assessment List for Trustworthy AI",
   kind: "framework",
-  policyNames: ["Assessment List for Trustworthy AI"],
+  // Enabled from the Frameworks library (tenant_frameworks), not as a policy.
+  policyNames: [],
   description:
     "Self-assessment of AI systems against the European Commission's seven requirements for trustworthy AI.",
   source: {
