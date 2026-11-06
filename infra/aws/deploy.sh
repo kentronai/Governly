@@ -24,7 +24,8 @@ else
   die "EC2 IP not found. Pass as argument or run provision.sh first."
 fi
 
-SSH="ssh -o StrictHostKeyChecking=no -i ${KEY_FILE} ubuntu@${EC2_IP}"
+# Keepalives: a silently dropped connection must fail the step, not hang the deploy for an hour.
+SSH="ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=6 -i ${KEY_FILE} ubuntu@${EC2_IP}"
 
 echo "╔══════════════════════════════════════════════╗"
 echo "║   Kentron — Deploy to EC2                   ║"
