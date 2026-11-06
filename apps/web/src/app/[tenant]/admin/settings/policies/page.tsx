@@ -311,6 +311,7 @@ const OrganizationPolicies = () => {
               Cancel
             </Button>
             <Button
+              data-autosave
               onClick={handleSaveChanges}
               className="bg-black text-white hover:bg-black/90 flex items-center gap-2"
               disabled={isSaving}

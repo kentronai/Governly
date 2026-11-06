@@ -538,7 +538,7 @@ export function RequirementDialog({
               <Button variant="outline" onClick={cancel}>
                 Cancel
               </Button>
-              <Button onClick={save} disabled={saving}>
+              <Button data-autosave onClick={save} disabled={saving}>
                 {saving ? (
                   <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                 ) : (

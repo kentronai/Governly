@@ -602,7 +602,7 @@ export default function DownloadModelsPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={editProcessing}>
+            <Button data-autosave onClick={handleSaveEdit} disabled={editProcessing}>
               {editProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

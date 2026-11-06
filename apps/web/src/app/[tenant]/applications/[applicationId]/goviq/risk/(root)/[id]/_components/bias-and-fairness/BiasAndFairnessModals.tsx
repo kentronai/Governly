@@ -358,6 +358,7 @@ const BiasAndFairnessModals: React.FC<BiasAndFairnessModalsProps> = ({
             <Button
               variant="default"
               disabled={isCreatePending}
+              data-autosave
               onClick={onCreateSave}
             >
               {isCreatePending ? (

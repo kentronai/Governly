@@ -46,24 +46,54 @@ function DialogOverlay({
   );
 }
 
+// Dialogs with a save action mark it `data-autosave` (a button, or a <form>).
+// Clicking outside such a dialog after editing it saves instead of silently
+// discarding the edits; Esc / X / Cancel still discard.
+const EDIT_CONTROLS = '[role="option"],[role="checkbox"],[role="switch"],[role="radio"]';
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onPointerDownOutside,
+  onInput,
+  onClickCapture,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
 }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Content unmounts on close, so this resets itself for the next open.
+  const edited = React.useRef(false);
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={ref}
         data-slot="dialog-content"
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
           className,
         )}
         {...props}
+        onInput={(e) => {
+          edited.current = true;
+          onInput?.(e);
+        }}
+        onClickCapture={(e) => {
+          if ((e.target as HTMLElement).closest?.(EDIT_CONTROLS)) edited.current = true;
+          onClickCapture?.(e);
+        }}
+        onPointerDownOutside={(e) => {
+          onPointerDownOutside?.(e);
+          if (e.defaultPrevented || !edited.current) return;
+          const save = ref.current?.querySelector<HTMLElement>("[data-autosave]");
+          if (!save) return;
+          e.preventDefault(); // stay open; the save handler closes it on success
+          if (save instanceof HTMLFormElement) save.requestSubmit();
+          else save.click();
+        }}
       >
         {children}
         {showCloseButton && (

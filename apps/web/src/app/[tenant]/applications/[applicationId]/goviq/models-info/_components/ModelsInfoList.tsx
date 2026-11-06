@@ -1,5 +1,6 @@
 "use client";
 
+import { htmlToPlainText } from "@/lib/utils";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -302,8 +303,8 @@ export function ModelsInfoList({
                       </TableCell>
                       <TableCell>{model.vendor || "-"}</TableCell>
                       <TableCell className="max-w-xs">
-                        <div className="truncate" title={model.objectives}>
-                          {model.objectives}
+                        <div className="truncate" title={htmlToPlainText(model.objectives)}>
+                          {htmlToPlainText(model.objectives)}
                         </div>
                       </TableCell>
                       <TableCell className="max-w-xs">

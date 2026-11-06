@@ -135,7 +135,7 @@ export default function LinkPromptDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleLink} disabled={processing}>
+          <Button data-autosave onClick={handleLink} disabled={processing}>
             {processing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

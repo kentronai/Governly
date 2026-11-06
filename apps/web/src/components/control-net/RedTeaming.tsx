@@ -606,6 +606,7 @@ const CreateRedTeamingTaskModal = ({
                           Back
                         </Button>
                         <Button
+                          data-autosave
                           onClick={handleSave}
                           className="bg-black hover:bg-gray-800 text-white"
                         >

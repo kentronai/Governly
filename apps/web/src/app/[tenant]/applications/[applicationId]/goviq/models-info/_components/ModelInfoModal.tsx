@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 import {
   Select,
   SelectContent,
@@ -691,12 +691,10 @@ export function ModelInfoModal({
             >
               Objectives*
             </Label>
-            <Textarea
-              id="objectives"
-              className={`${errors.objectives ? "border-destructive" : ""} min-h-20`}
+            <RichTextEditor
               value={formData.objectives}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, objectives: e.target.value }))
+              onChange={(html) =>
+                setFormData((prev) => ({ ...prev, objectives: html }))
               }
               placeholder="Enter objectives"
             />
@@ -712,15 +710,10 @@ export function ModelInfoModal({
             >
               Compute Infrastructure*
             </Label>
-            <Textarea
-              id="compute-infrastructure"
-              className={`${errors.computeInfrastructure ? "border-destructive" : ""} min-h-20`}
+            <RichTextEditor
               value={formData.computeInfrastructure}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  computeInfrastructure: e.target.value,
-                }))
+              onChange={(html) =>
+                setFormData((prev) => ({ ...prev, computeInfrastructure: html }))
               }
               placeholder="Enter compute infrastructure"
             />
@@ -837,15 +830,10 @@ export function ModelInfoModal({
             >
               Hardware Requirements*
             </Label>
-            <Textarea
-              id="hardware-requirements"
-              className={`${errors.hardwareRequirements ? "border-destructive" : ""} min-h-20`}
+            <RichTextEditor
               value={formData.hardwareRequirements}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  hardwareRequirements: e.target.value,
-                }))
+              onChange={(html) =>
+                setFormData((prev) => ({ ...prev, hardwareRequirements: html }))
               }
               placeholder="Enter hardware requirements"
             />
@@ -921,7 +909,7 @@ export function ModelInfoModal({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={isPending} onClick={handleSubmit}>
+          <Button data-autosave disabled={isPending} onClick={handleSubmit}>
             {isPending ? (
               <>
                 <Loader className="mr-2 h-4 w-4 animate-spin" /> Saving...

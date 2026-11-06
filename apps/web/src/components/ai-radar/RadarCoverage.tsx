@@ -338,7 +338,7 @@ export function RadarCoverage() {
             <Button variant="outline" onClick={() => setDraft(null)}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={saving || !draft?.jurisdictionName.trim()}>
+            <Button data-autosave onClick={save} disabled={saving || !draft?.jurisdictionName.trim()}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
             </Button>

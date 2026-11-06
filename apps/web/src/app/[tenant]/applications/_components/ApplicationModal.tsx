@@ -268,7 +268,7 @@ export function ApplicationModal({
               </Button>
 
               {!isViewMode && (
-                <Button type="submit" disabled={isPending}>
+                <Button data-autosave type="submit" disabled={isPending}>
                   {isPending ? (
                     <>
                       <Loader className="mr-2 h-4 w-4 animate-spin" />

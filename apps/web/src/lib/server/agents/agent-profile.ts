@@ -18,6 +18,8 @@ export interface AgentProfile {
   deployed: boolean;
   deployedAt: string | null;
   deployedOn: string | null;
+  /** Host-issued ID of the running service when the host is not a cloud scan (Render srv-…, Vercel prj_…). */
+  deployedId: string | null;
   observability: string[];
   framework: string | null;
   llms: string[];
@@ -33,6 +35,10 @@ export interface AgentProfile {
   iacApp: string | null;
 }
 
+/** Deployed = has ever been deployed (running or stopped); `deployed` alone means running now. */
+export const isEverDeployed = (p: Pick<AgentProfile, "deployed" | "deployedAt">) =>
+  p.deployed || Boolean(p.deployedAt);
+
 export const EMPTY_PROFILE: AgentProfile = {
   applicationsAccess: [],
   developer: null,
@@ -40,6 +46,7 @@ export const EMPTY_PROFILE: AgentProfile = {
   deployed: false,
   deployedAt: null,
   deployedOn: null,
+  deployedId: null,
   observability: [],
   framework: null,
   llms: [],
@@ -71,6 +78,7 @@ export function readProfile(value: unknown): AgentProfile {
     deployed: raw.deployed === true,
     deployedAt: raw.deployedAt ?? null,
     deployedOn: raw.deployedOn ?? null,
+    deployedId: raw.deployedId ?? null,
     observability: list(raw.observability),
     framework: raw.framework ?? null,
     llms: list(raw.llms),
@@ -97,6 +105,7 @@ export function mergeProfiles(base: AgentProfile, extra: AgentProfile): AgentPro
     deployed: base.deployed || extra.deployed,
     deployedAt: base.deployedAt ?? extra.deployedAt,
     deployedOn: base.deployedOn ?? extra.deployedOn,
+    deployedId: base.deployedId ?? extra.deployedId,
     observability: uniq([...base.observability, ...extra.observability]),
     framework: base.framework ?? extra.framework,
     llms: mergeAllLlms([...base.llms, ...extra.llms]),
@@ -607,6 +616,7 @@ export interface RepoEvidence {
   deployed: boolean;
   deployedAt: string | null;
   deployedOn: string | null;
+  deployedId?: string | null;
   /** Hosts the repo declares it deploys to (render.yaml → Render, sst.config.ts → AWS (SST)…). */
   deployTargets?: string[];
   /** App names inside those deploy configs. */
@@ -713,6 +723,7 @@ export function buildRepoProfile(e: RepoEvidence): AgentProfile {
     deployedAt: e.deployedAt,
     deployedOn:
       e.deployedOn ?? (e.deployTargets?.length ? `${e.deployTargets.join(", ")} (declared in repo)` : null),
+    deployedId: e.deployedId ?? null,
     observability: detectObservability(names, envKeys),
     framework: detectFramework(names),
     // Model ids, plus every provider the code calls that no listed model covers.
@@ -1069,6 +1080,7 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
     deployedOn: deployed
       ? `${providerLabel} ${agent.region}${launchOnly ? " · instance launch time, tag it deployed-at for deploy time" : ""}`
       : null,
+    deployedId: null,
     observability,
     framework,
     llms: llmsOut,

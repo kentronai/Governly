@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bot, Gauge, Moon, Play, type LucideIcon } from "lucide-react";
+import { Bot, Gauge, Moon, PackageX, Play, Rocket, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CompactMetricCard } from "@/components/agent-discovery/CompactMetricCard";
@@ -14,6 +14,7 @@ export interface KpiAgent {
   framework: string | null;
   level: string;
   reason: string;
+  deployed: boolean;
   running: boolean;
   stopped: boolean;
 }
@@ -34,8 +35,10 @@ const CARDS: Array<{ label: string; icon: LucideIcon; tone: string; description:
     }[level],
     filter: (a: KpiAgent) => a.level === level,
   })),
+  { label: "Deployed Agents", icon: Rocket, tone: "", description: "Deployed at some point: running plus stopped", filter: (a) => a.deployed },
   { label: "Running Agents", icon: Play, tone: "text-emerald-600", description: "Running right now", filter: (a) => a.running },
   { label: "Stopped Agents", icon: Moon, tone: "text-muted-foreground", description: "Deployed before, not running now", filter: (a) => a.stopped },
+  { label: "Not Deployed", icon: PackageX, tone: "text-muted-foreground", description: "Discovered but never deployed (code only)", filter: (a) => !a.deployed },
 ];
 
 export function KpiCards({ tenant, agents }: { tenant: string; agents: KpiAgent[] }) {
@@ -44,7 +47,7 @@ export function KpiCards({ tenant, agents }: { tenant: string; agents: KpiAgent[
   const rows = card ? agents.filter(card.filter) : [];
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-9">
         {CARDS.map((c) => (
           <button key={c.label} type="button" className="rounded-xl text-left transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setOpen(c.label)}>
             <CompactMetricCard label={c.label} value={agents.filter(c.filter).length} icon={c.icon} tone={c.tone} uppercaseLabel className="w-full" description={c.description} />

@@ -14,6 +14,8 @@ export interface HostedDeploy {
   host: string;
   deployedOn: string;
   deployedAt: string | null;
+  /** The host's own ID for the service/project: shown as the agent ID. */
+  serviceId: string | null;
   running: boolean;
   /** Person who triggered it when the host records one (Vercel). */
   deployer: string | null;
@@ -47,6 +49,7 @@ async function renderDeploys(conn: { connectionId: string; providerConfigKey: st
       host: "Render",
       deployedOn: `Render · ${service.serviceDetails?.url ?? service.name}`,
       deployedAt: at,
+      serviceId: service.id,
       running: service.suspended !== "suspended" && live?.deploy.status === "live",
       deployer: null,
       commit: live?.deploy.commit?.id ?? null,
@@ -58,6 +61,7 @@ type VercelDeployment = {
   url: string;
   created: number;
   state?: string;
+  projectId?: string;
   creator?: { username?: string };
   meta?: { githubCommitOrg?: string; githubCommitRepo?: string; githubCommitSha?: string };
 };
@@ -78,6 +82,7 @@ async function vercelDeploys(conn: { connectionId: string; providerConfigKey: st
       host: "Vercel",
       deployedOn: `Vercel · https://${d.url}`,
       deployedAt: at,
+      serviceId: d.projectId ?? null,
       running: true,
       deployer: d.creator?.username ?? null,
       commit: d.meta.githubCommitSha ?? null,

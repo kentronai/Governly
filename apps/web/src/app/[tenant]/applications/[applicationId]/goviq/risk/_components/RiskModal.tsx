@@ -654,7 +654,7 @@ export function RiskModal({
             {isViewMode ? "Close" : "Cancel"}
           </Button>
           {!isViewMode && (
-            <Button disabled={isPending} onClick={handleSubmit}>
+            <Button data-autosave disabled={isPending} onClick={handleSubmit}>
               {isPending ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />

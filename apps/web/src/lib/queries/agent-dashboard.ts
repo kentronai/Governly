@@ -16,6 +16,7 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { cache } from "react";
 import {
   policyViolations,
+  isEverDeployed,
   profileAutonomy,
   readProfile,
 } from "@/lib/server/agents/agent-profile";
@@ -75,6 +76,8 @@ export const getDashboardCards = cache(async (tenantId: string) => {
     l3: level("L3"),
     l4: level("L4"),
     running: rows.filter((r) => r.profile.deployed).length,
+    // Deployed = ever deployed (running + stopped).
+    deployed: rows.filter((r) => isEverDeployed(r.profile)).length,
     // Deployed before, not running now.
     stopped: rows.filter((r) => !r.profile.deployed && r.profile.deployedAt).length,
   };
@@ -382,12 +385,11 @@ export const getRecentViolations = cache(
 );
 
 export const getExecutiveDashboard = cache(async (tenantId: string) => {
-  const [cards, autonomy, platforms, recentAgents, trend, agentViolations, recentViolations] =
+  const [cards, autonomy, platforms, trend, agentViolations, recentViolations] =
     await Promise.all([
       getDashboardCards(tenantId),
       getAutonomyDistribution(tenantId),
       getPlatformDistribution(tenantId),
-      getRecentAgents(tenantId),
       getDiscoveryTrend(tenantId),
       getAgentPolicyViolations(tenantId),
       getRecentViolations(tenantId),
@@ -402,8 +404,9 @@ export const getExecutiveDashboard = cache(async (tenantId: string) => {
       level: r.autonomy.level,
       reason: r.autonomy.reason,
       running: r.profile.deployed,
+      deployed: isEverDeployed(r.profile),
       stopped: !r.profile.deployed && Boolean(r.profile.deployedAt),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return { cards, autonomy, platforms, recentAgents, trend, agentViolations, recentViolations, agentList };
+  return { cards, autonomy, platforms, trend, agentViolations, recentViolations, agentList };
 });

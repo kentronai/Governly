@@ -178,6 +178,7 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
           <Button
             className="bg-black text-white hover:bg-gray-600 transition-colors"
             disabled={isLoading}
+            data-autosave
             onClick={onSave}
           >
             {isLoading ? (

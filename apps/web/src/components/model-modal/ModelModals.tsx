@@ -456,6 +456,7 @@ const ModelModals: React.FC<ModelModalsProps> = ({
               variant="default"
               className="bg-black text-white hover:bg-gray-600 dark:bg-gray-900 dark:hover:bg-blue-900 transition-colors"
               disabled={isCreatePending}
+              data-autosave
               onClick={onCreateSave}
             >
               {isCreatePending ? (

@@ -93,7 +93,7 @@ export const getAgentInventorySummary = async (
         unownedAgents: sql<number>`count(*) filter (where ${agents.ownerUserId} is null)`,
         l4Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L4')`,
         l3Agents: sql<number>`count(*) filter (where ${agents.autonomyLevel} = 'L3')`,
-        deployedAgents: sql<number>`count(*) filter (where ${agents.profile}->>'deployed' = 'true')`,
+        deployedAgents: sql<number>`count(*) filter (where (${agents.profile}->>'deployed' = 'true' or ${agents.profile}->>'deployedAt' is not null))`,
         llmNotDetected: sql<number>`count(*) filter (where ${agents.model} is null and jsonb_array_length(coalesce(${agents.profile}->'llms', '[]'::jsonb)) = 0)`,
       })
       .from(agents)
@@ -136,9 +136,9 @@ export const getAgents = cache(
       conditions.push(eq(agents.ownerUserId, filters.ownerUserId));
     }
     if (filters.deployed === "yes") {
-      conditions.push(sql`${agents.profile}->>'deployed' = 'true'`);
+      conditions.push(sql`(${agents.profile}->>'deployed' = 'true' or ${agents.profile}->>'deployedAt' is not null)`);
     } else if (filters.deployed === "no") {
-      conditions.push(sql`${agents.profile}->>'deployed' is distinct from 'true'`);
+      conditions.push(sql`not (${agents.profile}->>'deployed' = 'true' or ${agents.profile}->>'deployedAt' is not null)`);
     }
     if (filters.policyViolation) {
       // Violations are derived in JS (same rule as the summary card), so resolve the ids first.

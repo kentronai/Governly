@@ -53,7 +53,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { errorToast, infoToast, successToast } from "@/lib/utils/toast";
-import { llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
+import { isEverDeployed, llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
 import {
   fetchAgents,
   fetchAgentDetail,
@@ -273,12 +273,14 @@ function ChipList({ label, items, emptyText }: { label: string; items: string[];
   );
 }
 
-/** The ID the cloud gave the running agent (EC2 instance, app id…); code-only agents have none. */
+/** The ID the host gave the running agent: EC2 instance / app id, or the Render/Vercel service id for a repo agent. Code-only agents have none. */
 const cloudIdOf = (row: any): string | null =>
-  row.platform === "github" ? null : (String(row.externalAgentId ?? "").split(":").pop() || null);
+  row.platform === "github"
+    ? readProfile(row.profile).deployedId
+    : (String(row.externalAgentId ?? "").split(":").pop() || null);
 
 const statusLabel = (profile: ReturnType<typeof readProfile>) =>
-  profile.deployed ? "Deployed" : "Not deployed";
+  profile.deployed ? "Deployed · Running" : isEverDeployed(profile) ? "Deployed · Stopped" : "Not deployed";
 
 // LangSmith tracing is linked per agent (not discovered), so fold it in here.
 const observabilityOf = (row: any) => {
@@ -680,7 +682,7 @@ export function AgentInventory({
                         </Button>
                       </div>
                     ) : (
-                      <NotFound title="Not deployed to a connected cloud, so no agent ID" />
+                      <NotFound title="No agent ID: not deployed to a connected cloud or host (Render, Vercel). Connect the host under Integrations, then Refresh." />
                     )}
                   </TableCell>
                   <TableCell>
@@ -702,6 +704,7 @@ export function AgentInventory({
                     {profile.deployedAt ? (
                       <div className="space-y-0.5">
                         <div>{formatTimestamp(profile.deployedAt)}</div>
+                        <div className="text-xs text-muted-foreground">{profile.deployed ? "Running" : "Stopped"}</div>
                         {profile.deployedOn ? (
                           <div className="max-w-[180px] truncate text-xs text-muted-foreground" title={profile.deployedOn}>
                             {profile.deployedOn}
@@ -914,7 +917,9 @@ function AgentDetailModal({
                     "border-transparent",
                     readProfile(agent.profile).deployed
                       ? STATUS_STYLES.active
-                      : STATUS_STYLES.inactive,
+                      : isEverDeployed(readProfile(agent.profile))
+                        ? STATUS_STYLES.dormant
+                        : STATUS_STYLES.inactive,
                   )}
                 >
                   {statusLabel(readProfile(agent.profile))}
@@ -963,7 +968,7 @@ function AgentDetailModal({
                         label="Last Deployed"
                         value={
                           profile.deployedAt
-                            ? `${formatTimestamp(profile.deployedAt)}${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} · ${profile.deployed ? "deployed now" : "not deployed now"}`
+                            ? `${formatTimestamp(profile.deployedAt)}${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} · ${profile.deployed ? "running now" : "stopped now"}`
                             : profile.deployed
                               ? `Live${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} (deploy time not recorded)`
                               : "Never deployed"

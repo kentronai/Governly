@@ -131,7 +131,7 @@ export default function CreatePromptDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={processing}>
+          <Button data-autosave onClick={handleCreate} disabled={processing}>
             {processing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

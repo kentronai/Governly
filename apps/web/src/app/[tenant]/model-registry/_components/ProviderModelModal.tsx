@@ -586,6 +586,7 @@ export function ProviderModelModal({
             </Button>
             <Button
               id="model-submit"
+              data-autosave
               onClick={handleSubmit}
               disabled={isPending}
             >

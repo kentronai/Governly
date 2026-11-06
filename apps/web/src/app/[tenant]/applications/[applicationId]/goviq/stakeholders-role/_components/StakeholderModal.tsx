@@ -295,7 +295,7 @@ export function StakeholderModal({
               <Button variant="outline" onClick={onClose} disabled={isPending}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={isPending}>
+              <Button data-autosave onClick={handleSubmit} disabled={isPending}>
                 {isPending
                   ? "Saving..."
                   : mode === "create"

@@ -1,5 +1,6 @@
 "use client";
 
+import { htmlToPlainText } from "@/lib/utils";
 import type React from "react";
 
 import { SingleSelectField, MultiSelectField } from "./_components/field";
@@ -7,7 +8,7 @@ import { SingleSelectField, MultiSelectField } from "./_components/field";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 import { Input } from "@/components/ui/input";
 import {
   Card,
@@ -506,7 +507,8 @@ export default function UseCaseModule({
             className="grid gap-6 py-4"
             onKeyDown={(e) => {
               // Enter inside a dropdown (search / custom value) must not save the form
-              if (e.key === "Enter" && !(e.target as HTMLElement).closest("[cmdk-root]"))
+              // Enter in the rich text editor adds a new line, it must not save
+              if (e.key === "Enter" && !(e.target as HTMLElement).closest("[cmdk-root]") && !(e.target as HTMLElement).isContentEditable)
                 handleSave();
             }}
           >
@@ -541,18 +543,12 @@ export default function UseCaseModule({
               >
                 What it does *
               </Label>
-              <Textarea
-                id="whatItDoes"
+              <RichTextEditor
                 placeholder="Describe what this use case does..."
-                value={formData.whatItDoes}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    whatItDoes: e.target.value,
-                  }))
+                value={formData.whatItDoes ?? ""}
+                onChange={(html) =>
+                  setFormData((prev) => ({ ...prev, whatItDoes: html }))
                 }
-                rows={4}
-                className=""
               />
               {errors.whatItDoes && (
                 <p className="text-sm text-red-600">{errors.whatItDoes}</p>
@@ -656,7 +652,7 @@ export default function UseCaseModule({
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isPending}>
+            <Button data-autosave onClick={handleSave} disabled={isPending}>
               {isPending ? "Saving..." : isEditing ? "Save" : "Create Use Case"}
             </Button>
           </DialogFooter>
@@ -699,7 +695,7 @@ export default function UseCaseModule({
                   <CardTitle className="text-xl font-semibold">
                     {useCaseItem.useCase}
                   </CardTitle>
-                  <CardDescription>{useCaseItem.whatItDoes}</CardDescription>
+                  <CardDescription>{htmlToPlainText(useCaseItem.whatItDoes)}</CardDescription>
                 </div>
                 <div className="flex gap-2 items-center">
                   <Button

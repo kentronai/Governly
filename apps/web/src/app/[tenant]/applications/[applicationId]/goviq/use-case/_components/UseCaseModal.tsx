@@ -330,6 +330,7 @@ export function UseCaseModal({ isOpen, mode, useCase, onClose, onSubmit, isPendi
           </Button>
           <Button
             className="bg-black text-white hover:bg-gray-600"
+            data-autosave
             onClick={handleSubmit}
             disabled={isPending}
           >

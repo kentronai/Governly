@@ -1179,6 +1179,7 @@ const CreatePolicyModal: React.FC<{
               </Button>
             ) : (
               <Button
+                data-autosave
                 onClick={handleSave}
                 className="bg-black hover:bg-gray-800 text-white"
                 disabled={!canProceedToNext() || isSaving || disabled}

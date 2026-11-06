@@ -315,7 +315,7 @@ export function ComplianceEvidenceManager({
           >
             Cancel
           </Button>
-          <Button type="button" onClick={save} disabled={loading}>
+          <Button data-autosave type="button" onClick={save} disabled={loading}>
             {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Save
           </Button>
         </DialogFooter>

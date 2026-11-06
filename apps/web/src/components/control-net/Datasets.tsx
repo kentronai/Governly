@@ -334,6 +334,7 @@ const DatasetsTab: React.FC<DatasetsTabProps> = ({ datasets }) => {
                 Cancel
               </Button>
               <Button
+                data-autosave
                 type="submit"
                 disabled={!selectedFile || !formData.name}
                 className="flex-1 bg-black text-white hover:bg-gray-800"

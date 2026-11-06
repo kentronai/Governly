@@ -316,6 +316,7 @@ async function folderEvidence(
     deployed: host ? host.running : (live ?? Boolean(deployment?.deployedAt)),
     deployedAt: deployment?.deployedAt ?? null,
     deployedOn: deployment?.deployedOn ?? null,
+    deployedId: host?.serviceId ?? null,
     deployTargets: detectDeployTargets(all.map((e) => e.path)),
     iacNames,
   };
