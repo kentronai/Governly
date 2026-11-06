@@ -35,7 +35,7 @@ export const FormFieldComponent: React.FC<FormFieldComponentProps> = ({
   label,
   placeholder,
   description,
-  fieldType = "textarea",
+  fieldType = "richtext",
   selectOptions = [],
 }) => {
   return (

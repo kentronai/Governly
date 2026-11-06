@@ -17,7 +17,8 @@ type RunHealth = {
   noPrimarySources?: string[];
   discovered?: number;
   sourceErrors?: unknown[];
-  modelErrors?: unknown[];
+  modelErrors?: { jurisdiction?: string; error?: string }[];
+  fatal?: string;
   rejected?: unknown[];
   searchError?: string;
 };
@@ -92,6 +93,12 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
   ].filter(Boolean);
   const gaps = status?.coverage.noSources ?? 0;
   const unavailable = status?.enabled === false || run?.status === "failed" || run?.status === "interrupted";
+  const unavailableReason =
+    status?.enabled === false
+      ? "AI Radar is switched off on this server (RADAR_ENABLED=false)."
+      : run?.status === "interrupted"
+        ? "The last run was interrupted before it finished. Run it again."
+        : `The last run failed${health.fatal || health.modelErrors?.[0]?.error ? `: ${health.fatal ?? health.modelErrors?.[0]?.error}` : "."}`;
 
   return (
     <Card className="mt-6">
@@ -143,10 +150,15 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
             }
           />
         </div>
+        {run && !run.model && !unavailable && (
+          <p className="text-sm text-muted-foreground">
+            No AI model was available for the last run. Add an API key under Admin Center → BYOK to enable AI analysis.
+          </p>
+        )}
         {unavailable ? (
           <div className="flex items-start gap-2 text-sm text-red-500">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>AI Radar is currently unavailable.</span>
+            <span>{unavailableReason}</span>
           </div>
         ) : issues.length > 0 && (
           <div className="flex items-start gap-2 text-sm text-yellow-600">

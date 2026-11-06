@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   EditorContent,
   useEditor,
@@ -224,6 +224,13 @@ export function RichTextEditor({
     content: value,
     onUpdate: ({ editor }) => onChange(editor.isEmpty ? "" : editor.getHTML()),
   });
+
+  // Saved data usually arrives after the editor mounts: show it unless the user is typing.
+  useEffect(() => {
+    if (!editor || editor.isFocused) return;
+    if (value === (editor.isEmpty ? "" : editor.getHTML())) return;
+    editor.commands.setContent(value ?? "", { emitUpdate: false });
+  }, [editor, value]);
 
   const state = useEditorState({
     editor,

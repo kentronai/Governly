@@ -14,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/common/RichTextEditor";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -95,6 +95,8 @@ export default function GovIQInformationProtectionPage({ params }: PageProps) {
       <div
         onKeyDown={(e) => {
           if (e.key === "Enter") {
+            // Enter inside the rich text editor must add a new line/bullet, not submit
+            if ((e.target as HTMLElement).isContentEditable) return;
             e.preventDefault(); // important, prevents ghost submits
             form.handleSubmit(onSubmit)();
           }
@@ -113,10 +115,10 @@ export default function GovIQInformationProtectionPage({ params }: PageProps) {
                     deployment and serving strategies?
                   </FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextEditor
                       placeholder="Describe identified risks..."
-                      className="resize-none"
-                      {...field}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
@@ -168,10 +170,10 @@ export default function GovIQInformationProtectionPage({ params }: PageProps) {
                     post-deployment.
                   </FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextEditor
                       placeholder="Describe mitigation measures..."
-                      className="resize-none"
-                      {...field}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
@@ -186,10 +188,10 @@ export default function GovIQInformationProtectionPage({ params }: PageProps) {
                 <FormItem>
                   <FormLabel>App Registration EU Region</FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextEditor
                       placeholder="App Registration..."
-                      className="resize-none"
-                      {...field}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

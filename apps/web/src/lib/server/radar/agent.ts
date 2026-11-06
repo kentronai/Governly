@@ -53,8 +53,8 @@ const DISCOVERY_PER_RUN = 150;
 const HOST_GAP_MS = 500;
 export const RADAR_INTERVAL_HOURS = Number(process.env.RADAR_INTERVAL_HOURS) || 72;
 
-/** Master switch: AI Radar only runs when RADAR_ENABLED=true on the server. */
-export const radarEnabled = () => process.env.RADAR_ENABLED === "true";
+/** AI Radar is on unless the server sets RADAR_ENABLED=false (the model is optional, so it needs no other setup). */
+export const radarEnabled = () => process.env.RADAR_ENABLED?.trim().toLowerCase() !== "false";
 
 export class RadarUnavailableError extends Error {
   constructor() {

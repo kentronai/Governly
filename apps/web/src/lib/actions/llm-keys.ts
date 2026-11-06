@@ -21,12 +21,9 @@ async function resolveAuthorizedTenant(slugOrId: string) {
 function assertProviderModel(provider: string, modelId: string) {
   const info = getLlmProvider(provider);
   if (!info) throw new Error("Unknown provider");
-  // OpenRouter serves hundreds of models, listed live; others use the fixed list.
-  const ok =
-    provider === "openrouter"
-      ? /^[\w.:/-]{1,200}$/.test(modelId)
-      : info.models.some((m) => m.id === modelId);
-  if (!ok) throw new Error("Unknown model");
+  // Providers serve far more models than we list, so any plausible model id is accepted;
+  // a wrong one is caught by the connection test.
+  if (!/^[\w.:/-]{1,200}$/.test(modelId)) throw new Error("Invalid model id");
   return info;
 }
 
@@ -51,10 +48,15 @@ export async function saveLlmKey(
   modelId: string,
   apiKey: string,
 ) {
-  assertProviderModel(provider, modelId);
+  const info = assertProviderModel(provider, modelId);
   const key = apiKey.trim();
   if (key.length < 8 || key.length > 512) throw new Error("Invalid API key");
   const { tenantId, userId } = await resolveAuthorizedTenant(tenantSlugOrId);
+
+  // Refuse a key or model the provider rejects; a rate limit or outage must not block saving.
+  const check = await getModelProviderAdapter(provider).testConnection(modelId, info.baseUrl, key);
+  if (check.status !== "ready" && ["authentication_failed", "model_unavailable"].includes(check.code ?? ""))
+    throw new Error(check.message);
 
   const values = {
     keyEncrypted: encryptSecret(key),

@@ -52,6 +52,8 @@ export default function GovIQRecordKeepingPage({ params }: PageProps) {
       <div
         onKeyDown={(e) => {
           if (e.key === "Enter") {
+            // Enter inside the rich text editor must add a new line/bullet, not submit
+            if ((e.target as HTMLElement).isContentEditable) return;
             e.preventDefault(); // important, prevents ghost submits
             form.handleSubmit(onSubmit)();
           }
