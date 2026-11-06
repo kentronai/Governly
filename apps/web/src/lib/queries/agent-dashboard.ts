@@ -391,7 +391,7 @@ export const getExecutiveDashboard = cache(async (tenantId: string) => {
       getAutonomyDistribution(tenantId),
       getPlatformDistribution(tenantId),
       getDiscoveryTrend(tenantId),
-      getAgentPolicyViolations(tenantId),
+      getAgentPolicyViolations(tenantId, 500),
       getRecentViolations(tenantId),
     ]);
   // Rows behind each KPI card, so a card can list exactly which agents it counts.
