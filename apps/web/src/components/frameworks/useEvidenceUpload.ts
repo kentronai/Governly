@@ -6,15 +6,14 @@ import {
 import type { FrameworkControlData } from "@/lib/actions/framework-controls";
 import type { FrameworkRequirement } from "@/lib/frameworks";
 import { str } from "@/lib/frameworks/helpers";
+import { referenceEntry } from "@/lib/evidence-reference";
 import { errorToast, infoToast } from "@/lib/utils/toast";
-
-const FILE_TYPES = ".pdf,.docx,.txt,.md,.csv";
 
 function pickFile(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = FILE_TYPES;
+    // Any file is accepted: unreadable formats are still attached as evidence.
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.oncancel = () => resolve(null);
     input.click(); // must run inside the click handler (browser user-gesture rule)
@@ -52,6 +51,18 @@ export function useEvidenceUpload() {
   const upload = async (requirement: FrameworkRequirement) => {
     const file = await pickFile();
     if (!file) return null;
+    // Too big to send to the server (action body limit): attach it as a reference.
+    if (file.size > 8 * 1024 * 1024) {
+      infoToast(
+        "The file is too large to read automatically. It is attached as evidence for you to review.",
+      );
+      return Object.fromEntries(
+        targets(requirement).map(({ key }) => [
+          key,
+          referenceEntry(file.name, "The file is too large to read automatically (over 8 MB)."),
+        ]),
+      );
+    }
     setBusy(true);
     infoToast(`Reading ${file.name}…`);
     try {
@@ -63,7 +74,9 @@ export function useEvidenceUpload() {
         errorToast(result.error);
         return null;
       }
-      infoToast("Details filled from your document. Review, then Save.");
+      infoToast(
+        result.note ?? "Details filled from your document. Review, then Save.",
+      );
       return result.fill;
     } catch {
       errorToast("Unable to read the document");

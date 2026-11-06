@@ -100,12 +100,30 @@ export async function radarChat(
   model: RadarModel,
   system: string,
   user: string,
+  /** Images the model should read along with the text (vision-capable models only). */
+  images: { data: Uint8Array; mediaType: string }[] = [],
 ): Promise<unknown> {
   const { text } = await generateText({
     model: radarLanguageModel(model),
     temperature: radarTemperature(model),
     system,
-    prompt: user,
+    ...(images.length
+      ? {
+          messages: [
+            {
+              role: "user" as const,
+              content: [
+                { type: "text" as const, text: user },
+                ...images.map((i) => ({
+                  type: "image" as const,
+                  image: i.data,
+                  mediaType: i.mediaType,
+                })),
+              ],
+            },
+          ],
+        }
+      : { prompt: user }),
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(180_000),
   });

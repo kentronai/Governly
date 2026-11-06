@@ -1,0 +1,1976 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`permanent control IDs match the committed list: only append, never renumber 1`] = `
+[
+  {
+    "code": "KN0001.1.1",
+    "id": "eu-ai-act:1.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0001.1.2",
+    "id": "eu-ai-act:1.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0001.1.3",
+    "id": "eu-ai-act:1.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0001.2.1",
+    "id": "eu-ai-act:1.2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0001.2.2",
+    "id": "eu-ai-act:1.2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0002.1.1",
+    "id": "eu-ai-act:2.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0002.1.2",
+    "id": "eu-ai-act:2.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0002.1.3",
+    "id": "eu-ai-act:2.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0003.1.1",
+    "id": "eu-ai-act:3.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0003.1.2",
+    "id": "eu-ai-act:3.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0003.1.3",
+    "id": "eu-ai-act:3.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0003.2.1",
+    "id": "eu-ai-act:3.2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0003.2.2",
+    "id": "eu-ai-act:3.2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0004.1.1",
+    "id": "eu-ai-act:4.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0004.1.2",
+    "id": "eu-ai-act:4.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0004.1.3",
+    "id": "eu-ai-act:4.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0005.1.1",
+    "id": "eu-ai-act:5.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0005.1.2",
+    "id": "eu-ai-act:5.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0005.2.1",
+    "id": "eu-ai-act:5.2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0005.2.2",
+    "id": "eu-ai-act:5.2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0006.1.1",
+    "id": "eu-ai-act:6.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0006.1.2",
+    "id": "eu-ai-act:6.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0007.1.1",
+    "id": "eu-ai-act:7.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0007.1.2",
+    "id": "eu-ai-act:7.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0007.1.3",
+    "id": "eu-ai-act:7.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0008.1.1",
+    "id": "eu-ai-act:8.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0008.1.2",
+    "id": "eu-ai-act:8.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0008.1.3",
+    "id": "eu-ai-act:8.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0009.1.1",
+    "id": "eu-ai-act:9.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0009.1.2",
+    "id": "eu-ai-act:9.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0009.1.3",
+    "id": "eu-ai-act:9.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0009.2.1",
+    "id": "eu-ai-act:9.2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0009.2.2",
+    "id": "eu-ai-act:9.2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0010.1.1",
+    "id": "eu-ai-act:10.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0010.1.2",
+    "id": "eu-ai-act:10.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0010.1.3",
+    "id": "eu-ai-act:10.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0011.1.1",
+    "id": "eu-ai-act:11.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0011.1.2",
+    "id": "eu-ai-act:11.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0011.1.3",
+    "id": "eu-ai-act:11.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0012.1.1",
+    "id": "eu-ai-act:12.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0012.1.2",
+    "id": "eu-ai-act:12.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0012.2.1",
+    "id": "eu-ai-act:12.2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0012.2.2",
+    "id": "eu-ai-act:12.2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0013.1",
+    "id": "colorado-ai-act:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0013.2",
+    "id": "colorado-ai-act:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0013.3",
+    "id": "colorado-ai-act:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0013.4",
+    "id": "colorado-ai-act:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0014.1",
+    "id": "colorado-ai-act:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0014.2",
+    "id": "colorado-ai-act:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0014.3",
+    "id": "colorado-ai-act:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0014.4",
+    "id": "colorado-ai-act:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0014.5",
+    "id": "colorado-ai-act:2.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.1",
+    "id": "colorado-ai-act:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.2",
+    "id": "colorado-ai-act:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.3",
+    "id": "colorado-ai-act:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.4",
+    "id": "colorado-ai-act:3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.5",
+    "id": "colorado-ai-act:3.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0015.6",
+    "id": "colorado-ai-act:3.6",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0016.1",
+    "id": "colorado-ai-act:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0016.2",
+    "id": "colorado-ai-act:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0016.3",
+    "id": "colorado-ai-act:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0016.4",
+    "id": "colorado-ai-act:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0016.5",
+    "id": "colorado-ai-act:4.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0017.1",
+    "id": "colorado-ai-act:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0017.2",
+    "id": "colorado-ai-act:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0017.3",
+    "id": "colorado-ai-act:5.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0017.4",
+    "id": "colorado-ai-act:5.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0017.5",
+    "id": "colorado-ai-act:5.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0018.1",
+    "id": "colorado-ai-act:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0018.2",
+    "id": "colorado-ai-act:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0018.3",
+    "id": "colorado-ai-act:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0018.4",
+    "id": "colorado-ai-act:6.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0018.5",
+    "id": "colorado-ai-act:6.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0019.1",
+    "id": "colorado-ai-act:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0019.2",
+    "id": "colorado-ai-act:7.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0019.3",
+    "id": "colorado-ai-act:7.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0019.4",
+    "id": "colorado-ai-act:7.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0020.1",
+    "id": "colorado-ai-act:8.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0020.2",
+    "id": "colorado-ai-act:8.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0020.3",
+    "id": "colorado-ai-act:8.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0020.4",
+    "id": "colorado-ai-act:8.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0021.1",
+    "id": "colorado-ai-act:9.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0021.2",
+    "id": "colorado-ai-act:9.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0021.3",
+    "id": "colorado-ai-act:9.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0021.4",
+    "id": "colorado-ai-act:9.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0022.1",
+    "id": "colorado-ai-act:10.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0022.2",
+    "id": "colorado-ai-act:10.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0022.3",
+    "id": "colorado-ai-act:10.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0022.4",
+    "id": "colorado-ai-act:10.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0023.1",
+    "id": "texas-traiga:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0023.2",
+    "id": "texas-traiga:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0023.3",
+    "id": "texas-traiga:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0023.4",
+    "id": "texas-traiga:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0024.1",
+    "id": "texas-traiga:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0024.2",
+    "id": "texas-traiga:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0024.3",
+    "id": "texas-traiga:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0024.4",
+    "id": "texas-traiga:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0024.5",
+    "id": "texas-traiga:2.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0025.1",
+    "id": "texas-traiga:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0025.2",
+    "id": "texas-traiga:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0025.3",
+    "id": "texas-traiga:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0025.4",
+    "id": "texas-traiga:3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0026.1",
+    "id": "texas-traiga:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0026.2",
+    "id": "texas-traiga:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0026.3",
+    "id": "texas-traiga:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0026.4",
+    "id": "texas-traiga:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0027.1",
+    "id": "texas-traiga:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0027.2",
+    "id": "texas-traiga:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0027.3",
+    "id": "texas-traiga:5.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0027.4",
+    "id": "texas-traiga:5.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0028.1",
+    "id": "texas-traiga:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0028.2",
+    "id": "texas-traiga:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0028.3",
+    "id": "texas-traiga:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0028.4",
+    "id": "texas-traiga:6.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0029.1",
+    "id": "texas-traiga:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0029.2",
+    "id": "texas-traiga:7.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0029.3",
+    "id": "texas-traiga:7.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0029.4",
+    "id": "texas-traiga:7.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0030.1",
+    "id": "texas-traiga:8.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0030.2",
+    "id": "texas-traiga:8.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0030.3",
+    "id": "texas-traiga:8.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0030.4",
+    "id": "texas-traiga:8.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0031.1",
+    "id": "texas-traiga:9.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0031.2",
+    "id": "texas-traiga:9.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0031.3",
+    "id": "texas-traiga:9.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0031.4",
+    "id": "texas-traiga:9.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0032.1",
+    "id": "texas-traiga:10.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0032.2",
+    "id": "texas-traiga:10.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0032.3",
+    "id": "texas-traiga:10.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0032.4",
+    "id": "texas-traiga:10.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0032.5",
+    "id": "texas-traiga:10.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0033.1",
+    "id": "nyc-ll-144:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0034.1",
+    "id": "nyc-ll-144:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0034.2",
+    "id": "nyc-ll-144:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0035.1",
+    "id": "nyc-ll-144:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0035.2",
+    "id": "nyc-ll-144:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0035.3",
+    "id": "nyc-ll-144:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0036.1",
+    "id": "nyc-ll-144:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0037.1",
+    "id": "nyc-ll-144:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0038.1",
+    "id": "nyc-ll-144:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0039.1",
+    "id": "nyc-ll-144:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.1",
+    "id": "hipaa-security:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.2",
+    "id": "hipaa-security:1.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.3",
+    "id": "hipaa-security:1.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.4",
+    "id": "hipaa-security:1.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.5",
+    "id": "hipaa-security:1.1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.6",
+    "id": "hipaa-security:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.7",
+    "id": "hipaa-security:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.8",
+    "id": "hipaa-security:1.3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.9",
+    "id": "hipaa-security:1.3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.10",
+    "id": "hipaa-security:1.3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.11",
+    "id": "hipaa-security:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.12",
+    "id": "hipaa-security:1.4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.13",
+    "id": "hipaa-security:1.4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.14",
+    "id": "hipaa-security:1.4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0040.15",
+    "id": "hipaa-security:1.4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.1",
+    "id": "hipaa-security:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.2",
+    "id": "hipaa-security:2.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.3",
+    "id": "hipaa-security:2.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.4",
+    "id": "hipaa-security:2.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.5",
+    "id": "hipaa-security:2.1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.6",
+    "id": "hipaa-security:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.7",
+    "id": "hipaa-security:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.8",
+    "id": "hipaa-security:2.3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.9",
+    "id": "hipaa-security:2.3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.10",
+    "id": "hipaa-security:2.3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0041.11",
+    "id": "hipaa-security:2.3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.1",
+    "id": "hipaa-security:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.2",
+    "id": "hipaa-security:3.1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.3",
+    "id": "hipaa-security:3.1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.4",
+    "id": "hipaa-security:3.1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.5",
+    "id": "hipaa-security:3.1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.6",
+    "id": "hipaa-security:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.7",
+    "id": "hipaa-security:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.8",
+    "id": "hipaa-security:3.3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0042.9",
+    "id": "hipaa-security:3.3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0043.1",
+    "id": "gdpr:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0043.2",
+    "id": "gdpr:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0043.3",
+    "id": "gdpr:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0044.1",
+    "id": "gdpr:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0044.2",
+    "id": "gdpr:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0044.3",
+    "id": "gdpr:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0045.1",
+    "id": "gdpr:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0045.2",
+    "id": "gdpr:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0045.3",
+    "id": "gdpr:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0045.4",
+    "id": "gdpr:3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0046.1",
+    "id": "ccpa:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0046.2",
+    "id": "ccpa:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0046.3",
+    "id": "ccpa:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0046.4",
+    "id": "ccpa:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0047.1",
+    "id": "ccpa:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0047.2",
+    "id": "ccpa:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0047.3",
+    "id": "ccpa:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0047.4",
+    "id": "ccpa:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0048.1",
+    "id": "ccpa:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0048.2",
+    "id": "ccpa:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0049.1",
+    "id": "dora:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0049.2",
+    "id": "dora:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0049.3",
+    "id": "dora:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0050.1",
+    "id": "dora:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0050.2",
+    "id": "dora:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0050.3",
+    "id": "dora:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0051.1",
+    "id": "dora:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0051.2",
+    "id": "dora:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0051.3",
+    "id": "dora:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0052.1",
+    "id": "dora:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0052.2",
+    "id": "dora:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0052.3",
+    "id": "dora:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0052.4",
+    "id": "dora:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0053.1",
+    "id": "dora:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0001.1",
+    "id": "ftc-ai:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0001.2",
+    "id": "ftc-ai:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0001.3",
+    "id": "ftc-ai:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0001.4",
+    "id": "ftc-ai:1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0002.1",
+    "id": "ftc-ai:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0002.2",
+    "id": "ftc-ai:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0002.3",
+    "id": "ftc-ai:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0002.4",
+    "id": "ftc-ai:2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0003.1",
+    "id": "ftc-ai:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0003.2",
+    "id": "ftc-ai:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0003.3",
+    "id": "ftc-ai:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0003.4",
+    "id": "ftc-ai:3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0004.1",
+    "id": "ftc-ai:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0004.2",
+    "id": "ftc-ai:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0004.3",
+    "id": "ftc-ai:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0005.1",
+    "id": "ftc-ai:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0005.2",
+    "id": "ftc-ai:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0005.3",
+    "id": "ftc-ai:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0005.4",
+    "id": "ftc-ai:5.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0006.1",
+    "id": "ftc-ai:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0006.2",
+    "id": "ftc-ai:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0006.3",
+    "id": "ftc-ai:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0006.4",
+    "id": "ftc-ai:6.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0007.1",
+    "id": "ftc-ai:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0007.2",
+    "id": "ftc-ai:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0007.3",
+    "id": "ftc-ai:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0008.1",
+    "id": "oecd-ai-principles:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0008.2",
+    "id": "oecd-ai-principles:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0008.3",
+    "id": "oecd-ai-principles:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0008.4",
+    "id": "oecd-ai-principles:1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0008.5",
+    "id": "oecd-ai-principles:1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0009.1",
+    "id": "oecd-ai-principles:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0009.2",
+    "id": "oecd-ai-principles:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0009.3",
+    "id": "oecd-ai-principles:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0009.4",
+    "id": "oecd-ai-principles:2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0010.1",
+    "id": "oecd-ai-principles:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0010.2",
+    "id": "oecd-ai-principles:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0010.3",
+    "id": "oecd-ai-principles:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0010.4",
+    "id": "oecd-ai-principles:3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0011.1",
+    "id": "oecd-ai-principles:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0011.2",
+    "id": "oecd-ai-principles:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0011.3",
+    "id": "oecd-ai-principles:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0011.4",
+    "id": "oecd-ai-principles:4.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0011.5",
+    "id": "oecd-ai-principles:4.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0012.1",
+    "id": "oecd-ai-principles:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0012.2",
+    "id": "oecd-ai-principles:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0012.3",
+    "id": "oecd-ai-principles:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0012.4",
+    "id": "oecd-ai-principles:5.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0012.5",
+    "id": "oecd-ai-principles:5.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0013.1",
+    "id": "oecd-ai-principles:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0013.2",
+    "id": "oecd-ai-principles:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0013.3",
+    "id": "oecd-ai-principles:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0014.1",
+    "id": "altai:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0014.2",
+    "id": "altai:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0015.1",
+    "id": "altai:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0015.2",
+    "id": "altai:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0015.3",
+    "id": "altai:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0015.4",
+    "id": "altai:2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0015.5",
+    "id": "altai:2.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0016.1",
+    "id": "altai:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0016.2",
+    "id": "altai:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0016.3",
+    "id": "altai:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0017.1",
+    "id": "altai:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0017.2",
+    "id": "altai:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0017.3",
+    "id": "altai:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0018.1",
+    "id": "altai:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0018.2",
+    "id": "altai:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0018.3",
+    "id": "altai:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0019.1",
+    "id": "altai:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0019.2",
+    "id": "altai:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0019.3",
+    "id": "altai:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0020.1",
+    "id": "altai:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0020.2",
+    "id": "altai:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0020.3",
+    "id": "altai:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0020.4",
+    "id": "altai:7.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0021.1",
+    "id": "pci-dss-lite:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0021.2",
+    "id": "pci-dss-lite:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0022.1",
+    "id": "pci-dss-lite:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0022.2",
+    "id": "pci-dss-lite:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0023.1",
+    "id": "pci-dss-lite:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0023.2",
+    "id": "pci-dss-lite:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0024.1",
+    "id": "pci-dss-lite:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0024.2",
+    "id": "pci-dss-lite:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0025.1",
+    "id": "pci-dss-lite:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0025.2",
+    "id": "pci-dss-lite:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0026.1",
+    "id": "ai-ethics-governance:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0026.2",
+    "id": "ai-ethics-governance:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0026.3",
+    "id": "ai-ethics-governance:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0027.1",
+    "id": "ai-ethics-governance:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0027.2",
+    "id": "ai-ethics-governance:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0027.3",
+    "id": "ai-ethics-governance:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0028.1",
+    "id": "ai-ethics-governance:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0028.2",
+    "id": "ai-ethics-governance:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0028.3",
+    "id": "ai-ethics-governance:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0029.1",
+    "id": "ai-ethics-governance:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0029.2",
+    "id": "ai-ethics-governance:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0029.3",
+    "id": "ai-ethics-governance:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0030.1",
+    "id": "ai-ethics-governance:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0030.2",
+    "id": "ai-ethics-governance:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0031.1",
+    "id": "iso-42001:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0031.2",
+    "id": "iso-42001:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0031.3",
+    "id": "iso-42001:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0031.4",
+    "id": "iso-42001:4.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0032.1",
+    "id": "iso-42001:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0032.2",
+    "id": "iso-42001:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0032.3",
+    "id": "iso-42001:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.1",
+    "id": "iso-42001:6.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.2",
+    "id": "iso-42001:6.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.3",
+    "id": "iso-42001:6.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.4",
+    "id": "iso-42001:6.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.5",
+    "id": "iso-42001:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0033.6",
+    "id": "iso-42001:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0034.1",
+    "id": "iso-42001:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0034.2",
+    "id": "iso-42001:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0034.3",
+    "id": "iso-42001:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0034.4",
+    "id": "iso-42001:7.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0034.5",
+    "id": "iso-42001:7.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0035.1",
+    "id": "iso-42001:8.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0035.2",
+    "id": "iso-42001:8.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0035.3",
+    "id": "iso-42001:8.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0035.4",
+    "id": "iso-42001:8.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0036.1",
+    "id": "iso-42001:9.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0036.2",
+    "id": "iso-42001:9.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0036.3",
+    "id": "iso-42001:9.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0037.1",
+    "id": "iso-42001:10.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0037.2",
+    "id": "iso-42001:10.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.1",
+    "id": "nist-ai-rmf:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.2",
+    "id": "nist-ai-rmf:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.3",
+    "id": "nist-ai-rmf:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.4",
+    "id": "nist-ai-rmf:1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.5",
+    "id": "nist-ai-rmf:1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.6",
+    "id": "nist-ai-rmf:1.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0038.7",
+    "id": "nist-ai-rmf:1.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0039.1",
+    "id": "nist-ai-rmf:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0039.2",
+    "id": "nist-ai-rmf:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0039.3",
+    "id": "nist-ai-rmf:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0040.1",
+    "id": "nist-ai-rmf:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0040.2",
+    "id": "nist-ai-rmf:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0041.1",
+    "id": "nist-ai-rmf:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0041.2",
+    "id": "nist-ai-rmf:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0041.3",
+    "id": "nist-ai-rmf:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0042.1",
+    "id": "nist-ai-rmf:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0042.2",
+    "id": "nist-ai-rmf:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0043.1",
+    "id": "nist-ai-rmf:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0043.2",
+    "id": "nist-ai-rmf:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0044.1",
+    "id": "iso-27001:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0044.2",
+    "id": "iso-27001:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0044.3",
+    "id": "iso-27001:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0044.4",
+    "id": "iso-27001:4.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0045.1",
+    "id": "iso-27001:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0045.2",
+    "id": "iso-27001:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0045.3",
+    "id": "iso-27001:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0046.1",
+    "id": "iso-27001:6.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0046.2",
+    "id": "iso-27001:6.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0046.3",
+    "id": "iso-27001:6.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0046.4",
+    "id": "iso-27001:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0046.5",
+    "id": "iso-27001:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0047.1",
+    "id": "iso-27001:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0047.2",
+    "id": "iso-27001:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0047.3",
+    "id": "iso-27001:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0047.4",
+    "id": "iso-27001:7.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0047.5",
+    "id": "iso-27001:7.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0048.1",
+    "id": "iso-27001:8.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0048.2",
+    "id": "iso-27001:8.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0048.3",
+    "id": "iso-27001:8.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0049.1",
+    "id": "iso-27001:9.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0049.2",
+    "id": "iso-27001:9.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0049.3",
+    "id": "iso-27001:9.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0050.1",
+    "id": "iso-27001:10.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0050.2",
+    "id": "iso-27001:10.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0051.1",
+    "id": "soc-2-type-ii:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0051.2",
+    "id": "soc-2-type-ii:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0051.3",
+    "id": "soc-2-type-ii:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0052.1",
+    "id": "soc-2-type-ii:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0052.2",
+    "id": "soc-2-type-ii:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0053.1",
+    "id": "soc-2-type-ii:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0053.2",
+    "id": "soc-2-type-ii:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0053.3",
+    "id": "soc-2-type-ii:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0054.1",
+    "id": "soc-2-type-ii:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0054.2",
+    "id": "soc-2-type-ii:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0054.3",
+    "id": "soc-2-type-ii:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0055.1",
+    "id": "soc-2-type-ii:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0055.2",
+    "id": "soc-2-type-ii:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0055.3",
+    "id": "soc-2-type-ii:5.3",
+    "kind": "framework",
+  },
+]
+`;

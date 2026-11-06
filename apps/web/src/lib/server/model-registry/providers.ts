@@ -149,6 +149,38 @@ export class OpenAIProviderAdapter implements ModelProviderAdapter {
   }
 }
 
+const clip = (text: string, apiKey: string) =>
+  text.replaceAll(apiKey, "***").replace(/\s+/g, " ").trim().slice(0, 220);
+
+/** Google's own error text ("[{error:{message}}]" or "{error:{message}}"), key stripped. */
+async function googleMessage(response: Response, apiKey: string) {
+  try {
+    const body = await response.json();
+    const message = (Array.isArray(body) ? body[0] : body)?.error?.message;
+    return typeof message === "string" ? clip(message, apiKey) : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Chat models the key can use, from Google's model list (null: list unavailable). */
+async function geminiModels(baseUrl: string, apiKey: string) {
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { data?: { id?: string }[] };
+    return (body.data ?? [])
+      .map((m) => String(m.id ?? "").replace(/^models\//, ""))
+      .filter((id) => /^gemini-/.test(id) && !/embedding|aqa|tts|image|live|audio/.test(id));
+  } catch {
+    return null;
+  }
+}
+
 export class GeminiProviderAdapter implements ModelProviderAdapter {
   readonly provider = "gemini";
 
@@ -219,9 +251,18 @@ export class GeminiProviderAdapter implements ModelProviderAdapter {
         );
       }
       if (response.status === 404) {
+        const models = await geminiModels(baseUrl, apiKey);
+        const preferred = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-flash-latest"];
+        const usable = models
+          ? [...preferred.filter((m) => models.includes(m)), ...models.filter((m) => !preferred.includes(m))].slice(0, 5)
+          : [];
         return safeFailure(
           "model_unavailable",
-          "This Gemini model is not available to the configured project.",
+          usable.length
+            ? `Google doesn't serve "${modelId}" to this key. Models this key can use: ${usable.join(", ")}. Pick one of them in BYOK.`
+            : models
+              ? `Google doesn't serve "${modelId}" to this key and lists no Gemini models for it. Check that the Generative Language API is enabled for the key's Google project.`
+              : `Google doesn't serve "${modelId}" to this key. Check that the key is an AI Studio / Gemini API key and that the Generative Language API is enabled for its project.`,
         );
       }
       if (response.status === 429) {
@@ -236,9 +277,10 @@ export class GeminiProviderAdapter implements ModelProviderAdapter {
           "Gemini is temporarily unavailable.",
         );
       }
+      const detail = await googleMessage(response, apiKey);
       return safeFailure(
         "connection_rejected",
-        `Gemini rejected the connection test (HTTP ${response.status}).`,
+        `Gemini rejected the connection test (HTTP ${response.status}${detail ? `: ${detail}` : ""}).`,
       );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {

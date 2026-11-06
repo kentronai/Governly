@@ -42,21 +42,26 @@ export async function listLlmKeys(tenantSlugOrId: string) {
   return rows;
 }
 
+/**
+ * Rejections the admin can act on are RETURNED, not thrown: in production Next hides the
+ * message of a thrown server-action error behind "An error occurred in the Server Components render".
+ */
+const rejected = (error: string) => ({ success: false as const, error });
+
 export async function saveLlmKey(
   tenantSlugOrId: string,
   provider: string,
   modelId: string,
   apiKey: string,
 ) {
-  const info = assertProviderModel(provider, modelId);
+  const info = getLlmProvider(provider);
+  if (!info) return rejected("Unknown provider");
+  if (!/^[\w.:/-]{1,200}$/.test(modelId)) return rejected("Invalid model id");
   const key = apiKey.trim();
-  if (key.length < 8 || key.length > 512) throw new Error("Invalid API key");
+  if (key.length < 8 || key.length > 512) return rejected("Invalid API key");
   const { tenantId, userId } = await resolveAuthorizedTenant(tenantSlugOrId);
 
-  // Refuse a key or model the provider rejects; a rate limit or outage must not block saving.
-  const check = await getModelProviderAdapter(provider).testConnection(modelId, info.baseUrl, key);
-  if (check.status !== "ready" && ["authentication_failed", "model_unavailable"].includes(check.code ?? ""))
-    throw new Error(check.message);
+  // The key is always saved; the card then shows whether the provider accepts it (testLlmKey).
 
   const values = {
     keyEncrypted: encryptSecret(key),
@@ -76,7 +81,7 @@ export async function saveLlmKey(
     targetType: "llm_provider",
     targetId: `${provider}/${modelId}`,
   });
-  return { success: true };
+  return { success: true as const };
 }
 
 export async function deleteLlmKey(

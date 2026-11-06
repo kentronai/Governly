@@ -2,6 +2,7 @@ import { FRAMEWORKS, enabledFrameworks, getFramework } from "@/lib/frameworks";
 import {
   EQUIVALENT_CONTROLS,
   buildControls,
+  controlCodes,
   mirrorWrites,
 } from "@/lib/frameworks/controls";
 
@@ -75,11 +76,17 @@ describe("buildControls", () => {
     ]);
   });
 
-  it("merges an enabled policy's equivalent requirement into the same row", () => {
-    const sections = buildControls([eu, colorado]);
-    const titles = sections.flatMap((s) => s.controls.map((c) => c.title));
-    expect(titles).not.toContain("Training and Awareness");
-    expect(titles).toContain("Compliance Program");
+  it("keeps every control in its own row, even when an equivalent one is enabled", () => {
+    const rows = buildControls([eu, colorado]).flatMap((s) => s.controls);
+    const titles = rows.map((c) => c.title);
+    expect(titles).toContain("Training and Awareness");
+    expect(titles).toContain("We train relevant staff on AI literacy and ethics");
+    // ...and each one lists the other as mapped, so saving either fills both.
+    const training = rows.find((c) => c.title === "Training and Awareness")!;
+    expect(training.members.map((m) => m.framework.slug)).toEqual([
+      "colorado-ai-act",
+      "eu-ai-act",
+    ]);
   });
 
   it("lists regulations before frameworks and tags each section", () => {
@@ -91,7 +98,7 @@ describe("buildControls", () => {
     );
   });
 
-  it("covers every leaf of every enabled framework exactly once per kind", () => {
+  it("gives every leaf of every enabled framework exactly one row, per kind", () => {
     for (const kind of ["regulation", "framework"] as const) {
       const leaves = FRAMEWORKS.filter((f) => f.kind === kind).flatMap((f) =>
         f.sections.flatMap((s) =>
@@ -105,9 +112,8 @@ describe("buildControls", () => {
       const placed = buildControls(FRAMEWORKS)
         .filter((s) => s.kind === kind)
         .flatMap((s) => s.controls)
-        .flatMap((c) => c.members)
-        .filter((m) => m.framework.kind === kind)
-        .map((m) => `${m.framework.slug}:${m.sub?.key ?? m.requirement.key}`);
+        .filter((c) => !c.parent)
+        .map((c) => `${c.primary.framework.slug}:${c.primary.sub?.key ?? c.primary.requirement.key}`);
       expect(new Set(placed).size).toBe(placed.length);
       expect([...placed].sort()).toEqual([...leaves].sort());
     }
@@ -149,6 +155,53 @@ describe("EQUIVALENT_CONTROLS groups", () => {
       const slugs = group.map((id) => id.split(":")[0]);
       expect(new Set(slugs).size).toBe(slugs.length);
     }
+  });
+});
+
+describe("permanent control IDs", () => {
+  const codesFor = (slugs: string[]) =>
+    Object.fromEntries(
+      buildControls(FRAMEWORKS.filter((f) => slugs.includes(f.slug)))
+        .flatMap((s) => s.controls)
+        .filter((c) => !c.parent)
+        .map((c) => [
+          `${c.primary.framework.slug}:${c.primary.sub?.key ?? c.primary.requirement.key}`,
+          c.code,
+        ]),
+    );
+  const all = codesFor(FRAMEWORKS.map((f) => f.slug));
+
+  it("never change when other policies are enabled or disabled", () => {
+    for (const slugs of [
+      ["gdpr"],
+      ["ccpa", "gdpr"],
+      ["eu-ai-act", "gdpr", "iso-42001"],
+      ["soc-2-type-ii"],
+    ])
+      for (const [id, code] of Object.entries(codesFor(slugs)))
+        expect(code).toBe(all[id]);
+  });
+
+  it("start at KN0001 for regulations and, separately, for frameworks", () => {
+    const first = (kind: string) =>
+      controlCodes().filter((c) => c.kind === kind)[0].code;
+    expect(first("regulation")).toBe("KN0001.1.1");
+    expect(first("framework")).toBe("KN0001.1");
+    // A policy enabled on its own keeps its own, later, ID.
+    expect(Object.values(codesFor(["gdpr"]))[0]).not.toBe("KN0001.1");
+  });
+
+  it("are unique within each kind", () => {
+    for (const kind of ["regulation", "framework"] as const) {
+      const codes = controlCodes()
+        .filter((c) => c.kind === kind)
+        .map((c) => c.code);
+      expect(new Set(codes).size).toBe(codes.length);
+    }
+  });
+
+  it("match the committed list: only append, never renumber", () => {
+    expect(controlCodes()).toMatchSnapshot();
   });
 });
 

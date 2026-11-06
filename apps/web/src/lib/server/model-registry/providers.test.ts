@@ -174,6 +174,47 @@ describe("GeminiProviderAdapter", () => {
     );
   });
 
+  it("on a 404 names the models the key can use instead of a generic message", async () => {
+    (fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: "models/gemini-2.0-flash" },
+            { id: "models/gemini-2.5-flash" },
+            { id: "models/text-embedding-004" },
+          ],
+        }),
+      });
+    const result = await new GeminiProviderAdapter().testConnection(
+      "gemini-3-pro-preview",
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+      "test-gemini-key",
+    );
+
+    expect(result.code).toBe("model_unavailable");
+    expect(result.message).toContain("gemini-2.5-flash, gemini-2.0-flash");
+    expect(result.message).not.toContain("embedding");
+    expect(JSON.stringify(result)).not.toContain("test-gemini-key");
+  });
+
+  it("shows Google's own reason for other rejections, without the key", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => [{ error: { message: "API key not valid: test-gemini-key" } }],
+    });
+    const result = await new GeminiProviderAdapter().testConnection(
+      "gemini-2.5-flash",
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+      "test-gemini-key",
+    );
+
+    expect(result.message).toContain("HTTP 400: API key not valid: ***");
+    expect(JSON.stringify(result)).not.toContain("test-gemini-key");
+  });
+
   it("rejects non-Google endpoints without sending credentials", async () => {
     const result = await new GeminiProviderAdapter().testConnection(
       "gemini-3.6-flash",

@@ -242,55 +242,74 @@ const peersOf = (id: string) =>
   (groupOf.get(id) ?? []).filter((other) => other !== id);
 
 /**
+ * Permanent control IDs. Every control gets its ID from its fixed place in the full
+ * framework list, per kind, never from what a tenant has enabled — so enabling or
+ * disabling a policy can't renumber anything. Regulations and frameworks each count
+ * from KN0001 and never share rows. Add new frameworks at the END of FRAMEWORKS (and
+ * new requirements at the end of a section) so existing IDs stay put; the snapshot
+ * test fails on any change.
+ * KN0001 = section, KN0001.1 = requirement, KN0001.1.1 = subcontrol.
+ */
+const sectionCodes = new Map<string, string>(); // "slug:sectionKey"
+const requirementCodes = new Map<string, string>(); // "slug:requirementKey"
+const leafCodes = new Map<string, string>(); // leaf id
+for (const kind of ["regulation", "framework"] as const) {
+  let sectionNo = 0;
+  for (const framework of FRAMEWORKS.filter((f) => f.kind === kind))
+    for (const section of framework.sections) {
+      const code = `KN${String(++sectionNo).padStart(4, "0")}`;
+      sectionCodes.set(`${framework.slug}:${section.key}`, code);
+      section.requirements.forEach((requirement, i) => {
+        const reqCode = `${code}.${i + 1}`;
+        requirementCodes.set(`${framework.slug}:${requirement.key}`, reqCode);
+        if (!requirement.subcontrols.length)
+          leafCodes.set(`${framework.slug}:${requirement.key}`, reqCode);
+        requirement.subcontrols.forEach((sub, j) =>
+          leafCodes.set(`${framework.slug}:${sub.key}`, `${reqCode}.${j + 1}`),
+        );
+      });
+    }
+}
+
+/** Every control ID with the control it belongs to, for the ID snapshot test. */
+export const controlCodes = () =>
+  [...leafCodes].map(([id, code]) => ({
+    kind: nodes.get(id)!.framework.kind,
+    code,
+    id,
+  }));
+
+/**
  * Kentron control library for the enabled frameworks: regulations first, then
- * frameworks, each in framework order and each numbered on its own.
- * Numbered KN0001… per section, KN0001.1… per requirement and KN0001.1.1… per
- * subcontrol. Equivalent leaves of the same kind merge into the row of the first
- * enabled framework that has them; mapped frameworks that are not enabled (or of
- * the other kind) still show in `members`, because filling the row completes them too.
+ * frameworks, each listed in framework order with its own row numbers (1, 2, 3…)
+ * and its own permanent IDs. Every control keeps its own row; equivalent controls
+ * (EQUIVALENT_CONTROLS) are shown in `members` and are filled in together when one
+ * is saved, whether or not their framework is enabled or of the other kind.
  */
 export function buildControls(
   enabled: FrameworkDefinition[],
 ): ControlSection[] {
   const sections: ControlSection[] = [];
-  // Regulations and frameworks are separate lists, each numbered from 1
-  // (KN0001, row 1) and each merging only with controls of its own kind. A
-  // mapped control of the other kind still shows in `members`, so saving here
-  // updates it too, but it keeps its own row in its own list.
   for (const kind of ["regulation", "framework"] as const) {
-    const placed = new Set<string>();
-    let kindSections = 0;
     let no = 0;
     for (const framework of enabled.filter((f) => f.kind === kind)) {
       for (const section of framework.sections) {
-        const drafts: {
-          requirement: FrameworkRequirement;
-          leaves: { primary: ControlMember; members: ControlMember[] }[];
-        }[] = [];
-        for (const requirement of section.requirements) {
-          const leaves = [];
-          for (const primary of leavesOf(framework, requirement)) {
-            if (placed.has(idOf(primary))) continue;
-            const others = peersOf(idOf(primary))
-              .map((id) => nodes.get(id))
-              .filter((m): m is ControlMember => !!m);
-            const members = [primary, ...others];
-            members
-              .filter((m) => m.framework.kind === kind)
-              .forEach((m) => placed.add(idOf(m)));
-            leaves.push({ primary, members });
-          }
-          if (leaves.length) drafts.push({ requirement, leaves });
-        }
-        if (!drafts.length) continue;
-
-        const code = `KN${String(++kindSections).padStart(4, "0")}`;
+        const code = sectionCodes.get(`${framework.slug}:${section.key}`)!;
         const sectionNo = ++no;
         const controls: Control[] = [];
-        drafts.forEach(({ requirement, leaves }, i) => {
-          const reqCode = `${code}.${i + 1}`;
+        for (const requirement of section.requirements) {
+          const reqCode = requirementCodes.get(
+            `${framework.slug}:${requirement.key}`,
+          )!;
           const heading = `${reqCode} ${requirement.title}`;
+          const membersOf = (primary: ControlMember) => [
+            primary,
+            ...peersOf(idOf(primary))
+              .map((id) => nodes.get(id))
+              .filter((m): m is ControlMember => !!m),
+          ];
           if (!requirement.subcontrols.length) {
+            const primary: ControlMember = { framework, requirement };
             controls.push({
               code: reqCode,
               no: ++no,
@@ -299,9 +318,10 @@ export function buildControls(
               nested: requirement.nested,
               parent: false,
               heading,
-              ...leaves[0],
+              primary,
+              members: membersOf(primary),
             });
-            return;
+            continue;
           }
           controls.push({
             code: reqCode,
@@ -313,25 +333,21 @@ export function buildControls(
             primary: { framework, requirement },
             members: [],
           });
-          leaves.forEach((leaf, j) =>
+          for (const sub of requirement.subcontrols) {
+            const primary: ControlMember = { framework, requirement, sub };
             controls.push({
-              code: `${reqCode}.${j + 1}`,
+              code: leafCodes.get(idOf(primary))!,
               no: ++no,
-              title: leaf.primary.sub!.title,
-              description: leaf.primary.sub!.description,
+              title: sub.title,
+              description: sub.description,
               parent: false,
               heading,
-              ...leaf,
-            }),
-          );
-        });
-        sections.push({
-          kind,
-          code,
-          no: sectionNo,
-          title: section.title,
-          controls,
-        });
+              primary,
+              members: membersOf(primary),
+            });
+          }
+        }
+        sections.push({ kind, code, no: sectionNo, title: section.title, controls });
       }
     }
   }

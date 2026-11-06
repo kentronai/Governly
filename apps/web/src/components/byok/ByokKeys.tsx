@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronsUpDown,
   Loader2,
-  Pencil,
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -57,7 +56,6 @@ export function ByokKeys() {
   const [saved, setSaved] = useState<SavedKey | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [check, setCheck] = useState<KeyCheck | null>(null);
-  const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -126,27 +124,15 @@ export function ByokKeys() {
     showProvider(slug);
   };
 
-  const startEdit = () => {
-    setApiKey("");
-    setEditing(true);
-  };
-
-  const cancelEdit = () => {
-    if (saved) {
-      setProvider(saved.provider);
-      setModelId(saved.modelId);
-      showProvider(saved.provider, saved.modelId);
-    }
-    setApiKey("");
-    setEditing(false);
-  };
-
   const save = async () => {
     setSaving(true);
     try {
-      await saveLlmKey(tenant!.slug, provider, modelId, apiKey);
+      const result = await saveLlmKey(tenant!.slug, provider, modelId, apiKey);
+      if (!result.success) {
+        errorToast(result.error);
+        return;
+      }
       setApiKey("");
-      setEditing(false);
       infoToast("API key saved");
       await load();
     } catch (e) {
@@ -161,7 +147,7 @@ export function ByokKeys() {
     setDeleting(true);
     try {
       await deleteLlmKey(tenant.slug, saved.provider, saved.modelId);
-      infoToast("API key deleted");
+      infoToast("API key removed");
       setSaved(null);
       setCheck(null);
       setProvider("");
@@ -175,7 +161,7 @@ export function ByokKeys() {
     }
   };
 
-  const showForm = loaded && (!saved || editing);
+  const showForm = loaded && !saved;
   const selected = models.find((m) => m.id === modelId);
 
   return (
@@ -183,13 +169,13 @@ export function ByokKeys() {
       <div className="w-full max-w-md space-y-6">
         <PageHeader
           title="Bring Your Own Key"
-          description="One provider, model and API key at a time. Saving a new key replaces the old one."
+          description="One provider, model and API key at a time. A saved key can't be edited: remove it to add a different one."
         />
         <Card>
           <CardContent className="space-y-4 pt-6">
             {!loaded ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : saved && !editing ? (
+            ) : saved ? (
               <>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -199,19 +185,15 @@ export function ByokKeys() {
                     <p className="truncate text-sm text-muted-foreground">{saved.modelId}</p>
                     <p className="mt-1 text-sm text-muted-foreground">•••• {saved.keyLast4}</p>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button variant="ghost" size="icon" aria-label="Edit key" onClick={startEdit}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Delete key"
-                      onClick={() => setConfirmDelete(true)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4 text-red-500" />
+                    Remove key
+                  </Button>
                 </div>
                 {check?.status === "checking" && (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -345,11 +327,6 @@ export function ByokKeys() {
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save
                 </Button>
-                {saved && (
-                  <Button variant="ghost" className="w-full" onClick={cancelEdit}>
-                    Cancel
-                  </Button>
-                )}
               </>
             ) : null}
           </CardContent>
@@ -361,7 +338,7 @@ export function ByokKeys() {
         onClose={() => setConfirmDelete(false)}
         onConfirm={remove}
         isLoading={deleting}
-        title="Delete this API key?"
+        title="Remove this API key?"
         itemName={saved ? `${getLlmProvider(saved.provider)?.label ?? saved.provider} · ${saved.modelId}` : "this key"}
         itemType="API key"
       />

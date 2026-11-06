@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import type { IconType } from "react-icons";
+import {
+  SiDatabricks,
+  SiGooglecloud,
+  SiMicrosoftazure,
+} from "react-icons/si";
 import {
   Blocks,
   Cloud,
@@ -64,6 +70,15 @@ const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g,
 // Logos come from Nango's public template-logo set, keyed by provider key.
 const LOCAL_LOGOS: Record<string, string> = {
   claude: "/logos/anthropic-claude.svg",
+};
+// Integrations Nango has no logo for: brand marks (react-icons) and a local file.
+const BRAND_ICONS: Record<string, { Icon: IconType; color: string }> = {
+  Azure: { Icon: SiMicrosoftazure, color: "#0078D4" },
+  "Google Cloud": { Icon: SiGooglecloud, color: "#4285F4" },
+  "Databricks Unity Catalog": { Icon: SiDatabricks, color: "#FF3621" },
+};
+const NAME_LOGOS: Record<string, string> = {
+  LangSmith: "/logos/langsmith.svg",
 };
 const providerLogoUrl = (key: string) =>
   LOCAL_LOGOS[key] ?? `https://app.nango.dev/images/template-logos/${key}.svg`;
@@ -286,6 +301,15 @@ function IntegrationLogo({ integration }: { integration: Integration }) {
       />
     );
   }
+  const brand = BRAND_ICONS[integration.name];
+  if (brand)
+    return <brand.Icon className="h-5 w-5" style={{ color: brand.color }} />;
+  const nameLogo = NAME_LOGOS[integration.name];
+  if (nameLogo)
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={nameLogo} alt="" className="h-5 w-5 object-contain" />
+    );
   const catalogKey = catalogKeyByName.get(normalizeName(integration.name));
   if (catalogKey) return <CatalogLogo providerKey={catalogKey} />;
   return CLOUD_PROVIDERS.has(integration.name) ? (
