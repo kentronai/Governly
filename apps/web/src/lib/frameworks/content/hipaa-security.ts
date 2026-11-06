@@ -7,6 +7,7 @@ export const hipaaSecurity: FrameworkDefinition = {
   slug: "hipaa-security",
   name: "HIPAA Security Rule",
   navLabel: "HIPAA Security Rule",
+  kind: "regulation",
   policyNames: ["HIPAA Security Rule"],
   description:
     "Security standards for protecting electronic protected health information (ePHI) under 45 CFR Part 164 Subpart C, covering administrative, physical and technical safeguards plus organizational and documentation requirements. Applies to covered entities and business associates, including AI systems that create, receive, maintain or transmit ePHI.",

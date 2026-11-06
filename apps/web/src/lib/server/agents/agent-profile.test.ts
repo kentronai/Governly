@@ -11,6 +11,7 @@ import {
   buildCloudProfile,
   buildRepoProfile,
   detectFramework,
+  importedPackages,
   policyViolations,
   extractModelIds,
   extractToolNames,
@@ -278,6 +279,51 @@ describe("provider from source", () => {
   });
 });
 
+describe("every supported LLM provider is reported", () => {
+  it("keeps providers a model id does not cover instead of showing only the model's company", () => {
+    const source = [
+      'const DEFAULT = "gemini-3.6-flash";',
+      'fetch("https://api.openai.com/v1"); fetch("https://openrouter.ai/api/v1"); fetch("https://api.x.ai/v1");',
+      'fetch("https://api.mistral.ai/v1"); fetch("https://api.deepseek.com/v1"); fetch("http://localhost:11434");',
+    ].join("\n");
+    const p = buildRepoProfile(repo({ sourceTexts: [source], packages: [{ name: "next", version: null }] }));
+    expect(p.llms).toEqual(
+      expect.arrayContaining(["gemini-3.6-flash", "OpenAI", "OpenRouter", "xAI", "Mistral", "DeepSeek", "Ollama"]),
+    );
+    expect(p.llms).not.toContain("Google Gemini");
+  });
+
+  it("does not list a provider twice once cloud and repo profiles merge", () => {
+    const a = { ...buildRepoProfile(repo({ sourceTexts: ["gemini-2.5-pro"] })), llms: ["gemini-2.5-pro"] };
+    const b = { ...a, llms: ["Google Gemini", "OpenAI"] };
+    expect(mergeProfiles(a, b).llms).toEqual(["gemini-2.5-pro", "OpenAI"]);
+  });
+});
+
+describe("LangChain detection", () => {
+  it("ignores a declared-but-unused langchain-community, keeps real LangChain use", () => {
+    expect(detectFramework(["langchain-community", "openai"])).toBeNull();
+    expect(detectFramework(["@langchain/community"])).toBeNull();
+    expect(detectFramework(["langchain-community", "langchain-openai"])).toBe("LangChain");
+    expect(detectFramework(importedPackages(["from langchain_community.llms import X"]))).toBe("LangChain");
+  });
+});
+
+describe("Databricks App framework", () => {
+  it("reads Streamlit from the start command and from imports when requirements.txt omits it", () => {
+    const facts = analyzeCodeBundle(["app.py", "requirements.txt"], {
+      "app.py": "import streamlit as st\nimport google.generativeai as genai",
+      "requirements.txt": "google-generativeai\n",
+    });
+    expect(detectFramework(facts.packages.map((x) => x.name))).toBe("Streamlit");
+    const p = buildCloudProfile({
+      externalAgentId: "x", name: "streamlit-chatbot", platform: "databricks_apps", region: "r", discoverySource: "databricks_app",
+      resources: [{ resourceType: "databricks_app", resourceId: "a", resourceArn: "a", resourceName: "x", region: "r", tags: {}, metadata: { activeDeployment: { command: ["streamlit", "run", "app.py"] } } }],
+    } as unknown as CorrelatedAgent);
+    expect(p.framework).toBe("Streamlit");
+  });
+});
+
 describe("iac tags and compose images", () => {
   it("names the SST stack as deployer, keeps the Owner tag as a hint, and lists compose images", () => {
     const p = buildCloudProfile({
@@ -345,6 +391,9 @@ describe("deploy targets + iac link", () => {
   it("reads where a repo deploys and the app name that links it to cloud resources", () => {
     expect(detectDeployTargets(["render.yaml", "Dockerfile", "src/a.ts"])).toEqual(["Render"]);
     expect(detectDeployTargets(["sst.config.ts", ".github/workflows/deploy.yml"])).toEqual(["AWS (SST)"]);
+    // Archived configs and CI-only files do not say where an app runs.
+    expect(detectDeployTargets([".archive/vercel.json", ".archive/netlify.toml", "infra/cloudbuild.yaml"])).toEqual([]);
+    expect(detectDeployTargets(["apps/web/vercel.json"])).toEqual(["Vercel"]);
     expect(extractIacAppNames({ "sst.config.ts": 'export default $config({ app(input) { return { name: "receipt-factory", home: "aws" }; } })' })).toEqual(["receipt-factory"]);
     expect(extractIacAppNames({ "render.yaml": "services:\n  - type: web\n    name: owluc-api\n" })).toEqual(["owluc-api"]);
     expect(sameIacApp("receipt-factory", "receipt-factory")).toBe(true);

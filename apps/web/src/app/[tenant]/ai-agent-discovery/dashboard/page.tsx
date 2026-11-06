@@ -18,7 +18,7 @@ export default async function ExecutiveRiskDashboard({ params }: { params: Promi
   if (tenantId !== orgId) throw new Error("Tenant access denied");
   const data = await getExecutiveDashboard(tenantId);
   return <main className="space-y-6"><LiveRefresh />
-    <header className="flex flex-wrap items-end justify-between gap-3"><div><PageTitle>Executive Risk Dashboard</PageTitle><p className="mt-1 text-sm text-muted-foreground">Live governance posture for every discovered AI agent.</p></div><ReportExports tenant={tenant} snapshot={{ cards: data.cards, autonomy: data.autonomy, platforms: data.platforms }} /></header>
+    <header className="flex flex-wrap items-end justify-between gap-3"><div><PageTitle>Agent Risk Dashboard</PageTitle><p className="mt-1 text-sm text-muted-foreground">Live governance posture for every discovered AI agent.</p></div><ReportExports tenant={tenant} snapshot={{ cards: data.cards, autonomy: data.autonomy, platforms: data.platforms }} /></header>
     <KpiCards tenant={tenant} agents={data.agentList} />
     <DashboardVisuals autonomy={data.autonomy} platforms={data.platforms} trend={data.trend} />
     <div className="grid gap-4 lg:grid-cols-2">

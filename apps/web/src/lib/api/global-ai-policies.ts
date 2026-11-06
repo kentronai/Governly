@@ -4,6 +4,7 @@ import * as globalAiPolicyActions from "@/lib/actions/global-ai-policies";
 
 export interface GetGlobalAiPoliciesOptions {
   region?: string;
+  category?: string;
   country?: string;
   status?: string;
   search?: string;
@@ -40,4 +41,9 @@ export async function fetchGlobalAiPolicyById(id: string) {
     console.error("Error fetching global AI policy:", error);
     throw error;
   }
+}
+
+/** Distinct region/country/status/category values for the filter dropdowns. */
+export async function fetchGlobalAiPolicyFilterOptions() {
+  return globalAiPolicyActions.getGlobalAiPolicyFilterOptions();
 }

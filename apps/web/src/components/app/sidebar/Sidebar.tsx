@@ -12,7 +12,6 @@ import {
   LayoutGrid,
   BarChart3,
   Bot,
-  Route,
   ChevronDown,
   CircleHelp,
 } from "lucide-react";
@@ -132,7 +131,7 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                     }
                     className="py-1.5 text-xs"
                   >
-                    Executive Risk Dashboard
+                    Agent Risk Dashboard
                   </NavItem>
                   <NavItem
                     href={`/${tenant}/ai-agent-inventory`}
@@ -143,16 +142,6 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
                     className="py-1.5 text-xs"
                   >
                     Agent Inventory
-                  </NavItem>
-                  <NavItem
-                    href={`/${tenant}/ai-agent-discovery/journey`}
-                    icon={<Route className="h-3.5 w-3.5" />}
-                    isActive={
-                      pathname === `/${tenant}/ai-agent-discovery/journey`
-                    }
-                    className="py-1.5 text-xs"
-                  >
-                    Registry Journey
                   </NavItem>
                 </div>
               </div>

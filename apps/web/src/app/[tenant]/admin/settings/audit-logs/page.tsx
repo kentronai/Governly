@@ -75,7 +75,7 @@ import { formatDate } from "@/lib/utils/date";
 const AuditLogs = () => {
   const [selectedLog, setSelectedLog] = useState<IActivityLog | null>(null);
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState<{
     entity: { id: string; label: string }[];
   }>({ entity: [] });

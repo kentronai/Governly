@@ -44,7 +44,9 @@ export interface FrameworkDefinition {
   name: string;
   /** Sidebar label. */
   navLabel: string;
-  /** `policy_center.name` values that enable this framework. */
+  /** Controls page groups: laws and official guidance vs voluntary frameworks and standards. */
+  kind: "regulation" | "framework";
+  /** `policy_center.name` values that enable this framework (none: enabled from the Frameworks library). */
   policyNames: string[];
   description: string;
   source: { title: string; url: string };

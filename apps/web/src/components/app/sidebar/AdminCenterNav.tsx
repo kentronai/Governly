@@ -30,7 +30,14 @@ function AdminNavLink({
     <NavItem
       href={href}
       icon={<Icon className="h-4 w-4" />}
-      isActive={isActiveHref(pathname, href, item.exact)}
+      isActive={
+        isActiveHref(pathname, href, item.exact) ||
+        Boolean(
+          item.alsoActiveOn?.some(
+            (path) => pathname === adminHref(tenant, path),
+          ),
+        )
+      }
       className="py-1.5 text-foreground/80"
     >
       {item.label}

@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import { useTenant } from "@/contexts/TenantContext";
+import { ComplianceTabs } from "@/components/frameworks/ComplianceTabs";
+import { LibraryStats } from "@/components/frameworks/LibraryStats";
 import { fetchPolicyCenterPolicies, updatePolicyCenterPolicyStatus } from "@/lib/api/policy-center";
 import type { PolicyPack } from "./type";
 import { ComplianceEvidenceManager } from "@/components/compliance/ComplianceEvidenceManager";
@@ -117,14 +119,14 @@ export default function CompliancePolicyCenterPage() {
   const resetFilters = () => { setSearch(""); setCountry(ALL); setCategory(ALL); setStatus(ALL); setRequirementType(ALL); };
   const hasFilters = Boolean(search) || [country, category, status, requirementType].some((value) => value !== ALL);
 
-  return <div className="min-h-full w-full bg-background p-5 lg:p-7">
+  return <><ComplianceTabs /><div className="min-h-full w-full bg-background p-5 lg:p-7">
     <div className="w-full space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary"><ShieldCheck className="h-4 w-4" />Compliance library</div>
           <PageTitle>Regulations</PageTitle>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore, understand and enable authoritative AI regulations, standards, frameworks and guidelines for application governance.</p>
         </div>
-        <div className="rounded-lg border bg-card px-4 py-2 text-right"><p className="text-2xl font-semibold tabular-nums">{catalog.length}</p><p className="text-xs text-muted-foreground">Policies in library</p></div>
+        <LibraryStats libraryCount={catalog.length} libraryLabel="Policies in library" enabledCount={catalog.filter((item) => item.isActive).length} />
       </header>
 
       <section className="rounded-xl border bg-card p-4 shadow-sm">
@@ -155,7 +157,7 @@ export default function CompliancePolicyCenterPage() {
     </div>
 
     <PolicyDetails tenant={tenant?.slug || tenant?.id || ""} policy={selected} onClose={() => setSelected(null)} onToggle={togglePolicy} toggling={toggling} />
-  </div>;
+  </div></>;
 }
 
 function PolicySelect({ value, onChange, label, options, format = (value) => value }: { value: string; onChange: (value: string) => void; label: string; options: string[]; format?: (value: string) => string }) {

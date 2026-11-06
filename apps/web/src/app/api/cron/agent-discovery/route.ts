@@ -30,7 +30,15 @@ function authorized(request: NextRequest): boolean {
 
 let discoveryRunInProgress = false;
 
+// Scheduled scans only re-scan a source whose last scan is older than this;
+// the Refresh button scans immediately and ignores it. `?force=1` skips the gate.
+const intervalMs =
+  (Number(process.env.AGENT_DISCOVERY_INTERVAL_HOURS) || 24) * 3_600_000;
+const isDue = (lastScanAt?: string | Date | null) =>
+  !lastScanAt || Date.now() - new Date(lastScanAt).getTime() >= intervalMs;
+
 async function run(request: NextRequest) {
+  const force = request.nextUrl.searchParams.get("force") === "1";
   if (!process.env.AGENT_DISCOVERY_CRON_SECRET && !process.env.CRON_SECRET) {
     return NextResponse.json(
       { error: "Agent discovery cron secret is not configured" },
@@ -85,7 +93,7 @@ async function run(request: NextRequest) {
               eq(awsDiscoveryConnections.isEnabled, true),
             ),
           });
-          if (connection) {
+          if (connection && (force || isDue(integration.lastSyncAt))) {
             results.push({
               integrationId: integration.id,
               provider: "AWS",
@@ -113,7 +121,7 @@ async function run(request: NextRequest) {
               ),
             },
           );
-          if (connection) {
+          if (connection && (force || isDue(connection.lastScanAt))) {
             results.push({
               integrationId: integration.id,
               provider: "Azure",
@@ -127,7 +135,8 @@ async function run(request: NextRequest) {
           }
         } else if (
           integration.name === "Google Cloud" &&
-          (integration.credentialsEncrypted || integration.nangoConnectionId)
+          (integration.credentialsEncrypted || integration.nangoConnectionId) &&
+          (force || isDue(integration.lastSyncAt))
         ) {
           results.push({
             integrationId: integration.id,
@@ -141,7 +150,8 @@ async function run(request: NextRequest) {
           });
         } else if (
           integration.name === "Databricks Unity Catalog" &&
-          (integration.credentialsEncrypted || integration.nangoConnectionId)
+          (integration.credentialsEncrypted || integration.nangoConnectionId) &&
+          (force || isDue(integration.lastSyncAt))
         ) {
           results.push({
             integrationId: integration.id,
@@ -153,7 +163,11 @@ async function run(request: NextRequest) {
               null,
             )),
           });
-        } else if (isGithub(integration) && integration.nangoConnectionId) {
+        } else if (
+          isGithub(integration) &&
+          integration.nangoConnectionId &&
+          (force || isDue(integration.lastSyncAt))
+        ) {
           results.push({
             integrationId: integration.id,
             provider: "GitHub",
@@ -166,7 +180,8 @@ async function run(request: NextRequest) {
           });
         } else if (
           integration.name === "CrewAI" &&
-          (integration.credentialsEncrypted || integration.nangoConnectionId)
+          (integration.credentialsEncrypted || integration.nangoConnectionId) &&
+          (force || isDue(integration.lastSyncAt))
         ) {
           results.push({
             integrationId: integration.id,

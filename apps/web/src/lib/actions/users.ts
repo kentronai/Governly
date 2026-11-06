@@ -812,7 +812,7 @@ export const getActiveUsers = async (options?: GetUsersOptions) => {
     throw new Error("Unauthorized");
   }
 
-  const { page = 1, pageSize = 50, search } = options || {};
+  const { page = 1, pageSize = 20, search } = options || {};
   const offset = (page - 1) * pageSize;
 
   // Build search condition
@@ -966,7 +966,7 @@ export const getDeactivatedUsers = async (options?: GetUsersOptions) => {
     throw new Error("Unauthorized");
   }
 
-  const { page = 1, pageSize = 50, search } = options || {};
+  const { page = 1, pageSize = 20, search } = options || {};
   const offset = (page - 1) * pageSize;
 
   // Get user IDs that were deactivated from this specific tenant

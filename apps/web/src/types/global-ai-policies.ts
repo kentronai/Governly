@@ -21,10 +21,12 @@ export interface GlobalAiPolicy {
   impact?: string | null;
   complianceRequirements?: string | null;
   enforcementDetails?: string | null;
+  category?: string | null;
 }
 
 export interface GlobalAiPolicyFilters {
   region?: string;
+  category?: string;
   country?: string;
   status?: string;
 }

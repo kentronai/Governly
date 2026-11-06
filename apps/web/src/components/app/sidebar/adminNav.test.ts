@@ -10,7 +10,7 @@ import {
   getVisibleAdminNav,
   isAdminRoute,
 } from "./adminNav";
-import { FRAMEWORKS, frameworkPath } from "@/lib/frameworks";
+import { FRAMEWORKS, frameworkPath, getFramework } from "@/lib/frameworks";
 import {
   FRAMEWORK_CATALOG,
   catalogFrameworkPath,
@@ -28,10 +28,13 @@ describe("Admin Center navigation config", () => {
       ["Deactivated Users", "admin/users/deactivate"],
       ["Archived Applications", "admin/archived-applications"],
       ["Audit Logs", "admin/settings/audit-logs"],
-      ["Manage Regulations", "admin/settings/policy-center"],
+      ["Regulations & Frameworks", "admin/settings/policy-center"],
       ...FRAMEWORKS.map((f) => [f.navLabel, frameworkPath(f.slug)]),
-      ["Manage Frameworks", "admin/settings/frameworks"],
-      ...FRAMEWORK_CATALOG.map((f) => [f.name, catalogFrameworkPath(f.slug)]),
+      ...FRAMEWORK_CATALOG.filter((f) => !getFramework(f.slug)).map((f) => [
+        f.name,
+        catalogFrameworkPath(f.slug),
+      ]),
+      ["Controls", "admin/controls"],
       ["Integrations", "admin/integrations"],
       ["BYOK", "admin/settings/byok"],
       ["AI Radar", "admin/settings/ai-policies-updates"],
@@ -78,11 +81,13 @@ describe("getVisibleAdminNav", () => {
     govIQEnabled: boolean;
     iso42001: boolean;
     activePolicyNames?: string[];
+    enabledFrameworkSlugs?: string[];
   }) =>
     getVisibleAdminNav({ activePolicyNames: [], ...ctx }).flatMap((group) =>
       flattenNavItems(group.items).map((item) => item.label),
     );
-  const allPolicies = FRAMEWORKS.map((f) => f.policyNames[0]);
+  const allPolicies = FRAMEWORKS.flatMap((f) => f.policyNames.slice(0, 1));
+  const allFrameworkSlugs = FRAMEWORKS.map((f) => f.slug);
 
   it("shows every option when GovIQ, ISO 42001 and every framework are enabled", () => {
     expect(
@@ -90,6 +95,7 @@ describe("getVisibleAdminNav", () => {
         govIQEnabled: true,
         iso42001: true,
         activePolicyNames: allPolicies,
+        enabledFrameworkSlugs: allFrameworkSlugs,
       }),
     ).toHaveLength(11 + FRAMEWORKS.length);
   });
@@ -103,7 +109,7 @@ describe("getVisibleAdminNav", () => {
       iso42001: true,
       activePolicyNames: ["NYC Local Law 144"],
     });
-    expect(visible[visible.indexOf("Manage Regulations") + 1]).toBe(
+    expect(visible[visible.indexOf("Regulations & Frameworks") + 1]).toBe(
       "NYC Local Law 144",
     );
     expect(visible).not.toContain("EU AI Act");
@@ -143,7 +149,7 @@ describe("getVisibleAdminNav", () => {
     expect(visible).not.toContain("ISO 42001");
     expect(visible).toEqual(
       expect.arrayContaining([
-        "Manage Regulations",
+        "Regulations & Frameworks",
         "Integrations",
       "BYOK",
         "AI Radar",

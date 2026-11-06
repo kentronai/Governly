@@ -30,7 +30,7 @@ interface IdentityMappingData {
 const UsersIdentityMapping = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const debouncedSearch = useDebounce(search, 1000);
 
   const { data: allIdentityData, isLoading } = useQuery({

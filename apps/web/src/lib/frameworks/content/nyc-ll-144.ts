@@ -7,6 +7,7 @@ export const nycLl144: FrameworkDefinition = {
   slug: "nyc-ll-144",
   name: "NYC Local Law 144",
   navLabel: "NYC Local Law 144",
+  kind: "regulation",
   policyNames: ["NYC Local Law 144"],
   description:
     "New York City's rules for automated employment decision tools (AEDTs): independent bias audits, public audit summaries and candidate notices.",

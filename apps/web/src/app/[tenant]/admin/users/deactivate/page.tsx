@@ -39,7 +39,7 @@ import {
 const DeactivatedUsers = () => {
   const [filterValue, setFilterValue] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const { user } = useUser();
   const orgId = user?.organizationMemberships?.[0]?.organization?.id;
 

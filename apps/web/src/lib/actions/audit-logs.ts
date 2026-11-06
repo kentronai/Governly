@@ -23,7 +23,7 @@ export interface GetAuditLogsInput {
 export const getAuditLogs = async (input: GetAuditLogsInput) => {
   const page = input.page && input.page > 0 ? input.page : 1;
   const pageSize =
-    input.pageSize && input.pageSize > 0 ? Math.min(input.pageSize, 200) : 50;
+    input.pageSize && input.pageSize > 0 ? Math.min(input.pageSize, 200) : 20;
 
   const tenantRow = await db
     .select()

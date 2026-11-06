@@ -55,8 +55,8 @@ const ADMIN_LINKS: [string, string][] = [
   ["Deactivated Users", "/acme/admin/users/deactivate"],
   ["Archived Applications", "/acme/admin/archived-applications"],
   ["Audit Logs", "/acme/admin/settings/audit-logs"],
-  ["Manage Regulations", "/acme/admin/settings/policy-center"],
-  ["Manage Frameworks", "/acme/admin/settings/frameworks"],
+  ["Regulations & Frameworks", "/acme/admin/settings/policy-center"],
+  ["Controls", "/acme/admin/controls"],
   ["Integrations", "/acme/admin/integrations"],
   ["BYOK", "/acme/admin/settings/byok"],
   ["AI Radar", "/acme/admin/settings/ai-policies-updates"],
@@ -136,7 +136,7 @@ describe("Sidebar — Admin Center section", () => {
       setup({ govIQEnabled: false });
       expandAdminCenter();
       for (const label of [
-        "Manage Regulations",
+        "Regulations & Frameworks",
         "ISO 42001",
         "Integrations",
         "BYOK",
@@ -161,7 +161,7 @@ describe("Sidebar — Admin Center section", () => {
         screen.queryByRole("link", { name: "ISO 42001" }),
       ).not.toBeInTheDocument();
       expect(
-        screen.getByRole("link", { name: "Manage Regulations" }),
+        screen.getByRole("link", { name: "Regulations & Frameworks" }),
       ).toBeInTheDocument();
     });
   });
@@ -199,7 +199,14 @@ describe("Sidebar — Admin Center section", () => {
     it("keeps the parent option current on nested admin routes", () => {
       setup({ pathname: "/acme/admin/settings/policy-center/eu-ai-act" });
       expect(
-        screen.getByRole("link", { name: "Manage Regulations" }),
+        screen.getByRole("link", { name: "Regulations & Frameworks" }),
+      ).toHaveAttribute("aria-current", "page");
+    });
+
+    it("keeps Regulations & Frameworks current on the Frameworks tab", () => {
+      setup({ pathname: "/acme/admin/settings/frameworks" });
+      expect(
+        screen.getByRole("link", { name: "Regulations & Frameworks" }),
       ).toHaveAttribute("aria-current", "page");
     });
 
@@ -213,9 +220,8 @@ describe("Sidebar — Admin Center section", () => {
 describe("Sidebar — existing navigation (regression)", () => {
   it.each([
     ["Applications", "/acme/applications"],
-    ["Executive Risk Dashboard", "/acme/ai-agent-discovery/dashboard"],
+    ["Agent Risk Dashboard", "/acme/ai-agent-discovery/dashboard"],
     ["Agent Inventory", "/acme/ai-agent-inventory"],
-    ["Registry Journey", "/acme/ai-agent-discovery/journey"],
     ["Model Registry", "/acme/model-registry"],
     ["AI Catalog", "/acme/ai-catalog"],
     ["Dashboard", "/acme/reports"],

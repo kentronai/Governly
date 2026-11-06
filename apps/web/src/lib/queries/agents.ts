@@ -118,7 +118,7 @@ export const getAgents = cache(
   async (tenantId: string, filters: AgentListFilters = {}) => {
     const owner = alias(users, "owner");
     const page = filters.page ?? 1;
-    const pageSize = filters.pageSize ?? 10;
+    const pageSize = filters.pageSize ?? 20;
     const offset = (page - 1) * pageSize;
 
     const conditions = [eq(agents.tenantId, tenantId)];

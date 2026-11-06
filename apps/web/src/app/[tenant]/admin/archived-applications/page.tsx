@@ -54,7 +54,7 @@ function ArchivedApplications() {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);

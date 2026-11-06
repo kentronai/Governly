@@ -58,7 +58,7 @@ interface TechnicalDetailsPageProps {
 }
 
 // Constants
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 20;
 const INITIAL_PAGE = 1;
 
 // Form data interfaces

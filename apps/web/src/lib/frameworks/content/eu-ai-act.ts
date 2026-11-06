@@ -8,6 +8,7 @@ export const euAiAct: FrameworkDefinition = {
   slug: "eu-ai-act",
   name: "EU AI Act",
   navLabel: "EU AI Act",
+  kind: "regulation",
   policyNames: [EU_AI_ACT_POLICY_NAME, LEGACY_EU_AI_ACT_POLICY_NAME],
   description:
     "Obligations for providers and deployers of AI systems under Regulation (EU) 2024/1689, focused on AI literacy, prohibited practices and the requirements for high-risk AI systems.",

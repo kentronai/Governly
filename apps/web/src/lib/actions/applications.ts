@@ -508,7 +508,7 @@ export const getApplications = async (
   if (!userId) throw new Error("Authentication required");
 
   const pageNum = page && page > 0 ? page : 1;
-  const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 50;
+  const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 20;
   const searchTerm = search?.trim();
 
   const tenantRow = await db
@@ -668,7 +668,7 @@ export const getArchivedApplicationsAction = async (
   if (!userId) throw new Error("Authentication required");
 
   const pageNum = page && page > 0 ? page : 1;
-  const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 50;
+  const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 20;
   const searchTerm = search?.trim();
 
   const tenantRow = await db

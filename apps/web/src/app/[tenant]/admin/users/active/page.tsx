@@ -52,7 +52,7 @@ const ActiveUsers = () => {
   const [filterValue, setFilterValue] = React.useState("");
   const [open, setOpen] = useState("");
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const { user } = useUser();
   const orgId = user?.organizationMemberships?.[0]?.organization?.id;
 

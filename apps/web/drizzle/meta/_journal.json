@@ -386,6 +386,13 @@
       "when": 1787900000000,
       "tag": "0054_radar_live_feeds",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1788000000000,
+      "tag": "0055_laws_to_regulations_guidance_to_frameworks",
+      "breakpoints": true
     }
   ]
 }

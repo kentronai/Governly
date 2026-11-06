@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Layers, Loader2 } from "lucide-react";
 import { PageTitle } from "@/components/common/PageHeader";
+import { ComplianceTabs } from "@/components/frameworks/ComplianceTabs";
+import { LibraryStats } from "@/components/frameworks/LibraryStats";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +47,8 @@ export function FrameworkCatalog() {
   };
 
   return (
+    <>
+    <ComplianceTabs />
     <div className="min-h-full w-full bg-background p-5 lg:p-7">
       <div className="w-full space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
@@ -59,14 +63,11 @@ export function FrameworkCatalog() {
               frameworks appear under Frameworks in the sidebar.
             </p>
           </div>
-          <div className="rounded-lg border bg-card px-4 py-2 text-right">
-            <p className="text-2xl font-semibold tabular-nums">
-              {FRAMEWORK_CATALOG.length}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Frameworks in library
-            </p>
-          </div>
+          <LibraryStats
+            libraryCount={FRAMEWORK_CATALOG.length}
+            libraryLabel="Frameworks in library"
+            enabledCount={FRAMEWORK_CATALOG.filter((fw) => enabled.has(fw.slug)).length}
+          />
         </header>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -127,5 +128,6 @@ export function FrameworkCatalog() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

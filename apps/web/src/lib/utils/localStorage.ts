@@ -269,12 +269,12 @@ export const projectStorage = {
 
   getPagination: (): { page: number; pageSize: number } => {
     const data = safeLocalStorage.getItem(STORAGE_KEYS.PROJECT_PAGINATION);
-    if (!data) return { page: 1, pageSize: 50 };
+    if (!data) return { page: 1, pageSize: 20 };
     try {
       return JSON.parse(data);
     } catch (error) {
       console.warn("Failed to parse pagination", error);
-      return { page: 1, pageSize: 50 };
+      return { page: 1, pageSize: 20 };
     }
   },
 

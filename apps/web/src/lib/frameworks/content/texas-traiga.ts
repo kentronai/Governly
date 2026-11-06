@@ -6,6 +6,7 @@ export const texasTraiga: FrameworkDefinition = {
   slug: "texas-traiga",
   name: "Texas Responsible AI Governance Act",
   navLabel: "Texas Responsible AI Governance Act",
+  kind: "regulation",
   policyNames: ["Texas Responsible AI Governance Act"],
   description:
     "Texas law restricting specified intentional harmful uses of AI, requiring governmental disclosures, and establishing Attorney General enforcement with a cure period, safe harbors and a regulatory sandbox.",

@@ -19,7 +19,7 @@ export const getActiveUsers = cache(
       search?: string;
     },
   ) => {
-    const { page = 1, pageSize = 50, search } = options || {};
+    const { page = 1, pageSize = 20, search } = options || {};
     const offset = (page - 1) * pageSize;
 
     // Build search condition
@@ -99,7 +99,7 @@ export const getUsers = cache(
   ) => {
     const {
       page = 1,
-      pageSize = 50,
+      pageSize = 20,
       search,
       activeOnly = true,
     } = options || {};

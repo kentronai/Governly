@@ -46,36 +46,6 @@ export const FRAMEWORK_CATALOG: CatalogFramework[] = [
     region: "United States",
   },
   {
-    slug: "gdpr",
-    name: "GDPR",
-    description: "EU General Data Protection Regulation",
-    about:
-      "The General Data Protection Regulation is the EU law governing how personal data of people in the EU is collected, used and protected. It requires a lawful basis, data-subject rights, security, breach notification and accountability, and applies to AI systems that process personal data. Fines reach up to 4% of global annual turnover.",
-    icon: "GDPR",
-    color: "bg-blue-800",
-    region: "European Union",
-  },
-  {
-    slug: "ccpa",
-    name: "CCPA",
-    description: "California Consumer Privacy Act",
-    about:
-      "The California Consumer Privacy Act (as amended by CPRA) gives California residents rights to know, delete, correct and opt out of the sale or sharing of their personal data. It applies to qualifying businesses and includes rules on automated decision-making and risk assessments that affect AI use.",
-    icon: "CCPA",
-    color: "bg-amber-700",
-    region: "United States · California",
-  },
-  {
-    slug: "dora",
-    name: "DORA",
-    description: "EU Digital Operational Resilience Act",
-    about:
-      "The Digital Operational Resilience Act is an EU regulation that requires financial entities and their critical ICT providers to manage ICT risk, report incidents, test resilience and oversee third-party providers. It applies to AI systems that are part of financial services' ICT estate.",
-    icon: "DORA",
-    color: "bg-sky-700",
-    region: "European Union",
-  },
-  {
     slug: "cis-controls-v8",
     name: "CIS Controls v8",
     description: "CIS Critical Security Controls, version 8",
@@ -83,6 +53,16 @@ export const FRAMEWORK_CATALOG: CatalogFramework[] = [
       "The CIS Critical Security Controls v8 are a prioritized set of 18 practical safeguards from the Center for Internet Security to defend against common cyber attacks. They are voluntary, grouped into implementation tiers, and widely used as a baseline for security programs.",
     icon: "CIS",
     color: "bg-cyan-800",
+    region: "International",
+  },
+  {
+    slug: "ai-ethics-governance",
+    name: "AI Ethics & Governance Framework",
+    description: "NORIX baseline for ethical, accountable AI",
+    about:
+      "NORIX's general-purpose baseline for responsible AI. It covers fairness, transparency, accountability, human oversight, privacy and security, robustness and monitoring, third-party AI and incident management, and maps conceptually to the NIST AI RMF and ISO/IEC 42001. It comes with a requirements tracker you fill in under its own tab.",
+    icon: "AIEG",
+    color: "bg-violet-700",
     region: "International",
   },
   {
@@ -94,56 +74,6 @@ export const FRAMEWORK_CATALOG: CatalogFramework[] = [
     icon: "DG",
     color: "bg-emerald-700",
     region: "International",
-  },
-  {
-    slug: "uae-pdpl",
-    name: "UAE Personal Data Protection Law",
-    description: "UAE PDPL and related AI guidance",
-    about:
-      "The UAE Personal Data Protection Law (Federal Decree-Law No. 45 of 2021) regulates processing of personal data in the UAE. It sets consent, transparency, data-subject rights, security and cross-border transfer rules, and is complemented by national AI guidance.",
-    icon: "UAE",
-    color: "bg-red-700",
-    region: "United Arab Emirates",
-  },
-  {
-    slug: "saudi-pdpl",
-    name: "Saudi Arabia Personal Data Protection Law",
-    description: "Saudi PDPL and SDAIA AI principles",
-    about:
-      "Saudi Arabia's Personal Data Protection Law, enforced by SDAIA, governs the collection and processing of personal data, including consent, individual rights and cross-border transfers. SDAIA also publishes AI ethics principles that apply to AI systems.",
-    icon: "KSA",
-    color: "bg-green-700",
-    region: "Saudi Arabia",
-  },
-  {
-    slug: "qatar-pdpl",
-    name: "Qatar Personal Data Privacy Law",
-    description: "Qatar Law No. 13 of 2016 and national AI policy",
-    about:
-      "Qatar Law No. 13 of 2016 regulates personal data privacy, setting rules for consent, purpose limitation, security and breach notification. It operates alongside Qatar's national AI policy for responsible AI use.",
-    icon: "QA",
-    color: "bg-rose-800",
-    region: "Qatar",
-  },
-  {
-    slug: "bahrain-pdpl",
-    name: "Bahrain Personal Data Protection Law",
-    description: "Bahrain PDPL and AI guidance",
-    about:
-      "Bahrain's Personal Data Protection Law (Law No. 30 of 2018) sets rules for lawful processing, data-subject rights, security and international transfers of personal data, and is supported by regulator guidance relevant to AI.",
-    icon: "BH",
-    color: "bg-red-800",
-    region: "Bahrain",
-  },
-  {
-    slug: "quebec-law-25",
-    name: "Quebec Law 25",
-    description: "Quebec's modernized private-sector privacy law",
-    about:
-      "Quebec's Law 25 modernizes its private-sector privacy law. It requires privacy impact assessments, consent, breach reporting, and transparency when decisions are made solely by automated processing, which directly affects AI systems using personal information.",
-    icon: "QC",
-    color: "bg-blue-600",
-    region: "Canada · Quebec",
   },
   {
     slug: "nist-csf",
@@ -163,6 +93,106 @@ export const FRAMEWORK_CATALOG: CatalogFramework[] = [
       "ISO/IEC 27001 is the international standard for an information security management system (ISMS). It requires a risk-based set of security controls, ongoing monitoring and continual improvement, and organizations can be independently certified against it.",
     icon: "ISO",
     color: "bg-teal-700",
+    region: "International",
+  },
+  {
+    slug: "iso-23894",
+    name: "ISO/IEC 23894",
+    description: "Guidance on AI risk management",
+    about:
+      "ISO/IEC 23894 is international guidance on managing risks specific to AI. It adapts the ISO 31000 risk management process to the AI lifecycle and is voluntary, but pairs naturally with ISO/IEC 42001 as the risk-assessment backbone of an AI management system.",
+    icon: "ISO",
+    color: "bg-blue-800",
+    region: "International",
+  },
+  {
+    slug: "oecd-ai-principles",
+    name: "OECD AI Principles",
+    description: "Values-based principles for trustworthy AI",
+    about:
+      "The OECD AI Principles are the first intergovernmental standard for AI. They set five values-based principles (inclusive growth, human rights and fairness, transparency, robustness and safety, accountability) and are voluntary, but underpin many national AI strategies and laws.",
+    icon: "OECD",
+    color: "bg-sky-800",
+    region: "International",
+  },
+  {
+    slug: "unesco-ai-ethics",
+    name: "UNESCO AI Ethics Recommendation",
+    description: "UNESCO Recommendation on the Ethics of AI",
+    about:
+      "The UNESCO Recommendation on the Ethics of Artificial Intelligence is a global, voluntary instrument adopted by 193 member states. It sets values and policy actions for human rights, fairness, transparency, accountability and environmental sustainability in AI.",
+    icon: "UN",
+    color: "bg-cyan-700",
+    region: "International",
+  },
+  {
+    slug: "eeoc-ada-ai",
+    name: "EEOC Guidance on ADA and AI",
+    description: "EEOC technical assistance on AI in employment",
+    about:
+      "The US Equal Employment Opportunity Commission's technical assistance explains how the Americans with Disabilities Act applies to AI and algorithmic tools used in hiring and employment. It is agency guidance, not a new law, but shows how existing law is enforced.",
+    icon: "EEOC",
+    color: "bg-slate-700",
+    region: "United States",
+  },
+  {
+    slug: "ftc-ai",
+    name: "FTC AI Guidance",
+    description: "FTC business guidance on AI under consumer-protection law",
+    about:
+      "The US Federal Trade Commission's business guidance explains how it expects companies to market, build and operate AI fairly and truthfully under existing consumer-protection law. It is guidance rather than a statute, but the FTC enforces the underlying law.",
+    icon: "FTC",
+    color: "bg-indigo-800",
+    region: "United States",
+  },
+  {
+    slug: "uk-ai-white-paper",
+    name: "UK AI Regulation Framework",
+    description: "UK pro-innovation, principles-based approach to AI",
+    about:
+      "The UK AI regulation white paper sets five cross-sector principles (safety, transparency, fairness, accountability, contestability) that existing regulators apply to AI in their sectors. It is a voluntary, principles-based framework rather than a single AI law.",
+    icon: "UK",
+    color: "bg-blue-900",
+    region: "United Kingdom",
+  },
+  {
+    slug: "australia-ai-ethics-principles",
+    name: "Australian AI Ethics Principles",
+    description: "Australia's 8 voluntary AI ethics principles",
+    about:
+      "Australia's AI Ethics Principles are eight voluntary principles, including human wellbeing, fairness, privacy, reliability, transparency, contestability and accountability, to guide the design, development and use of AI systems.",
+    icon: "AU",
+    color: "bg-emerald-800",
+    region: "Australia",
+  },
+  {
+    slug: "ai-verify",
+    name: "AI Verify Framework",
+    description: "Singapore's AI governance testing framework",
+    about:
+      "AI Verify is Singapore's voluntary AI governance testing framework and toolkit. It lets organizations check AI systems against internationally recognized principles using standardized tests and process checks, and report the results to stakeholders.",
+    icon: "AIV",
+    color: "bg-rose-700",
+    region: "Singapore",
+  },
+  {
+    slug: "altai",
+    name: "Assessment List for Trustworthy AI (ALTAI)",
+    description: "EU self-assessment checklist for trustworthy AI",
+    about:
+      "ALTAI is the European Commission High-Level Expert Group's self-assessment checklist for trustworthy AI. It turns the seven EU requirements (human agency, robustness, privacy, transparency, fairness, societal wellbeing, accountability) into practical questions. It is voluntary.",
+    icon: "ALTAI",
+    color: "bg-teal-700",
+    region: "European Union",
+  },
+  {
+    slug: "pci-dss-lite",
+    name: "PCI DSS Lite",
+    description: "Condensed view of the PCI Data Security Standard",
+    about:
+      "A condensed view of the PCI Data Security Standard for systems, including AI systems, that store, process or transmit payment card data. PCI DSS is an industry standard set by the card brands, not a law, and this view does not replace the official standard or a formal assessment.",
+    icon: "PCI",
+    color: "bg-orange-700",
     region: "International",
   },
 ];

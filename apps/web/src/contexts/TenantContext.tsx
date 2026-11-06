@@ -116,21 +116,24 @@ export function TenantProvider({ children, tenantData }: TenantProviderProps) {
 
   const refreshPolicyStatus = async () => {
     try {
-      const { fetchActivePolicies } = await import("@/lib/api/policy-center");
-      const active = await fetchActivePolicies();
+      const [{ fetchActivePolicies }, { getEnabledCatalogFrameworks }] =
+        await Promise.all([
+          import("@/lib/api/policy-center"),
+          import("@/lib/actions/framework-controls"),
+        ]);
+      // Independent queries: run together so the sidebar tab appears sooner.
+      const [active, enabledFrameworkSlugs] = await Promise.all([
+        fetchActivePolicies(),
+        tenant
+          ? getEnabledCatalogFrameworks(tenant.slug).catch(() => [])
+          : Promise.resolve([] as string[]),
+      ]);
       const activePolicy = active.map(
         (ele: any) => ele.parentPolicyId as string,
       );
       const activePolicyNames: string[] = active.map(
         (ele: any) => ele.name as string,
       );
-
-      const { getEnabledCatalogFrameworks } = await import(
-        "@/lib/actions/framework-controls"
-      );
-      const enabledFrameworkSlugs = tenant
-        ? await getEnabledCatalogFrameworks(tenant.slug).catch(() => [])
-        : [];
 
       setPolicyStatus({
         euAiAct: activePolicyNames.some(isEuAiActPolicyName),

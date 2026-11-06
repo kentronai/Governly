@@ -150,6 +150,8 @@ interface DatabricksAppDeployment {
   status?: { state?: string; message?: string };
   git_source?: Record<string, unknown>;
   env_vars?: Array<{ name?: string; value?: string }>;
+  // Databricks' own snapshot of the deployed code, readable when the source folder is not.
+  deployment_artifacts?: { source_code_path?: string };
 }
 
 interface DatabricksApp {
@@ -162,6 +164,7 @@ interface DatabricksApp {
   create_time?: string;
   update_time?: string;
   default_source_code_path?: string;
+  snapshot_source_code_path?: string;
   app_status?: { state?: string; message?: string };
   compute_status?: { state?: string; message?: string };
   active_deployment?: DatabricksAppDeployment;
@@ -695,7 +698,61 @@ function rememberFacts(path: string, texts: Record<string, string>) {
   });
 }
 
+/**
+ * A Databricks App's source is a workspace folder, and a folder export can omit
+ * plain files (app.py, requirements.txt). When it yielded no packages, list the
+ * folder and export those files one by one.
+ */
+async function inspectWorkspaceFolder(
+  credentials: DatabricksCredentials,
+  path: string,
+): Promise<AgentSourceEvidence[]> {
+  try {
+    const listing = await databricksApi<{ objects?: Array<{ path: string; object_type?: string }> }>(
+      credentials,
+      "/api/2.0/workspace/list",
+      new URLSearchParams({ path }),
+    );
+    const files = (listing.objects ?? [])
+      .filter((o) => o.object_type !== "DIRECTORY" && (isManifestPath(o.path) || isSourcePath(o.path)))
+      .slice(0, 30);
+    const texts: Record<string, string> = {};
+    for (const file of files) {
+      const payload = await databricksApi<{ content?: string }>(
+        credentials,
+        "/api/2.0/workspace/export",
+        new URLSearchParams({ path: file.path, format: "AUTO", direct_download: "false" }),
+      );
+      if (payload.content) {
+        texts[file.path.split("/").pop() ?? file.path] = Buffer.from(payload.content, "base64")
+          .subarray(0, MAX_SOURCE_BYTES)
+          .toString("utf8");
+      }
+    }
+    if (!Object.keys(texts).length) return [];
+    rememberFacts(path, texts);
+    return Object.entries(texts).flatMap(([name, text]) => {
+      const signals = detectAgentSourceSignals(text);
+      return signals.length ? [{ path: `${path}/${name}`, signals }] : [];
+    });
+  } catch {
+    // Source evidence is optional; a denied listing must not fail the sync.
+    return [];
+  }
+}
+
 async function inspectWorkspaceSource(
+  credentials: DatabricksCredentials,
+  path: string,
+): Promise<AgentSourceEvidence[]> {
+  const evidence = await exportWorkspaceSource(credentials, path);
+  if ((sourceFacts.get(path)?.codePackages as unknown[] | undefined)?.length) return evidence;
+  // The folder pass mainly records the app's packages; its evidence only stands in for an empty export.
+  const folder = await inspectWorkspaceFolder(credentials, path);
+  return evidence.length ? evidence : folder;
+}
+
+async function exportWorkspaceSource(
   credentials: DatabricksCredentials,
   path: string,
 ): Promise<AgentSourceEvidence[]> {
@@ -783,6 +840,17 @@ async function enrichDeploymentSourceEvidence(
       [path, await inspectWorkspaceSource(credentials, path)] as const,
   );
   const byPath = new Map(inspected);
+  // The app's source folder can be private to its author (403 for the
+  // integration token): fall back to Databricks' deployment snapshot and
+  // file its facts under the source path the profile looks up.
+  for (const app of apps) {
+    const path = app.active_deployment?.source_code_path || app.default_source_code_path;
+    const snapshot = app.snapshot_source_code_path;
+    if (!path || !snapshot || (sourceFacts.get(path)?.codePackages as unknown[] | undefined)?.length) continue;
+    const evidence = await inspectWorkspaceSource(credentials, snapshot);
+    if (sourceFacts.has(snapshot)) sourceFacts.set(path, sourceFacts.get(snapshot)!);
+    if (!byPath.get(path)?.length) byPath.set(path, evidence);
+  }
   return {
     apps: apps.map((app) => {
       const path =
@@ -1358,16 +1426,20 @@ async function listApps(credentials: DatabricksCredentials, detailed = true) {
             `/api/2.0/apps/${encodeURIComponent(app.name)}`,
           );
           // A stopped app has no active deployment, but its deployment history
-          // still says where the code was deployed from: read the source there.
-          if (!full.active_deployment?.source_code_path && !full.default_source_code_path) {
-            const history = await databricksApi<{ app_deployments?: Array<{ source_code_path?: string }> }>(
+          // still says where the code was deployed from, and where Databricks
+          // keeps its snapshot of it (readable when the source folder is not).
+          let snapshot = full.active_deployment?.deployment_artifacts?.source_code_path;
+          let path = full.active_deployment?.source_code_path || full.default_source_code_path;
+          if (!snapshot || !path) {
+            const history = await databricksApi<{ app_deployments?: DatabricksAppDeployment[] }>(
               credentials,
               `/api/2.0/apps/${encodeURIComponent(app.name)}/deployments`,
             ).catch(() => null);
-            const path = history?.app_deployments?.find((d) => d.source_code_path)?.source_code_path;
-            if (path) return { ...full, default_source_code_path: path };
+            const latest = history?.app_deployments?.find((d) => d.source_code_path);
+            path ||= latest?.source_code_path;
+            snapshot ||= latest?.deployment_artifacts?.source_code_path;
           }
-          return full;
+          return { ...full, default_source_code_path: path, snapshot_source_code_path: snapshot };
         } catch {
           return app;
         }
@@ -2071,6 +2143,7 @@ export const databricksDiscoveryTesting = {
   detectAgentSourceSignals,
   inspectWorkspaceSource,
   enrichDeploymentSourceEvidence,
+  sourceFactsFor: (path: string) => sourceFacts.get(path),
   detectAgentSchemaSignals,
   inspectServingEndpointSchema,
 };

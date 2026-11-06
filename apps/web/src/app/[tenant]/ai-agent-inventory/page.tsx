@@ -40,7 +40,7 @@ export default async function AgentInventoryPage({
         ? autonomy
         : undefined,
     page: 1,
-    pageSize: 10,
+    pageSize: 20,
   });
 
   return (

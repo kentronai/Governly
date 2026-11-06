@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   RadarBusyError,
   isRadarDue,
+  radarEnabled,
   startRadarRun,
 } from "@/lib/server/radar/agent";
 
@@ -34,6 +35,7 @@ async function run(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!radarEnabled()) return NextResponse.json({ status: "disabled" });
   const force = request.nextUrl.searchParams.get("force") === "1";
   if (!force && !(await isRadarDue())) {
     return NextResponse.json({ status: "not_due" });

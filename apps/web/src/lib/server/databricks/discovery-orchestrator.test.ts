@@ -348,8 +348,15 @@ describe("Databricks discovery orchestrator", () => {
   it("uses source evidence without failing when source export is unavailable", async () => {
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
+      if (url.pathname === "/api/2.0/workspace/list") {
+        const listed = url.searchParams.get("path");
+        if (listed === "/Workspace/denied") return apiResponse({ message: "Forbidden" }, 403);
+        if (listed === "/Workspace/folder") {
+          return apiResponse({ objects: [{ object_type: "FILE", path: "/Workspace/folder/app.py" }] });
+        }
+      }
       if (url.pathname === "/api/2.0/workspace/export") {
-        if (url.searchParams.get("path") === "/Workspace/denied") {
+        if (["/Workspace/denied", "/Workspace/folder"].includes(url.searchParams.get("path") ?? "")) {
           return apiResponse({ message: "Forbidden" }, 403);
         }
         return apiResponse({
@@ -378,6 +385,35 @@ describe("Databricks discovery orchestrator", () => {
         path: "/Workspace/support",
         signals: ["OpenAI Agents SDK"],
       },
+    ]);
+    // A folder export that fails falls back to reading the folder's files one by one.
+    await expect(
+      databricksDiscoveryTesting.inspectWorkspaceSource(credentials(), "/Workspace/folder"),
+    ).resolves.toEqual([{ path: "/Workspace/folder/app.py", signals: ["OpenAI Agents SDK"] }]);
+  });
+
+  it("reads a stopped app's code from the deployment snapshot when its source folder is private", async () => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const path = url.searchParams.get("path") ?? "";
+      if (path.startsWith("/Workspace/Users/author/")) return apiResponse({ error_code: "PERMISSION_DENIED" }, 403);
+      if (url.pathname === "/api/2.0/workspace/list" && path === "/Workspace/Users/app/src/d1") {
+        return apiResponse({ objects: [{ object_type: "FILE", path: "/Workspace/Users/app/src/d1/streamlit_app.py" }] });
+      }
+      if (url.pathname === "/api/2.0/workspace/export" && path.endsWith("streamlit_app.py")) {
+        return apiResponse({ content: Buffer.from("import streamlit as st\n").toString("base64") });
+      }
+      return apiResponse({ message: "Forbidden" }, 403);
+    }) as jest.Mock;
+
+    const { apps } = await databricksDiscoveryTesting.enrichDeploymentSourceEvidence(
+      credentials(),
+      [{ name: "streamlit-chatbot", default_source_code_path: "/Workspace/Users/author/chatbot", snapshot_source_code_path: "/Workspace/Users/app/src/d1" }],
+      [],
+    );
+    expect(apps).toHaveLength(1);
+    expect(databricksDiscoveryTesting.sourceFactsFor("/Workspace/Users/author/chatbot")?.codePackages).toEqual([
+      { name: "streamlit", version: null },
     ]);
   });
 

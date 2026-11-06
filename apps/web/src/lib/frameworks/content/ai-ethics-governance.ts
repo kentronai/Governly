@@ -7,7 +7,9 @@ export const aiEthicsGovernance: FrameworkDefinition = {
   slug: "ai-ethics-governance",
   name: "AI Ethics & Governance Framework",
   navLabel: "AI Ethics & Governance Framework",
-  policyNames: ["AI Ethics & Governance Framework"],
+  kind: "framework",
+  // Enabled from the Frameworks library (tenant_frameworks), not as a policy.
+  policyNames: [],
   description:
     "NORIX's general-purpose baseline for responsible AI. It covers fairness, transparency, accountability, human oversight, privacy and security, and maps conceptually to the NIST AI RMF and ISO/IEC 42001.",
   source: {

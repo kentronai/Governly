@@ -7,6 +7,7 @@ export const pciDssLite: FrameworkDefinition = {
   slug: "pci-dss-lite",
   name: "PCI DSS Lite",
   navLabel: "PCI DSS Lite",
+  kind: "framework",
   policyNames: ["PCI DSS Lite"],
   description:
     "A condensed view of the PCI Data Security Standard for systems — including AI systems — that store, process or transmit payment card data. It does not replace the official standard or a formal assessment.",

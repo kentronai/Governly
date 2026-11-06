@@ -48,12 +48,11 @@ import {
   UserX,
   ShieldOff,
   Rocket,
-  Cpu,
   Copy,
   Eye,
   MoreHorizontal,
 } from "lucide-react";
-import { successToast } from "@/lib/utils/toast";
+import { errorToast, infoToast, successToast } from "@/lib/utils/toast";
 import { llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
 import {
   fetchAgents,
@@ -61,7 +60,11 @@ import {
   fetchAgentInventorySummary,
   assignAgentToApplication,
 } from "@/lib/actions/agents";
-import { refreshAgentInventory } from "@/lib/actions/agent-inventory-refresh";
+import {
+  getAgentRefreshStatus,
+  refreshAgentInventory,
+  type RefreshStatus,
+} from "@/lib/actions/agent-inventory-refresh";
 import type {
   AgentInventoryInitialData,
   AgentInventorySummary,
@@ -167,10 +170,17 @@ function relativeFromNow(iso: string | null): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/** One empty-cell label for the whole table (Agent ID, framework, LLMs, observability). */
+const NotFound = ({ title }: { title?: string }) => (
+  <span className="text-xs text-amber-600" title={title}>
+    Not found
+  </span>
+);
+
 // Shows the first few items and a "+N" with the full list on hover.
 function Chips({ items, max = 2 }: { items: string[]; max?: number }) {
   if (items.length === 0) {
-    return <span className="text-muted-foreground">—</span>;
+    return <NotFound />;
   }
   return (
     <div className="flex max-w-[220px] flex-wrap gap-1" title={items.join(", ")}>
@@ -268,16 +278,7 @@ const cloudIdOf = (row: any): string | null =>
   row.platform === "github" ? null : (String(row.externalAgentId ?? "").split(":").pop() || null);
 
 const statusLabel = (profile: ReturnType<typeof readProfile>) =>
-  profile.deployed
-    ? "Running"
-    : profile.deployedAt
-      ? "Stopped"
-      : profile.deployedOn
-        ? "Not verified"
-        : "Not deployed";
-
-const textOrDash = (value?: string | null) =>
-  value ? value : <span className="text-muted-foreground">—</span>;
+  profile.deployed ? "Deployed" : "Not deployed";
 
 // LangSmith tracing is linked per agent (not discovered), so fold it in here.
 const observabilityOf = (row: any) => {
@@ -310,8 +311,11 @@ export function AgentInventory({
   const [total, setTotal] = useState(initialData.list.total);
   const [totalPages, setTotalPages] = useState(initialData.list.totalPages);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
+  // A refresh runs on the server, so it outlives this page: `refreshing` is
+  // re-derived from the server's status on every mount.
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [riskLevel, setRiskLevel] = useState(ALL);
   const [autonomyLevel, setAutonomyLevel] = useState(
@@ -339,7 +343,12 @@ export function AgentInventory({
   // placeholder, then the live value appears once we are purely client-side.
   const [mounted, setMounted] = useState(false);
 
+  // Only the newest request may write results: changing a filter on page 2 fires
+  // a stale request before the page resets, and a slow reply must not win.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setIsLoading(true);
     try {
       const result = await fetchAgents(tenant, {
@@ -359,11 +368,12 @@ export function AgentInventory({
         page,
         pageSize,
       });
+      if (seq !== loadSeq.current) return;
       setRows(result.rows);
       setTotal(result.total);
       setTotalPages(result.totalPages);
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeq.current) setIsLoading(false);
     }
   }, [
     tenant,
@@ -392,16 +402,55 @@ export function AgentInventory({
   }, [tenant]);
 
   const refreshAll = useCallback(async () => {
-    // Re-run discovery across every connected provider (real-time), then reload
-    // the inventory and summary so the whole view reflects fresh data.
-    setIsLoading(true);
+    // Start discovery across every connected provider on the server; the poll
+    // below reloads the inventory when it finishes.
     try {
-      await refreshAgentInventory(tenant);
-    } catch {
-      // Fall through to a plain reload even if a provider scan failed.
+      const status = await refreshAgentInventory(tenant);
+      setRefreshing(status.running);
+    } catch (error) {
+      errorToast(error);
     }
-    await Promise.all([load(), loadSummary()]);
-  }, [tenant, load, loadSummary]);
+  }, [tenant]);
+
+  const reportRefresh = useCallback(
+    (status: RefreshStatus) => {
+      const failed = status.results.filter((r) => !r.ok);
+      if (failed.length) {
+        errorToast(
+          failed.map((r) => `${r.name} scan failed: ${r.error ?? "unknown error"}`).join(" | "),
+        );
+      } else {
+        infoToast(
+          `Scan complete: ${status.results.map((r) => `${r.name} (${r.agents})`).join(", ") || "nothing connected"}`,
+        );
+      }
+    },
+    [],
+  );
+
+  // Pick up a refresh that was started before this page mounted (e.g. the user
+  // switched tabs and came back).
+  useEffect(() => {
+    void getAgentRefreshStatus(tenant)
+      .then((status) => setRefreshing(status.running))
+      .catch(() => undefined);
+  }, [tenant]);
+
+  useEffect(() => {
+    if (!refreshing) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await getAgentRefreshStatus(tenant);
+        if (status.running) return;
+        setRefreshing(false);
+        reportRefresh(status);
+        await Promise.all([load(), loadSummary()]);
+      } catch {
+        // Transient poll failure: keep polling.
+      }
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [refreshing, tenant, load, loadSummary, reportRefresh]);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -462,15 +511,15 @@ export function AgentInventory({
             variant="outline"
             size="sm"
             onClick={refreshAll}
-            disabled={isLoading || isSummaryLoading}
+            disabled={refreshing || isLoading || isSummaryLoading}
           >
             <RefreshCw
               className={cn(
                 "h-4 w-4 mr-1.5",
-                (isLoading || isSummaryLoading) && "animate-spin",
+                (refreshing || isLoading || isSummaryLoading) && "animate-spin",
               )}
             />{" "}
-            Refresh
+            {refreshing ? "Scanning…" : "Refresh"}
           </Button>
         </div>
       </div>
@@ -484,20 +533,12 @@ export function AgentInventory({
           description="Agent records discovered from connected providers or ingestion."
         />
         <SummaryCard
-          label="Running Agents"
+          label="Deployed Agents"
           value={summary?.deployedAgents}
           icon={Rocket}
           loading={isSummaryLoading}
           tone="text-emerald-600 dark:text-emerald-400"
           description="Agents whose runtime is up right now (cloud resource running, or a live GitHub deployment)."
-        />
-        <SummaryCard
-          label="LLM Not Detected"
-          value={summary?.llmNotDetected}
-          icon={Cpu}
-          loading={isSummaryLoading}
-          tone="text-amber-600 dark:text-amber-400"
-          description="Agents where no model was found in provider config, environment, IAM invoke policy or source code."
         />
         <SummaryCard
           label="Policy Violations"
@@ -540,8 +581,8 @@ export function AgentInventory({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Status: All</SelectItem>
-                <SelectItem value="yes">Running</SelectItem>
-                <SelectItem value="no">Stopped</SelectItem>
+                <SelectItem value="yes">Deployed</SelectItem>
+                <SelectItem value="no">Not deployed</SelectItem>
               </SelectContent>
             </Select>
             <Select value={policy} onValueChange={setPolicy}>
@@ -550,18 +591,19 @@ export function AgentInventory({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Policy: All</SelectItem>
-                <SelectItem value="yes">Violating policies</SelectItem>
-                <SelectItem value="no">No violations</SelectItem>
+                <SelectItem value="yes">Policy violated</SelectItem>
+                <SelectItem value="no">Not violated</SelectItem>
               </SelectContent>
             </Select>
           </>
         ) : (
           <div className="h-8 w-full max-w-[720px] rounded-md border bg-muted/10" />
         )}
-        {mounted && hasActiveFilters && (
+        {mounted && (
           <Button
             variant="ghost"
             size="sm"
+            disabled={!hasActiveFilters}
             onClick={() => {
               setSearch("");
               setRiskLevel(ALL);
@@ -573,7 +615,7 @@ export function AgentInventory({
               setPolicy(ALL);
             }}
           >
-            Clear filters
+            Clear all
           </Button>
         )}
         <span className="text-xs text-muted-foreground self-center ml-auto">
@@ -588,7 +630,7 @@ export function AgentInventory({
             <TableHead>Agent ID</TableHead>
             <TableHead>Platform</TableHead>
             <TableHead>Last Deployed</TableHead>
-            <TableHead>Framework</TableHead>
+            <TableHead>Agent Framework</TableHead>
             <TableHead>LLMs</TableHead>
             <TableHead>Observability</TableHead>
             <TableHead className="w-[80px]">Actions</TableHead>
@@ -638,7 +680,7 @@ export function AgentInventory({
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground" title="Not deployed to a connected cloud, so no agent ID">—</span>
+                      <NotFound title="Not deployed to a connected cloud, so no agent ID" />
                     )}
                   </TableCell>
                   <TableCell>
@@ -649,9 +691,11 @@ export function AgentInventory({
                           ? (profile.deployedOn?.split(/ · | \(/)[0] ?? "Not deployed")
                           : platformLabel(r.platform)}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {r.platform === "github" ? `code: ${r.externalAgentId}` : `${r.region} · ${r.accountId}`}
-                      </div>
+                      {r.platform !== "github" && (
+                        <div className="text-xs text-muted-foreground">
+                          {`${r.region} · ${r.accountId}`}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -665,10 +709,12 @@ export function AgentInventory({
                         ) : null}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground">Never</span>
+                      <span className="text-muted-foreground">
+                        {profile.deployed ? "Not recorded" : "Never"}
+                      </span>
                     )}
                   </TableCell>
-                  <TableCell>{textOrDash(profile.framework)}</TableCell>
+                  <TableCell>{profile.framework ?? <NotFound />}</TableCell>
                   <TableCell>
                     <Chips items={llmCompanies(llmsOf(r))} />
                   </TableCell>
@@ -676,7 +722,7 @@ export function AgentInventory({
                     {observabilityOf(r).length ? (
                       <Chips items={observabilityOf(r)} />
                     ) : (
-                      <span className="text-xs text-amber-600">Not detected</span>
+                      <NotFound />
                     )}
                   </TableCell>
                   <TableCell>
@@ -730,7 +776,7 @@ export function AgentInventory({
             applicationId,
           );
           setActiveAgent(refreshed);
-          await refreshAll();
+          await Promise.all([load(), loadSummary()]);
         }}
         onOpenChange={(open) => !open && setActiveAgentId(null)}
       />
@@ -917,10 +963,12 @@ function AgentDetailModal({
                         label="Last Deployed"
                         value={
                           profile.deployedAt
-                            ? `${formatTimestamp(profile.deployedAt)}${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} · ${profile.deployed ? "running now" : "stopped now"}`
-                            : "Never deployed"
+                            ? `${formatTimestamp(profile.deployedAt)}${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} · ${profile.deployed ? "deployed now" : "not deployed now"}`
+                            : profile.deployed
+                              ? `Live${profile.deployedOn ? ` · ${profile.deployedOn}` : ""} (deploy time not recorded)`
+                              : "Never deployed"
                         }
-                        warn={!profile.deployedAt}
+                        warn={!profile.deployedAt && !profile.deployed}
                       />
                       <Field label="Developer" value={profile.developer ?? `Not recorded.${linkHint}`} warn={!profile.developer} />
                       <Field
@@ -933,7 +981,7 @@ function AgentDetailModal({
                         }
                         warn={!profile.deployer}
                       />
-                      <Field label="Framework" value={profile.framework ?? `No agent framework found in tags, startup script or code.${linkHint}`} warn={!profile.framework} />
+                      <Field label="Agent Framework" value={profile.framework ?? `No agent framework found in tags, startup script or code.${linkHint}`} warn={!profile.framework} />
                       <Field label="LLMs" value={llmCompanies(llms).join(", ") || `No model or provider found in config, environment names or code.${linkHint}`} warn={llms.length === 0} />
                       {llms.length > 0 && llms.join() !== llmCompanies(llms).join() ? (
                         <ChipList label="Models" items={llms} />

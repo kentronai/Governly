@@ -57,6 +57,8 @@ if (process.env.NORIX_NATIVE === "1") {
 const nextConfig = {
   output: "standalone",
   experimental: {
+    // Evidence documents (8 MB max) are uploaded through server actions.
+    serverActions: { bodySizeLimit: "10mb" },
     // Avoid compiling entire barrel-export packages when a page uses only a
     // handful of components/icons. This keeps dev-route compilation small.
     optimizePackageImports: [

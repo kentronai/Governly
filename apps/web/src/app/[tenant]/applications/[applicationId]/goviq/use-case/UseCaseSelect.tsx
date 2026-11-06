@@ -37,6 +37,7 @@ export const UseCaseSelect: React.FC<UseCaseSelectProps> = ({
   };
 
   const typed = search.trim();
+  const filtered = options.filter((o) => o.toLowerCase().includes(typed.toLowerCase()));
   const canAddCustom =
     allowCustom && typed && !options.some((o) => o.toLowerCase() === typed.toLowerCase());
 
@@ -59,7 +60,8 @@ export const UseCaseSelect: React.FC<UseCaseSelectProps> = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <Command>
+        {/* Filtered by hand: cmdk hides a whole group (and our "Add custom" row) when no option matches the typed text */}
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder={allowCustom ? "Search or type a custom use case..." : "Search use cases..."}
             value={search}
@@ -68,10 +70,8 @@ export const UseCaseSelect: React.FC<UseCaseSelectProps> = ({
           <CommandList>
             <CommandEmpty>No use case found.</CommandEmpty>
             <CommandGroup className="max-h-48 overflow-y-auto">
-              {/* forceMount: cmdk's filter would otherwise hide this as soon as the user types */}
               {canAddCustom && (
                 <CommandItem
-                  forceMount
                   value={`__custom__ ${typed}`}
                   onSelect={() => commit(typed)}
                 >
@@ -79,7 +79,7 @@ export const UseCaseSelect: React.FC<UseCaseSelectProps> = ({
                   Add custom use case &quot;{typed}&quot;
                 </CommandItem>
               )}
-              {options.map((option) => (
+              {filtered.map((option) => (
                 <CommandItem key={option} value={option} onSelect={() => commit(option)}>
                   <Check
                     className={cn(

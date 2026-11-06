@@ -1,5 +1,10 @@
 import type { LucideIcon } from "lucide-react";
-import { FRAMEWORKS, enabledFrameworks, frameworkPath } from "@/lib/frameworks";
+import {
+  FRAMEWORKS,
+  enabledFrameworks,
+  frameworkPath,
+  getFramework,
+} from "@/lib/frameworks";
 import {
   FRAMEWORK_CATALOG,
   catalogFrameworkPath,
@@ -12,6 +17,7 @@ import {
   Home,
   KeyRound,
   Layers,
+  ListChecks,
   Scale,
   ScrollText,
   Settings,
@@ -42,6 +48,8 @@ export interface AdminNavItem {
   path?: string;
   /** Only active on this exact path (its sub-paths belong to other tabs). */
   exact?: boolean;
+  /** Other exact paths (relative to `/[tenant]`) on which this item is also active. */
+  alsoActiveOn?: string[];
   /** Nested items; the parent renders as an open/close toggle. */
   children?: AdminNavItem[];
   icon: LucideIcon;
@@ -86,12 +94,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "Regulations",
     isVisible: ({ govIQEnabled }) => govIQEnabled,
     items: [
       {
-        label: "Manage Regulations",
+        label: "Regulations & Frameworks",
         path: "admin/settings/policy-center",
+        // The Frameworks tab lives on its own route but is part of this entry.
+        alsoActiveOn: ["admin/settings/frameworks"],
         icon: FileText,
       },
       ...FRAMEWORKS.map(
@@ -99,23 +108,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
           label: framework.navLabel,
           path: frameworkPath(framework.slug),
           icon: Scale,
-          isVisible: ({ activePolicyNames }) =>
-            enabledFrameworks(activePolicyNames).includes(framework),
+          isVisible: ({ activePolicyNames, enabledFrameworkSlugs }) =>
+            enabledFrameworks(activePolicyNames, enabledFrameworkSlugs).includes(
+              framework,
+            ),
         }),
       ),
-    ],
-  },
-  {
-    title: "Frameworks",
-    isVisible: ({ govIQEnabled }) => govIQEnabled,
-    items: [
-      {
-        label: "Manage Frameworks",
-        path: "admin/settings/frameworks",
-        icon: Layers,
-        exact: true,
-      },
-      ...FRAMEWORK_CATALOG.map(
+      // Catalog entries that have their own requirements tracker already get a tab above.
+      ...FRAMEWORK_CATALOG.filter((f) => !getFramework(f.slug)).map(
         (framework): AdminNavItem => ({
           label: framework.name,
           path: catalogFrameworkPath(framework.slug),
@@ -124,6 +124,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
             enabledFrameworkSlugs.includes(framework.slug),
         }),
       ),
+      { label: "Controls", path: "admin/controls", icon: ListChecks },
     ],
   },
   {

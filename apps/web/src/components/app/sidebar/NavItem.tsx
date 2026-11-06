@@ -31,7 +31,8 @@ export function NavItem({
         className,
       )}
     >
-      {icon}
+      {/* shrink-0: a label that wraps to two lines must not squeeze the icon. */}
+      <span className="shrink-0">{icon}</span>
       {children}
     </Link>
   );

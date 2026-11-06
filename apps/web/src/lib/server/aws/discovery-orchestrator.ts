@@ -14,7 +14,7 @@ import {
   discoveryScans,
   integrations,
 } from "@db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   buildAwsClients,
   type DiscoveryConnectionRecord,
@@ -30,6 +30,7 @@ import { discoverSecretsManagerSecrets } from "./discovery/secretsManager";
 import { discoverApiGateway } from "./discovery/apiGateway";
 import { discoverEventBridgeRules } from "./discovery/eventBridge";
 import { discoverEc2 } from "./discovery/ec2";
+import { mapRepoIps } from "./discovery/repo-hosts";
 import { discoverEksClusters } from "./discovery/eks";
 import { correlateAgents } from "./correlation";
 import { buildCapabilityFacts } from "../agents/capability-engine";
@@ -38,7 +39,8 @@ import { assessRisk } from "../agents/risk-engine";
 import { detectOwnership } from "../agents/ownership-engine";
 import { generateRecommendations } from "../agents/recommendations-engine";
 import type { RawDiscoveredResource } from "./discovery/types";
-import { composeProfile } from "@/lib/server/agents/agent-profile";
+import { composeProfile, readProfile } from "@/lib/server/agents/agent-profile";
+import { removeAgent } from "@/lib/server/github/discovery-orchestrator";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 
 export interface RunScanResult {
@@ -155,6 +157,29 @@ export async function runDiscoveryScan(
     // Collapsed into a single non-persisted notice below, not one line/region.
     const agentCorePermissionRegions: string[] = [];
     let ec2RegionsScanned = 0;
+    // Repos whose live site points at an instance link to it whatever it is named.
+    // Includes repos already merged into a cloud agent (kept as its githubProfile).
+    const repoByIp = await db
+      .select({ platform: agents.platform, profile: agents.profile, rawMetadata: agents.rawMetadata })
+      .from(agents)
+      .where(
+        and(
+          eq(agents.tenantId, tenantId),
+          sql`(${agents.platform} = 'github' or ${agents.rawMetadata}->'githubProfile' is not null)`,
+        ),
+      )
+      .then((rows) =>
+        mapRepoIps(
+          rows.map((r) =>
+            readProfile(
+              r.platform === "github"
+                ? r.profile
+                : (r.rawMetadata as { githubProfile?: unknown } | null)?.githubProfile,
+            ),
+          ),
+        ),
+      )
+      .catch(() => new Map<string, string>());
 
     // Regional AWS APIs are independent. A small concurrency limit keeps the
     // scan fast without flooding the customer's account or exhausting sockets.
@@ -169,7 +194,7 @@ export async function runDiscoveryScan(
         // Capture explicitly identified EC2 agents even in regions where
         // Bedrock is unavailable or access to another service is denied.
         try {
-          ec2Resources.push(...(await discoverEc2(clients)));
+          ec2Resources.push(...(await discoverEc2(clients, repoByIp)));
           ec2RegionsScanned += 1;
         } catch (error) {
           serviceWarnings.push(formatServiceWarning(region, "EC2", error));
@@ -354,7 +379,27 @@ export async function runDiscoveryScan(
         ),
       });
 
-      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
+      // The repo this workload runs (its live site resolves here, or its image
+      // names it): fold the repo's own registry row into this agent, so it
+      // shows once, as the deployed instance, whichever provider scanned first.
+      const repoName = agent.resources
+        .map((r) => r.metadata.codeRepository)
+        .find((v): v is string => typeof v === "string");
+      const repoRow = repoName
+        ? await db.query.agents.findFirst({
+            where: and(
+              eq(agents.tenantId, tenantId),
+              eq(agents.platform, "github"),
+              sql`lower(${agents.profile}->>'repository') = ${repoName.toLowerCase()}`,
+            ),
+          })
+        : undefined;
+      const { profile, rawMetadata: profileMeta } = composeProfile(
+        agent,
+        repoRow
+          ? { ...((existing?.rawMetadata as object) ?? {}), githubProfile: repoRow.profile }
+          : existing?.rawMetadata,
+      );
 
       const agentValues = {
         tenantId,
@@ -443,6 +488,9 @@ export async function runDiscoveryScan(
           .values({ ...agentValues, firstSeenAt: nowIso })
           .returning();
         agentId = inserted.id;
+      }
+      if (repoRow) {
+        await removeAgent(repoRow.id);
       }
 
       // Refresh the resource/recommendation snapshot for this agent.

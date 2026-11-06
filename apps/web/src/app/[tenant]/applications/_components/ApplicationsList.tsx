@@ -84,7 +84,7 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [isFetching, setFetching] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

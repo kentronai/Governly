@@ -34,6 +34,7 @@ import {
   detectDeployTargets,
   extractIacAppNames,
   isDeployConfig,
+  RETIRED_PATH,
   sameIacApp,
   isManifestPath,
   matchRepoToAgent,
@@ -78,7 +79,9 @@ const REPO_CONCURRENCY = 4;
 const SOURCE_SAMPLE = 8;
 // Config formats too: agents are often declared in JSON/TOML/YAML (model, tools).
 const SOURCE_FILE = /\.(py|ts|tsx|js|mjs|yaml|yml|json|jsonc|toml)$/i;
-const SOURCE_HINT = /agent|main|app|config|settings|llm|model|tool|server|index|crew|graph|bot|prompt/i;
+const SOURCE_HINT = /agent|main|app|config|settings|llm|model|provider|tool|server|index|crew|graph|bot|prompt/i;
+// Files that name the LLMs/providers an app supports are read first, however deep they sit.
+const LLM_HINT = /llm|model|provider/i;
 const SOURCE_SKIP = /(^|\/)(node_modules|vendor|dist|build|\.venv|venv|tests?|__tests__|migrations)\/|\.(test|spec|min)\.|lock/i;
 
 const isEnvExample = (p: string) => /(^|\/)\.env\.(example|sample|template)$/i.test(p);
@@ -162,13 +165,30 @@ export function pickAppUrl(homepage: string | null | undefined, texts: string[])
   return onDomain.find((u) => /^https:\/\/(app|dashboard|console|portal)\./i.test(u)) ?? homepage ?? null;
 }
 
+/** First real domain an nginx `server_name` serves (skips `_`, IPs, localhost); exported for tests. */
+export function serverNameUrl(texts: string[]): string | null {
+  for (const text of texts) {
+    for (const m of text.matchAll(/^\s*server_name\s+([^;]+);/gm)) {
+      const host = m[1].split(/\s+/).find((h) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(h) && !/^\d+(\.\d+){3}$/.test(h));
+      if (host) return `https://${host}`;
+    }
+  }
+  return null;
+}
+
 /**
  * The deployed app's URL: the repo's website (GitHub "homepage"), refined to
  * the app host on the same domain when the README, changelog, env example or
  * a manifest names one (e.g. owluc.com -> app.owluc.com).
  */
 async function appUrl(conn: GithubConnection, repo: GithubRepo, all: GithubTreeEntry[]) {
-  if (!repo.homepage) return null;
+  if (!repo.homepage) {
+    // No website set on the repo: the domain its own nginx config serves is the app's host.
+    const proxies = all
+      .filter((e) => /(^|\/)nginx[^/]*\.conf$/i.test(e.path) && e.path.split("/").length <= 3 && !RETIRED_PATH.test(e.path))
+      .slice(0, 2);
+    return serverNameUrl((await Promise.all(proxies.map((e) => getBlobText(conn, repo, e)))).filter((t): t is string => Boolean(t)));
+  }
   const files = all
     .filter((e) => /^(README|CHANGELOG)[^/]*$/i.test(e.path) || isEnvExample(e.path) || /(^|\/)manifest\.json$/i.test(e.path))
     .slice(0, 6);
@@ -189,7 +209,7 @@ async function repoDeployFacts(
   const [ghDeployment, developer, liveUrl, live] = await Promise.all([
     getLatestDeployment(conn, repo, pushDeployed.length > 0),
     getDevelopers(conn, repo),
-    targets.length ? appUrl(conn, repo, all) : Promise.resolve(null),
+    appUrl(conn, repo, all),
   ]).then(async ([d, dev, url]) => [d, dev, url, url ? await isLive(url) : null] as const);
   // Repos deployed by Render/Vercel leave no GitHub deployment: use the host's
   // record, and the live commit's author as the deployer when none is recorded.
@@ -215,6 +235,9 @@ async function repoDeployFacts(
       deployedOn: `${targets[0]}${live && liveUrl ? ` · ${liveUrl}` : ""}`,
     };
   }
+  // No deployment record and no recognised deploy config (e.g. a docker-compose
+  // app pushed by script): the repo's website answering is still proof it is live.
+  if (!deployment && live && liveUrl) deployment = { deployer: null, deployedAt: null, deployedOn: liveUrl };
   return { deployment, developer, host, live };
 }
 
@@ -243,7 +266,11 @@ async function folderEvidence(
   // GitHub's hourly API budget; cache by tree sha if more depth is needed.
   const sources = blobs
     .filter((e) => SOURCE_FILE.test(e.path) && (isFolder || SOURCE_HINT.test(e.path)) && !SOURCE_SKIP.test(e.path))
-    .sort((a, b) => a.path.split("/").length - b.path.split("/").length)
+    .sort(
+      (a, b) =>
+        Number(LLM_HINT.test(b.path)) - Number(LLM_HINT.test(a.path)) ||
+        a.path.split("/").length - b.path.split("/").length,
+    )
     .slice(0, isFolder ? 3 : SOURCE_SAMPLE);
   const deployFiles = all.filter((e) => isDeployConfig(e.path)).slice(0, 4);
   const deployTexts = await Promise.all(deployFiles.map((e) => getBlobText(conn, repo, e)));
@@ -318,7 +345,7 @@ function toCorrelatedAgent(repo: GithubRepo, key: string, name: string): Correla
 }
 
 /** Removes an agent row and everything that references it (no FK cascade). */
-async function removeAgent(agentId: string) {
+export async function removeAgent(agentId: string) {
   await db.delete(agentPolicyEvaluations).where(eq(agentPolicyEvaluations.agentId, agentId));
   await db.delete(policyFindings).where(eq(policyFindings.agentId, agentId));
   await db.delete(agentResources).where(eq(agentResources.agentId, agentId));

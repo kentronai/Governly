@@ -16,12 +16,16 @@ jest.mock("@/lib/actions/framework-controls", () => ({
   getFrameworkControls: (...args: unknown[]) => getFrameworkControls(...args),
   saveFrameworkControls: (...args: unknown[]) => saveFrameworkControls(...args),
 }));
+jest.mock("@/lib/actions/evidence-autofill", () => ({
+  autofillFromDocument: jest.fn(),
+}));
 jest.mock("@/lib/actions/users", () => ({
   getActiveUsers: async () => ({ success: true, users: [] }),
 }));
 jest.mock("@/lib/utils/toast", () => ({
   successToast: jest.fn(),
   errorToast: jest.fn(),
+  infoToast: jest.fn(),
 }));
 // Tiptap needs a real DOM layout engine; the editor itself isn't under test here.
 jest.mock("@/components/common/RichTextEditor", () => ({

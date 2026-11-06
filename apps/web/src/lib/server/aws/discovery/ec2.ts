@@ -3,8 +3,10 @@
  *
  * Cloud inventory cannot prove what arbitrary code inside a VM does. NORIX
  * therefore only registers EC2 instances with an auditable agent signal in
- * their name or tags. Untagged workloads can register through the universal
- * agent-discovery ingestion endpoint.
+ * their name or tags, or whose public IP is where a connected GitHub repo's
+ * live site resolves (the repo is then recorded as the instance's code).
+ * Other workloads can register through the universal agent-discovery
+ * ingestion endpoint.
  */
 
 import {
@@ -99,6 +101,7 @@ async function readImages(
 
 export async function discoverEc2(
   clients: AwsClientBundle,
+  repoByIp: Map<string, string> = new Map(),
 ): Promise<RawDiscoveredResource[]> {
   const resources: RawDiscoveredResource[] = [];
   let nextToken: string | undefined;
@@ -125,7 +128,8 @@ export async function discoverEc2(
             .map((tag) => [tag.Key as string, tag.Value as string]),
         );
         const name = tags.Name || instance.InstanceId;
-        if (!hasAgentSignal(name, tags)) continue;
+        const siteRepo = instance.PublicIpAddress ? repoByIp.get(instance.PublicIpAddress) : undefined;
+        if (!siteRepo && !hasAgentSignal(name, tags)) continue;
 
         const gaps: string[] = [];
         const userData = await readUserData(clients, instance.InstanceId, gaps);
@@ -160,8 +164,10 @@ export async function discoverEc2(
             ...imageFacts,
             ...(deployer ?? {}),
             ...(gaps.length ? { permissionGaps: gaps } : {}),
-            discoveryQualification:
-              "Name or tags explicitly identify this compute workload as an AI agent.",
+            ...(siteRepo ? { codeRepository: siteRepo } : {}),
+            discoveryQualification: siteRepo
+              ? `The live site of GitHub repo ${siteRepo} resolves to this instance's public IP.`
+              : "Name or tags explicitly identify this compute workload as an AI agent.",
           },
         });
       }

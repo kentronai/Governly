@@ -66,7 +66,7 @@ export const Pagination = ({
           Item per Page
         </span>
         <Select
-          value={String(limit || 10) || "10"}
+          value={String(limit || 20) || "20"}
           onValueChange={(v) => updateParams("limit", v)}
         >
           <SelectTrigger className="h-8 w-fit text-xs">

@@ -9,6 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 // Icons
 import { Loader2, RefreshCw } from "lucide-react";
 import { fetchSummaryMetrics, fetchUseCasesByRisk } from "@/lib/api/reports";
+import { fetchPolicyCenterPolicies } from "@/lib/api/policy-center";
+import { FRAMEWORK_CATALOG } from "@/lib/frameworks/catalog";
+import { useTenant } from "@/contexts/TenantContext";
 
 import { PageTitle } from "@/components/common/PageHeader";
 interface ReportsPageProps {
@@ -40,13 +43,30 @@ interface SummaryMetricsResponse {
   data: {
     totalApplications: number;
     totalUseCases: number;
-    systemTypeCounts: {
-      "In-house ML": number;
-      GenAI: number;
-      "3rd Party": number;
-      Agent: number;
-    };
+    totalAgents: number;
   };
+}
+
+function MetricCard({
+  title,
+  stats,
+}: {
+  title: string;
+  stats: { label: string; value: number }[];
+}) {
+  return (
+    <div className="rounded-xl border bg-muted p-6 transition-shadow hover:shadow-md">
+      <h4 className="text-sm font-semibold text-muted-foreground">{title}</h4>
+      <div className="mt-4 flex items-end justify-around gap-4">
+        {stats.map(({ label, value }) => (
+          <div key={label} className="text-center">
+            <div className="text-4xl font-bold tabular-nums">{value}</div>
+            <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ReportsPage({ params }: ReportsPageProps) {
@@ -60,13 +80,14 @@ export default function ReportsPage({ params }: ReportsPageProps) {
   const [summaryMetrics, setSummaryMetrics] = useState({
     totalApplications: 0,
     totalUseCases: 0,
-    systemTypeCounts: {
-      "In-house ML": 0,
-      GenAI: 0,
-      "3rd Party": 0,
-      Agent: 0,
-    },
+    totalAgents: 0,
   });
+  const [regulations, setRegulations] = useState({ total: 0, active: 0 });
+  const { policyStatus } = useTenant();
+  const frameworks = {
+    total: FRAMEWORK_CATALOG.length,
+    active: policyStatus.enabledFrameworkSlugs.length,
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +100,18 @@ export default function ReportsPage({ params }: ReportsPageProps) {
     } catch (err) {
       console.error("Error fetching summary metrics:", err);
       // Don't set error state for summary metrics to avoid breaking the main functionality
+    }
+  };
+
+  const fetchRegulationsData = async () => {
+    try {
+      const policies = await fetchPolicyCenterPolicies();
+      setRegulations({
+        total: policies.length,
+        active: policies.filter((policy: any) => policy.isActive).length,
+      });
+    } catch (err) {
+      console.error("Error fetching regulations:", err);
     }
   };
 
@@ -107,11 +140,13 @@ export default function ReportsPage({ params }: ReportsPageProps) {
   const handleRefresh = () => {
     fetchRiskData(true);
     fetchSummaryMetricsData();
+    fetchRegulationsData();
   };
 
   useEffect(() => {
     fetchRiskData();
     fetchSummaryMetricsData();
+    fetchRegulationsData();
   }, [params]);
 
   // Helper function to get bar width based on count
@@ -176,7 +211,7 @@ export default function ReportsPage({ params }: ReportsPageProps) {
             {/* Summary Metrics Header */}
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold ">
-                Applications and Use Cases Metrics
+                Governance Overview
               </h3>
               <Button
                 variant="outline"
@@ -191,174 +226,30 @@ export default function ReportsPage({ params }: ReportsPageProps) {
               </Button>
             </div>
 
-            {/* Top Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-              <div className="bg-muted border-muted p-6 rounded-xl border  hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      Total Applications
-                    </div>
-                    <div className="text-3xl font-bold">
-                      {summaryMetrics.totalApplications}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted border-muted p-6 rounded-xl border  shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      Total Use Cases
-                    </div>
-                    <div className="text-3xl font-bold ">
-                      {summaryMetrics.totalUseCases}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* AI System Type Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-muted border-muted p-6 rounded-xl border  shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      In-house ML
-                    </div>
-                    <div className="text-3xl font-bold ">
-                      {summaryMetrics.systemTypeCounts["In-house ML"]}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted border-muted p-6 rounded-xl border  shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      GenAI
-                    </div>
-                    <div className="text-3xl font-bold ">
-                      {summaryMetrics.systemTypeCounts["GenAI"]}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted border-muted p-6 rounded-xl border  shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      3rd Party
-                    </div>
-                    <div className="text-3xl font-bold ">
-                      {summaryMetrics.systemTypeCounts["3rd Party"]}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-muted border-muted p-6 rounded-xl border  shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1">
-                      Agent
-                    </div>
-                    <div className="text-3xl font-bold ">
-                      {summaryMetrics.systemTypeCounts["Agent"]}
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-6 h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+            {/* Key metrics */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <MetricCard
+                title="Applications and Use Cases"
+                stats={[
+                  { label: "Applications", value: summaryMetrics.totalApplications },
+                  { label: "Use Cases", value: summaryMetrics.totalUseCases },
+                  { label: "Agents", value: summaryMetrics.totalAgents },
+                ]}
+              />
+              <MetricCard
+                title="Frameworks"
+                stats={[
+                  { label: "Total", value: frameworks.total },
+                  { label: "Active", value: frameworks.active },
+                ]}
+              />
+              <MetricCard
+                title="Regulations"
+                stats={[
+                  { label: "Total", value: regulations.total },
+                  { label: "Active", value: regulations.active },
+                ]}
+              />
             </div>
 
             {/* Main Content Area - Three Column Layout */}

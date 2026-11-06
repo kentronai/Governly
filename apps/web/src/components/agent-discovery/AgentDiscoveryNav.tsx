@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bot, Route } from "lucide-react";
+import { BarChart3, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AgentDiscoveryNav({ tenant }: { tenant: string }) {
   const pathname = usePathname();
   const items = [
     {
-      label: "Executive Risk Dashboard",
+      label: "Agent Risk Dashboard",
       href: `/${tenant}/ai-agent-discovery/dashboard`,
       icon: BarChart3,
     },
@@ -17,11 +17,6 @@ export function AgentDiscoveryNav({ tenant }: { tenant: string }) {
       label: "Agent Inventory",
       href: `/${tenant}/ai-agent-inventory`,
       icon: Bot,
-    },
-    {
-      label: "Registry Journey",
-      href: `/${tenant}/ai-agent-discovery/journey`,
-      icon: Route,
     },
   ];
   return (

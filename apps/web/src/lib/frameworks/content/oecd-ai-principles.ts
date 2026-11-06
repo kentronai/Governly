@@ -6,6 +6,7 @@ export const oecdAiPrinciples: FrameworkDefinition = {
   slug: "oecd-ai-principles",
   name: "OECD AI Principles",
   navLabel: "OECD AI Principles",
+  kind: "framework",
   policyNames: ["OECD AI Principles"],
   description:
     "Organizational requirements derived from the five values-based principles of the OECD Recommendation on Artificial Intelligence, which call on AI actors to promote trustworthy AI that respects human rights and democratic values.",

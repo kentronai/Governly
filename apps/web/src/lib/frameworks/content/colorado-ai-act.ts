@@ -6,6 +6,7 @@ export const coloradoAiAct: FrameworkDefinition = {
   slug: "colorado-ai-act",
   name: "Colorado Artificial Intelligence Act",
   navLabel: "Colorado Artificial Intelligence Act",
+  kind: "regulation",
   policyNames: ["Colorado AI Act SB 205"],
   description:
     "Consumer protections for interactions with high-risk AI systems in Colorado, requiring developers and deployers to use reasonable care to protect consumers from algorithmic discrimination.",

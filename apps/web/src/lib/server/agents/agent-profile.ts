@@ -99,7 +99,7 @@ export function mergeProfiles(base: AgentProfile, extra: AgentProfile): AgentPro
     deployedOn: base.deployedOn ?? extra.deployedOn,
     observability: uniq([...base.observability, ...extra.observability]),
     framework: base.framework ?? extra.framework,
-    llms: uniq([...base.llms, ...extra.llms], 12),
+    llms: mergeAllLlms([...base.llms, ...extra.llms]),
     skills: uniq([...base.skills, ...extra.skills]),
     packages: uniq([...base.packages, ...extra.packages], 200),
     sources: uniq([...base.sources, ...extra.sources]),
@@ -122,7 +122,7 @@ const MODEL_ID = new RegExp(
       "claude-(?:\\d|opus|sonnet|haiku|instant)[a-z0-9.-]*",
       "amazon\\.(?:nova|titan)-[a-z0-9.-]+(?::\\d+)?",
       "meta\\.llama[a-z0-9.-]+(?::\\d+)?",
-      "mistral\\.[a-z0-9.-]+(?::\\d+)?",
+      "mistral\\.(?:mistral|mixtral|pixtral|ministral)-[a-z0-9.-]+(?::\\d+)?",
       "cohere\\.command[a-z0-9.-]+(?::\\d+)?",
       "gpt-(?:\\d|oss)[a-z0-9.-]*",
       "o\\d-(?:mini|pro|preview)",
@@ -161,6 +161,9 @@ const LLM_PROVIDER_PACKAGES: Array<[string, RegExp]> = [
   ["Cohere", /^(cohere|@langchain\/cohere|langchain-cohere)$/],
   ["Groq", /^(groq|langchain-groq|groq-sdk)$/],
   ["Ollama", /^(ollama|langchain-ollama)$/],
+  ["xAI", /^(xai-sdk|@ai-sdk\/xai|langchain-xai|@langchain\/xai)$/],
+  ["OpenRouter", /^(@openrouter\/ai-sdk-provider|@openrouter\/sdk|langchain-openrouter)$/],
+  ["DeepSeek", /^(@ai-sdk\/deepseek|langchain-deepseek|@langchain\/deepseek)$/],
   ["LiteLLM", /^litellm$/],
 ];
 
@@ -175,6 +178,9 @@ const SOURCE_PROVIDERS: Array<[string, RegExp]> = [
   ["Groq", /api\.groq\.com|from groq import|groq-sdk/],
   ["Cohere", /api\.cohere|import cohere|cohere-ai/],
   ["Ollama", /localhost:11434|ChatOllama|from ollama import/],
+  ["xAI", /api\.x\.ai|from xai_sdk|ChatXAI/],
+  ["OpenRouter", /openrouter\.ai|ChatOpenRouter/],
+  ["DeepSeek", /api\.deepseek\.com|ChatDeepSeek/],
 ];
 
 /** LLM providers a source file visibly calls (imports, SDK classes, API hosts). */
@@ -188,10 +194,11 @@ const MODEL_COMPANIES: Array<[RegExp, string]> = [
   [/^(gemini|gemma|google)/i, "Gemini"],
   [/^(llama|meta)/i, "Meta"],
   [/^(mistral|mixtral|codestral)/i, "Mistral"],
-  [/^grok/i, "xAI"],
+  [/^(grok|xai)/i, "xAI"],
   [/^(amazon|nova|titan)/i, "Amazon"],
   [/^(command|cohere)/i, "Cohere"],
   [/^deepseek/i, "DeepSeek"],
+  [/^openrouter/i, "OpenRouter"],
 ];
 
 /**
@@ -206,6 +213,23 @@ export function llmCompanies(llms: string[]): string[] {
     }),
   );
 }
+
+/**
+ * Models plus the providers the code calls. A provider is dropped only when a
+ * listed model already names its company, so one "gemini-…" string can no longer
+ * hide every other provider the agent supports.
+ */
+export function mergeLlms(models: string[], providers: string[], max = 12): string[] {
+  const covered = new Set(llmCompanies(models));
+  return uniq([...models, ...providers.filter((p) => !covered.has(llmCompanies([p])[0]))], max);
+}
+
+/** Splits a mixed list into model ids and provider names (the same test policyViolations uses), then merges. */
+const mergeAllLlms = (all: string[]) => {
+  const isModel = (m: string) => /[-.\d]/.test(m) && !/\s/.test(m);
+  const u = uniq(all);
+  return mergeLlms(u.filter(isModel), u.filter((m) => !isModel(m)));
+};
 
 // Packages that let an agent execute code, drive a browser or run a sandbox.
 const EXECUTION_PACKAGE = /^(playwright|puppeteer|selenium|e2b(-code-interpreter)?|@e2b\/.+|docker|dockerode|@openai\/codex|@anthropic-ai\/claude-code|claude-agent-sdk|@anthropic-ai\/claude-agent-sdk|opensandbox.*|daytona.*|modal)(@.*)?$/i;
@@ -310,7 +334,10 @@ const FRAMEWORKS: Array<[string, RegExp]> = [
   ["Mastra", /^@mastra\/.+$/],
   ["Bedrock AgentCore", /^(bedrock-agentcore|bedrock-agentcore-starter-toolkit)$/],
   // Any LangChain integration package (@langchain/openai, langchain-anthropic, ...).
-  ["LangChain", /^(langchain(-[a-z0-9-]+)?|@langchain\/.+)$/],
+  // Not the bare "community" grab-bag: repos pin it without ever using LangChain
+  // (Norix lists langchain-community but never imports it). Real use imports a
+  // submodule ("langchain_community.llms"), which still matches.
+  ["LangChain", /^(langchain(?!-community$)(-[a-z0-9-]+)?|@langchain\/(?!community$).+)$/],
   // Broad TS agent/LLM library: only when no dedicated agent framework above matched.
   ["Vercel AI SDK", /^(ai|@ai-sdk\/.+)$/],
   // App frameworks that host an LLM chat/agent directly, when no agent framework is used.
@@ -599,16 +626,19 @@ const DEPLOY_FILES: Array<[RegExp, string]> = [
   [/(^|\/)cdk\.json$/i, "AWS (CDK)"],
   [/(^|\/)samconfig\.toml$/i, "AWS (SAM)"],
   [/(^|\/)amplify\.ya?ml$/i, "AWS Amplify"],
-  [/(^|\/)(app|cloudbuild)\.ya?ml$/i, "Google Cloud"],
+  [/(^|\/)app\.ya?ml$/i, "Google Cloud"],
   [/(^|\/)azure-pipelines\.ya?ml$/i, "Azure"],
   [/(^|\/)databricks\.ya?ml$/i, "Databricks"],
 ];
 
+// Dot-folders (.archive, .old…) and archive/legacy folders hold retired configs, not live ones.
+export const RETIRED_PATH = /(^|\/)(\.[^/]+|archive[d]?|legacy|deprecated|old)\//i;
+
 export const isDeployConfig = (path: string) =>
-  path.split("/").length <= 3 && DEPLOY_FILES.some(([re]) => re.test(path));
+  path.split("/").length <= 3 && !RETIRED_PATH.test(path) && DEPLOY_FILES.some(([re]) => re.test(path));
 
 export function detectDeployTargets(paths: string[]): string[] {
-  return uniq(DEPLOY_FILES.filter(([re]) => paths.some((p) => p.split("/").length <= 3 && re.test(p))).map(([, l]) => l));
+  return uniq(DEPLOY_FILES.filter(([re]) => paths.some((p) => isDeployConfig(p) && re.test(p))).map(([, l]) => l));
 }
 
 /** App/service names declared in deploy configs (matched against cloud IaC tags). */
@@ -685,9 +715,8 @@ export function buildRepoProfile(e: RepoEvidence): AgentProfile {
       e.deployedOn ?? (e.deployTargets?.length ? `${e.deployTargets.join(", ")} (declared in repo)` : null),
     observability: detectObservability(names, envKeys),
     framework: detectFramework(names),
-    // Concrete model ids win; otherwise name the provider so the column is
-    // never blank for a repo that clearly calls an LLM.
-    llms: models.length ? uniq(models, 12) : uniq([...detectLlmProviders(names), ...detectProvidersFromSource(source)]),
+    // Model ids, plus every provider the code calls that no listed model covers.
+    llms: mergeLlms(models, [...detectLlmProviders(names), ...detectProvidersFromSource(source)]),
     skills: uniq([
       ...e.skillNames.map((s) => `Skill: ${s}`),
       ...e.mcpServers,
@@ -741,10 +770,15 @@ export function analyzeCodeBundle(paths: string[], texts: Record<string, string>
   for (const [path, text] of Object.entries(texts)) {
     if (isManifestPath(path)) parseManifest(path, text).forEach(add);
   }
-  const source = Object.entries(texts)
+  const sourceTexts = Object.entries(texts)
     .filter(([path]) => isSourcePath(path))
-    .map(([, text]) => text)
-    .join("\n");
+    .map(([, text]) => text);
+  // A framework or LLM SDK the code imports counts even when no manifest lists
+  // it (Databricks Apps pre-install streamlit, so requirements.txt omits it).
+  for (const name of importedPackages(sourceTexts)) {
+    if (detectFramework([name]) || detectLlmProviders([name]).length) add({ name, version: null });
+  }
+  const source = sourceTexts.join("\n");
   return {
     packages: Array.from(packages.values()),
     tools: extractToolNames(source),
@@ -865,6 +899,10 @@ const KEY_PROVIDERS: Array<[RegExp, string]> = [
   [/mistral/, "Mistral"],
   [/groq/, "Groq"],
   [/cohere/, "Cohere"],
+  [/xai|grok/, "xAI"],
+  [/openrouter/, "OpenRouter"],
+  [/deepseek/, "DeepSeek"],
+  [/ollama/, "Ollama"],
 ];
 
 const STOPPED = /stopped|deallocat|deleted|failed|unavailable|disabled|terminated|inactive/i;
@@ -891,6 +929,12 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
   const dbxResources = Array.isArray(dbxMeta.resources)
     ? (dbxMeta.resources as Array<Record<string, unknown>>)
     : [];
+  // The app's start command names its framework ("streamlit run app.py").
+  // Discovery stores the deployment as `activeDeployment`; the raw API shape is `active_deployment`.
+  const dbxDeployment = (dbxMeta.activeDeployment ?? dbxMeta.active_deployment ?? dbxMeta.pendingDeployment) as
+    | { command?: unknown }
+    | undefined;
+  const dbxCommand = strings(dbxDeployment?.command);
   const dbxText = dbxResources.map((x) => `${x.name ?? ""} ${(x.secret as { key?: string } | undefined)?.key ?? ""}`).join(" ");
 
   // Facts read from the deployed code bundle (Lambda zip), when fetchable.
@@ -916,21 +960,19 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
     ],
     12,
   );
-  // No model id anywhere: name the provider from bound secret / env key names.
-  if (!llms.length) {
-    const hint = `${dbxText} ${envKeys.join(" ")}`.toLowerCase();
-    llms.push(
-      ...res.flatMap((r) => strings(r.metadata.codeProviders)),
-      ...KEY_PROVIDERS.filter(([re]) => re.test(hint)).map(([, label]) => label),
-    );
-  }
+  // Also name the providers from the code bundle and bound secret / env key names.
+  const hint = `${dbxText} ${envKeys.join(" ")}`.toLowerCase();
+  const llmsOut = mergeLlms(llms, [
+    ...res.flatMap((r) => strings(r.metadata.codeProviders)),
+    ...KEY_PROVIDERS.filter(([re]) => re.test(hint)).map(([, label]) => label),
+  ]);
 
   // Framework = the code library the agent is built with (LangGraph, CrewAI,
   // Vercel AI SDK…). Tools it calls (Codex CLI) or runs code in (OpenSandbox)
   // are not frameworks, so they never appear here.
   const framework =
     TAG_FIRST(tags, ["framework", "agent-framework"]) ??
-    detectFramework([...codeNames, ...layers, ...envKeys.map((k) => k.toLowerCase())]) ??
+    detectFramework([...codeNames, ...layers, ...envKeys.map((k) => k.toLowerCase()), ...dbxCommand]) ??
     (PLATFORM_FRAMEWORK[agent.platform] ?? null);
 
   const services = roles.flatMap((r) => strings(r.metadata.actionServices));
@@ -1018,7 +1060,7 @@ export function buildCloudProfile(agent: CorrelatedAgent): AgentProfile {
     deployedOn: deployed ? `${providerLabel} ${agent.region}` : null,
     observability,
     framework,
-    llms,
+    llms: llmsOut,
     skills,
     packages: uniq(
       [runtime ? `runtime: ${runtime}` : null, ...layers.map((l) => `layer: ${l}`), ...codePackages.map(pkgLabel)],

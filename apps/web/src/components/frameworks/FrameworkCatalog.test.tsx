@@ -12,6 +12,10 @@ jest.mock("@/contexts/TenantContext", () => ({
 jest.mock("@/lib/actions/framework-controls", () => ({
   setCatalogFrameworkEnabled: jest.fn(),
 }));
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/acme/admin/settings/frameworks",
+  useParams: () => ({ tenant: "acme" }),
+}));
 jest.mock("@/lib/utils/toast", () => ({
   successToast: jest.fn(),
   errorToast: jest.fn(),

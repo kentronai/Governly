@@ -9,6 +9,7 @@ export const altai: FrameworkDefinition = {
   slug: "altai",
   name: "Assessment List for Trustworthy AI",
   navLabel: "Assessment List for Trustworthy AI",
+  kind: "framework",
   policyNames: ["Assessment List for Trustworthy AI"],
   description:
     "Self-assessment of AI systems against the European Commission's seven requirements for trustworthy AI.",

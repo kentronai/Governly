@@ -8,6 +8,7 @@ import { db, policyCenter, applicationPolicyCenter } from "@db";
 import { eq, and, isNull, ilike, notInArray, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { rolloutTenantCompliancePolicy } from "@/lib/server/policy-enforcement/compliance-rollout";
 
 export interface GetPolicyCenterPoliciesOptions {
@@ -19,12 +20,23 @@ export interface GetPolicyCenterPoliciesOptions {
   type?: string;
 }
 
-// Voluntary standards that live under Admin Center → Frameworks, so they are
+// Voluntary standards and guidance that live under Admin Center → Frameworks, so they are
 // hidden from the Regulations library (rows stay for existing tenant mappings).
 const FRAMEWORK_ONLY_POLICIES = [
   "ISO/IEC 42001",
   "ISO/IEC 27001",
   "NIST AI Risk Management Framework",
+  "AI Ethics & Governance Framework",
+  "ISO/IEC 23894",
+  "OECD AI Principles",
+  "UNESCO Recommendation on the Ethics of Artificial Intelligence",
+  "EEOC Technical Assistance on ADA and AI",
+  "FTC AI Guidance",
+  "UK AI White Paper",
+  "Australian AI Ethics Principles",
+  "AI Verify Framework",
+  "Assessment List for Trustworthy AI",
+  "PCI DSS Lite",
 ];
 
 /**
@@ -273,14 +285,20 @@ export const updatePolicyCenterPolicyStatus = async (
       });
     }
 
-    const rollout = await rolloutTenantCompliancePolicy(orgId, id, isActive);
+    // Evaluating every application and agent is the slow part (seconds to minutes
+    // on a big tenant). The policy is already on/off, so answer now and finish the
+    // rollout after the response instead of making the toggle (and the sidebar tab) wait.
+    after(() =>
+      rolloutTenantCompliancePolicy(orgId, id, isActive).catch((error) =>
+        console.error("[POLICY ROLLOUT] failed", { orgId, policyId: id, error }),
+      ),
+    );
     revalidatePath("/[tenant]/admin/settings/policy-center", "page");
 
     return {
       policy: exist,
       success: true,
       message: `Status updated for policy ${id}`,
-      rollout,
     };
   } catch (error) {
     console.error("Error updating policy center policy:", error);

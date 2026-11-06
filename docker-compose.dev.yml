@@ -245,9 +245,8 @@ services:
       retries: 12
       start_period: 60s
 
-  # Continuously refresh every connected cloud account. The first refresh runs
-  # as soon as the web service is healthy; later refreshes run at the configured
-  # interval and wait for the previous run to finish, so scans cannot overlap.
+  # Polls hourly; the route only scans a source whose last scan is older than
+  # AGENT_DISCOVERY_INTERVAL_HOURS (default 24), so restarts never trigger a scan.
   agent-discovery-scheduler:
     image: alpine:3.20
     container_name: controlnet-agent-discovery-scheduler
@@ -257,7 +256,6 @@ services:
         condition: service_healthy
     environment:
       AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:-norix-local-agent-discovery}
-      AGENT_DISCOVERY_INTERVAL_SECONDS: ${AGENT_DISCOVERY_INTERVAL_SECONDS:-300}
     command:
       - /bin/sh
       - -c
@@ -275,7 +273,7 @@ services:
           else
             echo "[$$(date -Iseconds)] agent-discovery: RUN FAILED (exit $$?)" >&2
           fi
-          sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
+          sleep 3600
         done
 
   # AI Radar scheduler. Polls hourly; the endpoint itself only starts a sweep

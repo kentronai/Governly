@@ -214,8 +214,9 @@ services:
       retries: 3
       start_period: 30s
 
-  # Production recurring discovery worker. It calls the authenticated internal
-  # route immediately after startup and then after each completed interval.
+  # Production recurring discovery worker. Polls the authenticated internal
+  # route hourly; the route only scans a source whose last scan is older than
+  # AGENT_DISCOVERY_INTERVAL_HOURS (default 24), so restarts never trigger a scan.
   agent-discovery-scheduler:
     image: alpine:3.20
     container_name: controlnet-agent-discovery-scheduler
@@ -227,7 +228,6 @@ services:
       - .env
     environment:
       AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:?AGENT_DISCOVERY_CRON_SECRET must be configured}
-      AGENT_DISCOVERY_INTERVAL_SECONDS: ${AGENT_DISCOVERY_INTERVAL_SECONDS:-300}
     command:
       - /bin/sh
       - -c
@@ -236,7 +236,7 @@ services:
           wget -qO- --timeout=900 \
             --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
             http://web:8080/api/cron/agent-discovery || true
-          sleep "$${AGENT_DISCOVERY_INTERVAL_SECONDS}"
+          sleep 3600
         done
 
   # AI Radar scheduler. Polls hourly; the endpoint itself only starts a sweep

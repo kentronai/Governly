@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Pencil,
   Save,
+  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,7 +51,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageTitle } from "@/components/common/PageHeader";
 import { RichTextEditor } from "@/components/common/RichTextEditor";
-import { errorToast, successToast } from "@/lib/utils/toast";
+import { errorToast, infoToast, successToast } from "@/lib/utils/toast";
+import { readDraft, useDraft } from "@/hooks/useDraft";
+import type { AutofillEntry } from "@/lib/actions/evidence-autofill";
+import { mergeFill, useEvidenceUpload } from "./useEvidenceUpload";
 import {
   getFrameworkControls,
   saveFrameworkControls,
@@ -60,6 +64,13 @@ import type {
   FrameworkDefinition,
   FrameworkRequirement,
 } from "@/lib/frameworks";
+import {
+  controlKeys,
+  isDone,
+  percent,
+  statusOf,
+  str,
+} from "@/lib/frameworks/helpers";
 
 type Requirement = FrameworkRequirement;
 
@@ -72,38 +83,7 @@ const TAB_TRIGGER =
 const STATUSES = ["Not started", "In progress", "Done"];
 const NONE = "__none__";
 
-type User = { id: string; name: string | null; email: string };
-
-const str = (value: unknown) => (typeof value === "string" ? value : "");
-// A subcontrol counts as completed once any of its details are filled in (or it is marked Done).
-const isDone = (data: Record<string, FrameworkControlData>, key: string) => {
-  const c = data[key];
-  return Boolean(
-    c &&
-      (c.status === "Done" ||
-        ["implementation", "evidence", "auditorFeedback"].some((f) =>
-          str(c[f]).trim(),
-        )),
-  );
-};
-// Shown status: the one picked, else "In progress" once any detail is filled in.
-// ("Waiting" was the old default label; treat it as unset.)
-const statusOf = (c: FrameworkControlData | undefined) => {
-  const picked = str(c?.status);
-  if (picked && picked !== "Waiting") return picked;
-  return c &&
-    ["implementation", "evidence", "auditorFeedback"].some((f) =>
-      str(c[f]).trim(),
-    )
-    ? "In progress"
-    : "Not started";
-};
-// Keys whose Details count toward completion: the subcontrols, or the
-// requirement itself for flat frameworks.
-const controlKeys = (r: Requirement) =>
-  r.subcontrols.length ? r.subcontrols.map((s) => s.key) : [r.key];
-const percent = (done: number, total: number) =>
-  total ? Math.round((done / total) * 100) : 0;
+export type User = { id: string; name: string | null; email: string };
 
 export function FrameworkTracker({
   framework,
@@ -120,6 +100,17 @@ export function FrameworkTracker({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Requirement | null>(null);
   const [completionFor, setCompletionFor] = useState<Requirement | null>(null);
+  const [prefill, setPrefill] = useState<Record<string, AutofillEntry> | null>(
+    null,
+  );
+  const { upload } = useEvidenceUpload();
+  const uploadFor = async (req: Requirement) => {
+    const fill = await upload(req);
+    if (fill) {
+      setPrefill(fill);
+      setSelected(req);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -279,6 +270,12 @@ export function FrameworkTracker({
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => void uploadFor(req)}
+                                >
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Upload evidence document
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -302,9 +299,13 @@ export function FrameworkTracker({
         tenant={tenant}
         framework={framework.slug}
         requirement={selected}
+        prefill={prefill}
         controls={controls}
         users={users}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          setPrefill(null);
+        }}
         onSaved={(entries) =>
           setControls((current) => ({ ...current, ...entries }))
         }
@@ -313,18 +314,27 @@ export function FrameworkTracker({
   );
 }
 
-function RequirementDialog({
+export function RequirementDialog({
   tenant,
   framework,
   requirement,
   controls,
   users,
+  heading,
+  tab,
+  prefill,
   onClose,
   onSaved,
 }: {
   tenant: string;
   framework: string;
   requirement: Requirement | null;
+  /** Subcontrol key to open on; defaults to the first. */
+  tab?: string;
+  /** Dialog title; defaults to the requirement's own "key title". */
+  heading?: string;
+  /** AI-drafted details from an uploaded document, merged into the form on open. */
+  prefill?: Record<string, AutofillEntry> | null;
   controls: Record<string, FrameworkControlData>;
   users: User[];
   onClose: () => void;
@@ -332,28 +342,59 @@ function RequirementDialog({
 }) {
   const [draft, setDraft] = useState<Record<string, FrameworkControlData>>({});
   const [saving, setSaving] = useState(false);
+  const [edited, setEdited] = useState(false);
+  const { busy: reading, upload } = useEvidenceUpload();
+
+  // Unsaved input is kept (even after leaving the page or closing the browser) until
+  // Save or Cancel. Closing with X / Esc keeps it; the next open restores it.
+  const draftKey = requirement
+    ? `${tenant}:${framework}:${requirement.key}`
+    : null;
+  const clearDraft = useDraft(draftKey, draft, edited);
 
   useEffect(() => {
-    if (!requirement) return;
+    if (!requirement || !draftKey) return;
     const keys = [
       requirement.key,
       ...requirement.subcontrols.map((s) => s.key),
     ];
-    setDraft(
-      Object.fromEntries(keys.map((key) => [key, { ...controls[key] }])),
+    const base = Object.fromEntries(
+      keys.map((key) => [key, { ...controls[key] }]),
     );
-  }, [requirement, controls]);
+    const stored = readDraft<Record<string, FrameworkControlData>>(draftKey);
+    if (stored) infoToast("Restored your unsaved changes.");
+    const start = stored ? { ...base, ...stored } : base;
+    setDraft(prefill ? mergeFill(start, prefill) : start);
+    setEdited(Boolean(stored || prefill));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-init only when the control opens, so a parent re-render can't wipe typing
+  }, [requirement, prefill]);
 
-  const set = (key: string, field: string, value: unknown) =>
+  const set = (key: string, field: string, value: unknown) => {
+    setEdited(true);
     setDraft((current) => ({
       ...current,
       [key]: { ...current[key], [field]: value },
     }));
+  };
+
+  const fromDocument = async () => {
+    if (!requirement) return;
+    const fill = await upload(requirement);
+    if (!fill) return;
+    setEdited(true);
+    setDraft((current) => mergeFill(current, fill));
+  };
+
+  const cancel = () => {
+    clearDraft();
+    onClose();
+  };
 
   const save = async () => {
     setSaving(true);
     try {
       await saveFrameworkControls(tenant, framework, draft);
+      clearDraft();
       onSaved(draft);
       successToast("Requirement saved", requirement?.title ?? "", "updated");
       onClose();
@@ -381,15 +422,36 @@ function RequirementDialog({
           <div className="flex max-h-[90vh] flex-col">
             <DialogHeader className="shrink-0 space-y-3 border-b p-5 pr-12">
               <DialogTitle className="text-lg">
-                {requirement.key} {requirement.title}
+                {heading ?? `${requirement.key} ${requirement.title}`}
               </DialogTitle>
               <DialogDescription className="sr-only">
                 {requirement.description}
               </DialogDescription>
-              <DescriptionBox text={requirement.description} />
+              {requirement.description !== requirement.summary && (
+                <DescriptionBox text={requirement.description} />
+              )}
             </DialogHeader>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-dashed p-3">
+                <p className="text-sm text-muted-foreground">
+                  Have a policy, report or screenshot export? Upload it and the
+                  details below are filled in for you to review.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={reading}
+                  onClick={() => void fromDocument()}
+                >
+                  {reading ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-1.5 h-4 w-4" />
+                  )}
+                  Upload document
+                </Button>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(["owner", "reviewer", "approver"] as const).map((field) => (
                   <div key={field} className="space-y-1.5">
@@ -438,8 +500,8 @@ function RequirementDialog({
                 </div>
               ) : (
                 <Tabs
-                  defaultValue={requirement.subcontrols[0].key}
-                  key={requirement.key}
+                  defaultValue={tab ?? requirement.subcontrols[0].key}
+                  key={`${requirement.key}:${tab}`}
                 >
                   <TabsList className={TAB_LIST}>
                     {requirement.subcontrols.map((s, i) => (
@@ -473,7 +535,7 @@ function RequirementDialog({
             </div>
 
             <div className="flex shrink-0 justify-end gap-2 border-t p-4">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={cancel}>
                 Cancel
               </Button>
               <Button onClick={save} disabled={saving}>
