@@ -35,6 +35,7 @@ export function ViolationsTable({ rows }: { rows: ViolationRow[] }) {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-14">#</TableHead>
             <TableHead>Agent</TableHead>
             <TableHead>Reason</TableHead>
             <TableHead>Description</TableHead>
@@ -44,13 +45,14 @@ export function ViolationsTable({ rows }: { rows: ViolationRow[] }) {
         <TableBody>
           {visible.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                 No policy violations.
               </TableCell>
             </TableRow>
           ) : (
-            visible.map((row) => (
+            visible.map((row, i) => (
               <TableRow key={row.key}>
+                <TableCell className="text-muted-foreground">{(page - 1) * pageSize + i + 1}</TableCell>
                 <TableCell className="font-medium">{row.agent}</TableCell>
                 <TableCell>
                   <Badge variant="destructive">{row.reason}</Badge>
