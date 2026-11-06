@@ -4,12 +4,15 @@
 
 "use server";
 
-import { db, globalAiPolicies } from "@db";
-import { eq, desc, and, sql, or, ilike } from "drizzle-orm";
+import { db, globalAiPolicies, radarCoverage } from "@db";
+import { POLICY_CATEGORIES, POLICY_STATUSES } from "@/lib/radar-categories";
+import { eq, desc, and, sql, or, ilike, isNotNull } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 export interface GetGlobalAiPoliciesOptions {
   region?: string;
+  category?: string;
   country?: string;
   status?: string;
   search?: string;
@@ -29,11 +32,12 @@ export const getGlobalAiPolicies = async (
   }
 
   try {
-    const { region, country, status, search, page, pageSize } = options || {};
+    const { region, category, country, status, search, page, pageSize } =
+      options || {};
 
     // Pagination defaults
     const pageNum = page && page > 0 ? page : 1;
-    const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 50;
+    const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 20;
     const offset = (pageNum - 1) * limit;
 
     // Build where conditions
@@ -42,6 +46,9 @@ export const getGlobalAiPolicies = async (
     // Filter conditions
     if (region) {
       whereConditions.push(eq(globalAiPolicies.region, region));
+    }
+    if (category) {
+      whereConditions.push(eq(globalAiPolicies.category, category));
     }
     if (country) {
       whereConditions.push(eq(globalAiPolicies.country, country));
@@ -130,4 +137,51 @@ export const getGlobalAiPolicyById = async (id: string) => {
     console.error("Error fetching global AI policy:", error);
     throw error;
   }
+};
+
+/**
+ * Distinct filter values straight from the table. (Deriving these from a
+ * paginated list silently drops values once there are more than 200 policies.)
+ */
+export const getGlobalAiPolicyFilterOptions = async () => {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Authentication required");
+  }
+  const distinct = async (column: AnyPgColumn) =>
+    (
+      await db
+        .selectDistinct({ value: column })
+        .from(globalAiPolicies)
+        .where(isNotNull(column))
+        .orderBy(column)
+    )
+      .map((r) => r.value as string)
+      .filter(Boolean);
+
+  const [regions, countries, statuses, categories, coverage] = await Promise.all([
+    distinct(globalAiPolicies.region),
+    distinct(globalAiPolicies.country),
+    distinct(globalAiPolicies.status),
+    distinct(globalAiPolicies.category),
+    db
+      .selectDistinct({
+        region: radarCoverage.region,
+        country: sql<string>`coalesce(${radarCoverage.country}, ${radarCoverage.jurisdictionName})`,
+      })
+      .from(radarCoverage)
+      .where(eq(radarCoverage.isEnabled, true)),
+  ]);
+  const covRegions = coverage.map((r) => r.region).filter(Boolean) as string[];
+  const covCountries = coverage.map((r) => r.country).filter(Boolean);
+  // Dropdowns offer everything AI Radar monitors (plus anything already in the
+  // table), so they are usable before the first policy arrives.
+  const merge = (...lists: string[][]) =>
+    Array.from(new Set(lists.flat())).sort((a, b) => a.localeCompare(b));
+  return {
+    regions: merge(regions, covRegions),
+    countries: merge(countries, covCountries),
+    statuses: merge([...POLICY_STATUSES], statuses),
+    categories: merge([...POLICY_CATEGORIES], categories),
+  };
 };

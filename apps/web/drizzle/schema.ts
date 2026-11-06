@@ -2217,6 +2217,7 @@ export const globalAiPolicies = pgTable("global_ai_policies", {
   impact: text(),
   complianceRequirements: text("compliance_requirements"),
   enforcementDetails: text("enforcement_details"),
+  category: text(),
 });
 
 export const applicationPolicies = pgTable(
@@ -3608,9 +3609,16 @@ export const radarCoverage = pgTable(
     jurisdictionName: text("jurisdiction_name").notNull(),
     tier: integer().default(2).notNull(),
     instrumentsTracked: text("instruments_tracked"),
+    region: text(),
+    country: text(),
+    state: text(),
     primarySourceUrls: text("primary_source_urls").array().default([]).notNull(),
     isEnabled: boolean("is_enabled").default(true).notNull(),
     lastVerifiedDate: date("last_verified_date"),
+    discoveryAttemptedAt: timestamp("discovery_attempted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -3630,6 +3638,7 @@ export const radarSourceSnapshots = pgTable(
       .references(() => radarCoverage.id, { onDelete: "cascade" }),
     url: text().notNull(),
     contentHash: text("content_hash"),
+    seenKeys: text("seen_keys").array().default([]).notNull(),
     lastFetchedAt: timestamp("last_fetched_at", {
       withTimezone: true,
       mode: "string",
@@ -3675,7 +3684,22 @@ export const radarUpdates = pgTable("radar_updates", {
   effectiveDate: date("effective_date"),
   sourceUrl: text("source_url").notNull(),
   sourceQuote: text("source_quote").notNull(),
+  instrumentType: text("instrument_type"),
+  publishedDate: date("published_date"),
   detectedAt: timestamp("detected_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+});
+
+/** The model AI Radar runs on (platform-wide, single row). Key encrypted via lib/server/crypto. */
+export const radarSettings = pgTable("radar_settings", {
+  id: text().default("default").primaryKey().notNull(),
+  provider: text().notNull(),
+  modelId: text("model_id").notNull(),
+  keyEncrypted: text("key_encrypted").notNull(),
+  keyLast4: text("key_last4").notNull(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
     .defaultNow()
     .notNull(),
 });

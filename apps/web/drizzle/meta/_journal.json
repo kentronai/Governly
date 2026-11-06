@@ -351,6 +351,41 @@
       "when": 1787400000000,
       "tag": "0049_ai_radar",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787500000000,
+      "tag": "0050_radar_seed_and_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1787600000000,
+      "tag": "0051_radar_settings_and_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1787700000000,
+      "tag": "0052_radar_seen_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1787800000000,
+      "tag": "0053_gdpr_regulation_ai_ethics_framework",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1787900000000,
+      "tag": "0054_radar_live_feeds",
+      "breakpoints": true
     }
   ]
 }

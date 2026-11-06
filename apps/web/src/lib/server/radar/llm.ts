@@ -1,6 +1,8 @@
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { generateText } from "ai";
+import { desc } from "drizzle-orm";
 import { db, tenantLlmKeys } from "@db";
 import { getLlmProvider } from "@/lib/llm-providers";
 import { decryptSecret } from "@/lib/server/crypto";
@@ -14,77 +16,90 @@ export interface RadarModel {
 }
 
 /**
- * The model behind AI Radar. Platform config first (RADAR_LLM_PROVIDER /
- * RADAR_LLM_MODEL / RADAR_LLM_API_KEY, falling back to the provider's own
- * `<PROVIDER>_API_KEY`, e.g. GEMINI_API_KEY). Manual runs with no platform key
- * fall back to the triggering tenant's BYOK key. Any OpenAI-compatible provider
- * from llm-providers.ts works.
+ * Models AI Radar may use, best first. Admins set the model once under BYOK, so
+ * that comes first (the triggering tenant's, else the most recently saved one);
+ * then the server env: RADAR_LLM_PROVIDER / RADAR_LLM_MODEL / RADAR_LLM_API_KEY, or
+ * the provider's own `<PROVIDER>_API_KEY`. Any OpenAI-compatible provider works.
  */
-export async function resolveRadarModel(tenantId?: string): Promise<RadarModel> {
-  const provider = process.env.RADAR_LLM_PROVIDER?.trim() || "gemini";
-  const info = getLlmProvider(provider);
-  if (!info) throw new Error(`Unknown RADAR_LLM_PROVIDER "${provider}"`);
+async function radarModelCandidates(tenantId?: string): Promise<RadarModel[]> {
+  const out: RadarModel[] = [];
 
+  const byokRows = await db.select().from(tenantLlmKeys).orderBy(desc(tenantLlmKeys.updatedAt));
+  // ponytail: platform-wide scheduled runs reuse the newest BYOK key of any tenant.
+  for (const row of [...byokRows.filter((r) => r.tenantId === tenantId), ...byokRows]) {
+    const info = getLlmProvider(row.provider);
+    if (!info) continue;
+    try {
+      out.push({
+        provider: row.provider,
+        modelId: row.modelId,
+        baseUrl: info.baseUrl,
+        apiKey: decryptSecret(row.keyEncrypted),
+      });
+    } catch {
+      // unreadable key: skip it
+    }
+  }
+
+  const provider =
+    process.env.RADAR_LLM_PROVIDER?.trim() ||
+    ["gemini", "openai", "anthropic"].find((p) => process.env[`${p.toUpperCase()}_API_KEY`]?.trim()) ||
+    "gemini";
+  const info = getLlmProvider(provider);
   const apiKey =
-    process.env.RADAR_LLM_API_KEY?.trim() ||
-    process.env[`${provider.toUpperCase()}_API_KEY`]?.trim();
-  if (apiKey) {
+    process.env.RADAR_LLM_API_KEY?.trim() || process.env[`${provider.toUpperCase()}_API_KEY`]?.trim();
+  if (info && apiKey) {
     const modelId =
       process.env.RADAR_LLM_MODEL?.trim() ||
       (provider === "gemini" && process.env.GEMINI_MODEL?.trim()) ||
       info.models[0].id;
-    return { provider, modelId, baseUrl: info.baseUrl, apiKey };
+    out.push({ provider, modelId, baseUrl: info.baseUrl, apiKey });
   }
-
-  if (tenantId) {
-    const [row] = await db
-      .select()
-      .from(tenantLlmKeys)
-      .where(eq(tenantLlmKeys.tenantId, tenantId))
-      .orderBy(desc(tenantLlmKeys.updatedAt))
-      .limit(1);
-    const byok = row && getLlmProvider(row.provider);
-    if (row && byok) {
-      return {
-        provider: row.provider,
-        modelId: row.modelId,
-        baseUrl: byok.baseUrl,
-        apiKey: decryptSecret(row.keyEncrypted),
-      };
-    }
-  }
-  throw new Error(
-    "AI Radar has no model: set RADAR_LLM_API_KEY (and optionally RADAR_LLM_PROVIDER / RADAR_LLM_MODEL), or add a key under Admin Center → BYOK.",
-  );
+  return out;
 }
 
-/** One JSON-mode chat completion. Throws on HTTP errors or non-JSON output. */
+/**
+ * The first configured model whose key actually works, or null. AI is optional:
+ * without it the agent still runs (search + change detection, no model analysis).
+ */
+export async function pickRadarModel(tenantId?: string): Promise<RadarModel | null> {
+  for (const model of await radarModelCandidates(tenantId)) {
+    try {
+      await radarChat(model, 'Reply with the JSON {"ok":true}', "ping");
+      return model;
+    } catch {
+      // rejected key, unknown model, quota: try the next one
+    }
+  }
+  return null;
+}
+
+/** The BYOK/env model as a Vercel AI SDK model (every supported provider speaks the OpenAI wire format). */
+export function radarLanguageModel(model: RadarModel) {
+  return createOpenAICompatible({
+    name: model.provider,
+    baseURL: model.baseUrl,
+    apiKey: model.apiKey,
+  }).chatModel(model.modelId);
+}
+
+// Reasoning models (o-series, gpt-5) reject an explicit temperature.
+export const radarTemperature = (model: RadarModel) =>
+  /^(o\d|gpt-5)/.test(model.modelId) ? undefined : 0;
+
+/** One JSON answer from the model. Throws on API errors or non-JSON output. */
 export async function radarChat(
   model: RadarModel,
   system: string,
   user: string,
 ): Promise<unknown> {
-  const res = await fetch(`${model.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${model.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: model.modelId,
-      // Reasoning models (o-series, gpt-5) reject an explicit temperature.
-      ...(/^(o\d|gpt-5)/.test(model.modelId) ? {} : { temperature: 0 }),
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-    signal: AbortSignal.timeout(180_000),
-    cache: "no-store",
+  const { text } = await generateText({
+    model: radarLanguageModel(model),
+    temperature: radarTemperature(model),
+    system,
+    prompt: user,
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(180_000),
   });
-  if (!res.ok) throw new Error(`Model API returned HTTP ${res.status}`);
-  const content = (await res.json())?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("Model API returned no content");
-  return parseModelJson(content);
+  return parseModelJson(text);
 }

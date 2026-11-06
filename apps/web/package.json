@@ -23,6 +23,7 @@
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.90",
     "@amcharts/amcharts5": "^5.12.2",
     "@aws-sdk/client-api-gateway": "^3.1091.0",
     "@aws-sdk/client-apigatewayv2": "^3.1091.0",
@@ -77,6 +78,7 @@
     "@tiptap/starter-kit": "^3.32.2",
     "@vercel/analytics": "^1.2.2",
     "@vercel/speed-insights": "^1.0.10",
+    "ai": "^6.0.323",
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.1",
     "classnames": "^2.5.1",
@@ -110,6 +112,7 @@
     "svix": "^1.76.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "unpdf": "^2.1.0",
     "use-debounce": "^10.0.6",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
