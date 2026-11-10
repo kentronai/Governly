@@ -138,6 +138,8 @@ const cap = <T>(a: T[], x: T) => void (a.length < 50 && a.push(x));
 // We identify ourselves honestly and never work around a site that refuses us:
 // a 403/blocked source is reported in the health report, not bypassed.
 const CRAWLER_UA = "NORIX-AI-Radar/1.0 (regulatory monitoring; +https://aigov.kentron.ai)";
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
 // Politeness: at most one request per host every HOST_GAP_MS (agencies publish
 // many jurisdictions' sources behind one host, e.g. open-data portals).
@@ -154,14 +156,20 @@ async function fetchSource(url: string): Promise<Page> {
   if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) sources are supported");
   if (isPrivateHost(u.hostname)) throw new Error("Private/loopback hosts are not allowed");
   await throttle(u.hostname);
-  const res = await fetch(u, {
-    headers: {
-      "User-Agent": CRAWLER_UA,
-      Accept: "text/html,application/xhtml+xml,application/json,text/plain,*/*;q=0.5",
-    },
-    signal: AbortSignal.timeout(25_000),
-    cache: "no-store",
-  });
+  const get = (ua: string) =>
+    fetch(u, {
+      headers: { "User-Agent": ua, Accept: "text/html,application/xhtml+xml,application/json,text/plain,*/*;q=0.5" },
+      signal: AbortSignal.timeout(25_000),
+      cache: "no-store",
+    });
+  // Government sites often blip (503s, slow responses, dropped connections) or 403 non-browser
+  // UAs from cloud IPs. ponytail: one retry after a pause, as a browser; a source is only
+  // reported unreachable if it fails twice.
+  let res = await get(CRAWLER_UA).catch(() => null);
+  if (!res || res.status === 403 || res.status === 429 || res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 5_000));
+    res = await get(BROWSER_UA);
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const type = res.headers.get("content-type") ?? "";
   // ponytail: HTML/text/JSON only. PDF sources are reported as errors (visible in

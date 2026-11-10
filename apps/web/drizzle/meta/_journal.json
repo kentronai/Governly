@@ -414,6 +414,13 @@
       "when": 1788300000000,
       "tag": "0058_radar_hinshaw_source",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788400000000,
+      "tag": "0059_radar_replace_dead_sources",
+      "breakpoints": true
     }
   ]
 }

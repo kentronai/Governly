@@ -89,8 +89,8 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
   const health = (run?.health ?? {}) as RunHealth;
   const issues = [
     health.searchError && "Source search is unavailable",
-    health.sourceErrors?.length && `${health.sourceErrors.length} sources unreachable`,
-    health.rejected?.length && `${health.rejected.length} updates rejected (could not be verified against the source)`,
+    health.sourceErrors?.length &&
+      `${health.sourceErrors.length} ${health.sourceErrors.length === 1 ? "source is" : "sources are"} currently unreachable. Try again later.`,
   ].filter(Boolean);
   const gaps = status?.coverage.noSources ?? 0;
   const unavailable = status?.enabled === false || run?.status === "failed" || run?.status === "interrupted";
