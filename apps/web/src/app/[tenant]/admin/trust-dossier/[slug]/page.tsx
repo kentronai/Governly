@@ -1,24 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { TrackButton } from "@/components/trust-dossier/TrackButton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
-import { TrackButton } from "@/components/trust-dossier/TrackButton";
 import { getTrackedVendorSlugs } from "@/lib/actions/trust-dossier";
+import { GRADE_CLASSES, GRADE_SCALE } from "@/lib/trust-dossier/grades";
 import {
-  GRADE_CLASSES,
-  GRADE_SCALE,
-  TRUST_DOSSIER_RUBRIC,
   type CheckStatus,
-  getTrustDossierDetails,
   getTrustDossierScorecard,
   getTrustDossierVendor,
 } from "@/lib/trust-dossier/vendors";
+import { cn } from "@/lib/utils";
 
 const STATUS_DOT: Record<CheckStatus, string> = {
   Disclosed: "bg-emerald-600",
@@ -43,10 +41,22 @@ export default async function TrustDossierVendorPage({
   const { tenant, slug } = await params;
   const vendor = getTrustDossierVendor(slug);
   if (!vendor) notFound();
-  const details = getTrustDossierDetails(slug);
   const card = getTrustDossierScorecard(slug)!;
-  const checks = details?.checks ?? {};
-  const trackedSlugs = await getTrackedVendorSlugs(tenant).catch((): string[] => []);
+  const trackedSlugs = await getTrackedVendorSlugs(tenant).catch(
+    (): string[] => [],
+  );
+
+  const details = [
+    ["Company", vendor.company],
+    ["Category", vendor.category],
+    ["Audience", vendor.audience],
+    ["Assessment confidence", vendor.confidence],
+    ["Modalities", vendor.modalities?.join(", ")],
+    ["Trains on customer data", vendor.trainsOnCustomerData],
+    ["Certifications", vendor.certifications?.join(", ")],
+    ["Policy last updated", vendor.policyLastUpdated],
+    ["Last checked", vendor.lastChecked],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
 
   return (
     <div className="space-y-6 p-6">
@@ -68,10 +78,9 @@ export default async function TrustDossierVendorPage({
           <PageHeader
             title={vendor.name}
             description={[
-              details?.company && details.company !== "Not stated"
-                ? details.company
-                : null,
+              vendor.company,
               vendor.category,
+              vendor.confidence && `${vendor.confidence} confidence`,
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -97,12 +106,12 @@ export default async function TrustDossierVendorPage({
             }
           />
           <div className="flex max-w-md items-center gap-3">
-            <Badge variant="outline" className={GRADE_CLASSES[card.grade]}>
-              {card.grade}
+            <Badge variant="outline" className={GRADE_CLASSES[vendor.grade]}>
+              {vendor.grade}
             </Badge>
-            <Progress value={card.score} className="h-2" />
+            <Progress value={vendor.score} className="h-2" />
             <span className="whitespace-nowrap text-sm font-medium">
-              {card.score}/100
+              {vendor.score}/100
             </span>
           </div>
         </div>
@@ -111,10 +120,10 @@ export default async function TrustDossierVendorPage({
       <p className="text-sm">
         {vendor.name} earns{" "}
         <span className="font-semibold">
-          {/^[AEF]/.test(card.grade) ? "an" : "a"} {card.grade} ({card.score}
-          /100)
+          {/^[AEF]/.test(vendor.grade) ? "an" : "a"} {vendor.grade} (
+          {vendor.score}/100)
         </span>{" "}
-        because it {GRADE_REASON[card.grade]}.
+        because it {GRADE_REASON[vendor.grade]}.
       </p>
 
       <Card>
@@ -124,7 +133,7 @@ export default async function TrustDossierVendorPage({
             label={`of ${card.total} vendors ranked`}
           />
           <Stat
-            value={String(card.score)}
+            value={String(vendor.score)}
             label={`score · ${vendor.category} avg ${card.categoryAverage}`}
           />
           <Stat
@@ -147,7 +156,7 @@ export default async function TrustDossierVendorPage({
             variant="outline"
             className={cn(
               GRADE_CLASSES[band.grade],
-              band.grade === card.grade && "ring-2 ring-foreground/40",
+              band.grade === vendor.grade && "ring-2 ring-foreground/40",
             )}
           >
             {band.grade} · {band.min}–{band.max}
@@ -155,31 +164,42 @@ export default async function TrustDossierVendorPage({
         ))}
       </div>
 
+      {vendor.redFlags.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Red flags in the policy</AlertTitle>
+          <AlertDescription>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              {vendor.redFlags.map((flag, i) => (
+                <li key={i}>“{flag}”</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Summary</CardTitle>
         </CardHeader>
         <CardContent className="text-sm leading-relaxed">
-          {details?.summary ??
-            "Dossier details for this vendor have not been compiled yet."}
+          {vendor.summary}
         </CardContent>
       </Card>
 
-      {details?.highlights?.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Highlights</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {details.highlights.map((h) => (
-              <div key={h.title} className="rounded-md border p-3">
-                <h3 className="text-sm font-semibold">{h.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{h.text}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Highlights</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          {vendor.highlights.map((h, i) => (
+            <div key={`${h.title}-${i}`} className="rounded-md border p-3">
+              <h3 className="text-sm font-semibold">{h.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{h.text}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -188,12 +208,12 @@ export default async function TrustDossierVendorPage({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 p-0 pb-2">
-          {TRUST_DOSSIER_RUBRIC.map((section) => {
+          {vendor.sections.map((section) => {
             const disclosed = section.items.filter(
-              (i) => checks[i.id] === "Disclosed",
+              (i) => i.status === "Disclosed",
             ).length;
             return (
-              <section key={section.id}>
+              <section key={section.name}>
                 <div className="space-y-2 border-y bg-muted/40 px-6 py-3">
                   <div className="flex items-center justify-between text-sm">
                     <h3 className="font-semibold">{section.name}</h3>
@@ -207,28 +227,25 @@ export default async function TrustDossierVendorPage({
                   />
                 </div>
                 <ul className="divide-y">
-                  {section.items.map((item) => {
-                    const status: CheckStatus = checks[item.id] ?? "Silent";
-                    return (
-                      <li
-                        key={item.id}
-                        className="flex items-center justify-between gap-4 px-6 py-2.5 text-sm"
-                      >
-                        <span className="flex items-center gap-3">
-                          <span
-                            className={cn(
-                              "h-2 w-2 shrink-0 rounded-full",
-                              STATUS_DOT[status],
-                            )}
-                          />
-                          {item.label}
-                        </span>
-                        <span className="whitespace-nowrap text-muted-foreground">
-                          {status}
-                        </span>
-                      </li>
-                    );
-                  })}
+                  {section.items.map((item) => (
+                    <li
+                      key={item.label}
+                      className="flex items-center justify-between gap-4 px-6 py-2.5 text-sm"
+                    >
+                      <span className="flex items-center gap-3">
+                        <span
+                          className={cn(
+                            "h-2 w-2 shrink-0 rounded-full",
+                            STATUS_DOT[item.status],
+                          )}
+                        />
+                        {item.label}
+                      </span>
+                      <span className="whitespace-nowrap text-muted-foreground">
+                        {item.status}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </section>
             );
@@ -240,16 +257,16 @@ export default async function TrustDossierVendorPage({
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">
             Sub-processors
-            {details?.subprocessors.length
-              ? ` (${details.subprocessors.length})`
+            {vendor.subprocessors.length
+              ? ` (${vendor.subprocessors.length})`
               : ""}
           </CardTitle>
           <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
         </CardHeader>
         <CardContent>
-          {details?.subprocessors.length ? (
+          {vendor.subprocessors.length ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {details.subprocessors.map((sp, index) => (
+              {vendor.subprocessors.map((sp, index) => (
                 <div
                   key={`${sp.name}-${index}`}
                   className="space-y-1 rounded-md border p-3"
@@ -264,24 +281,53 @@ export default async function TrustDossierVendorPage({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {details?.subprocessorsNote ??
+              {vendor.subprocessorsNote ??
                 "No public sub-processor list has been found for this vendor."}
             </p>
           )}
         </CardContent>
       </Card>
 
+      {vendor.scoreHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Score history</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {vendor.scoreHistory.map((h) => (
+              <div
+                key={h.date}
+                className="flex items-center justify-between rounded-md border p-3 text-sm"
+              >
+                <span className="text-muted-foreground">{h.date}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {h.score}/100
+                  <Badge variant="outline" className={GRADE_CLASSES[h.grade]}>
+                    {h.grade}
+                  </Badge>
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sources</CardTitle>
+          <CardTitle className="text-base">Details and sources</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">
-            Policy last updated: {details?.policyLastUpdated ?? "Not stated"}
-          </p>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {details.map(([label, value]) => (
+              <div key={label} className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1">{value}</p>
+              </div>
+            ))}
+          </div>
           <div className="flex flex-col gap-1">
             <SourceLink label="Privacy policy" url={vendor.privacyPolicyUrl} />
-            {(details?.sourcesChecked ?? [])
+            {vendor.sourcesChecked
               .filter((u) => u !== vendor.privacyPolicyUrl)
               .map((u) => (
                 <SourceLink key={u} label={u} url={u} />
