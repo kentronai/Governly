@@ -3614,7 +3614,10 @@ export const radarCoverage = pgTable(
     region: text(),
     country: text(),
     state: text(),
-    primarySourceUrls: text("primary_source_urls").array().default([]).notNull(),
+    primarySourceUrls: text("primary_source_urls")
+      .array()
+      .default([])
+      .notNull(),
     isEnabled: boolean("is_enabled").default(true).notNull(),
     lastVerifiedDate: date("last_verified_date"),
     discoveryAttemptedAt: timestamp("discovery_attempted_at", {
@@ -3705,3 +3708,19 @@ export const radarSettings = pgTable("radar_settings", {
     .defaultNow()
     .notNull(),
 });
+
+// Trust Dossier: vendors a tenant has chosen to track.
+export const trustDossierTracked = pgTable(
+  "trust_dossier_tracked",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    vendorSlug: text("vendor_slug").notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.vendorSlug] })],
+);
