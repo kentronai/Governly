@@ -87,3 +87,47 @@ describe("Trust Dossier vendor directory", () => {
     );
   });
 });
+
+import {
+  TRUST_DOSSIER_RUBRIC,
+  getTrustDossierDetails,
+  getTrustDossierScorecard,
+  gradeFor,
+  scoreChecks,
+} from "./vendors";
+
+describe("Trust Dossier scoring", () => {
+  it("scores Disclosed=1, Partial=0.5, Silent=0 and skips Not applicable", () => {
+    expect(scoreChecks({})).toBe(0);
+    const all = Object.fromEntries(
+      TRUST_DOSSIER_RUBRIC.flatMap((s) => s.items).map((i) => [
+        i.id,
+        "Disclosed" as const,
+      ]),
+    );
+    expect(scoreChecks(all)).toBe(100);
+    const [first, second] = Object.keys(all);
+    expect(
+      scoreChecks({ ...all, [first]: "Partial", [second]: "Not applicable" }),
+    ).toBe(
+      Math.round(
+        ((Object.keys(all).length - 1.5) / (Object.keys(all).length - 1)) * 100,
+      ),
+    );
+  });
+
+  it("maps scores onto the grade scale", () => {
+    expect(
+      [100, 70, 69, 60, 59, 48, 47, 35, 34, 0].map(gradeFor).join(""),
+    ).toBe("AABBCCDDFF");
+  });
+
+  it("has a complete dossier and scorecard for every vendor", () => {
+    for (const vendor of TRUST_DOSSIER_VENDORS) {
+      const details = getTrustDossierDetails(vendor.slug);
+      expect(details?.summary).toBeTruthy();
+      expect(details?.highlights).toHaveLength(4);
+      expect(getTrustDossierScorecard(vendor.slug)?.rank).toBeGreaterThan(0);
+    }
+  });
+});

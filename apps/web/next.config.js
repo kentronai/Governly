@@ -21,6 +21,10 @@ if (process.env.NODE_ENV !== "production") {
   const injectedOpenAIModel = process.env.OPENAI_MODEL;
   const injectedGeminiApiKey = process.env.GEMINI_API_KEY;
   const injectedGeminiModel = process.env.GEMINI_MODEL;
+  // Native (no-Docker) runs inject DATABASE_URL pointing at the host Postgres
+  // (localhost:5433); don't let .env.local's Docker URL replace it.
+  const injectedNativeDatabaseUrl =
+    process.env.NORIX_NATIVE === "1" ? process.env.DATABASE_URL : undefined;
 
   dotenv.config({
     path: path.resolve(__dirname, ".env.local"),
@@ -38,6 +42,9 @@ if (process.env.NODE_ENV !== "production") {
   }
   if (injectedGeminiModel) {
     process.env.GEMINI_MODEL = injectedGeminiModel;
+  }
+  if (injectedNativeDatabaseUrl) {
+    process.env.DATABASE_URL = injectedNativeDatabaseUrl;
   }
 }
 
