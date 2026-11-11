@@ -27,6 +27,7 @@ import {
   GRADE_CLASSES,
   GRADE_SCALE,
 } from "@/lib/trust-dossier/grades";
+import { cn } from "@/lib/utils";
 import { errorToast, infoToast } from "@/lib/utils/toast";
 
 export interface TrustDossierCard {
@@ -88,9 +89,12 @@ export function TrustDossierBrowser({
   useEffect(() => {
     getTrackedVendorSlugs(tenant)
       .then((slugs) => setTracked(new Set(slugs)))
-      .catch((error) => {
+      .catch(() => {
         setTracked(new Set());
-        errorToast(error);
+        // Raw server errors (SQL, stack) are not useful to the user.
+        errorToast(
+          new Error("Couldn't load your tracked vendors. Please refresh."),
+        );
       });
   }, [tenant]);
 
@@ -278,24 +282,24 @@ export function TrustDossierBrowser({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {visible.map((c) => {
             const href = `/${tenant}/admin/trust-dossier/${c.slug}`;
             const isTracked = tracked?.has(c.slug) ?? false;
             return (
               <Card key={c.slug} className="flex flex-col">
-                <CardContent className="flex flex-1 flex-col gap-3 p-4">
+                <CardContent className="flex flex-1 flex-col gap-2 p-3">
                   <div className="flex items-start gap-3">
                     <Checkbox
                       aria-label={`Select ${c.name}`}
-                      className="mt-1"
+                      className={cn("mt-1", isTracked && "invisible")}
                       checked={selected.has(c.slug)}
-                      disabled={!tracked || isTracked}
+                      disabled={!tracked}
                       onCheckedChange={(on) =>
                         toggleSelected(c.slug, on === true)
                       }
                     />
-                    <Avatar className="h-9 w-9 rounded-md border bg-white">
+                    <Avatar className="h-8 w-8 rounded-md border bg-white">
                       <AvatarImage alt="" src={c.logoUrl} />
                       <AvatarFallback className="rounded-md text-xs">
                         {c.name.slice(0, 2).toUpperCase()}
@@ -324,7 +328,7 @@ export function TrustDossierBrowser({
                   </div>
                   <Link
                     href={href}
-                    className="line-clamp-4 text-sm text-muted-foreground hover:text-foreground"
+                    className="line-clamp-2 text-xs text-muted-foreground hover:text-foreground"
                   >
                     {c.summary}
                   </Link>

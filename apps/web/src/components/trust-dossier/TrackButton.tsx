@@ -45,11 +45,12 @@ export function TrackButton({
       disabled={pending}
       onClick={toggle}
       size={size}
-      variant={tracked ? "secondary" : "outline"}
+      variant="outline"
+      className={cn(size === "sm" && "h-8 px-2.5 text-xs")}
     >
       <Star
         className={cn(
-          "mr-1.5 h-4 w-4",
+          "mr-1.5 h-3.5 w-3.5",
           tracked && "fill-current text-amber-500",
         )}
       />
