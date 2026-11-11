@@ -27,6 +27,7 @@ describe("Admin Center navigation config", () => {
       ["Active Users", "admin/users/active"],
       ["Deactivated Users", "admin/users/deactivate"],
       ["Archived Applications", "admin/archived-applications"],
+      ["Trust Dossier", "admin/trust-dossier"],
       ["Audit Logs", "admin/settings/audit-logs"],
       ["Regulations & Frameworks", "admin/settings/policy-center"],
       ...FRAMEWORKS.map((f) => [f.navLabel, frameworkPath(f.slug)]),
@@ -69,6 +70,20 @@ describe("Admin Center navigation config", () => {
     expect(indexPage).toContain("/admin/home");
   });
 
+  it("has a dynamic detail page for Trust Dossier vendors", () => {
+    expect(
+      fs.existsSync(
+        path.join(
+          TENANT_APP_DIR,
+          "admin",
+          "trust-dossier",
+          "[slug]",
+          "page.tsx",
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("removes the old standalone admin sidebar", () => {
     expect(
       fs.existsSync(path.resolve(__dirname, "../../admin/sidebar/Sidebar.tsx")),
@@ -97,7 +112,7 @@ describe("getVisibleAdminNav", () => {
         activePolicyNames: allPolicies,
         enabledFrameworkSlugs: allFrameworkSlugs,
       }),
-    ).toHaveLength(11 + FRAMEWORKS.length);
+    ).toHaveLength(12 + FRAMEWORKS.length);
   });
 
   it("shows a framework tab right below Regulations only when its policy is enabled", () => {
@@ -139,6 +154,7 @@ describe("getVisibleAdminNav", () => {
       "Active Users",
       "Deactivated Users",
       "Archived Applications",
+      "Trust Dossier",
       "Audit Logs",
       "Support",
     ]);
