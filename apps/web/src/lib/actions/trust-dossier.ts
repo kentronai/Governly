@@ -52,3 +52,21 @@ export async function setVendorTracked(
   }
   return { tracked };
 }
+
+export async function trackVendors(
+  tenantSlugOrId: string,
+  vendorSlugs: string[],
+) {
+  const slugs = [...new Set(vendorSlugs)].filter((s) =>
+    getTrustDossierVendor(s),
+  );
+  if (!slugs.length) return { tracked: 0 };
+  const { tenantId, userId } = await resolveTenantForUser(tenantSlugOrId);
+  await db
+    .insert(trustDossierTracked)
+    .values(
+      slugs.map((vendorSlug) => ({ tenantId, vendorSlug, createdBy: userId })),
+    )
+    .onConflictDoNothing();
+  return { tracked: slugs.length };
+}

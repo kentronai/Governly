@@ -15,6 +15,9 @@ export default async function TrustDossierPage({
   const cards = TRUST_DOSSIER_VENDORS.map((v) => ({
     slug: v.slug,
     name: v.name,
+    company: v.company,
+    summary: v.summary,
+    hasRedFlags: v.redFlags.length > 0,
     collection: v.collection,
     group: v.group,
     category: v.category,

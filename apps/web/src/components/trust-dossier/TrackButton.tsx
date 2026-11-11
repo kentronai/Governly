@@ -45,7 +45,7 @@ export function TrackButton({
       disabled={pending}
       onClick={toggle}
       size={size}
-      variant={tracked ? "outline" : "default"}
+      variant={tracked ? "secondary" : "outline"}
     >
       <Star
         className={cn(

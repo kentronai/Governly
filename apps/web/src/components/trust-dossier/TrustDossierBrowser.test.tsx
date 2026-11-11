@@ -7,6 +7,7 @@ import {
 
 jest.mock("@/lib/actions/trust-dossier", () => ({
   getTrackedVendorSlugs: jest.fn().mockResolvedValue(["groq"]),
+  trackVendors: jest.fn().mockResolvedValue({ tracked: 1 }),
   setVendorTracked: jest.fn().mockResolvedValue({ tracked: true }),
 }));
 jest.mock("@/lib/utils/toast", () => ({
@@ -21,6 +22,9 @@ const card = (
 ): TrustDossierCard => ({
   slug,
   name: slug.toUpperCase(),
+  company: `${slug} Inc.`,
+  summary: `${slug} summary`,
+  hasRedFlags: false,
   collection,
   group: "G",
   category: "C",
@@ -42,10 +46,14 @@ it("shows Neo Cloud cards by default with dossier links and track buttons", asyn
   });
   expect(screen.getByText("GROQ")).toBeInTheDocument();
   expect(screen.queryByText("N8N")).not.toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "View dossier" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "GROQ" })).toHaveAttribute(
     "href",
     "/acme/admin/trust-dossier/groq",
   );
+  expect(screen.getByText("groq summary")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Track selected (0)" }),
+  ).toBeDisabled();
   expect(screen.getByRole("button", { name: /Tracked/ })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Tracked (1)" })).toBeInTheDocument();
 
