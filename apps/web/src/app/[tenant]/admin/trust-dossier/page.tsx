@@ -1,9 +1,6 @@
 import { PageHeader } from "@/components/common/PageHeader";
 import { TrustDossierBrowser } from "@/components/trust-dossier/TrustDossierBrowser";
-import {
-  TRUST_DOSSIER_VENDORS,
-  getTrustDossierScorecard,
-} from "@/lib/trust-dossier/vendors";
+import { TRUST_DOSSIER_VENDORS } from "@/lib/trust-dossier/vendors";
 
 export default async function TrustDossierPage({
   params,
@@ -23,16 +20,14 @@ export default async function TrustDossierPage({
     category: v.category,
     domains: v.websites.map((w) => w.label).join(" · "),
     logoUrl: v.logoUrl,
-    grade: v.grade,
-    score: v.score,
-    rank: getTrustDossierScorecard(v.slug)!.rank,
+    subprocessorCount: v.subprocessors.length,
   }));
 
   return (
     <div className="space-y-6 p-6">
       <PageHeader
         title="Trust Dossier"
-        description="Privacy disclosures, scores and sub-processors for cloud, inference and AI application vendors."
+        description="Privacy disclosures and sub-processors for cloud, inference and AI application vendors."
       />
       <TrustDossierBrowser tenant={tenant} cards={cards} />
     </div>

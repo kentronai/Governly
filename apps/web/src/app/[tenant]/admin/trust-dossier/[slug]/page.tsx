@@ -6,14 +6,12 @@ import { TrackButton } from "@/components/trust-dossier/TrackButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getTrackedVendorSlugs } from "@/lib/actions/trust-dossier";
-import { GRADE_CLASSES, GRADE_SCALE } from "@/lib/trust-dossier/grades";
 import {
   type CheckStatus,
-  getTrustDossierScorecard,
   getTrustDossierVendor,
 } from "@/lib/trust-dossier/vendors";
 import { cn } from "@/lib/utils";
@@ -25,14 +23,6 @@ const STATUS_DOT: Record<CheckStatus, string> = {
   "Not applicable": "bg-muted-foreground/60",
 };
 
-const GRADE_REASON: Record<string, string> = {
-  A: "discloses its data practices clearly",
-  B: "discloses most of its data practices",
-  C: "discloses some of its data practices, with notable gaps",
-  D: "leaves many data practices undisclosed",
-  F: "discloses very little about its data practices",
-};
-
 export default async function TrustDossierVendorPage({
   params,
 }: {
@@ -41,7 +31,6 @@ export default async function TrustDossierVendorPage({
   const { tenant, slug } = await params;
   const vendor = getTrustDossierVendor(slug);
   if (!vendor) notFound();
-  const card = getTrustDossierScorecard(slug)!;
   const trackedSlugs = await getTrackedVendorSlugs(tenant).catch(
     (): string[] => [],
   );
@@ -94,7 +83,7 @@ export default async function TrustDossierVendorPage({
                 />
                 <Button asChild variant="outline" size="sm">
                   <a
-                    href={vendor.websites[0].url}
+                    href={vendor.privacyPolicyUrl ?? vendor.websites[0].url}
                     rel="noopener noreferrer"
                     target="_blank"
                   >
@@ -105,64 +94,60 @@ export default async function TrustDossierVendorPage({
               </div>
             }
           />
-          <div className="flex max-w-md items-center gap-3">
-            <Badge variant="outline" className={GRADE_CLASSES[vendor.grade]}>
-              {vendor.grade}
-            </Badge>
-            <Progress value={vendor.score} className="h-2" />
-            <span className="whitespace-nowrap text-sm font-medium">
-              {vendor.score}/100
-            </span>
-          </div>
         </div>
       </div>
 
-      <p className="text-sm">
-        {vendor.name} earns{" "}
-        <span className="font-semibold">
-          {/^[AEF]/.test(vendor.grade) ? "an" : "a"} {vendor.grade} (
-          {vendor.score}/100)
-        </span>{" "}
-        because it {GRADE_REASON[vendor.grade]}.
-      </p>
-
       <Card>
-        <CardContent className="grid divide-y p-0 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <Stat
-            value={`#${card.rank}`}
-            label={`of ${card.total} vendors ranked`}
-          />
-          <Stat
-            value={String(vendor.score)}
-            label={`score · ${vendor.category} avg ${card.categoryAverage}`}
-          />
-          <Stat
-            value={`${card.vsCategory >= 0 ? "+" : ""}${card.vsCategory}`}
-            label="vs category average"
-            className={
-              card.vsCategory >= 0 ? "text-emerald-700" : "text-red-700"
-            }
-          />
+        <CardHeader>
+          <CardTitle className="text-base">Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm leading-relaxed">
+          {vendor.summary}
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase text-muted-foreground">
-          Grade scale
-        </span>
-        {GRADE_SCALE.map((band) => (
-          <Badge
-            key={band.grade}
-            variant="outline"
-            className={cn(
-              GRADE_CLASSES[band.grade],
-              band.grade === vendor.grade && "ring-2 ring-foreground/40",
-            )}
-          >
-            {band.grade} · {band.min}–{band.max}
-          </Badge>
-        ))}
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">
+            Sub-processors
+            {vendor.subprocessors.length
+              ? ` (${vendor.subprocessors.length})`
+              : ""}
+          </CardTitle>
+          <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
+        </CardHeader>
+        <CardContent>
+          {vendor.subprocessors.length ? (
+            <div className="space-y-3">
+              <SubprocessorGrid items={vendor.subprocessors.slice(0, 4)} />
+              {vendor.subprocessors.length > 4 && (
+                // ponytail: native <details> instead of a client toggle.
+                <details className="group space-y-3">
+                  <summary
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "cursor-pointer list-none",
+                    )}
+                  >
+                    <span className="group-open:hidden">
+                      View all {vendor.subprocessors.length} sub-processors
+                    </span>
+                    <span className="hidden group-open:inline">Show fewer</span>
+                  </summary>
+                  <SubprocessorGrid items={vendor.subprocessors.slice(4)} />
+                </details>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No sub-processor vendors found
+              {vendor.subprocessorsNote
+                ? ` — ${vendor.subprocessorsNote}.`
+                : "."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {vendor.redFlags.length > 0 && (
         <Alert variant="destructive">
@@ -177,15 +162,6 @@ export default async function TrustDossierVendorPage({
           </AlertDescription>
         </Alert>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm leading-relaxed">
-          {vendor.summary}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -254,65 +230,6 @@ export default async function TrustDossierVendorPage({
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">
-            Sub-processors
-            {vendor.subprocessors.length
-              ? ` (${vendor.subprocessors.length})`
-              : ""}
-          </CardTitle>
-          <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
-        </CardHeader>
-        <CardContent>
-          {vendor.subprocessors.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {vendor.subprocessors.map((sp, index) => (
-                <div
-                  key={`${sp.name}-${index}`}
-                  className="space-y-1 rounded-md border p-3"
-                >
-                  <h3 className="text-sm font-semibold">{sp.name}</h3>
-                  <p className="text-sm text-muted-foreground">{sp.purpose}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Location: {sp.location}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {vendor.subprocessorsNote ??
-                "No public sub-processor list has been found for this vendor."}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {vendor.scoreHistory.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Score history</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {vendor.scoreHistory.map((h) => (
-              <div
-                key={h.date}
-                className="flex items-center justify-between rounded-md border p-3 text-sm"
-              >
-                <span className="text-muted-foreground">{h.date}</span>
-                <span className="flex items-center gap-2 font-medium">
-                  {h.score}/100
-                  <Badge variant="outline" className={GRADE_CLASSES[h.grade]}>
-                    {h.grade}
-                  </Badge>
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
         <CardHeader>
           <CardTitle className="text-base">Details and sources</CardTitle>
         </CardHeader>
@@ -339,19 +256,25 @@ export default async function TrustDossierVendorPage({
   );
 }
 
-function Stat({
-  value,
-  label,
-  className,
+function SubprocessorGrid({
+  items,
 }: {
-  value: string;
-  label: string;
-  className?: string;
+  items: { name: string; purpose: string; location: string }[];
 }) {
   return (
-    <div className="p-4 text-center">
-      <p className={cn("text-2xl font-bold", className)}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((sp, index) => (
+        <div
+          key={`${sp.name}-${index}`}
+          className="space-y-1 rounded-md border p-3"
+        >
+          <h3 className="text-sm font-semibold">{sp.name}</h3>
+          <p className="text-sm text-muted-foreground">{sp.purpose}</p>
+          <p className="text-xs text-muted-foreground">
+            Location: {sp.location}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

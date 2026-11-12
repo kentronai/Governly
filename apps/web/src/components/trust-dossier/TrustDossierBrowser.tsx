@@ -22,11 +22,7 @@ import {
   getTrackedVendorSlugs,
   trackVendors,
 } from "@/lib/actions/trust-dossier";
-import {
-  COLLECTIONS,
-  GRADE_CLASSES,
-  GRADE_SCALE,
-} from "@/lib/trust-dossier/grades";
+import { COLLECTIONS } from "@/lib/trust-dossier/grades";
 import { cn } from "@/lib/utils";
 import { errorToast, infoToast } from "@/lib/utils/toast";
 
@@ -41,9 +37,7 @@ export interface TrustDossierCard {
   category: string;
   domains: string;
   logoUrl: string;
-  grade: string;
-  score: number;
-  rank: number;
+  subprocessorCount: number;
 }
 
 type View = (typeof COLLECTIONS)[number]["id"] | "tracked";
@@ -53,22 +47,6 @@ const TAB_LIST =
   "h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0";
 const TAB_TRIGGER =
   "h-auto flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2 text-muted-foreground shadow-none data-[state=active]:border-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
-
-const SORTS = {
-  "score-desc": {
-    label: "Best score first",
-    fn: (a: TrustDossierCard, b: TrustDossierCard) => b.score - a.score,
-  },
-  "score-asc": {
-    label: "Lowest score first",
-    fn: (a: TrustDossierCard, b: TrustDossierCard) => a.score - b.score,
-  },
-  name: {
-    label: "Name A–Z",
-    fn: (a: TrustDossierCard, b: TrustDossierCard) =>
-      a.name.localeCompare(b.name),
-  },
-} as const;
 
 export function TrustDossierBrowser({
   tenant,
@@ -80,8 +58,6 @@ export function TrustDossierBrowser({
   const [view, setView] = useState<View>("neo-cloud");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [grade, setGrade] = useState("all");
-  const [sort, setSort] = useState<keyof typeof SORTS>("score-desc");
   const [tracked, setTracked] = useState<Set<string> | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -130,17 +106,9 @@ export function TrustDossierBrowser({
   const inCategory = inView.filter(
     (c) => category === "all" || c.category === category,
   );
-  const gradeCount = (g: string) =>
-    inCategory.filter((c) => c.grade === g).length;
-
   const visible = inCategory
-    .filter((c) => (grade === "all" || c.grade === grade) && matchesSearch(c))
-    .sort(SORTS[sort].fn);
-
-  const untrackedVisible = visible.filter((c) => !tracked?.has(c.slug));
-  const allSelected =
-    untrackedVisible.length > 0 &&
-    untrackedVisible.every((c) => selected.has(c.slug));
+    .filter(matchesSearch)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const toggleSelected = (slug: string, on: boolean) =>
     setSelected((prev) => {
@@ -218,49 +186,10 @@ export function TrustDossierBrowser({
             ))}
           </SelectContent>
         </Select>
-        <Select value={grade} onValueChange={setGrade}>
-          <SelectTrigger className="w-40" aria-label="Filter by grade">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              All grades ({inCategory.length})
-            </SelectItem>
-            {GRADE_SCALE.map((g) => (
-              <SelectItem key={g.grade} value={g.grade}>
-                Grade {g.grade} ({gradeCount(g.grade)})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={sort}
-          onValueChange={(v) => setSort(v as keyof typeof SORTS)}
-        >
-          <SelectTrigger className="w-44" aria-label="Sort">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(SORTS).map(([key, s]) => (
-              <SelectItem key={key} value={key}>
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <div className="ml-auto flex items-center gap-3">
-          <Checkbox
-            aria-label="Select all untracked vendors"
-            checked={allSelected}
-            disabled={!tracked || untrackedVisible.length === 0}
-            onCheckedChange={(on) =>
-              setSelected(
-                on ? new Set(untrackedVisible.map((c) => c.slug)) : new Set(),
-              )
-            }
-          />
           <Button
             size="sm"
+            className="border border-slate-600 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-70 dark:border-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600"
             disabled={pending || selected.size === 0}
             onClick={trackSelected}
           >
@@ -322,9 +251,6 @@ export function TrustDossierBrowser({
                         {c.company ?? c.domains}
                       </p>
                     </div>
-                    <Badge variant="outline" className={GRADE_CLASSES[c.grade]}>
-                      {c.grade}
-                    </Badge>
                   </div>
                   <Link
                     href={href}
@@ -339,7 +265,11 @@ export function TrustDossierBrowser({
                     >
                       {c.category}
                     </Badge>
-                    <span className="text-sm font-medium">{c.score}/100</span>
+                    <span className="text-xs text-muted-foreground">
+                      {c.subprocessorCount
+                        ? `${c.subprocessorCount} sub-processors`
+                        : "No sub-processors listed"}
+                    </span>
                     <div className="ml-auto">
                       {tracked && (
                         <TrackButton

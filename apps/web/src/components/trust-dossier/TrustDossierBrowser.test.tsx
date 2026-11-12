@@ -15,11 +15,7 @@ jest.mock("@/lib/utils/toast", () => ({
   infoToast: jest.fn(),
 }));
 
-const card = (
-  slug: string,
-  collection: string,
-  grade = "A",
-): TrustDossierCard => ({
+const card = (slug: string, collection: string): TrustDossierCard => ({
   slug,
   name: slug.toUpperCase(),
   company: `${slug} Inc.`,
@@ -30,9 +26,7 @@ const card = (
   category: "C",
   domains: `${slug}.com`,
   logoUrl: "https://x/y.png",
-  grade,
-  score: 80,
-  rank: 1,
+  subprocessorCount: 3,
 });
 
 it("shows Neo Cloud cards by default with dossier links and track buttons", async () => {
@@ -40,7 +34,7 @@ it("shows Neo Cloud cards by default with dossier links and track buttons", asyn
     render(
       <TrustDossierBrowser
         tenant="acme"
-        cards={[card("groq", "neo-cloud"), card("n8n", "ai-apps", "B")]}
+        cards={[card("groq", "neo-cloud"), card("n8n", "ai-apps")]}
       />,
     );
   });
