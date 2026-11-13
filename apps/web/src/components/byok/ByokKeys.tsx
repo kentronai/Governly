@@ -1,36 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  ChevronsUpDown,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useTenant } from "@/contexts/TenantContext";
 import {
   deleteLlmKey,
@@ -40,7 +18,6 @@ import {
   testLlmKey,
 } from "@/lib/actions/llm-keys";
 import { LLM_PROVIDERS, getLlmProvider } from "@/lib/llm-providers";
-import { cn } from "@/lib/utils";
 import { errorToast, infoToast } from "@/lib/utils/toast";
 
 type Model = { id: string; label: string };
@@ -62,8 +39,6 @@ export function ByokKeys() {
   const [provider, setProvider] = useState("");
   const [models, setModels] = useState<Model[]>([]);
   const [modelId, setModelId] = useState("");
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -162,17 +137,16 @@ export function ByokKeys() {
   };
 
   const showForm = loaded && !saved;
-  const selected = models.find((m) => m.id === modelId);
 
   return (
     <div className="min-h-full w-full bg-background p-5 lg:p-7">
-      <div className="w-full max-w-md space-y-6">
+      <div className="w-full space-y-6">
         <PageHeader
           title="Bring Your Own Key"
           description="One provider, model and API key at a time. A saved key can't be edited: remove it to add a different one."
         />
-        <Card>
-          <CardContent className="space-y-4 pt-6">
+        <Card className="w-full max-w-2xl border shadow-sm">
+          <CardContent className="space-y-4 p-6">
             {!loaded ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : saved ? (
@@ -217,94 +191,34 @@ export function ByokKeys() {
             ) : showForm ? (
               <>
                 <div className="space-y-2">
-                  <Label>Provider</Label>
-                  <Select value={provider} onValueChange={pickProvider}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LLM_PROVIDERS.map((p) => (
-                        <SelectItem key={p.slug} value={p.slug}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="byok-provider">Provider</Label>
+                  <SearchableSelect
+                    id="byok-provider"
+                    value={provider}
+                    onValueChange={pickProvider}
+                    options={LLM_PROVIDERS.map((p) => ({ value: p.slug, label: p.label }))}
+                    placeholder="Select a provider"
+                    searchPlaceholder="Search providers..."
+                    emptyText="No provider found."
+                  />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Model</Label>
-                  <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        disabled={!provider}
-                        className="w-full justify-between font-normal"
-                      >
-                        <span className="truncate">
-                          {selected?.label ??
-                            (provider ? "Select a model" : "Select a provider first")}
-                        </span>
-                        <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-[var(--radix-popover-trigger-width)] p-0"
-                      align="start"
-                    >
-                      <Command>
-                        <CommandInput
-                          placeholder="Search or type a model id..."
-                          value={query}
-                          onValueChange={setQuery}
-                        />
-                        <CommandList>
-                          <CommandEmpty>No model found.</CommandEmpty>
-                          <CommandGroup>
-                            {query.trim() && !models.some((m) => m.id === query.trim()) && (
-                              <CommandItem
-                                forceMount
-                                value={`custom ${query}`}
-                                onSelect={() => {
-                                  const id = query.trim();
-                                  setModels((list) => [{ id, label: id }, ...list]);
-                                  setModelId(id);
-                                  setApiKey("");
-                                  setQuery("");
-                                  setOpen(false);
-                                }}
-                              >
-                                <span className="truncate">
-                                  Use custom model “{query.trim()}”
-                                </span>
-                              </CommandItem>
-                            )}
-                            {models.map((m) => (
-                              <CommandItem
-                                key={m.id}
-                                value={`${m.label} ${m.id}`}
-                                onSelect={() => {
-                                  setModelId(m.id);
-                                  setApiKey("");
-                                  setQuery("");
-                                  setOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    modelId === m.id ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                                <span className="truncate">{m.label}</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Label htmlFor="byok-model">Model</Label>
+                  <SearchableSelect
+                    id="byok-model"
+                    value={modelId}
+                    onValueChange={(id) => {
+                      setModelId(id);
+                      setApiKey("");
+                    }}
+                    options={models.map((m) => ({ value: m.id, label: m.label }))}
+                    disabled={!provider}
+                    allowCustom
+                    placeholder={provider ? "Select a model" : "Select a provider first"}
+                    searchPlaceholder="Search or type a model id..."
+                    emptyText="No model found."
+                  />
                 </div>
 
                 <div className="space-y-2">

@@ -1,7 +1,9 @@
 /**
- * LLM providers a tenant can bring their own API key (BYOK) for. All expose an
- * OpenAI-compatible `/chat/completions` endpoint, which is what the connection
- * test uses. Client-safe: no secrets here.
+ * THE model catalog: every provider/model picker in NORIX (BYOK, Model Registry, Applications)
+ * reads from here. LLM_PROVIDERS are hosted APIs with an OpenAI-compatible `/chat/completions`
+ * endpoint, so all of them work for BYOK. ENDPOINT_PROVIDERS need a customer-specific endpoint
+ * (or aren't chat APIs), so they appear in the registry/applications pickers but not in BYOK.
+ * Models are listed newest first. Client-safe: no secrets here.
  */
 export interface LlmProvider {
   slug: string;
@@ -12,17 +14,59 @@ export interface LlmProvider {
   keyHint: string;
 }
 
+const m = (id: string, label = id) => ({ id, label });
+
 /** Model ids are listed for convenience; the BYOK page also accepts any custom id the provider serves. */
 export const LLM_PROVIDERS: LlmProvider[] = [
-  { slug: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", models: [{ id: "gpt-5.1", label: "GPT-5.1" }, { id: "gpt-5", label: "GPT-5" }, { id: "gpt-5-mini", label: "GPT-5 mini" }, { id: "gpt-5-nano", label: "GPT-5 nano" }, { id: "gpt-4.1", label: "GPT-4.1" }, { id: "gpt-4.1-mini", label: "GPT-4.1 mini" }, { id: "gpt-4.1-nano", label: "GPT-4.1 nano" }, { id: "gpt-4o", label: "GPT-4o" }, { id: "gpt-4o-mini", label: "GPT-4o mini" }, { id: "o3", label: "o3" }, { id: "o3-mini", label: "o3-mini" }, { id: "o4-mini", label: "o4-mini" }, { id: "o1", label: "o1" }], keyHint: "sk-..." },
-  { slug: "anthropic", label: "Anthropic (Claude)", baseUrl: "https://api.anthropic.com/v1", models: [{ id: "claude-fable-5-1", label: "Claude Fable 5.1" }, { id: "claude-opus-5-5", label: "Claude Opus 5.5" }, { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" }, { id: "claude-haiku-5-5", label: "Claude Haiku 5.5" }, { id: "claude-opus-4-5-20251101", label: "Claude Opus 4.5" }, { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5" }, { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" }, { id: "claude-opus-4-1-20250805", label: "Claude Opus 4.1" }, { id: "claude-opus-4-20250514", label: "Claude Opus 4" }, { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" }, { id: "claude-3-7-sonnet-20250219", label: "Claude Sonnet 3.7" }, { id: "claude-3-5-haiku-20241022", label: "Claude Haiku 3.5" }], keyHint: "sk-ant-..." },
-  { slug: "gemini", label: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", models: [{ id: "gemini-3-pro-preview", label: "Gemini 3 Pro (preview)" }, { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }, { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }, { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" }, { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" }, { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite" }, { id: "gemini-pro-latest", label: "Gemini Pro (latest)" }, { id: "gemini-flash-latest", label: "Gemini Flash (latest)" }, { id: "gemini-flash-lite-latest", label: "Gemini Flash-Lite (latest)" }], keyHint: "AIza..." },
-  { slug: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", models: [{ id: "openai/gpt-4o", label: "OpenAI GPT-4o" }, { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" }, { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" }, { id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" }, { id: "deepseek/deepseek-chat", label: "DeepSeek Chat" }], keyHint: "sk-or-..." },
-  { slug: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1", models: [{ id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B" }, { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B" }, { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" }, { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B" }, { id: "qwen/qwen3-32b", label: "Qwen3 32B" }, { id: "moonshotai/kimi-k2-instruct", label: "Kimi K2" }], keyHint: "gsk_..." },
-  { slug: "mistral", label: "Mistral", baseUrl: "https://api.mistral.ai/v1", models: [{ id: "mistral-large-latest", label: "Mistral Large" }, { id: "mistral-medium-latest", label: "Mistral Medium" }, { id: "mistral-small-latest", label: "Mistral Small" }, { id: "codestral-latest", label: "Codestral" }, { id: "ministral-8b-latest", label: "Ministral 8B" }, { id: "pixtral-large-latest", label: "Pixtral Large" }], keyHint: "" },
-  { slug: "xai", label: "xAI (Grok)", baseUrl: "https://api.x.ai/v1", models: [{ id: "grok-4", label: "Grok 4" }, { id: "grok-3", label: "Grok 3" }, { id: "grok-3-mini", label: "Grok 3 mini" }, { id: "grok-code-fast-1", label: "Grok Code Fast 1" }], keyHint: "xai-..." },
-  { slug: "deepseek", label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", models: [{ id: "deepseek-chat", label: "DeepSeek Chat" }, { id: "deepseek-reasoner", label: "DeepSeek Reasoner" }], keyHint: "sk-..." },
+  {
+    slug: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", keyHint: "sk-...",
+    models: [m("gpt-5.5", "GPT-5.5"), m("gpt-5.4", "GPT-5.4"), m("gpt-5.2", "GPT-5.2"), m("gpt-5.1", "GPT-5.1"), m("gpt-5", "GPT-5"), m("gpt-5-mini", "GPT-5 mini"), m("gpt-5-nano", "GPT-5 nano"), m("gpt-4.1", "GPT-4.1"), m("gpt-4.1-mini", "GPT-4.1 mini"), m("gpt-4.1-nano", "GPT-4.1 nano"), m("gpt-4o", "GPT-4o"), m("gpt-4o-mini", "GPT-4o mini"), m("o3"), m("o4-mini"), m("o3-mini"), m("o1")],
+  },
+  {
+    slug: "anthropic", label: "Anthropic (Claude)", baseUrl: "https://api.anthropic.com/v1", keyHint: "sk-ant-...",
+    models: [m("claude-fable-5-2", "Claude Fable 5.2"), m("claude-opus-5-5", "Claude Opus 5.5"), m("claude-sonnet-5-5", "Claude Sonnet 5.5"), m("claude-haiku-5-5", "Claude Haiku 5.5"), m("claude-opus-5", "Claude Opus 5"), m("claude-sonnet-5", "Claude Sonnet 5"), m("claude-opus-4-8", "Claude Opus 4.8"), m("claude-opus-4-7", "Claude Opus 4.7"), m("claude-opus-4-6", "Claude Opus 4.6"), m("claude-sonnet-4-6", "Claude Sonnet 4.6"), m("claude-opus-4-5-20251101", "Claude Opus 4.5"), m("claude-sonnet-4-5-20250929", "Claude Sonnet 4.5"), m("claude-haiku-4-5-20251001", "Claude Haiku 4.5"), m("claude-opus-4-1-20250805", "Claude Opus 4.1"), m("claude-opus-4-20250514", "Claude Opus 4"), m("claude-sonnet-4-20250514", "Claude Sonnet 4"), m("claude-3-7-sonnet-20250219", "Claude Sonnet 3.7"), m("claude-3-5-haiku-20241022", "Claude Haiku 3.5")],
+  },
+  {
+    slug: "gemini", label: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", keyHint: "AIza...",
+    models: [m("gemini-3.6-pro", "Gemini 3.6 Pro"), m("gemini-3.6-flash", "Gemini 3.6 Flash"), m("gemini-3.5-flash", "Gemini 3.5 Flash"), m("gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)"), m("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash-Lite (preview)"), m("gemini-3-pro-preview", "Gemini 3 Pro (preview)"), m("gemini-3-flash-preview", "Gemini 3 Flash (preview)"), m("gemini-2.5-pro", "Gemini 2.5 Pro"), m("gemini-2.5-flash", "Gemini 2.5 Flash"), m("gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"), m("gemini-2.0-flash", "Gemini 2.0 Flash"), m("gemini-2.0-flash-lite", "Gemini 2.0 Flash-Lite"), m("gemini-pro-latest", "Gemini Pro (latest)"), m("gemini-flash-latest", "Gemini Flash (latest)"), m("gemini-flash-lite-latest", "Gemini Flash-Lite (latest)")],
+  },
+  {
+    slug: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", keyHint: "sk-or-...",
+    models: [m("openrouter/auto", "Auto (best available)"), m("openai/gpt-5", "OpenAI GPT-5"), m("anthropic/claude-sonnet-4.5", "Claude Sonnet 4.5"), m("google/gemini-2.5-pro", "Gemini 2.5 Pro"), m("google/gemini-2.5-flash", "Gemini 2.5 Flash"), m("x-ai/grok-4", "Grok 4"), m("openai/gpt-4o", "OpenAI GPT-4o"), m("anthropic/claude-3.5-sonnet", "Claude 3.5 Sonnet"), m("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B"), m("deepseek/deepseek-chat", "DeepSeek Chat")],
+  },
+  {
+    slug: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1", keyHint: "gsk_...",
+    models: [m("meta-llama/llama-4-maverick-17b-128e-instruct", "Llama 4 Maverick"), m("meta-llama/llama-4-scout-17b-16e-instruct", "Llama 4 Scout"), m("openai/gpt-oss-120b", "GPT-OSS 120B"), m("openai/gpt-oss-20b", "GPT-OSS 20B"), m("moonshotai/kimi-k2-instruct", "Kimi K2"), m("qwen/qwen3-32b", "Qwen3 32B"), m("llama-3.3-70b-versatile", "Llama 3.3 70B"), m("llama-3.1-8b-instant", "Llama 3.1 8B")],
+  },
+  {
+    slug: "mistral", label: "Mistral", baseUrl: "https://api.mistral.ai/v1", keyHint: "",
+    models: [m("mistral-large-latest", "Mistral Large"), m("mistral-medium-latest", "Mistral Medium"), m("magistral-medium-latest", "Magistral Medium"), m("mistral-small-latest", "Mistral Small"), m("codestral-latest", "Codestral"), m("ministral-8b-latest", "Ministral 8B"), m("pixtral-large-latest", "Pixtral Large")],
+  },
+  {
+    slug: "xai", label: "xAI (Grok)", baseUrl: "https://api.x.ai/v1", keyHint: "xai-...",
+    models: [m("grok-4", "Grok 4"), m("grok-4-fast", "Grok 4 Fast"), m("grok-code-fast-1", "Grok Code Fast 1"), m("grok-3", "Grok 3"), m("grok-3-mini", "Grok 3 mini")],
+  },
+  {
+    slug: "deepseek", label: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", keyHint: "sk-...",
+    models: [m("deepseek-chat", "DeepSeek Chat"), m("deepseek-reasoner", "DeepSeek Reasoner")],
+  },
 ];
+
+/** Registry/applications-only providers: their endpoint is per-customer, so no BYOK. */
+export const ENDPOINT_PROVIDERS: LlmProvider[] = [
+  { slug: "vertex", label: "Google (Vertex AI)", baseUrl: "https://vertexai.googleapis.com/v1", keyHint: "", models: [m("gemini-3-pro-preview", "Gemini 3 Pro (preview)"), m("gemini-3-flash-preview", "Gemini 3 Flash (preview)"), m("gemini-2.5-pro", "Gemini 2.5 Pro"), m("gemini-2.5-flash", "Gemini 2.5 Flash")] },
+  { slug: "bedrock", label: "AWS (Bedrock)", baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com", keyHint: "", models: [m("anthropic.claude-sonnet-4-5-20250929-v1:0", "Claude Sonnet 4.5"), m("anthropic.claude-opus-4-1-20250805-v1:0", "Claude Opus 4.1"), m("amazon.nova-pro-v1:0", "Amazon Nova Pro"), m("amazon.nova-lite-v1:0", "Amazon Nova Lite"), m("amazon.nova-micro-v1:0", "Amazon Nova Micro"), m("meta.llama3-3-70b-instruct-v1:0", "Llama 3.3 70B"), m("mistral.mistral-large-2407-v1:0", "Mistral Large")] },
+  { slug: "azure_openai", label: "Azure OpenAI", baseUrl: "https://your-resource.openai.azure.com", keyHint: "", models: [] },
+  { slug: "ollama", label: "Ollama (self-hosted)", baseUrl: "http://localhost:11434/v1", keyHint: "", models: [m("llama3.3", "Llama 3.3"), m("llama3.1", "Llama 3.1"), m("gemma3", "Gemma 3"), m("qwen2.5", "Qwen 2.5"), m("mistral", "Mistral"), m("deepseek-r1", "DeepSeek R1")] },
+  { slug: "huggingface", label: "Hugging Face", baseUrl: "", keyHint: "", models: [] },
+  { slug: "custom", label: "Custom", baseUrl: "", keyHint: "", models: [] },
+];
+
+/** Every provider, for the registry and applications pickers. */
+export const ALL_MODEL_PROVIDERS = [...LLM_PROVIDERS, ...ENDPOINT_PROVIDERS];
 
 export const getLlmProvider = (slug: string) =>
   LLM_PROVIDERS.find((p) => p.slug === slug);
+
+export const getModelProvider = (slug: string) =>
+  ALL_MODEL_PROVIDERS.find((p) => p.slug === slug);

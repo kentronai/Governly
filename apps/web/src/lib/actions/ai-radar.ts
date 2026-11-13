@@ -1,7 +1,8 @@
 "use server";
 
+import { radarModelCandidates } from "@/lib/server/radar/llm";
 import { auth } from "@clerk/nextjs/server";
-import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -16,6 +17,7 @@ import { createAuditEvent } from "@/lib/server/audit";
 import {
   RADAR_INTERVAL_HOURS,
   RadarBusyError,
+  RadarNoKeyError,
   RadarUnavailableError,
   radarEnabled,
   startRadarRun,
@@ -44,6 +46,9 @@ async function resolveAdmin(slugOrId: string) {
 /** Agent card: latest run, cadence, coverage and health. */
 export async function getRadarStatus() {
   await requireUser();
+  const { orgId } = await auth();
+  // Cheap presence check (no network ping); the run itself verifies the key works.
+  const hasKey = (await radarModelCandidates(orgId ?? undefined)).length > 0;
   const [lastRun] = await db
     .select()
     .from(radarRuns)
@@ -60,7 +65,7 @@ export async function getRadarStatus() {
   const [recent] = await db
     .select({ n: sql<number>`count(*)` })
     .from(radarUpdates)
-    .where(sql`${radarUpdates.detectedAt} > now() - interval '7 days'`);
+    .where(and(isNotNull(radarUpdates.publishedDate), sql`${radarUpdates.detectedAt} > now() - interval '7 days'`));
 
   // A "running" row older than the run lock means the server died mid-run.
   const stale =
@@ -71,6 +76,7 @@ export async function getRadarStatus() {
       ? { ...lastRun, status: stale ? "interrupted" : lastRun.status }
       : null,
     enabled: radarEnabled(),
+    hasKey,
     intervalHours: RADAR_INTERVAL_HOURS,
     newThisWeek: Number(recent.n),
     coverage: {
@@ -96,6 +102,7 @@ export async function getRadarUpdates(filters: RadarUpdateFilters = {}) {
   const { region, country, category, search, page = 1, pageSize = 20 } = filters;
   const q = search?.trim();
   const where = and(
+    isNotNull(radarUpdates.publishedDate),
     region ? eq(globalAiPolicies.region, region) : undefined,
     country ? eq(globalAiPolicies.country, country) : undefined,
     category ? eq(globalAiPolicies.category, category) : undefined,
@@ -235,6 +242,8 @@ export async function runRadarNow(tenantSlugOrId: string) {
   } catch (error) {
     if (error instanceof RadarUnavailableError)
       return { success: false as const, message: error.message };
+    if (error instanceof RadarNoKeyError)
+      return { success: false as const, message: error.message, needsKey: true as const };
     if (error instanceof RadarBusyError)
       return { success: false as const, message: "A run is already in progress" };
     return { success: false as const, message: "AI Radar is currently unavailable. Please try again later." };

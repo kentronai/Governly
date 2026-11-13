@@ -10,11 +10,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getTrackedVendorSlugs } from "@/lib/actions/trust-dossier";
+import { getSubprocessorOverrides } from "@/lib/server/trust-dossier/agent";
 import {
   type CheckStatus,
   getTrustDossierVendor,
 } from "@/lib/trust-dossier/vendors";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const STATUS_DOT: Record<CheckStatus, string> = {
   Disclosed: "bg-emerald-600",
@@ -29,8 +31,18 @@ export default async function TrustDossierVendorPage({
   params: Promise<{ tenant: string; slug: string }>;
 }) {
   const { tenant, slug } = await params;
-  const vendor = getTrustDossierVendor(slug);
-  if (!vendor) notFound();
+  const base = getTrustDossierVendor(slug);
+  if (!base) notFound();
+  // The agent's latest verified list (from the vendor's own page) wins over the static catalog.
+  const override = (await getSubprocessorOverrides().catch(() => null))?.get(slug);
+  const vendor = override?.subprocessors.length
+    ? { ...base, subprocessors: override.subprocessors, subprocessorsUrl: override.sourceUrl }
+    : base;
+  // "Last updated" = when the agent last verified this list. A failed or skipped run never touches it.
+  const checkedOn = override?.lastCheckedAt ?? base.lastChecked;
+  const listUpdated = checkedOn
+    ? format(new Date(checkedOn.length === 10 ? `${checkedOn}T00:00:00` : checkedOn), "d MMMM yyyy")
+    : undefined;
   const trackedSlugs = await getTrackedVendorSlugs(tenant).catch(
     (): string[] => [],
   );
@@ -43,6 +55,7 @@ export default async function TrustDossierVendorPage({
     ["Modalities", vendor.modalities?.join(", ")],
     ["Trains on customer data", vendor.trainsOnCustomerData],
     ["Certifications", vendor.certifications?.join(", ")],
+    ["Sub-processors last updated", listUpdated],
     ["Policy last updated", vendor.policyLastUpdated],
     ["Last checked", vendor.lastChecked],
   ].filter((row): row is [string, string] => Boolean(row[1]));
@@ -114,7 +127,14 @@ export default async function TrustDossierVendorPage({
               ? ` (${vendor.subprocessors.length})`
               : ""}
           </CardTitle>
-          <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
+          <div className="flex flex-col items-end gap-1">
+            <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
+            {listUpdated && (
+              <span className="text-xs text-muted-foreground">
+                Last updated {listUpdated}
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {vendor.subprocessors.length ? (

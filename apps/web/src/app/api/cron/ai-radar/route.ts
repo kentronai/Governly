@@ -5,6 +5,7 @@ import {
   isRadarDue,
   radarEnabled,
   startRadarRun,
+  RadarNoKeyError,
 } from "@/lib/server/radar/agent";
 
 // Same machine-to-machine auth as /api/cron/agent-discovery.
@@ -46,6 +47,9 @@ async function run(request: NextRequest) {
   } catch (error) {
     if (error instanceof RadarBusyError) {
       return NextResponse.json({ status: "already_running" }, { status: 409 });
+    }
+    if (error instanceof RadarNoKeyError) {
+      return NextResponse.json({ status: "no_key", error: error.message }, { status: 200 });
     }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "AI Radar failed to start" },

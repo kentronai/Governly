@@ -11,13 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { ALL_MODEL_PROVIDERS } from "@/lib/llm-providers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getModelsByProvider } from "@/lib/actions/model-register";
 import toast from "react-hot-toast";
@@ -71,42 +66,11 @@ interface Props {
 // Provider URL mappings
 const OTHER_MODEL = "__other__";
 
-const PROVIDER_OPTIONS: Array<[string, string]> = [
-  ["openai", "OpenAI"],
-  ["anthropic", "Anthropic"],
-  ["gemini", "Google (Gemini)"],
-  ["vertex", "Google (Vertex AI)"],
-  ["openrouter", "OpenRouter"],
-  ["xai", "xAI (Grok)"],
-  ["groq", "Groq (Llama, GPT-OSS)"],
-  ["mistral", "Mistral"],
-  ["deepseek", "DeepSeek"],
-  ["bedrock", "AWS (Bedrock)"],
-  ["azure_openai", "Azure OpenAI"],
-  ["ollama", "Ollama (Llama, self-hosted)"],
-  ["huggingface", "Hugging Face"],
-  ["custom", "Custom"],
-];
-
-const providerUrls: Record<string, string> = {
-  openai: "https://api.openai.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
-  // Gemini's OpenAI-compatible endpoint — must match GEMINI_OPENAI_API_BASE_URL
-  // in @/lib/server/model-registry/runtime, or the connection test is rejected
-  // as an untrusted endpoint.
-  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
-  vertex: "https://vertexai.googleapis.com/v1",
-  bedrock: "https://bedrock-runtime.us-east-1.amazonaws.com",
-  azure_openai: "https://your-resource.openai.azure.com",
-  groq: "https://api.groq.com/openai/v1",
-  ollama: "http://localhost:11434/v1",
-  openrouter: "https://openrouter.ai/api/v1",
-  mistral: "https://api.mistral.ai/v1",
-  xai: "https://api.x.ai/v1",
-  deepseek: "https://api.deepseek.com/v1",
-  huggingface: "",
-  custom: "",
-};
+// Providers + endpoints come from the shared catalog (lib/llm-providers).
+const PROVIDER_OPTIONS = ALL_MODEL_PROVIDERS.map((p) => ({ value: p.slug, label: p.label }));
+const providerUrls: Record<string, string> = Object.fromEntries(
+  ALL_MODEL_PROVIDERS.map((p) => [p.slug, p.baseUrl]),
+);
 
 export function ProviderModelModal({
   isOpen,
@@ -393,12 +357,13 @@ export function ProviderModelModal({
                 <Label htmlFor="provider" className="text-sm font-medium">
                   Provider *
                 </Label>
-                <Select
+                <SearchableSelect
+                  id="provider"
                   value={formData.provider}
                   onValueChange={(value) => {
                     const autoUrl = providerUrls[value] || "";
-                    setFormData((prev) => ({ 
-                      ...prev, 
+                    setFormData((prev) => ({
+                      ...prev,
                       provider: value,
                       modelUrl: autoUrl,
                       displayName: "",
@@ -407,21 +372,12 @@ export function ProviderModelModal({
                     setSelectedModelId("");
                     setAvailableModels([]);
                   }}
+                  options={PROVIDER_OPTIONS}
                   disabled={mode === "edit"}
-                >
-                  <SelectTrigger
-                    className={errors.provider ? "border-destructive" : ""}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_OPTIONS.map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  searchPlaceholder="Search providers..."
+                  emptyText="No provider found."
+                  className={errors.provider ? "border-destructive" : ""}
+                />
                 {errors.provider && (
                   <p className="text-xs text-destructive mt-1">{errors.provider}</p>
                 )}
@@ -494,36 +450,20 @@ export function ProviderModelModal({
                       <Label htmlFor="modelSelect" className="text-sm font-medium">
                         Model Name *
                       </Label>
-                      <Select
+                      <SearchableSelect
+                        id="modelSelect"
                         value={selectedModelId}
                         onValueChange={handleModelSelect}
                         disabled={loadingModels}
-                      >
-                        <SelectTrigger
-                          id="modelSelect"
-                          className={errors.family ? "border-destructive" : ""}
-                        >
-                          <SelectValue placeholder={loadingModels ? "Loading models..." : "Select model"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableModels.length === 0 ? (
-                            <div className="p-2 text-sm text-muted-foreground">
-                              {loadingModels ? "Loading..." : "No models available"}
-                            </div>
-                          ) : (
-                            [
-                              ...availableModels.map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                  {model.displayName}
-                                </SelectItem>
-                              )),
-                              <SelectItem key={OTHER_MODEL} value={OTHER_MODEL}>
-                                Other (type model ID)
-                              </SelectItem>,
-                            ]
-                          )}
-                        </SelectContent>
-                      </Select>
+                        options={[
+                          ...availableModels.map((m) => ({ value: m.id, label: m.displayName })),
+                          { value: OTHER_MODEL, label: "Other (type model ID)" },
+                        ]}
+                        placeholder={loadingModels ? "Loading models..." : "Select model"}
+                        searchPlaceholder="Search models..."
+                        emptyText="No model found."
+                        className={errors.family ? "border-destructive" : ""}
+                      />
                       {errors.family && (
                         <p className="text-xs text-destructive">{errors.family}</p>
                       )}

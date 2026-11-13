@@ -2,7 +2,7 @@ import "server-only";
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, tenantLlmKeys } from "@db";
 import { getLlmProvider } from "@/lib/llm-providers";
 import { decryptSecret } from "@/lib/server/crypto";
@@ -16,17 +16,17 @@ export interface RadarModel {
 }
 
 /**
- * Models AI Radar may use, best first. Admins set the model once under BYOK, so
- * that comes first (the triggering tenant's, else the most recently saved one);
- * then the server env: RADAR_LLM_PROVIDER / RADAR_LLM_MODEL / RADAR_LLM_API_KEY, or
- * the provider's own `<PROVIDER>_API_KEY`. Any OpenAI-compatible provider works.
+ * Models AI Radar may use, best first: the triggering tenant's own BYOK key, then
+ * the server env (RADAR_LLM_PROVIDER / RADAR_LLM_MODEL / RADAR_LLM_API_KEY, or the
+ * provider's own `<PROVIDER>_API_KEY`). Never another tenant's key.
  */
-async function radarModelCandidates(tenantId?: string): Promise<RadarModel[]> {
+export async function radarModelCandidates(tenantId?: string): Promise<RadarModel[]> {
   const out: RadarModel[] = [];
 
-  const byokRows = await db.select().from(tenantLlmKeys).orderBy(desc(tenantLlmKeys.updatedAt));
-  // ponytail: platform-wide scheduled runs reuse the newest BYOK key of any tenant.
-  for (const row of [...byokRows.filter((r) => r.tenantId === tenantId), ...byokRows]) {
+  const byokRows = tenantId
+    ? await db.select().from(tenantLlmKeys).where(eq(tenantLlmKeys.tenantId, tenantId)).orderBy(desc(tenantLlmKeys.updatedAt))
+    : [];
+  for (const row of byokRows) {
     const info = getLlmProvider(row.provider);
     if (!info) continue;
     try {
@@ -59,8 +59,7 @@ async function radarModelCandidates(tenantId?: string): Promise<RadarModel[]> {
 }
 
 /**
- * The first configured model whose key actually works, or null. AI is optional:
- * without it the agent still runs (search + change detection, no model analysis).
+ * The first configured model whose key actually works, or null (then the run must not start).
  */
 export async function pickRadarModel(
   tenantId?: string,

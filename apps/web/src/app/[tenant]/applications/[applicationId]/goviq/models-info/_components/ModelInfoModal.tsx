@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader, Upload, X, File, ExternalLink } from "lucide-react";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { getModelProvider } from "@/lib/llm-providers";
 import {
   getApprovedModelsByProvider,
   getApprovedProviders,
@@ -142,23 +144,8 @@ const PROMPT_REGISTRY_INTEGRATIONS = [
   { value: "custom", label: "Custom/Other", link: null },
 ];
 
-// Vendor labels, matching the Model Registry
-const PROVIDER_OPTIONS = [
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "gemini", label: "Google (Gemini)" },
-  { value: "vertex", label: "Google (Vertex AI)" },
-  { value: "openrouter", label: "OpenRouter" },
-  { value: "xai", label: "xAI (Grok)" },
-  { value: "groq", label: "Groq (Llama, GPT-OSS)" },
-  { value: "mistral", label: "Mistral" },
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "bedrock", label: "AWS (Bedrock)" },
-  { value: "azure_openai", label: "Azure OpenAI" },
-  { value: "ollama", label: "Ollama (Llama, self-hosted)" },
-  { value: "huggingface", label: "Hugging Face" },
-  { value: "custom", label: "Custom" },
-];
+// Vendor labels from the shared catalog (lib/llm-providers).
+const providerLabel = (slug: string) => getModelProvider(slug)?.label ?? slug;
 
 export function ModelInfoModal({
   isOpen,
@@ -473,31 +460,18 @@ export function ModelInfoModal({
               >
                 Vendor (Optional)
               </Label>
-              <Select
+              <SearchableSelect
+                id="vendor"
                 value={formData.vendor}
                 onValueChange={(value) =>
                   setFormData((prev) => ({ ...prev, vendor: value, model: "" }))
                 }
-              >
-                <SelectTrigger
-                  className={`${errors.vendor ? "border-destructive" : ""} h-9`}
-                >
-                  <SelectValue placeholder="Select a vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {approvedProviders.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      No approved models in Model Registry
-                    </div>
-                  ) : (
-                    approvedProviders.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {PROVIDER_OPTIONS.find((p) => p.value === value)?.label ?? value}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                options={approvedProviders.map((value) => ({ value, label: providerLabel(value) }))}
+                placeholder="Select a vendor"
+                searchPlaceholder="Search vendors..."
+                emptyText="No approved models in Model Registry"
+                className={`${errors.vendor ? "border-destructive" : ""} h-9`}
+              />
               {errors.vendor && (
                 <p className="text-sm  text-destructive">{errors.vendor}</p>
               )}
@@ -510,44 +484,27 @@ export function ModelInfoModal({
               >
                 Model (Optional)
               </Label>
-              <Select
+              <SearchableSelect
+                id="model"
                 value={formData.model}
                 onValueChange={(value) =>
                   setFormData((prev) => ({ ...prev, model: value }))
                 }
-                disabled={!formData.vendor}
-              >
-                <SelectTrigger
-                  className={`${errors.model ? "border-destructive" : ""} h-9`}
-                >
-                  <SelectValue
-                    placeholder={
-                      !formData.vendor
-                        ? "Select vendor first"
-                        : selectedVendorModels.length === 0
-                          ? "No approved models for this vendor"
-                          : "Select a model"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingModels ? (
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      Loading models...
-                    </div>
-                  ) : selectedVendorModels.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      No approved models in Model Registry
-                    </div>
-                  ) : (
-                    selectedVendorModels.map((model) => (
-                      <SelectItem key={model.id} value={model.displayName}>
-                        {model.displayName}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                disabled={!formData.vendor || loadingModels}
+                options={selectedVendorModels.map((m) => ({ value: m.displayName, label: m.displayName }))}
+                placeholder={
+                  !formData.vendor
+                    ? "Select vendor first"
+                    : loadingModels
+                      ? "Loading models..."
+                      : selectedVendorModels.length === 0
+                        ? "No approved models for this vendor"
+                        : "Select a model"
+                }
+                searchPlaceholder="Search models..."
+                emptyText="No approved models in Model Registry"
+                className={`${errors.model ? "border-destructive" : ""} h-9`}
+              />
               {errors.model && (
                 <p className="text-sm  text-destructive">{errors.model}</p>
               )}

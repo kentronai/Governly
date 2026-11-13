@@ -1,9 +1,32 @@
 "use server";
 
 import { db } from "@db";
-import { providerModelMetadata, providerModels } from "@db";
+import { providerModels } from "@db";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
+import { getLlmProvider, getModelProvider } from "@/lib/llm-providers";
+import { radarModelCandidates } from "@/lib/server/radar/llm";
+
+const NON_CHAT = /embed|whisper|tts|dall-e|moderation|transcribe|image|audio|realtime|rerank/i;
+
+/** Every model the provider's own API lists for the workspace's BYOK / server key; [] if no key or the call fails. */
+async function fetchLiveModelIds(provider: string, orgId?: string | null): Promise<string[]> {
+  const info = getLlmProvider(provider);
+  if (!info) return [];
+  try {
+    const cand = (await radarModelCandidates(orgId ?? undefined)).find((c) => c.provider === provider);
+    if (!cand) return [];
+    const res = await fetch(`${info.baseUrl.replace(/\/+$/, "")}/models`, {
+      headers: { Authorization: `Bearer ${cand.apiKey}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return [];
+    const { data } = (await res.json()) as { data?: { id?: string }[] };
+    return (data ?? []).map((m) => (m.id ?? "").replace(/^models\//, "")).filter((id) => id && !NON_CHAT.test(id));
+  } catch {
+    return [];
+  }
+}
 
 // A registry model is "approved" (selectable in applications) unless it is deprecated/unavailable.
 const APPROVED_STATUSES: ("available" | "preview")[] = ["available", "preview"];
@@ -18,28 +41,22 @@ export async function getModelsByProvider(provider: string) {
       };
     }
 
-    const models = await db
-      .select({
-        id: providerModelMetadata.id,
-        provider: providerModelMetadata.provider,
-        modelId: providerModelMetadata.modelId, // API identifier for auto-fill (may be null if not migrated)
-        displayName: providerModelMetadata.displayName,
-        contextWindow: providerModelMetadata.contextWindow,
-        inputCost: providerModelMetadata.inputCost,
-        outputCost: providerModelMetadata.outputCost,
-      })
-      .from(providerModelMetadata)
-      //   @ts-ignore
-      .where(eq(providerModelMetadata.provider, provider))
-      .orderBy(providerModelMetadata.displayName);
-
-    // Ensure all values are non-null for React controlled inputs
-    const sanitizedModels = models.map((m) => ({
-      ...m,
-      modelId: m.modelId ?? "",
-      contextWindow: m.contextWindow ?? "",
-      inputCost: m.inputCost ?? "",
-      outputCost: m.outputCost ?? "",
+    // One catalog for every picker (BYOK, Model Registry, Applications): see lib/llm-providers.
+    const base = getModelProvider(provider)?.models ?? [];
+    const { orgId } = await auth();
+    const known = new Set(base.map((m) => m.id));
+    const live = (await fetchLiveModelIds(provider, orgId))
+      .filter((id) => !known.has(id))
+      .sort()
+      .map((id) => ({ id, label: id }));
+    const sanitizedModels = [...base, ...live].map((m) => ({
+      id: m.id,
+      provider,
+      modelId: m.id,
+      displayName: m.label,
+      contextWindow: "",
+      inputCost: "",
+      outputCost: "",
     }));
 
     return {

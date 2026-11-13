@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/common/PageHeader";
 import { TrustDossierBrowser } from "@/components/trust-dossier/TrustDossierBrowser";
+import { getSubprocessorOverrides } from "@/lib/server/trust-dossier/agent";
 import { TRUST_DOSSIER_VENDORS } from "@/lib/trust-dossier/vendors";
 
 export default async function TrustDossierPage({
@@ -8,6 +9,7 @@ export default async function TrustDossierPage({
   params: Promise<{ tenant: string }>;
 }) {
   const { tenant } = await params;
+  const overrides = await getSubprocessorOverrides().catch(() => new Map());
   // Only the fields a card needs go to the client; the full catalog stays on the server.
   const cards = TRUST_DOSSIER_VENDORS.map((v) => ({
     slug: v.slug,
@@ -20,7 +22,7 @@ export default async function TrustDossierPage({
     category: v.category,
     domains: v.websites.map((w) => w.label).join(" · "),
     logoUrl: v.logoUrl,
-    subprocessorCount: v.subprocessors.length,
+    subprocessorCount: (overrides.get(v.slug)?.subprocessors.length ?? v.subprocessors.length),
   }));
 
   return (

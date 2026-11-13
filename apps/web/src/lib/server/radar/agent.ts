@@ -62,6 +62,15 @@ export class RadarUnavailableError extends Error {
   }
 }
 
+export const RADAR_NO_KEY_MESSAGE =
+  "AI Radar is currently unavailable. Add your AI provider API key under Admin Center → BYOK to run it.";
+
+export class RadarNoKeyError extends Error {
+  constructor(public details: string[] = []) {
+    super(RADAR_NO_KEY_MESSAGE);
+  }
+}
+
 export class RadarBusyError extends Error {
   constructor() {
     super("An AI Radar run is already in progress");
@@ -126,8 +135,8 @@ type Stats = {
   discoveryBudget: number;
   searchOff: boolean;
 };
-type Link = { text: string; href: string };
-type Page = { url: string; text: string; links: Link[]; items?: FeedItem[] | null };
+export type Link = { text: string; href: string };
+export type Page = { url: string; text: string; links: Link[]; items?: FeedItem[] | null };
 type Changed = Page & { hash: string; keys: string[]; fresh: Link[] };
 // A link is "seen" by what it says and where it points.
 const linkKey = (l: Link) => `${l.href}|${l.text.toLowerCase()}`.slice(0, 500);
@@ -151,7 +160,7 @@ async function throttle(host: string) {
   if (at > now) await new Promise((r) => setTimeout(r, at - now));
 }
 
-async function fetchSource(url: string): Promise<Page> {
+export async function fetchSource(url: string): Promise<Page> {
   const u = new URL(url);
   if (!/^https?:$/.test(u.protocol)) throw new Error("Only http(s) sources are supported");
   if (isPrivateHost(u.hostname)) throw new Error("Private/loopback hosts are not allowed");
@@ -206,7 +215,7 @@ export async function isRadarDue(): Promise<boolean> {
   return !recent;
 }
 
-/** Records the run (lock-checked), then works in the background. A model is optional. Throws RadarUnavailableError while switched off. */
+/** Records the run (lock-checked), then works in the background. Throws RadarUnavailableError while switched off, RadarNoKeyError without a working model key. */
 export async function startRadarRun(opts: {
   trigger: "cron" | "manual";
   tenantId?: string;
@@ -223,6 +232,8 @@ export async function startRadarRun(opts: {
 
   const modelSetup: string[] = [];
   const model = await pickRadarModel(opts.tenantId, modelSetup);
+  // No working key (tenant BYOK or server env): don't run at all.
+  if (!model) throw new RadarNoKeyError(modelSetup);
   const [run] = await db
     .insert(radarRuns)
     .values({
@@ -247,7 +258,7 @@ export async function startRadarRun(opts: {
   return { runId: run.id };
 }
 
-async function executeRun(runId: string, model: RadarModel | null, modelSetup: string[]) {
+async function executeRun(runId: string, model: RadarModel, modelSetup: string[]) {
   // Tier 1 first, so a partial run still covers what matters most.
   const coverage = await db
     .select()
@@ -851,6 +862,9 @@ async function investigate(
 
   let effectiveDate = isoOrNull(f.effective_date);
   if (effectiveDate && !pages.get(sourceUrl)!.includes(effectiveDate.slice(0, 4))) effectiveDate = null;
+  // ponytail: no stated publication date = not a verifiable update; skip it rather than show "Not stated".
+  const publishedDate = isoOrNull(f.published_date) ?? item.date;
+  if (!publishedDate) return reject("No publication date stated by the source");
   const fields = {
     policyName: name,
     category: oneOf(POLICY_CATEGORIES, f.category) ?? guessCategory(`${name} ${description}`),
@@ -864,7 +878,7 @@ async function investigate(
     fields,
     changeType: oneOf(updateSchema.shape.change_type.options, f.change_type) ?? "new_instrument",
     instrumentType: oneOf(INSTRUMENT_TYPES, f.instrument_type),
-    publishedDate: isoOrNull(f.published_date) ?? item.date,
+    publishedDate,
     sourceUrl,
     quote,
   });

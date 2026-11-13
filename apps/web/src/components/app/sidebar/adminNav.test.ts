@@ -27,7 +27,6 @@ describe("Admin Center navigation config", () => {
       ["Active Users", "admin/users/active"],
       ["Deactivated Users", "admin/users/deactivate"],
       ["Archived Applications", "admin/archived-applications"],
-      ["Trust Dossier", "admin/trust-dossier"],
       ["Audit Logs", "admin/settings/audit-logs"],
       ["Regulations & Frameworks", "admin/settings/policy-center"],
       ...FRAMEWORKS.map((f) => [f.navLabel, frameworkPath(f.slug)]),
@@ -112,7 +111,7 @@ describe("getVisibleAdminNav", () => {
         activePolicyNames: allPolicies,
         enabledFrameworkSlugs: allFrameworkSlugs,
       }),
-    ).toHaveLength(12 + FRAMEWORKS.length);
+    ).toHaveLength(11 + FRAMEWORKS.length);
   });
 
   it("shows a framework tab right below Regulations only when its policy is enabled", () => {
@@ -154,7 +153,6 @@ describe("getVisibleAdminNav", () => {
       "Active Users",
       "Deactivated Users",
       "Archived Applications",
-      "Trust Dossier",
       "Audit Logs",
       "Support",
     ]);

@@ -22,6 +22,8 @@ import {
 import { TechnicalDetail } from '@/lib/api/technicalDetails';
 import { useQuery } from '@tanstack/react-query';
 import { getModelsByProvider } from '@/lib/actions/model-register';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
+import { ALL_MODEL_PROVIDERS } from '@/lib/llm-providers';
 
 interface AddTechnicalDetailData {
   sVendor: string;
@@ -279,18 +281,8 @@ const PROMPT_REGISTRY_INTEGRATIONS = [
   { value: 'custom', label: 'Custom/Other', link: null },
 ];
 
-// Provider options matching model-registry
-const PROVIDER_OPTIONS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'vertex', label: 'Google (Vertex AI)' },
-  { value: 'bedrock', label: 'AWS (Bedrock)', disabled: true },
-  { value: 'azure_openai', label: 'Azure OpenAI', disabled: true },
-  { value: 'groq', label: 'Groq', disabled: true },
-  { value: 'ollama', label: 'Ollama', disabled: true },
-  { value: 'huggingface', label: 'Hugging Face' },
-  { value: 'custom', label: 'Custom', disabled: true },
-];
+// Same provider catalog as BYOK and the Model Registry (lib/llm-providers).
+const PROVIDER_OPTIONS = ALL_MODEL_PROVIDERS.map((p) => ({ value: p.slug, label: p.label }));
 
 const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
   openModal,
@@ -719,21 +711,15 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
                   <Label htmlFor="edit-vendor" className="text-sm font-medium">
                     Vendor (Optional)
                   </Label>
-                  <Select
-                    value={editTechnicalDetailData.sVendor || ''}
-                    onValueChange={handleEditVendorChange}
-                  >
-                    <SelectTrigger className={`${errors.sVendor ? 'border-destructive' : ''} h-9`}>
-                      <SelectValue placeholder="Select a vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROVIDER_OPTIONS.map((provider) => (
-                        <SelectItem key={provider.value} value={provider.value} disabled={provider.disabled}>
-                          {provider.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                  value={editTechnicalDetailData.sVendor || ''}
+                  onValueChange={handleEditVendorChange}
+                  options={PROVIDER_OPTIONS}
+                  placeholder="Select a vendor"
+                  searchPlaceholder="Search vendors..."
+                  emptyText="No vendor found."
+                  className={`${errors.sVendor ? 'border-destructive' : ''} h-9`}
+                />
                   {errors.sVendor && (
                     <p className="text-sm text-red-500 text-destructive">
                       {errors.sVendor}
@@ -745,34 +731,24 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
                   <Label htmlFor="edit-model" className="text-sm font-medium">
                     Model (Optional)
                   </Label>
-                  <Select
-                    value={editTechnicalDetailData.sModel || ''}
-                    onValueChange={(value) => handleEditInputChange('sModel', value)}
-                    disabled={!editTechnicalDetailData.sVendor}
-                  >
-                    <SelectTrigger className={`${errors.sModel ? 'border-destructive' : ''} h-9`}>
-                      <SelectValue placeholder={
-                        !editTechnicalDetailData.sVendor
-                          ? "Select vendor first"
-                          : editSelectedVendorModels.length === 0
-                            ? "No models available"
-                            : "Select a model"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingModels ? (
-                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading models...</div>
-                      ) : editSelectedVendorModels.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-gray-500">No models available</div>
-                      ) : (
-                        editSelectedVendorModels.map((model) => (
-                          <SelectItem key={model.id} value={model.displayName}>
-                            {model.displayName}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                  value={editTechnicalDetailData.sModel || ''}
+                  onValueChange={(value) => handleEditInputChange('sModel', value)}
+                  disabled={!editTechnicalDetailData.sVendor || loadingModels}
+                  options={editSelectedVendorModels.map((m) => ({ value: m.displayName, label: m.displayName }))}
+                  placeholder={
+                    !editTechnicalDetailData.sVendor
+                      ? "Select vendor first"
+                      : loadingModels
+                        ? "Loading models..."
+                        : editSelectedVendorModels.length === 0
+                          ? "No models available"
+                          : "Select a model"
+                  }
+                  searchPlaceholder="Search models..."
+                  emptyText="No model found."
+                  className={`${errors.sModel ? 'border-destructive' : ''} h-9`}
+                />
                   {errors.sModel && (
                     <p className="text-sm text-red-500 text-destructive">
                       {errors.sModel}
@@ -1114,21 +1090,15 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
                 <Label htmlFor="vendor" className="text-sm font-medium">
                   Vendor (Optional)
                 </Label>
-                <Select
-                  value={addTechnicalDetailData.sVendor}
+                <SearchableSelect
+                  value={addTechnicalDetailData.sVendor || ''}
                   onValueChange={handleCreateVendorChange}
-                >
-                  <SelectTrigger className={`${errors.sVendor ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}>
-                    <SelectValue placeholder="Select a vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_OPTIONS.map((provider) => (
-                      <SelectItem key={provider.value} value={provider.value} disabled={provider.disabled}>
-                        {provider.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={PROVIDER_OPTIONS}
+                  placeholder="Select a vendor"
+                  searchPlaceholder="Search vendors..."
+                  emptyText="No vendor found."
+                  className={`${errors.sVendor ? 'border-destructive' : ''} h-9`}
+                />
                 {errors.sVendor && (
                   <p className="text-sm text-red-500 text-destructive">
                     {errors.sVendor}
@@ -1140,34 +1110,24 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
                 <Label htmlFor="model" className="text-sm font-medium">
                   Model (Optional)
                 </Label>
-                <Select
-                  value={addTechnicalDetailData.sModel}
+                <SearchableSelect
+                  value={addTechnicalDetailData.sModel || ''}
                   onValueChange={handleCreateModelChange}
-                  disabled={!addTechnicalDetailData.sVendor}
-                >
-                  <SelectTrigger className={`${errors.sModel ? 'border-red-500 focus-visible:border-red-500 border-destructive' : ''} h-9`}>
-                    <SelectValue placeholder={
-                      !addTechnicalDetailData.sVendor
-                        ? "Select vendor first"
+                  disabled={!addTechnicalDetailData.sVendor || loadingModels}
+                  options={selectedVendorModels.map((m) => ({ value: m.displayName, label: m.displayName }))}
+                  placeholder={
+                    !addTechnicalDetailData.sVendor
+                      ? "Select vendor first"
+                      : loadingModels
+                        ? "Loading models..."
                         : selectedVendorModels.length === 0
                           ? "No models available"
                           : "Select a model"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingModels ? (
-                      <div className="px-2 py-1.5 text-sm text-gray-500">Loading models...</div>
-                    ) : selectedVendorModels.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-gray-500">No models available</div>
-                    ) : (
-                      selectedVendorModels.map((model) => (
-                        <SelectItem key={model.id} value={model.displayName}>
-                          {model.displayName}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  }
+                  searchPlaceholder="Search models..."
+                  emptyText="No model found."
+                  className={`${errors.sModel ? 'border-destructive' : ''} h-9`}
+                />
                 {errors.sModel && (
                   <p className="text-sm text-red-500 text-destructive">
                     {errors.sModel}

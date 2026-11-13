@@ -262,6 +262,28 @@ services:
           sleep 3600
         done
 
+  # Trust Dossier agent scheduler. Polls hourly; the endpoint only starts a sweep
+  # on Saturdays (from 02:00 UTC), once a week, so restarts never trigger an early run.
+  trust-dossier-scheduler:
+    image: alpine:3.20
+    container_name: controlnet-trust-dossier-scheduler
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      AGENT_DISCOVERY_CRON_SECRET: ${AGENT_DISCOVERY_CRON_SECRET:?AGENT_DISCOVERY_CRON_SECRET must be configured}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          wget -qO- --timeout=60 \
+            --header="Authorization: Bearer $${AGENT_DISCOVERY_CRON_SECRET}" \
+            http://web:8080/api/cron/trust-dossier || true
+          sleep 3600
+        done
+
   # ------------------------------------------------------------------
   # Self-hosted Nango (open-source, free — no Nango cloud account).
   # Provides the Auth + Proxy layer: OAuth flows, an encrypted credential

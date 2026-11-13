@@ -72,6 +72,7 @@ import type {
 
 
 import { PageTitle } from "@/components/common/PageHeader";
+import { ConnectIntegrationDialog } from "@/components/integrations/ConnectIntegrationDialog";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -318,6 +319,8 @@ export function AgentInventory({
   // A refresh runs on the server, so it outlives this page: `refreshing` is
   // re-derived from the server's status on every mount.
   const [refreshing, setRefreshing] = useState(false);
+  // null = closed, "" = no provider connected at all, otherwise the provider name.
+  const [connectPrompt, setConnectPrompt] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [riskLevel, setRiskLevel] = useState(ALL);
   const [autonomyLevel, setAutonomyLevel] = useState(
@@ -416,7 +419,13 @@ export function AgentInventory({
 
   const reportRefresh = useCallback(
     (status: RefreshStatus) => {
+      if (!status.results.length) {
+        setConnectPrompt("");
+        return;
+      }
       const failed = status.results.filter((r) => !r.ok);
+      const disconnected = failed.find((r) => /not connected/i.test(r.error ?? ""));
+      if (disconnected) setConnectPrompt(disconnected.name);
       if (failed.length) {
         errorToast(
           failed.map((r) => `${r.name} scan failed: ${r.error ?? "unknown error"}`).join(" | "),
@@ -495,6 +504,17 @@ export function AgentInventory({
 
   return (
     <div className="space-y-4">
+      <ConnectIntegrationDialog
+        open={connectPrompt !== null}
+        onOpenChange={(open) => !open && setConnectPrompt(null)}
+        tenant={tenant}
+        provider={connectPrompt || undefined}
+        description={
+          connectPrompt
+            ? undefined
+            : "Agent discovery scans your connected providers, and none are connected yet. Connect AWS, GitHub, Azure, Google Cloud, Databricks or CrewAI in Admin Center → Integrations, then scan again."
+        }
+      />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <PageTitle>Agent Registry</PageTitle>

@@ -3724,3 +3724,35 @@ export const trustDossierTracked = pgTable(
   },
   (table) => [primaryKey({ columns: [table.tenantId, table.vendorSlug] })],
 );
+
+/** Trust Dossier agent: one row per weekly (or manual) sweep. */
+export const trustDossierRuns = pgTable("trust_dossier_runs", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  trigger: text().notNull(),
+  status: text().default("running").notNull(),
+  model: text(),
+  triggeredBy: text("triggered_by"),
+  vendorsChecked: integer("vendors_checked").default(0).notNull(),
+  vendorsUpdated: integer("vendors_updated").default(0).notNull(),
+  health: jsonb().default({}).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true, mode: "string" }),
+});
+
+/** Latest verified sub-processor list per vendor; overrides the static catalog. */
+export const trustDossierSubprocessors = pgTable("trust_dossier_subprocessors", {
+  vendorSlug: text("vendor_slug").primaryKey().notNull(),
+  subprocessors: jsonb()
+    .$type<{ name: string; purpose: string; location: string }[]>()
+    .default([])
+    .notNull(),
+  sourceUrl: text("source_url").notNull(),
+  sourceHash: text("source_hash"),
+  listUpdatedOn: date("list_updated_on", { mode: "string" }),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+  lastError: text("last_error"),
+});

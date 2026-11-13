@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
+import { format } from "date-fns";
 import { AlertTriangle, Loader2, Play, Radar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
         await load();
       } else {
         errorToast({ message: res.message });
+        if ("needsKey" in res) await load();
       }
     } catch (e) {
       errorToast(e);
@@ -93,6 +95,7 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
       `${health.sourceErrors.length} ${health.sourceErrors.length === 1 ? "source is" : "sources are"} currently unreachable. Try again later.`,
   ].filter(Boolean);
   const gaps = status?.coverage.noSources ?? 0;
+  const noKey = status?.hasKey === false;
   const unavailable = status?.enabled === false || run?.status === "failed" || run?.status === "interrupted";
   const unavailableReason =
     status?.enabled === false
@@ -107,14 +110,14 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
         <CardTitle className="flex items-center gap-2 text-base">
           <Radar className="h-4 w-4" />
           AI Radar agent
-          {status?.enabled === false ? (
+          {status?.enabled === false || noKey ? (
             <Badge className={STATUS_STYLE.interrupted}>Unavailable</Badge>
           ) : (
             run && <Badge className={cn("capitalize", STATUS_STYLE[run.status])}>{run.status}</Badge>
           )}
         </CardTitle>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={start} disabled={starting || running}>
+          <Button size="sm" onClick={start} disabled={starting || running || noKey}>
             {starting || running ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -127,8 +130,8 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Stat
-            label="Last run"
-            value={run ? formatDistanceToNow(new Date(run.startedAt), { addSuffix: true }) : "Never"}
+            label="Last updated"
+            value={run ? format(new Date(run.finishedAt ?? run.startedAt), "d MMM yyyy, h:mm a") : "Never"}
             sub={run ? (run.trigger === "cron" ? "Scheduled" : "Manual") : undefined}
           />
           <Stat
@@ -151,19 +154,19 @@ export function RadarAgentCard({ onRunFinished }: { onRunFinished?: () => void }
             }
           />
         </div>
-        {run && !run.model && !unavailable && (
-          health.modelSetup?.length ? (
-            <div className="flex items-start gap-2 text-sm text-yellow-600">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Your saved API key could not be used, so AI analysis was skipped. {health.modelSetup[0]}</span>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No API key is set. Add one under Admin Center → BYOK to enable AI analysis.
-            </p>
-          )
+        {noKey && (
+          <div className="flex items-start gap-2 text-sm text-red-500">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              AI Radar is currently unavailable. Add your AI provider API key in{" "}
+              <Link href={`/${tenant?.slug}/admin/settings/byok`} className="underline">
+                Admin Center → BYOK
+              </Link>{" "}
+              to run it.
+            </span>
+          </div>
         )}
-        {unavailable ? (
+        {noKey ? null : unavailable ? (
           <div className="flex items-start gap-2 text-sm text-red-500">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{unavailableReason}</span>

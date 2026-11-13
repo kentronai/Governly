@@ -13,7 +13,6 @@ import {
   Archive,
   Blocks,
   FileText,
-  FileSearch,
   Headset,
   Home,
   KeyRound,
@@ -86,11 +85,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: "Archived Applications",
         path: "admin/archived-applications",
         icon: Archive,
-      },
-      {
-        label: "Trust Dossier",
-        path: "admin/trust-dossier",
-        icon: FileSearch,
       },
       {
         label: "Audit Logs",

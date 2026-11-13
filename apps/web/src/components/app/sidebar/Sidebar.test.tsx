@@ -223,7 +223,7 @@ describe("Sidebar — existing navigation (regression)", () => {
     ["Agent Risk Dashboard", "/acme/ai-agent-discovery/dashboard"],
     ["Agent Inventory", "/acme/ai-agent-inventory"],
     ["Model Registry", "/acme/model-registry"],
-    ["AI Catalog", "/acme/ai-catalog"],
+    ["Trust Dossier", "/acme/admin/trust-dossier"],
     ["Dashboard", "/acme/reports"],
     ["AI Usage Console", "/acme/ai-console"],
     ["API Keys", "/acme/api-keys"],

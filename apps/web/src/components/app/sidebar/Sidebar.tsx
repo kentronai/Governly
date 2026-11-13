@@ -6,7 +6,7 @@ import {
   Settings,
   FolderOpen,
   Database,
-  Search,
+  FileSearch,
   LayoutDashboard,
   AlertTriangle,
   LayoutGrid,
@@ -154,17 +154,14 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
           >
             Model Registry
           </NavItem>
-          {tenantInfo?.govIQEnabled && (
-            <>
-              <NavItem
-                href={`/${tenant}/ai-catalog`}
-                icon={<Search className="h-4 w-4" />}
-                isActive={isActive(`/${tenant}/ai-catalog`)}
-              >
-                AI Catalog
-              </NavItem>
-            </>
-          )}
+          {/* AI Catalog is hidden; Trust Dossier takes its place. */}
+          <NavItem
+            href={`/${tenant}/admin/trust-dossier`}
+            icon={<FileSearch className="h-4 w-4" />}
+            isActive={isActive(`/${tenant}/admin/trust-dossier`)}
+          >
+            Trust Dossier
+          </NavItem>
           <NavItem
             href={`/${tenant}/ai-console`}
             icon={<AlertTriangle className="h-4 w-4" />}

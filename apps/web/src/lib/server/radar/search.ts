@@ -11,8 +11,8 @@ export const searchEnabled = () => !!process.env.BRAVE_SEARCH_API_KEY?.trim();
 /** Thrown for key/quota problems so the caller can stop searching for this run. */
 export class SearchUnavailableError extends Error {}
 
-/** Official-looking result URLs for a query, best first. */
-export async function searchOfficialUrls(query: string): Promise<string[]> {
+/** Result URLs for a query, best first (no host filtering: callers decide what to trust). */
+export async function searchUrls(query: string): Promise<string[]> {
   const wait = Math.max(0, nextAt - Date.now());
   nextAt = Date.now() + wait + BRAVE_GAP_MS;
   if (wait) await new Promise((r) => setTimeout(r, wait));
@@ -33,13 +33,16 @@ export async function searchOfficialUrls(query: string): Promise<string[]> {
   if (!res.ok) throw new Error(`Search API returned HTTP ${res.status}`);
 
   const results: { url?: string }[] = (await res.json())?.web?.results ?? [];
-  return results
-    .map((r) => r.url ?? "")
-    .filter((u) => {
-      try {
-        return isOfficialHost(new URL(u).hostname);
-      } catch {
-        return false;
-      }
-    });
+  return results.map((r) => r.url ?? "").filter(Boolean);
+}
+
+/** Official-looking (government/regulator) result URLs for a query, best first. */
+export async function searchOfficialUrls(query: string): Promise<string[]> {
+  return (await searchUrls(query)).filter((u) => {
+    try {
+      return isOfficialHost(new URL(u).hostname);
+    } catch {
+      return false;
+    }
+  });
 }
