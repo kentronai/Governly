@@ -146,7 +146,9 @@ const cap = <T>(a: T[], x: T) => void (a.length < 50 && a.push(x));
 // ── source fetching ──────────────────────────────────────────────────────
 // We identify ourselves honestly and never work around a site that refuses us:
 // a 403/blocked source is reported in the health report, not bypassed.
-const CRAWLER_UA = "NORIX-AI-Radar/1.0 (regulatory monitoring; +https://aigov.kentron.ai)";
+const CRAWLER_UA = `NORIX-AI-Radar/1.0 (regulatory monitoring; +${
+  process.env.NEXT_PUBLIC_APP_URL || "https://github.com/kentronai/Norix"
+})`;
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 

@@ -1,0 +1,32 @@
+name: Bug report
+description: Something in NORIX is broken.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See error ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit (`git rev-parse --short HEAD`) or release.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant output from `docker compose logs <service>`. Remove any secrets first.
+      render: shell

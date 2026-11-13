@@ -1,0 +1,28 @@
+name: Setup help
+description: Trouble installing or self-hosting NORIX.
+labels: [setup]
+body:
+  - type: markdown
+    attributes:
+      value: Check [Troubleshooting](https://github.com/kentronai/Norix/blob/main/docs/self-hosting.md#troubleshooting) first.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where are you installing?
+      options: [Laptop (macOS), Laptop (Linux), Linux server / VM, Windows (WSL2), Other]
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `./install.sh --doctor`
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What went wrong?
+      description: The step that failed and the last ~40 lines of its output. Remove any secrets first.
+    validations:
+      required: true

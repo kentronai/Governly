@@ -1,0 +1,40 @@
+# Self-host overlay for the root docker-compose.yml. Used by install.sh:
+#   docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml up -d
+# It changes only what ties the stack to one hosted domain: nginx serves plain
+# HTTP on NORIX_HTTP_PORT (TLS goes in front, see deploy/README.md), and a
+# one-shot `migrate` service applies the Drizzle migrations.
+services:
+  nginx:
+    ports: !override
+      - "${NORIX_HTTP_PORT:-80}:80"
+    volumes: !override
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  # docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml run --rm migrate
+  migrate:
+    image: node:20-bookworm
+    profiles: ["tools"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_SSL: "false"
+    working_dir: /repo
+    volumes:
+      - ./:/repo
+      - migrate_node_modules:/repo/node_modules
+      - migrate_web_node_modules:/repo/apps/web/node_modules
+    command:
+      - bash
+      - -c
+      - >-
+        corepack enable && corepack prepare pnpm@9.0.0 --activate &&
+        pnpm install --frozen-lockfile --filter @ai-governance/web... &&
+        cd apps/web && pnpm exec drizzle-kit migrate --config=src/drizzle.config.env.ts
+
+volumes:
+  migrate_node_modules:
+  migrate_web_node_modules:

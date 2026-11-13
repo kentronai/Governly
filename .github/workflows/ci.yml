@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @ai-governance/web...
+      - name: Typecheck
+        working-directory: apps/web
+        run: pnpm typecheck
+      - name: Tests
+        working-directory: apps/web
+        run: pnpm test --ci
+
+  selfhost:
+    name: Self-host files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh syntax
+        run: bash -n install.sh
+      - name: Compose overlay resolves
+        run: |
+          printf 'POSTGRES_PASSWORD=x\nAGENT_DISCOVERY_CRON_SECRET=x\nNANGO_SECRET_KEY=x\nNANGO_ENCRYPTION_KEY=x\n' > .env
+          docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml --profile tools config --quiet
+      - name: nginx config is valid
+        run: |
+          docker run --rm -v "$PWD/deploy/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            --add-host controlnet:127.0.0.1 --add-host web:127.0.0.1 \
+            --add-host onnx-service:127.0.0.1 --add-host nango-server:127.0.0.1 \
+            nginx:alpine nginx -t
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Known placeholders (docs examples, test fixtures, Nango provider samples) are in .gitleaksignore.
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 git /repo --no-banner --redact

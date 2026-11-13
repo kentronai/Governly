@@ -6,13 +6,14 @@
  * ControlNet backend (see `nginx.conf`), and in local dev `next.config.js`
  * rewrites `/v1/:path*` to `NEXT_PUBLIC_BACKEND_URL`. So the origin the user is
  * currently on is always the correct base URL, which keeps the snippets right on
- * every environment (app.kentron.ai, staging, localhost) with no build-time env.
+ * every environment (production, staging, localhost) with no build-time env.
  *
  * `NEXT_PUBLIC_CONTROLNET_GATEWAY_URL` is an explicit override for the case where
  * the gateway is deliberately hosted on a different host than the dashboard.
  */
 
-const FALLBACK_GATEWAY_URL = "https://aigov.kentron.ai";
+// Only reached server-side with no NEXT_PUBLIC_APP_URL (install.sh always sets it).
+const FALLBACK_GATEWAY_URL = "http://localhost";
 
 /** Trims whitespace, trailing slashes and a trailing `/v1` path segment. */
 function normalizeOrigin(url: string): string {
