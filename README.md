@@ -1,4 +1,4 @@
-<h1 align="center">NORIX</h1>
+<h1 align="center">GOVERNLY</h1>
 
 <p align="center">
   <b>Open-source AI governance: find every AI agent you run, guard every call, prove compliance.</b>
