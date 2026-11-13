@@ -5,11 +5,18 @@ import {
   OrganizationSwitcher as ClerkOrganizationSwitcher,
   UserButton as ClerkUserButton,
 } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { shadcn } from "@clerk/themes";
+import { isKentronEmail } from "@/lib/utils/validateEmail";
 import { useState, useEffect } from "react";
 
 export function OrganizationSwitcher() {
   const [isMounted, setIsMounted] = useState(false);
+  const { user } = useUser();
+  // Kentron staff onboard client organizations; everyone else is limited to one and gets told so.
+  const createUrl = isKentronEmail(user?.primaryEmailAddress?.emailAddress ?? "")
+    ? "/admin/client-onboarding"
+    : "/unauthorized?reason=organization-limit";
 
   useEffect(() => {
     setIsMounted(true);
@@ -27,9 +34,7 @@ export function OrganizationSwitcher() {
     <ClerkOrganizationSwitcher
       appearance={{ baseTheme: shadcn }}
       createOrganizationMode="navigation"
-      createOrganizationUrl="/admin/client-onboarding"
-      organizationProfileMode="navigation"
-      organizationProfileUrl="/admin"
+      createOrganizationUrl={createUrl}
       afterCreateOrganizationUrl="/"
       afterSelectOrganizationUrl="/"
     />

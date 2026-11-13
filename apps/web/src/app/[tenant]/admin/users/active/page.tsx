@@ -128,7 +128,9 @@ const ActiveUsers = () => {
         successToast(
           "User added successfully",
           "User",
-          "added to both Clerk and database"
+          result.emailSent
+            ? "invitation email sent"
+            : "added, but the invitation email could not be sent (email service is not configured)"
         );
         setOpen("");
         setAddUserData({

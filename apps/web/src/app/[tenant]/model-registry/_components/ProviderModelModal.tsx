@@ -105,6 +105,8 @@ export function ProviderModelModal({
 
   const [availableModels, setAvailableModels] = useState<ModelMetadata[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  // Provider the model list was last loaded for: an empty list only means "type an ID" once loaded.
+  const [loadedFor, setLoadedFor] = useState("");
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -145,6 +147,7 @@ export function ProviderModelModal({
           setAvailableModels([]);
         } finally {
           setLoadingModels(false);
+          setLoadedFor(formData.provider);
         }
       } else {
         setAvailableModels([]);
@@ -204,6 +207,7 @@ export function ProviderModelModal({
     }
     setErrors({});
     setSelectedModelId("");
+    setLoadedFor("");
   }, [mode, model, isOpen]);
 
   const handleModelSelect = (value: string) => {
@@ -361,6 +365,8 @@ export function ProviderModelModal({
                   id="provider"
                   value={formData.provider}
                   onValueChange={(value) => {
+                    // Re-picking the current provider must not wipe its (already loaded) model list.
+                    if (value === formData.provider) return;
                     const autoUrl = providerUrls[value] || "";
                     setFormData((prev) => ({
                       ...prev,
@@ -410,7 +416,7 @@ export function ProviderModelModal({
             </div>
 
             {formData.provider === "huggingface" ||
-            (mode === "create" && !loadingModels && availableModels.length === 0) ||
+            (mode === "create" && !loadingModels && loadedFor === formData.provider && availableModels.length === 0) ||
             selectedModelId === OTHER_MODEL ? (
               <>
                 {/* For Hugging Face, Model Name is the identifier */}

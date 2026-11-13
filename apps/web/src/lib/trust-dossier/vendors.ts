@@ -36,6 +36,9 @@ export interface TrustDossierVendor {
 
 // ponytail: static catalog (46 researched providers + VerifyWise AI Trust Index export,
 // 2026-11-11). Server-only: ~1.5 MB, never import from a client component.
+/** When the static catalog was researched; shown as "Last updated" until the agent checks a vendor. */
+export const CATALOG_RESEARCHED_ON = "2026-11-11";
+
 export const TRUST_DOSSIER_VENDORS = catalog as TrustDossierVendor[];
 
 export const getTrustDossierVendor = (slug: string) =>

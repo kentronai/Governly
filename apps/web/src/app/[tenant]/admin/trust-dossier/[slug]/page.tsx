@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { getTrackedVendorSlugs } from "@/lib/actions/trust-dossier";
 import { getSubprocessorOverrides } from "@/lib/server/trust-dossier/agent";
 import {
+  CATALOG_RESEARCHED_ON,
   type CheckStatus,
   getTrustDossierVendor,
 } from "@/lib/trust-dossier/vendors";
@@ -39,10 +40,11 @@ export default async function TrustDossierVendorPage({
     ? { ...base, subprocessors: override.subprocessors, subprocessorsUrl: override.sourceUrl }
     : base;
   // "Last updated" = when the agent last verified this list. A failed or skipped run never touches it.
-  const checkedOn = override?.lastCheckedAt ?? base.lastChecked;
-  const listUpdated = checkedOn
-    ? format(new Date(checkedOn.length === 10 ? `${checkedOn}T00:00:00` : checkedOn), "d MMMM yyyy")
-    : undefined;
+  const checkedOn = override?.lastCheckedAt ?? base.lastChecked ?? CATALOG_RESEARCHED_ON;
+  const listUpdated = format(
+    new Date(checkedOn.length === 10 ? `${checkedOn}T00:00:00` : checkedOn),
+    "d MMMM yyyy",
+  );
   const trackedSlugs = await getTrackedVendorSlugs(tenant).catch(
     (): string[] => [],
   );
@@ -129,11 +131,9 @@ export default async function TrustDossierVendorPage({
           </CardTitle>
           <div className="flex flex-col items-end gap-1">
             <SourceLink label="Source list" url={vendor.subprocessorsUrl} />
-            {listUpdated && (
-              <span className="text-xs text-muted-foreground">
-                Last updated {listUpdated}
-              </span>
-            )}
+            <span className="text-xs text-muted-foreground">
+              Last updated {listUpdated}
+            </span>
           </div>
         </CardHeader>
         <CardContent>

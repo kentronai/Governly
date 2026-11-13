@@ -4,6 +4,8 @@
 
 "use server";
 
+import { headers } from "next/headers";
+import { invitationEmail, sendEmail } from "@/lib/server/email";
 import { db, users, memberships, auditEvents } from "@db";
 import { eq, and, or, like, notInArray, desc, sql, inArray } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -119,6 +121,37 @@ interface UpdateUserInput {
   role?: string;
 }
 
+const memberLimitMessage = (limit: number) =>
+  `Your free plan allows up to ${limit || 2} active members per organization. Remove a member or upgrade your plan to add more.`;
+
+/**
+ * Mirrors the Clerk organization's members into our users/memberships tables.
+ * Covers anyone whose Clerk webhook was missed (e.g. the creator of a brand-new
+ * organization), so the Active Users list always matches who can actually sign in.
+ */
+async function syncOrgMembersFromClerk(organizationId: string) {
+  const clerk = await clerkClient();
+  const members = (await clerk.organizations.getOrganizationMembershipList({ organizationId, limit: 100 })).data;
+  const ids = members.map((m) => m.publicUserData?.userId).filter((id): id is string => !!id);
+  if (!ids.length) return;
+  const clerkUsers = (await clerk.users.getUserList({ userId: ids, limit: 100 })).data;
+  for (const m of members) {
+    const u = clerkUsers.find((c) => c.id === m.publicUserData?.userId);
+    if (!u) continue;
+    const email = u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ?? u.emailAddresses[0]?.emailAddress;
+    if (!email) continue;
+    const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+    await db
+      .insert(users)
+      .values({ id: u.id, email, name, firstName: u.firstName ?? "", lastName: u.lastName ?? "", imageUrl: u.imageUrl })
+      .onConflictDoNothing();
+    await db
+      .insert(memberships)
+      .values({ tenantId: organizationId, userId: u.id, role: m.role.replace(/^org:/, ""), permissions: [] })
+      .onConflictDoNothing();
+  }
+}
+
 /**
  * Create a new user and add them to the organization
  */
@@ -160,6 +193,18 @@ export const createUser = async (input: CreateUserInput) => {
       throw orgError;
     }
 
+    // Plan limit: tell the admin plainly instead of surfacing Clerk's raw error.
+    const org = await clerk.organizations.getOrganization({ organizationId });
+    const limit = org.maxAllowedMemberships;
+    if (limit > 0) {
+      const members = await clerk.organizations.getOrganizationMembershipList({
+        organizationId,
+        limit: 1,
+      });
+      if (members.totalCount >= limit)
+        return { error: memberLimitMessage(limit) };
+    }
+
     // Create user in Clerk
     const firstName =
       input.firstName || (input.name ? input.name.split(" ")[0] : "");
@@ -195,6 +240,11 @@ export const createUser = async (input: CreateUserInput) => {
     } catch (membershipError: any) {
       // If adding to organization fails, we should clean up the created user
       // But only if it's a critical error (not a duplicate membership)
+      if (membershipError.errors?.[0]?.code === "organization_membership_quota_exceeded") {
+        // Don't leave an orphan Clerk user behind (it would block re-adding this email).
+        await clerk.users.deleteUser(clerkUser.id).catch(() => {});
+        return { error: memberLimitMessage(0) };
+      }
       if (membershipError.status === 404) {
         throw new Error(
           `Failed to add user to organization: Organization ${organizationId} not found. User was created but not added to organization.`,
@@ -273,12 +323,26 @@ export const createUser = async (input: CreateUserInput) => {
       console.error("Failed to write audit event (user.created):", e);
     }
 
+    // Invitation email (best effort: the user exists either way).
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const mail = invitationEmail({
+      orgName: (await clerk.organizations.getOrganization({ organizationId })).name,
+      firstName: dbFirstName || "there",
+      email: localUser.email,
+      loginUrl: `${host ? `${proto}://${host}` : process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign-in`,
+    });
+    const emailResult = await sendEmail({ to: localUser.email, ...mail });
+    if (!emailResult.sent) console.error("Invitation email not sent:", emailResult.reason);
+
     return {
       id: localUser.id,
       name: localUser.name || "",
       email: localUser.email,
       role: membership.role,
       status: true,
+      emailSent: emailResult.sent,
     };
   } catch (error: any) {
     console.error("Error creating user:", error);
@@ -814,6 +878,8 @@ export const getActiveUsers = async (options?: GetUsersOptions) => {
 
   const { page = 1, pageSize = 20, search } = options || {};
   const offset = (page - 1) * pageSize;
+
+  await syncOrgMembersFromClerk(orgId).catch((e) => console.error("Member sync failed:", e));
 
   // Build search condition
   const searchConditions = search

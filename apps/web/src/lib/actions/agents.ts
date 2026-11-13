@@ -28,6 +28,7 @@ import {
   type LangSmithRunRow,
 } from "@/lib/queries/langsmith-metrics";
 import { revalidatePath } from "next/cache";
+import { pruneOrphanAgents } from "@/lib/server/agents/prune-orphans";
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
   const [tenantRow] = await db
@@ -47,6 +48,7 @@ export const fetchAgents = async (
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
   if (tenantId !== orgId) throw new Error("Tenant access denied");
+  await pruneOrphanAgents(tenantId);
   return getAgents(tenantId, filters);
 };
 
@@ -75,6 +77,7 @@ export const fetchAgentInventorySummary = async (tenantSlugOrId: string) => {
   if (!userId || !orgId) throw new Error("Authentication required");
   const tenantId = await resolveTenantId(tenantSlugOrId);
   if (tenantId !== orgId) throw new Error("Tenant access denied");
+  await pruneOrphanAgents(tenantId);
   return getAgentInventorySummary(tenantId);
 };
 

@@ -54,6 +54,7 @@ import {
   updateIntegration,
 } from "@/lib/actions/integrations";
 import { disconnectNango } from "@/lib/actions/nango-connect";
+import { pruneOrphanAgents } from "@/lib/server/agents/prune-orphans";
 
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const CREWAI = "CrewAI";
@@ -600,6 +601,8 @@ export async function POST(request: NextRequest) {
       } else {
         await clearIntegrationCredentials(tenant, integrationId);
       }
+      // Whatever the provider, its discovered agents go with it.
+      await pruneOrphanAgents(await resolveTenantId(tenant));
       return NextResponse.json({ ok: true });
     }
 
