@@ -63,6 +63,8 @@ if (process.env.NORIX_NATIVE === "1") {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // App version shown in the sidebar; scripts/release.sh keeps package.json in sync with VERSION.
+  env: { NEXT_PUBLIC_APP_VERSION: require("./package.json").version },
   experimental: {
     // Evidence documents (8 MB max) are uploaded through server actions.
     serverActions: { bodySizeLimit: "10mb" },

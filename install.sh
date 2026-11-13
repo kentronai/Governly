@@ -112,6 +112,7 @@ EOF
 # ── doctor ──────────────────────────────────────────────────────────────────
 if [ "${1:-}" = "--doctor" ]; then
   [ -f docker-compose.yml ] || cd "$GOVERNLY_DIR" 2>/dev/null || die "Run this from your Governly folder."
+  ok "Governly version $(cat VERSION 2>/dev/null || echo unknown)"
   check_prereqs || true
   [ -f .env ] && ok ".env present" || warn ".env missing: run ./install.sh"
   docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml ps 2>/dev/null || true

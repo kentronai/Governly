@@ -55,7 +55,7 @@ version:
 - One change per PR, with a description of what and why, and how you tested it.
 - Add or update tests for behaviour you change.
 - Update docs (`README.md`, `docs/`) when you change setup, configuration or user-facing behaviour.
-- Add a line under `Unreleased` in [CHANGELOG.md](CHANGELOG.md).
+- Start commit messages with `feat:`, `fix:`, `perf:` etc.: releases build the [changelog](CHANGELOG.md) from them ([docs/releasing.md](docs/releasing.md)).
 - Never commit secrets, `.env` files or keys.
 
 By contributing you agree your work is licensed under the [MIT License](LICENSE) and that you follow

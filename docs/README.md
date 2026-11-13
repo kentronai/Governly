@@ -35,3 +35,4 @@
 - [Development guide](DEVELOPMENT.md) and [local vs remote development](tech/local-remote-development.md)
 - [Design system](norix-design-system/README.md) and [UI spec](norix-design-system/NORIX-UI-SPEC.md)
 - [CONTRIBUTING.md](../CONTRIBUTING.md) and [AGENTS.md](../AGENTS.md)
+- [Versions and releases](releasing.md)

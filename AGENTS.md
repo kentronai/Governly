@@ -55,5 +55,5 @@ cd apps/controlnet && pytest
 ## Definition of done
 
 Re-read the request, confirm every item is done with Governly's own components and patterns, run the
-checks above, and update docs and `CHANGELOG.md` when setup, configuration or user-facing behaviour
+checks above, use `feat:`/`fix:` commit prefixes (the changelog is built from them), and update docs when setup, configuration or user-facing behaviour
 changed. Verify UI changes in a real browser, not only with tests.

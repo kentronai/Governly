@@ -210,6 +210,9 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
         >
           Docs
         </NavItem>
+        <p className="px-3 pt-2 text-xs text-muted-foreground">
+          Governly v{process.env.NEXT_PUBLIC_APP_VERSION}
+        </p>
       </nav>
     </div>
   );

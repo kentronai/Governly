@@ -237,6 +237,12 @@ describe("Sidebar — existing navigation (regression)", () => {
     );
   });
 
+  it("shows the app version in the footer", () => {
+    process.env.NEXT_PUBLIC_APP_VERSION = "9.8.7";
+    setup({ orgRole: "org:member" });
+    expect(screen.getByText("Governly v9.8.7")).toBeInTheDocument();
+  });
+
   it('shows "Dashboard" (formerly Reports) as the first nav item', () => {
     setup({ orgRole: "org:member" });
     const links = screen.getAllByRole("link");
