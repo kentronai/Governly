@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in NORIX is broken.
+description: Something in Governly is broken.
 labels: [bug]
 body:
   - type: textarea

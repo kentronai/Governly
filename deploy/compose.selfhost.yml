@@ -1,12 +1,12 @@
 # Self-host overlay for the root docker-compose.yml. Used by install.sh:
 #   docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml up -d
 # It changes only what ties the stack to one hosted domain: nginx serves plain
-# HTTP on NORIX_HTTP_PORT (TLS goes in front, see deploy/README.md), and a
+# HTTP on GOVERNLY_HTTP_PORT (TLS goes in front, see deploy/README.md), and a
 # one-shot `migrate` service applies the Drizzle migrations.
 services:
   nginx:
     ports: !override
-      - "${NORIX_HTTP_PORT:-80}:80"
+      - "${GOVERNLY_HTTP_PORT:-80}:80"
     volumes: !override
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
 

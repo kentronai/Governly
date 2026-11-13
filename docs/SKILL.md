@@ -1,11 +1,11 @@
 ---
-name: norix-setup
-description: Install and run NORIX (open-source AI governance platform) on this machine or a server with Docker. Use when asked to set up, install, self-host, deploy or try NORIX.
+name: governly-setup
+description: Install and run Governly (open-source AI governance platform) on this machine or a server with Docker. Use when asked to set up, install, self-host, deploy or try Governly.
 ---
 
-# Set up NORIX
+# Set up Governly
 
-NORIX runs as one Docker Compose stack started by `install.sh`. Ask the person before each step that
+Governly runs as one Docker Compose stack started by `install.sh`. Ask the person before each step that
 changes their machine. Never print, echo or paste a secret key into the chat or a log.
 
 ## 1. Check prerequisites
@@ -21,15 +21,15 @@ stop. Note: the stack wants about 8 GB of RAM free.
 
 ## 2. Get the code
 
-If the current folder is not already a NORIX clone (no `install.sh` and `deploy/compose.selfhost.yml`):
+If the current folder is not already a Governly clone (no `install.sh` and `deploy/compose.selfhost.yml`):
 
 ```sh
-git clone https://github.com/kentronai/Norix.git norix && cd norix
+git clone https://github.com/kentronai/Norix.git governly && cd governly
 ```
 
 ## 3. Clerk keys
 
-NORIX signs people in with Clerk. Ask the person to:
+Governly signs people in with Clerk. Ask the person to:
 
 1. Create an app at https://dashboard.clerk.com and turn on **Organizations**.
 2. Copy the Publishable key (`pk_...`) and Secret key (`sk_...`) from **API Keys**.
@@ -44,17 +44,17 @@ step 4 and wait for them.
 Local machine:
 
 ```sh
-./install.sh > norix-install.log 2>&1; echo "exit $?"
+./install.sh > governly-install.log 2>&1; echo "exit $?"
 ```
 
 Server with a domain (HTTPS goes in front, see docs/self-hosting.md#https):
 
 ```sh
-NORIX_URL=https://norix.example.com NORIX_HTTP_PORT=8080 ./install.sh > norix-install.log 2>&1; echo "exit $?"
+GOVERNLY_URL=https://governly.example.com GOVERNLY_HTTP_PORT=8080 ./install.sh > governly-install.log 2>&1; echo "exit $?"
 ```
 
 The first build takes 10-20 minutes. If it exits non-zero, show the person the last 40 lines of
-`norix-install.log` (they contain no secrets) and check docs/self-hosting.md#troubleshooting.
+`governly-install.log` (they contain no secrets) and check docs/self-hosting.md#troubleshooting.
 An existing `.env` is reused, so re-running is safe.
 
 ## 5. Verify and hand over

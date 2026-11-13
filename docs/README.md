@@ -1,4 +1,4 @@
-# NORIX documentation
+# Governly documentation
 
 ## Getting started
 
@@ -6,7 +6,7 @@
 - [Configuration](configuration.md): every `.env` setting
 - [Setup skill for coding agents](SKILL.md): hand this to Claude Code, Codex or Cursor
 
-## Using NORIX
+## Using Governly
 
 - [ControlNet API reference](API.md): the OpenAI-compatible guardrail gateway
 - [Composable Guard Algebra](CGA_GUIDE.md): composing guards

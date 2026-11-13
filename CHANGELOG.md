@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to NORIX are listed here. The format follows
+All notable changes to Governly are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased

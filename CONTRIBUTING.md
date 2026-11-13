@@ -1,4 +1,4 @@
-# Contributing to NORIX
+# Contributing to Governly
 
 Thanks for helping. Bug reports, fixes, docs and new integrations are all welcome.
 

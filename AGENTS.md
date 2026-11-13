@@ -1,9 +1,9 @@
-# NORIX: working agreement for contributors and coding agents
+# Governly: working agreement for contributors and coding agents
 
 Read this before changing code. Claude Code loads it through `CLAUDE.md`; Codex, Cursor and others read
-it directly. To *install* NORIX rather than work on it, use [docs/SKILL.md](docs/SKILL.md).
+it directly. To *install* Governly rather than work on it, use [docs/SKILL.md](docs/SKILL.md).
 
-## What NORIX is
+## What Governly is
 
 A multi-tenant AI governance platform: agent discovery, a guardrail gateway, model registry, vendor
 dossiers, regulatory radar and compliance controls. One Docker Compose stack.
@@ -54,6 +54,6 @@ cd apps/controlnet && pytest
 
 ## Definition of done
 
-Re-read the request, confirm every item is done with NORIX's own components and patterns, run the
+Re-read the request, confirm every item is done with Governly's own components and patterns, run the
 checks above, and update docs and `CHANGELOG.md` when setup, configuration or user-facing behaviour
 changed. Verify UI changes in a real browser, not only with tests.

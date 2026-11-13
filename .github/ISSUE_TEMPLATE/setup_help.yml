@@ -1,5 +1,5 @@
 name: Setup help
-description: Trouble installing or self-hosting NORIX.
+description: Trouble installing or self-hosting Governly.
 labels: [setup]
 body:
   - type: markdown

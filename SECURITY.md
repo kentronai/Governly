@@ -20,12 +20,12 @@ Security fixes land on `main`. Self-hosters should upgrade with `git pull && ./i
 In scope: this repository's code, the Docker images it builds, and the default self-host setup
 (`install.sh`, `deploy/`).
 
-Out of scope: third-party services NORIX connects to (Clerk, Nango, cloud providers, LLM providers),
+Out of scope: third-party services Governly connects to (Clerk, Nango, cloud providers, LLM providers),
 and deployments that changed the defaults in ways this repo does not document.
 
 ## Hardening checklist for self-hosters
 
-- Put HTTPS in front before exposing NORIX (see [docs/self-hosting.md](docs/self-hosting.md#https)).
+- Put HTTPS in front before exposing Governly (see [docs/self-hosting.md](docs/self-hosting.md#https)).
 - Keep `.env` private (`chmod 600`) and backed up. Its keys encrypt stored credentials.
 - Change `NANGO_DASHBOARD_PASSWORD` if you set it by hand. The installer generates a random one.
 - Do not publish Postgres, Redis or Nango ports. The default compose file keeps them internal.

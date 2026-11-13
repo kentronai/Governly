@@ -19,7 +19,7 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
-NORIX is a multi-tenant platform for governing AI in an organization. It discovers the AI agents and
+Governly is a multi-tenant platform for governing AI in an organization. It discovers the AI agents and
 models running across your cloud accounts and repositories, puts a guardrail gateway in front of LLM
 calls, tracks regulations and vendors, and maps it all to compliance controls. Run it on your laptop or
 your own server with one command.
@@ -34,7 +34,7 @@ your own server with one command.
 <tr><td><b>AI Radar</b></td><td>Monitors regulators and standards bodies for AI regulation changes that affect you.</td></tr>
 <tr><td><b>Regulations &amp; controls</b></td><td>Frameworks (EU AI Act, NIST AI RMF, ISO 42001 and more) collapsed into one control library.</td></tr>
 <tr><td><b>Observability &amp; audit</b></td><td>Request logs, guard executions, violations and a full audit trail, per tenant.</td></tr>
-<tr><td><b>Integrations</b></td><td>Connect providers through a self-hosted <a href="https://nango.dev">Nango</a>: credentials never sit in NORIX's own tables.</td></tr>
+<tr><td><b>Integrations</b></td><td>Connect providers through a self-hosted <a href="https://nango.dev">Nango</a>: credentials never sit in Governly's own tables.</td></tr>
 </table>
 
 ## Quick install
@@ -64,13 +64,13 @@ sign up.
 
 **Let your coding agent do it.** Tell Claude Code, Codex or Cursor:
 
-> Read https://raw.githubusercontent.com/kentronai/Norix/main/docs/SKILL.md and set up NORIX for me.
+> Read https://raw.githubusercontent.com/kentronai/Norix/main/docs/SKILL.md and set up Governly for me.
 
 ## Deploy it
 
 | Where | How |
 | --- | --- |
-| **Any Linux server or VM** (AWS EC2, GCP, Azure, DigitalOcean, Hetzner…) | Run the same one-liner on the server with `NORIX_URL=https://your.domain`, then put HTTPS in front. [Self-hosting guide](docs/self-hosting.md) |
+| **Any Linux server or VM** (AWS EC2, GCP, Azure, DigitalOcean, Hetzner…) | Run the same one-liner on the server with `GOVERNLY_URL=https://your.domain`, then put HTTPS in front. [Self-hosting guide](docs/self-hosting.md) |
 | **Your laptop** | `./install.sh`, open http://localhost |
 | **Development** (hot reload) | [Development guide](docs/DEVELOPMENT.md) |
 
@@ -120,4 +120,4 @@ encrypted with AES-256-GCM under keys only your `.env` holds.
 
 ## License
 
-[MIT](LICENSE). Copyright 2026 goverly.si.
+[MIT](LICENSE). Copyright 2026 governly.
