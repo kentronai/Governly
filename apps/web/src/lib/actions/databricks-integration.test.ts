@@ -205,7 +205,8 @@ describe("Databricks integration actions", () => {
       expect.objectContaining({ id: "integration-1" }),
       "user-1",
     );
-    expect(revalidatePath).toHaveBeenCalledTimes(5);
+    // inventory, discovery dashboard, discovery journey, admin integrations
+    expect(revalidatePath).toHaveBeenCalledTimes(4);
   });
 
   it("removes stored credentials and disables the integration", async () => {

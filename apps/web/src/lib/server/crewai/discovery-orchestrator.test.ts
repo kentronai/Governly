@@ -16,7 +16,7 @@ function chain(returnValue: unknown = []) {
   return builder;
 }
 
-const findFirstMock = jest.fn(async () => null);
+const findFirstMock = jest.fn(async (..._args: unknown[]) => null);
 
 jest.mock("@db", () => ({
   agents: {
@@ -89,6 +89,7 @@ import {
   runCrewAIDiscoveryScan,
   type CrewAIConnection,
 } from "./discovery-orchestrator";
+import type { CrewAIDirectCredentials } from "./api-client";
 
 const creds = JSON.stringify({
   baseUrl: "https://app.crewai.com",
@@ -120,7 +121,8 @@ beforeEach(() => {
 describe("parseCrewAICredentials", () => {
   it("parses stored credentials", () => {
     const c = parseCrewAICredentials(connection);
-    expect(c.accessToken).toBe("pat_test");
+    expect(c.mode).not.toBe("nango");
+    expect((c as CrewAIDirectCredentials).accessToken).toBe("pat_test");
     expect(c.baseUrl).toBe("https://app.crewai.com");
   });
   it("throws when credentials are absent", () => {

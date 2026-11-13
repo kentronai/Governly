@@ -16,7 +16,4 @@ echo "📝 Next steps:"
 echo "   1. Review the generated migration file in drizzle/ directory"
 echo "   2. Run: npx drizzle-kit push (to apply to database)"
 echo "   3. Or run: npx drizzle-kit migrate (for production)"
-echo ""
-echo "🌱 To seed demo data:"
-echo "   npx tsx scripts/seed-goviq-data.ts"
 
