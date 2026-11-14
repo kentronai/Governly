@@ -1,7 +1,7 @@
 <h1 align="center">GOVERNLY</h1>
 
 <p align="center">
-  <b>Open-source AI governance: find every AI agent you run, guard every call, prove compliance.</b>
+  <b>Open-source AI governance Platform: find every AI agent you run, guard every call, prove compliance.</b>
 </p>
 
 <p align="center">
