@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.7.2**](#172---2026-11-16) | 2026-11-16 | Control Owner removed from risks, underline tabs on the risk page |
+| [**1.7.3**](#173---2026-11-16) | 2026-11-16 | Security fixes: tenant isolation across the app, guardrail bypasses closed, safer agent discovery |
+| [1.7.2](#172---2026-11-16) | 2026-11-16 | Control Owner removed from risks, underline tabs on the risk page |
 | [1.7.1](#171---2026-11-16) | 2026-11-16 | Risk catalog picker shows all IBM and MIT risks when scrolling |
 | [1.7.0](#170---2026-11-16) | 2026-11-16 | Real fairness testing on risks, controls for 5 more frameworks, risk security fixes |
 | [1.6.0](#160---2026-11-16) | 2026-11-16 | Controls for 8 more regulations, consistent risk form, editable categories |
@@ -18,6 +19,66 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.7.3] - 2026-11-16
+
+### Security
+
+- **Tenant isolation.** Every server action and integration route now checks that the signed-in user
+  belongs to the organization named in the request. Before, a user of one organization could read
+  another's audit logs, request logs and prompts, create or revoke its API keys, and edit or delete
+  its applications, risks, use cases, stakeholders, policies, guardrails, documentation and
+  integrations.
+- Only organization admins can create users.
+- Integration secrets are no longer written in plain text to the audit log, and encrypted
+  credentials are no longer sent to the browser. Keys saved before this release may still be in old
+  audit entries: rotate them.
+- Connecting an integration only accepts Nango connections created by the same organization.
+- Opening another organization's policy or model scan report by URL shows "not found". Model scans
+  are recorded against the signed-in organization instead of a fixed account.
+- Unused debug endpoints that exposed model data across organizations were removed.
+- Clerk webhooks are verified against the raw request body.
+
+### Guardrail gateway
+
+- Input guards check every user message, including OpenAI multi-part content and earlier messages
+  in the conversation (system prompts are not scanned).
+- Medium and low severity guards now block instead of only logging.
+- PII redaction now actually replaces the text sent to the model and returned to the user.
+- Streaming responses: tool calls are checked, deep (T2) checks run before the stream is closed, and
+  every choice is checked when `n > 1` (also for non-streaming responses).
+- The organization is always taken from the signed token or API key, never from the
+  `X-Tenant-ID` header. Clerk session tokens v1 and v2 are both supported.
+- Without an application id, the organization's default policy can no longer be bypassed by naming
+  a weaker policy, and deactivated application policies are no longer selected.
+- Model download refuses private and internal addresses, enforces the size limit while
+  downloading, and always stores models under the caller's organization.
+- Cache admin endpoints only show or clear the caller's own organization.
+- Gateway-only fields (`policy_id`, `application_id`, `agent_id`) are no longer forwarded to the
+  model provider, which rejected them.
+- Revoked API keys stop working within 30 seconds; edited policies take effect immediately.
+- CORS preflight requests are no longer rejected by authentication.
+
+### Fixed
+
+- Agent discovery never deletes or retires agents after a temporary provider error (Databricks,
+  AWS, Azure, GCP, GitHub). AWS, Azure and GCP now retire agents that were really removed.
+- AWS discovery reads every page of results (API Gateway, Bedrock, CloudWatch).
+- One failing agent no longer stops the rest of a discovery scan.
+- LangSmith sync ingests all runs since the last sync, not just the newest 100.
+- Nango calls time out after 30 seconds instead of leaving a scan running forever.
+- Findings from a deactivated policy are resolved.
+- Pagination no longer jumps back to page 1 on request logs and the admin users pages.
+- Reactivating a deactivated user works again.
+- Failed saves show an error message instead of replacing the page with an error screen.
+- "Modified By" stays filled in after editing an application.
+- Old links like `/applications/<id>/...` keep the full path when redirected.
+- The GovIQ overview shows real framework progress instead of placeholder numbers.
+- Removed broken and test-only pages.
+
+### Changed
+
+- Linting is configured (`pnpm lint` runs `next/core-web-vitals`).
 
 ## [1.7.2] - 2026-11-16
 
