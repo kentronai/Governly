@@ -214,41 +214,48 @@ async function requireCatalogAccess() {
   if (!email || !isKentronEmail(email)) throw new Error("Risk catalog is not available for your account");
 }
 
-/** Search the IBM / MIT risk catalog (risk_list). Capped; narrow with the query. */
-export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
+const CATALOG_PAGE = 100;
+
+/**
+ * Search the IBM / MIT risk catalog (risk_list), one page at a time in catalog-number order.
+ * `total` is the number of matches, so the picker can keep loading until it has them all.
+ */
+export async function searchRiskCatalog(source: "ibm" | "mit", query: string, offset = 0) {
   await requireCatalogAccess();
   const q = `%${query.trim()}%`;
-  return db
-    .select({
-      id: riskList.id,
-      catalogNo: riskList.catalogNo,
-      sourceId: riskList.sourceId,
-      riskName: riskList.riskName,
-      description: riskList.description,
-      severity: riskList.severity,
-      likelihood: riskList.likelihood,
-      category: riskList.category,
-      sourceRef: riskList.sourceRef,
-    })
-    .from(riskList)
-    .where(
-      and(
-        eq(riskList.source, source),
-        isNotNull(riskList.sourceId),
-        query.trim()
-          ? or(
-              /^\d+$/.test(query.trim())
-                ? eq(riskList.catalogNo, Number(query.trim()))
-                : undefined,
-              ilike(riskList.riskName, q),
-              ilike(riskList.description, q),
-              sql`array_to_string(${riskList.category}, ' ') ILIKE ${q}`,
-            )
-          : undefined,
-      ),
-    )
-    .orderBy(riskList.catalogNo)
-    .limit(200);
+  const where = and(
+    eq(riskList.source, source),
+    isNotNull(riskList.sourceId),
+    query.trim()
+      ? or(
+          /^\d+$/.test(query.trim()) ? eq(riskList.catalogNo, Number(query.trim())) : undefined,
+          ilike(riskList.riskName, q),
+          ilike(riskList.description, q),
+          sql`array_to_string(${riskList.category}, ' ') ILIKE ${q}`,
+        )
+      : undefined,
+  );
+  const [rows, [count]] = await Promise.all([
+    db
+      .select({
+        id: riskList.id,
+        catalogNo: riskList.catalogNo,
+        sourceId: riskList.sourceId,
+        riskName: riskList.riskName,
+        description: riskList.description,
+        severity: riskList.severity,
+        likelihood: riskList.likelihood,
+        category: riskList.category,
+        sourceRef: riskList.sourceRef,
+      })
+      .from(riskList)
+      .where(where)
+      .orderBy(riskList.catalogNo)
+      .limit(CATALOG_PAGE)
+      .offset(Math.max(0, Math.floor(offset))),
+    db.select({ n: sql<number>`count(*)::int` }).from(riskList).where(where),
+  ]);
+  return { rows, total: count?.n ?? 0 };
 }
 
 export async function countRiskCatalog(source: "ibm" | "mit") {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MoreHorizontal, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -31,7 +31,7 @@ import {
 } from "@/lib/actions/risk-links";
 
 export type CatalogSource = "ibm" | "mit";
-export type CatalogRisk = Awaited<ReturnType<typeof searchRiskCatalog>>[number];
+export type CatalogRisk = Awaited<ReturnType<typeof searchRiskCatalog>>["rows"][number];
 
 export const CATALOG_SOURCES: Record<
   CatalogSource,
@@ -64,7 +64,11 @@ export function RiskCatalogPicker({
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<CatalogRisk[]>([]);
   const [total, setTotal] = useState(0);
+  const [matches, setMatches] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState("");
 
   useEffect(() => {
@@ -77,14 +81,52 @@ export function RiskCatalogPicker({
   useEffect(() => {
     if (!source) return;
     setLoading(true);
+    let stale = false;
     const t = setTimeout(() => {
-      searchRiskCatalog(source, query)
-        .then(setRows)
+      searchRiskCatalog(source, query, 0)
+        .then((r) => {
+          if (stale) return;
+          setRows(r.rows);
+          setMatches(r.total);
+          scroller.current?.scrollTo({ top: 0 });
+        })
         .catch(() => errorToast("Unable to load the risk database"))
-        .finally(() => setLoading(false));
+        .finally(() => !stale && setLoading(false));
     }, 250);
-    return () => clearTimeout(t);
+    return () => {
+      stale = true;
+      clearTimeout(t);
+    };
   }, [source, query]);
+
+  // Load the next page when the end of the list scrolls into view.
+  const loadMore = useCallback(async () => {
+    if (!source || loading || loadingMore || rows.length >= matches) return;
+    setLoadingMore(true);
+    try {
+      const r = await searchRiskCatalog(source, query, rows.length);
+      setRows((prev) => {
+        const seen = new Set(prev.map((x) => x.id));
+        return [...prev, ...r.rows.filter((x) => !seen.has(x.id))];
+      });
+      setMatches(r.total);
+    } catch {
+      errorToast("Unable to load more risks");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [source, query, rows, matches, loading, loadingMore]);
+
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && void loadMore(), {
+      root: scroller.current,
+      rootMargin: "200px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore, rows.length]);
 
   const meta = source ? CATALOG_SOURCES[source] : null;
   const picked = rows.find((r) => r.id === selected);
@@ -113,7 +155,7 @@ export function RiskCatalogPicker({
           />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto rounded-md border">
           <RadioGroup value={selected} onValueChange={setSelected}>
             <Table className="table-fixed">
               <TableHeader className="sticky top-0 z-10 bg-background">
@@ -202,6 +244,13 @@ export function RiskCatalogPicker({
               </TableBody>
             </Table>
           </RadioGroup>
+          <div ref={sentinel} className="flex h-10 items-center justify-center text-xs text-muted-foreground">
+            {loadingMore ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : rows.length >= matches && rows.length > 0 ? (
+              `All ${matches.toLocaleString()} shown`
+            ) : null}
+          </div>
         </div>
         {picked && (
           <div className="max-h-32 overflow-y-auto rounded-md border bg-muted/40 p-3 text-sm">
@@ -211,11 +260,10 @@ export function RiskCatalogPicker({
             <p className="mt-1 text-muted-foreground">{clean(picked.description) || "No description in the source."}</p>
           </div>
         )}
-        {rows.length === 200 && (
-          <p className="text-xs text-muted-foreground">
-            Showing the first 200 matches. Search to narrow the list.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Showing {rows.length.toLocaleString()} of {matches.toLocaleString()}
+          {query.trim() ? " matches" : " risks"}. Scroll for more.
+        </p>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
