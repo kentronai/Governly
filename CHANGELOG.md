@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.5.0**](#150---2026-11-16) | 2026-11-16 | Risk and Treatment tabs: use cases, frameworks, AI lifecycle phase, potential impact, residual risk |
+| [**1.6.0**](#160---2026-11-16) | 2026-11-16 | Controls for 8 more regulations, consistent risk form, editable categories |
+| [1.5.0](#150---2026-11-16) | 2026-11-16 | Risk and Treatment tabs: use cases, frameworks, AI lifecycle phase, potential impact, residual risk |
 | [1.4.2](#142---2026-11-16) | 2026-11-16 | Numbered risk catalog with category in an actions menu, Governly logo |
 | [1.4.1](#141---2026-11-16) | 2026-11-16 | Risk register summary cards and filters, catalog picker layout fixes |
 | [1.4.0](#140---2026-11-16) | 2026-11-16 | Risk management: import from IBM AI Risk Atlas and MIT AI Risk Repository, automatic risk level, risk-to-control links |
@@ -14,6 +15,28 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.6.0] - 2026-11-16
+
+### Added
+
+- Controls for 8 more regulations, each written from the official text with article references
+  (146 controls): Quebec Law 25 (31), Saudi Arabia PDPL (24), UAE PDPL (23), Bahrain PDPL (20),
+  Colorado SB21-169 (19), Qatar PDPPL (19), California AB 2839 (6; struck down in Kohls v. Bonta,
+  appeal pending, marked not currently enforceable) and Illinois HB3773 (4). Existing control IDs
+  are unchanged; new ones follow them.
+- Risk categories can be removed (×) and added in the risk form.
+
+### Changed
+
+- Risk form: Owner and Control owner match the other fields; every text box has the same height;
+  "Applies to frameworks" is now "Applies to regulations & frameworks", grouped by kind.
+- Risk page shows only Risk Details. The Transparency, Human Oversight, Bias & Fairness, Bias
+  Monitoring, Explainability and Environmental Impact tabs are hidden for now.
+
+### Fixed
+
+- The risk page only opens risks that belong to the signed-in organisation.
 
 ## [1.5.0] - 2026-11-16
 

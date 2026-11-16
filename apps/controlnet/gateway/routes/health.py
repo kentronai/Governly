@@ -60,7 +60,7 @@ async def info(request: Request):
     return JSONResponse(
         content={
             "service": "guardrails-gateway",
-            "version": "1.5.0",
+            "version": "1.6.0",
             "description": "OpenAI-compatible API gateway with guard enforcement",
             "features": [
                 "OpenAI API compatibility",
