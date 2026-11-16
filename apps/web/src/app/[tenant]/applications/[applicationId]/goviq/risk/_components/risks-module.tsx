@@ -61,6 +61,8 @@ import { getFormattedDateString } from "@/lib/utils/helpers";
 import { getUserNamesFromIds } from "@/lib/utils/userUtils";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import { usePathname, useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { isKentronEmail } from "@/lib/utils/validateEmail";
 
 
 import { PageTitle } from "@/components/common/PageHeader";
@@ -189,6 +191,11 @@ export default function RisksModule({
 
   const router = useRouter();
   const pathname = usePathname();
+  // IBM / MIT catalog import is for Kentron staff only for now (the server enforces it too).
+  const { user } = useUser();
+  const canImportCatalog = isKentronEmail(
+    (user?.primaryEmailAddress?.emailAddress ?? "").toLowerCase(),
+  );
 
   const fetchRisk = async () => {
     try {
@@ -440,6 +447,12 @@ export default function RisksModule({
       {/* Header */}
       <div className="flex justify-between items-start">
         <PageTitle className="mb-6">Risks</PageTitle>
+        {!canImportCatalog ? (
+          <Button disabled={isPending} onClick={openCustom}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Risk
+          </Button>
+        ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button disabled={isPending}>
@@ -475,6 +488,7 @@ export default function RisksModule({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
 
       {/* Summary: click a level to filter by it */}

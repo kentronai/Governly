@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.6.0**](#160---2026-11-16) | 2026-11-16 | Controls for 8 more regulations, consistent risk form, editable categories |
+| [**1.7.0**](#170---2026-11-16) | 2026-11-16 | Real fairness testing on risks, controls for 5 more frameworks, risk security fixes |
+| [1.6.0](#160---2026-11-16) | 2026-11-16 | Controls for 8 more regulations, consistent risk form, editable categories |
 | [1.5.0](#150---2026-11-16) | 2026-11-16 | Risk and Treatment tabs: use cases, frameworks, AI lifecycle phase, potential impact, residual risk |
 | [1.4.2](#142---2026-11-16) | 2026-11-16 | Numbered risk catalog with category in an actions menu, Governly logo |
 | [1.4.1](#141---2026-11-16) | 2026-11-16 | Risk register summary cards and filters, catalog picker layout fixes |
@@ -15,6 +16,32 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.7.0] - 2026-11-16
+
+### Added
+
+- **Real fairness testing on risks** (Bias & Fairness tab). Upload a model's decisions as CSV or Excel;
+  the file is read in the browser and only the summary is saved. Shows selection rate and impact ratio
+  per group, the four-fifths rule (below 0.8 fails), selection-rate gap and, with a true-label column,
+  equal opportunity gap. Replaces the old tab, which showed hard-coded sample data.
+- Controls for 5 more frameworks, written from the official sources with references (236 controls):
+  NIST Cybersecurity Framework 2.0 (106), AI Verify (65), UNESCO Recommendation on the Ethics of AI (36),
+  EEOC guidance on the ADA and AI (15, guidance withdrawn in 2025, noted in the description) and the UK
+  AI White Paper (14). Existing control IDs are unchanged; new ones follow them.
+
+### Changed
+
+- Risk assessment tabs (Transparency, Human Oversight, Bias & Fairness, Bias Monitoring, Explainability,
+  Environmental Impact) are back, for High and Critical risks.
+- Import from the IBM and MIT risk catalogs is limited to Kentron staff for now. Everyone else sees a
+  plain "Create Risk" button for a custom risk. Enforced on the server as well as in the menu.
+- "Linked policies" is hidden from the risk menu for now.
+
+### Fixed
+
+- Editing or deleting a risk now checks that it belongs to the signed-in organisation.
+- Use cases and regulations ticked on a risk are validated on the server.
 
 ## [1.6.0] - 2026-11-16
 

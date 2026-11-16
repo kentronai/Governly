@@ -11,6 +11,8 @@ import { and, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db, policyCenter, riskLinks, riskList, risks, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { describeControl } from "@/lib/frameworks/controls";
+import { fetchClerkIdentity } from "@/lib/server/user-identity";
+import { isKentronEmail } from "@/lib/utils/validateEmail";
 
 type TargetType = "control" | "policy";
 
@@ -201,10 +203,20 @@ export async function unlinkRisk(tenant: string, linkId: string) {
     }).catch(() => undefined);
 }
 
-/** Search the IBM / MIT risk catalog (risk_list). Capped; narrow with the query. */
-export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
+/**
+ * The IBM / MIT catalog import is limited to Kentron staff for now (same @kentron.ai rule as
+ * /ops). Enforced here, not only in the menu, so the data can't be pulled by calling the action.
+ */
+async function requireCatalogAccess() {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  const email = (await fetchClerkIdentity(userId))?.email?.toLowerCase();
+  if (!email || !isKentronEmail(email)) throw new Error("Risk catalog is not available for your account");
+}
+
+/** Search the IBM / MIT risk catalog (risk_list). Capped; narrow with the query. */
+export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
+  await requireCatalogAccess();
   const q = `%${query.trim()}%`;
   return db
     .select({
@@ -240,8 +252,7 @@ export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
 }
 
 export async function countRiskCatalog(source: "ibm" | "mit") {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Authentication required");
+  await requireCatalogAccess();
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(riskList)

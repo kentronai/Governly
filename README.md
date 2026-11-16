@@ -5,10 +5,11 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.6.0" src="https://img.shields.io/badge/version-1.6.0-blue?style=flat-square"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-blue?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
   <a href="https://github.com/kentronai/Norix/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kentronai/Norix/ci.yml?branch=main&style=flat-square&label=checks"></a>
   <a href="docs/self-hosting.md"><img alt="Self-host" src="https://img.shields.io/badge/self--host-docker%20compose-2496ED?style=flat-square&logo=docker&logoColor=white"></a>
+  <a href="https://discord.gg/2SkRjwxbq"><img alt="Join our Discord" src="https://img.shields.io/badge/discord-join%20us-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -17,7 +18,8 @@
   <a href="#deploy-it">Deploy</a> ·
   <a href="#how-it-fits-together">Architecture</a> ·
   <a href="docs/README.md">Docs</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="https://discord.gg/2SkRjwxbq">Discord</a>
 </p>
 
 Governly is a multi-tenant platform for governing AI in an organization. It discovers the AI agents and
