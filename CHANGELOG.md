@@ -6,13 +6,36 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.4.2**](#142---2026-11-16) | 2026-11-16 | Numbered risk catalog with category in an actions menu, Governly logo |
+| [**1.5.0**](#150---2026-11-16) | 2026-11-16 | Risk and Treatment tabs: use cases, frameworks, AI lifecycle phase, potential impact, residual risk |
+| [1.4.2](#142---2026-11-16) | 2026-11-16 | Numbered risk catalog with category in an actions menu, Governly logo |
 | [1.4.1](#141---2026-11-16) | 2026-11-16 | Risk register summary cards and filters, catalog picker layout fixes |
 | [1.4.0](#140---2026-11-16) | 2026-11-16 | Risk management: import from IBM AI Risk Atlas and MIT AI Risk Repository, automatic risk level, risk-to-control links |
 | [1.3.0](#130---2026-11-13) | 2026-11-13 | Trust Dossier, live AI Radar, controls center, code-based agent discovery, BYOK, open-source self-hosting |
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.5.0] - 2026-11-16
+
+### Added
+
+- **Risk form in two tabs.** *Risk* (what can go wrong) and *Treatment* (what is done about it):
+  - Risk: applies to use cases (from the application's Use Case page), applies to frameworks
+    (the ones enabled for the organisation), AI lifecycle phase, description, potential impact,
+    inherent likelihood × severity with automatic level, and review notes (filled in automatically
+    when a risk is imported from the IBM or MIT catalog).
+  - Treatment: status, target date, control owner, treatment plan, implementation strategy, and
+    residual likelihood × severity with an automatic residual level (inherent → residual shown
+    side by side).
+- "Residual" column in the risk register.
+
+### Changed
+
+- Use case cards are compact: sections in a three-column grid, smaller text and icon buttons.
+
+### Fixed
+
+- Creating a risk now checks that the user belongs to the risk's organisation.
 
 ## [1.4.2] - 2026-11-16
 

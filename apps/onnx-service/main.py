@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ONNX Inference Service",
     description="High-performance ONNX model inference for AI governance",
-    version="1.4.2",
+    version="1.5.0",
     lifespan=lifespan
 )
 
@@ -317,7 +317,7 @@ async def root():
     """Root endpoint"""
     return {
         "service": "onnx-inference",
-        "version": "1.4.2",
+        "version": "1.5.0",
         "status": "running",
         "endpoints": {
             "health": "/health",
