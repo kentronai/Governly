@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.7.1**](#171---2026-11-16) | 2026-11-16 | Risk catalog picker shows all IBM and MIT risks when scrolling |
+| [**1.7.2**](#172---2026-11-16) | 2026-11-16 | Control Owner removed from risks, underline tabs on the risk page |
+| [1.7.1](#171---2026-11-16) | 2026-11-16 | Risk catalog picker shows all IBM and MIT risks when scrolling |
 | [1.7.0](#170---2026-11-16) | 2026-11-16 | Real fairness testing on risks, controls for 5 more frameworks, risk security fixes |
 | [1.6.0](#160---2026-11-16) | 2026-11-16 | Controls for 8 more regulations, consistent risk form, editable categories |
 | [1.5.0](#150---2026-11-16) | 2026-11-16 | Risk and Treatment tabs: use cases, frameworks, AI lifecycle phase, potential impact, residual risk |
@@ -17,6 +18,18 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.7.2] - 2026-11-16
+
+### Removed
+
+- **Control Owner** on risks: removed from the risk form, the register, the risk details page and
+  the details pop-up. The risk's Owner is the single responsible person. Values already saved stay
+  in the database, hidden.
+
+### Changed
+
+- The risk page's assessment tabs use the same flat underline style as the Controls page and AI Radar.
 
 ## [1.7.1] - 2026-11-16
 

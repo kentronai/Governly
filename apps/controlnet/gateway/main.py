@@ -203,7 +203,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ControlNet Gateway",
     description="AI Governance and Guardrails Gateway with Composable Guard Algebra",
-    version="1.7.1",
+    version="1.7.2",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -247,7 +247,7 @@ async def root():
     """Root endpoint."""
     return {
         "service": "ControlNet Gateway",
-        "version": "1.7.1",
+        "version": "1.7.2",
         "status": "operational",
         "docs": "/docs"
     }
