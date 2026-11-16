@@ -6,12 +6,25 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.4.1**](#141---2026-11-16) | 2026-11-16 | Risk register summary cards and filters, catalog picker layout fixes |
+| [**1.4.2**](#142---2026-11-16) | 2026-11-16 | Numbered risk catalog with category in an actions menu, Governly logo |
+| [1.4.1](#141---2026-11-16) | 2026-11-16 | Risk register summary cards and filters, catalog picker layout fixes |
 | [1.4.0](#140---2026-11-16) | 2026-11-16 | Risk management: import from IBM AI Risk Atlas and MIT AI Risk Repository, automatic risk level, risk-to-control links |
 | [1.3.0](#130---2026-11-13) | 2026-11-13 | Trust Dossier, live AI Radar, controls center, code-based agent discovery, BYOK, open-source self-hosting |
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.4.2] - 2026-11-16
+
+### Changed
+
+- Risk catalog picker: each source is numbered 1, 2, 3… (IBM 1–99, MIT 1–1,617). The number is
+  stored with the risk (`risk_list.catalog_no`) and always maps to the same source reference.
+  Search accepts the number. Raw source references (e.g. MIT `59.25.01`) moved out of the table.
+- Category and source reference now open from a "…" actions menu on each catalog row (IBM and MIT).
+  Risks MIT never categorised say so instead of showing a blank.
+- Governly logo in the header, plus a Governly favicon and Apple touch icon.
+- ControlNet `uv.lock` synced with the declared `boto3` dependency.
 
 ## [1.4.1] - 2026-11-16
 
