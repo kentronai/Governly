@@ -45,7 +45,7 @@ const COPY: Record<TargetType, { title: string; empty: string; add: string }> = 
   },
   policy: {
     title: "Linked policies",
-    empty: "No policies linked yet. Link the policies that address this risk.",
+    empty: "No policies linked to this risk.",
     add: "Link policy",
   },
 };
@@ -108,6 +108,9 @@ export function RiskLinksDialog({
         .catch(() => setPolicies([]));
   }, [load, risk, tenant, type]);
 
+  // ponytail: policy linking is view-only for now; the policy library shows tenant policies,
+  // not the enabled frameworks, which confused users. Flip this once that is sorted out.
+  const editable = type === "control";
   const linked = new Set(links.map((l) => l.targetId));
   const options = (type === "control" ? controls : policies).filter((o) => !linked.has(o.id));
 
@@ -142,6 +145,7 @@ export function RiskLinksDialog({
           <DialogDescription>{risk?.riskName}</DialogDescription>
         </DialogHeader>
 
+        {editable && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="w-fit">
@@ -170,6 +174,7 @@ export function RiskLinksDialog({
             </Command>
           </PopoverContent>
         </Popover>
+        )}
 
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {loading ? (
@@ -186,9 +191,11 @@ export function RiskLinksDialog({
                   <p className="truncate text-sm font-medium">{l.label}</p>
                   <p className="text-xs text-muted-foreground">{l.sublabel}</p>
                 </div>
-                <Button variant="ghost" size="icon" aria-label="Remove link" onClick={() => remove(l.linkId)}>
-                  <X className="h-4 w-4" />
-                </Button>
+                {editable && (
+                  <Button variant="ghost" size="icon" aria-label="Remove link" onClick={() => remove(l.linkId)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             ))
           )}

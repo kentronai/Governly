@@ -29,7 +29,20 @@ import {
   ChevronDown,
   Database,
   PenLine,
+  Layers,
+  ShieldAlert,
+  ShieldCheck,
+  FileText,
+  X,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CompactMetricCard } from "@/components/agent-discovery/CompactMetricCard";
 import {
   RiskCatalogPicker,
   CATALOG_SOURCES,
@@ -89,6 +102,16 @@ interface Risk {
   };
 }
 
+const LEVELS = ["Critical", "High", "Medium", "Low"] as const;
+const LEVEL_TONE: Record<(typeof LEVELS)[number], string> = {
+  Critical: "text-red-600",
+  High: "text-orange-600",
+  Medium: "text-yellow-600",
+  Low: "text-green-600",
+};
+const SEVERITY_OPTIONS = ["Catastrophic", "Major", "Moderate", "Minor"];
+const STATUS_OPTIONS = ["Not Started", "In Progress", "Requires Review", "Completed"];
+
 interface RisksModuleProps {
   applicationId: string;
   tenantId: string;
@@ -132,6 +155,11 @@ export default function RisksModule({
 }: RisksModuleProps) {
   const [risks, setRisks] = useState<Risk[]>([]);
   const [search, setSearch] = useState("");
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const filtersActive =
+    levelFilter !== "all" || severityFilter !== "all" || statusFilter !== "all";
   const [isPending, startTransition] = useTransition();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -217,6 +245,9 @@ export default function RisksModule({
 
   // Filter risks based on search
   const filteredRisks = risks.filter((risk) => {
+    if (levelFilter !== "all" && risk.riskLevel !== levelFilter) return false;
+    if (severityFilter !== "all" && risk.severity !== severityFilter) return false;
+    if (statusFilter !== "all" && risk.mitigationStatus !== statusFilter) return false;
     if (!search) return true;
     const searchLower = search.toLowerCase();
     return (
@@ -414,16 +445,83 @@ export default function RisksModule({
         </DropdownMenu>
       </div>
 
-      {/* Search */}
-      <div className="relative w-[343px]">
-        <Input
-          type="search"
-          placeholder="Search risks..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-        />
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Summary: click a level to filter by it */}
+      <div className="flex flex-wrap gap-3">
+        <button type="button" onClick={() => setLevelFilter("all")} className="rounded-xl text-left">
+          <CompactMetricCard
+            label="Total"
+            value={risks.length}
+            icon={Layers}
+            loading={isLoadingRisk}
+            className={levelFilter === "all" ? "ring-2 ring-primary" : undefined}
+          />
+        </button>
+        {LEVELS.map((level) => (
+          <button
+            key={level}
+            type="button"
+            onClick={() => setLevelFilter(levelFilter === level ? "all" : level)}
+            className="rounded-xl text-left"
+          >
+            <CompactMetricCard
+              label={level}
+              value={risks.filter((r) => r.riskLevel === level).length}
+              icon={level === "Low" ? ShieldCheck : ShieldAlert}
+              tone={LEVEL_TONE[level]}
+              loading={isLoadingRisk}
+              className={levelFilter === level ? "ring-2 ring-primary" : undefined}
+            />
+          </button>
+        ))}
+      </div>
+
+      {/* Search and filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-[343px]">
+          <Input
+            type="search"
+            placeholder="Search risks..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
+        {(
+          [
+            ["Risk level", levelFilter, setLevelFilter, [...LEVELS]],
+            ["Severity", severityFilter, setSeverityFilter, SEVERITY_OPTIONS],
+            ["Status", statusFilter, setStatusFilter, STATUS_OPTIONS],
+          ] as const
+        ).map(([label, value, set, options]) => (
+          <Select key={label} value={value} onValueChange={set}>
+            <SelectTrigger className="w-[170px]" aria-label={label}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All {label.toLowerCase()}s</SelectItem>
+              {options.map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ))}
+        {filtersActive && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setLevelFilter("all");
+              setSeverityFilter("all");
+              setStatusFilter("all");
+            }}
+          >
+            <X className="mr-1 h-4 w-4" />
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -438,7 +536,6 @@ export default function RisksModule({
             <TableHead>Owner</TableHead>
             <TableHead>Control Owner</TableHead>
             <TableHead>Controls</TableHead>
-            <TableHead>Policies</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -447,7 +544,7 @@ export default function RisksModule({
             <>
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={9}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading Risk...
@@ -458,11 +555,11 @@ export default function RisksModule({
           {!isLoadingRisk && filteredRisks.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={9}
                 className="text-center py-12 text-muted-foreground"
               >
-                {search
-                  ? "No risks found"
+                {search || filtersActive
+                  ? "No risks match your search or filters"
                   : "No risks yet. Create one to get started!"}
               </TableCell>
             </TableRow>
@@ -513,19 +610,16 @@ export default function RisksModule({
                     ? userNames[risk.controlOwner] || risk.controlOwner
                     : "—"}
                 </TableCell>
-                {(["control", "policy"] as const).map((type) => (
-                  <TableCell key={type}>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0"
-                      onClick={() => setLinkTarget({ risk, type })}
-                    >
-                      {type === "control" ? "View controls" : "View policies"} (
-                      {linkCounts[risk.id]?.[type] ?? 0})
-                    </Button>
-                  </TableCell>
-                ))}
+                <TableCell>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0"
+                    onClick={() => setLinkTarget({ risk, type: "control" })}
+                  >
+                    View controls ({linkCounts[risk.id]?.control ?? 0})
+                  </Button>
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -550,6 +644,12 @@ export default function RisksModule({
                       >
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setLinkTarget({ risk, type: "policy" })}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Linked policies ({linkCounts[risk.id]?.policy ?? 0})
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
