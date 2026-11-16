@@ -21,8 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { UserSelect } from "@/components/common/UserSelect";
+import {
+  calculateRiskLevel,
+  LIKELIHOODS,
+  SEVERITIES,
+} from "@/lib/risk-level";
 
 interface Risk {
   id: string;
@@ -58,15 +63,6 @@ interface Risk {
   };
 }
 
-interface RiskListItem {
-  id: string;
-  riskName: string;
-  description?: string | null;
-  severity?: string | null;
-  likelihood?: string | null;
-  category?: string[] | null;
-}
-
 interface Props {
   isOpen: boolean;
   mode: "create" | "edit" | "view";
@@ -85,50 +81,20 @@ interface Props {
   ) => Promise<void>;
   isPending: boolean;
   tenantId: string;
-  riskListItems?: RiskListItem[];
-  enableRiskFromDB?: boolean;
-  onToggleRiskFromDB?: () => void;
-  onRiskItemSelect?: (riskItem: RiskListItem) => void;
-  isLoadingRiskList?: boolean;
+  /** Create mode: values picked from the IBM / MIT catalog. */
+  initial?: Partial<Risk> | null;
+  /** Shown under the title, e.g. "From IBM AI Risk Atlas". */
+  sourceLabel?: string;
 }
 
-const SEVERITY_OPTIONS = ["Minor", "Moderate", "Major", "Catastrophic"];
-const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely"];
-const RISK_LEVEL_OPTIONS = ["Low", "Medium", "High"];
+const SEVERITY_OPTIONS = SEVERITIES;
+const LIKELIHOOD_OPTIONS = LIKELIHOODS;
 const STATUS_OPTIONS = [
   "Not Started",
   "In Progress",
   "Requires Review",
   "Completed",
 ];
-
-// Calculate risk level based on severity and likelihood
-const calculateRiskLevel = (
-  severity: string | null | undefined,
-  likelihood: string | null | undefined
-): "Low" | "Medium" | "High" => {
-  const severityMap: Record<string, number> = {
-    Minor: 1,
-    Moderate: 2,
-    Major: 3,
-    Catastrophic: 4,
-  };
-
-  const likelihoodMap: Record<string, number> = {
-    Rare: 1,
-    Unlikely: 2,
-    Possible: 3,
-    Likely: 4,
-  };
-
-  const severityValue = severity ? severityMap[severity] || 1 : 1;
-  const likelihoodValue = likelihood ? likelihoodMap[likelihood] || 1 : 1;
-  const score = severityValue * likelihoodValue;
-
-  if (score <= 4) return "Low";
-  if (score <= 8) return "Medium";
-  return "High";
-};
 
 export function RiskModal({
   isOpen,
@@ -138,11 +104,8 @@ export function RiskModal({
   onSubmit,
   isPending,
   tenantId,
-  riskListItems = [],
-  enableRiskFromDB = true,
-  onToggleRiskFromDB,
-  onRiskItemSelect,
-  isLoadingRiskList = false,
+  initial,
+  sourceLabel,
 }: Props) {
   const [formData, setFormData] = useState<Partial<Risk>>({
     riskName: "",
@@ -199,10 +162,14 @@ export function RiskModal({
         targetDate: "",
         mitigationPlan: "",
         categories: [],
+        ...initial,
       });
     }
     setErrors({});
-  }, [mode, risk, isOpen]);
+  }, [mode, risk, isOpen, initial]);
+
+  // Risk level is never typed in: it follows severity x likelihood.
+  const riskLevel = calculateRiskLevel(formData.severity, formData.likelihood);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -218,9 +185,6 @@ export function RiskModal({
     }
     if (!formData.likelihood) {
       newErrors.likelihood = "Likelihood is required";
-    }
-    if (!formData.riskLevel) {
-      newErrors.riskLevel = "Risk level is required";
     }
     if (!formData.mitigationStatus) {
       newErrors.mitigationStatus = "Status is required";
@@ -240,7 +204,7 @@ export function RiskModal({
 
     try {
       await onSubmit(
-        formData as Partial<Risk> & {
+        { ...formData, riskLevel } as Partial<Risk> & {
           riskName: string;
           owner: string;
           controlOwner?: string | null;
@@ -255,50 +219,6 @@ export function RiskModal({
     }
   };
 
-  const handleRiskItemSelect = (value: string) => {
-    const selectedRisk = riskListItems.find((risk) => risk.riskName === value);
-    if (selectedRisk && onRiskItemSelect) {
-      onRiskItemSelect(selectedRisk);
-      const calculatedRiskLevel = calculateRiskLevel(
-        selectedRisk.severity,
-        selectedRisk.likelihood
-      );
-
-      const severityValue: Risk["severity"] | undefined =
-        selectedRisk.severity &&
-        ["Minor", "Moderate", "Major", "Catastrophic"].includes(
-          selectedRisk.severity
-        )
-          ? (selectedRisk.severity as Risk["severity"])
-          : undefined;
-      const likelihoodValue: Risk["likelihood"] | undefined =
-        selectedRisk.likelihood &&
-        ["Rare", "Unlikely", "Possible", "Likely"].includes(
-          selectedRisk.likelihood
-        )
-          ? (selectedRisk.likelihood as Risk["likelihood"])
-          : undefined;
-
-      setFormData((prev) => ({
-        ...prev,
-        riskName: selectedRisk.riskName,
-        description: selectedRisk.description || "",
-        severity: severityValue,
-        likelihood: likelihoodValue,
-        riskLevel: calculatedRiskLevel,
-        categories: selectedRisk.category || [],
-      }));
-    } else {
-      setFormData((prev) => ({ ...prev, riskName: value }));
-    }
-  };
-
-  const isFieldDisabled: boolean =
-    !isEditMode &&
-    enableRiskFromDB &&
-    !!formData.riskName &&
-    riskListItems.some((item) => item.riskName === formData.riskName);
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px]  p-0 gap-0 z-50 max-h-[90vh] overflow-y-auto">
@@ -307,79 +227,30 @@ export function RiskModal({
           <h3 className="text-lg font-semibold leading-none tracking-tight">
             {title}
           </h3>
+          {sourceLabel && (
+            <p className="text-sm text-muted-foreground">{sourceLabel}</p>
+          )}
         </DialogHeader>
 
         <div className="p-6 space-y-6">
           {/* Risk Name Field */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="riskName"
-                className="text-sm font-medium text-muted-foreground"
-              >
-                Risk Name*
-              </Label>
-              {mode === "create" && (
-                <div className="flex items-center space-x-2">
-                  <Label
-                    htmlFor="riskSwitch"
-                    className="text-xs text-muted-foreground"
-                  >
-                    From DB
-                  </Label>
-                  <Switch
-                    id="riskSwitch"
-                    checked={enableRiskFromDB}
-                    onCheckedChange={onToggleRiskFromDB}
-                  />
-                </div>
-              )}
-            </div>
-
-            {enableRiskFromDB && mode === "create" ? (
-              <Select
-                value={formData.riskName}
-                onValueChange={handleRiskItemSelect}
-                disabled={isLoadingRiskList || isViewMode}
-              >
-                <SelectTrigger
-                  className={`h-14! ${errors.riskName ? "border-red-500 focus-visible:border-red-500" : ""}`}
-                >
-                  <SelectValue
-                    placeholder={
-                      isLoadingRiskList
-                        ? "Loading risks..."
-                        : "Select risk from database"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {riskListItems.map((riskItem) => (
-                    <SelectItem key={riskItem.id} value={riskItem.riskName}>
-                      <div className="flex flex-col text-left">
-                        <span className="font-medium">{riskItem.riskName}</span>
-                        {riskItem.description && (
-                          <span className="text-xs text-muted-foreground truncate max-w-xs">
-                            {riskItem.description}
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                id="riskName"
-                placeholder="Enter risk name manually"
-                className={`h-9 ${errors.riskName ? "border-red-500 focus-visible:border-red-500" : ""}`}
-                value={formData.riskName}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, riskName: e.target.value }))
-                }
-                disabled={isViewMode}
-              />
-            )}
+            <Label
+              htmlFor="riskName"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              Risk Name*
+            </Label>
+            <Input
+              id="riskName"
+              placeholder="Enter risk name manually"
+              className={`h-9 ${errors.riskName ? "border-red-500 focus-visible:border-red-500" : ""}`}
+              value={formData.riskName}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, riskName: e.target.value }))
+              }
+              disabled={isViewMode}
+            />
             {errors.riskName && (
               <p className="text-sm text-red-500">{errors.riskName}</p>
             )}
@@ -447,6 +318,29 @@ export function RiskModal({
               disabled={isViewMode}
             />
           </div>
+
+          {!!formData.categories?.filter(Boolean).length && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">
+                Categories
+              </Label>
+              <div className="flex flex-wrap gap-1.5">
+                {formData.categories.filter(Boolean).map((c) => (
+                  <Badge key={c} variant="outline">
+                    {c}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {initial && mode === "create" && (
+            <p className="text-xs text-muted-foreground">
+              Severity and likelihood below are suggested defaults for this
+              catalog risk (the source does not rate them). Adjust them to your
+              use case; the risk level updates automatically.
+            </p>
+          )}
 
           {/* Severity and Likelihood */}
           <div className="grid grid-cols-2 gap-4">
@@ -528,34 +422,17 @@ export function RiskModal({
                 htmlFor="riskLevel"
                 className="text-sm font-medium text-muted-foreground"
               >
-                Risk Level*
+                Risk Level (auto)
               </Label>
-              <Select
-                value={formData.riskLevel}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    riskLevel: value as Risk["riskLevel"],
-                  }))
-                }
-                disabled={isViewMode}
-              >
-                <SelectTrigger
-                  className={`h-9 ${errors.riskLevel ? "border-red-500" : ""}`}
-                >
-                  <SelectValue placeholder="Select level" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RISK_LEVEL_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.riskLevel && (
-                <p className="text-sm text-red-500">{errors.riskLevel}</p>
-              )}
+              <div className="flex h-9 items-center">
+                {riskLevel ? (
+                  <Badge variant="secondary">{riskLevel} risk</Badge>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    Set severity and likelihood
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

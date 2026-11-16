@@ -1,5 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
+import { LinkedRisks } from "./LinkedRisks";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -497,6 +498,10 @@ export function RequirementDialog({
                       set(requirement.key, field, value)
                     }
                   />
+                  <LinkedRisks
+                    tenant={tenant}
+                    controlId={`${framework}:${requirement.key}`}
+                  />
                 </div>
               ) : (
                 <Tabs
@@ -527,6 +532,10 @@ export function RequirementDialog({
                       <SubcontrolDetails
                         data={draft[s.key] ?? {}}
                         onChange={(field, value) => set(s.key, field, value)}
+                      />
+                      <LinkedRisks
+                        tenant={tenant}
+                        controlId={`${framework}:${s.key}`}
                       />
                     </TabsContent>
                   ))}

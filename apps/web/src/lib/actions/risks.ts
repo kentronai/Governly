@@ -11,7 +11,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
 import { createAuditEvent } from "@/lib/server/audit";
-import { input } from "@nextui-org/react";
+import { calculateRiskLevel } from "@/lib/risk-level";
 
 interface CreateRiskInput {
   tenantId: string;
@@ -22,7 +22,8 @@ interface CreateRiskInput {
   owner: string;
   severity: "Minor" | "Moderate" | "Major" | "Catastrophic";
   likelihood: "Rare" | "Unlikely" | "Possible" | "Likely";
-  riskLevel: "Low" | "Medium" | "High";
+  /** Ignored: always derived from severity x likelihood (lib/risk-level). */
+  riskLevel?: "Low" | "Medium" | "High" | "Critical";
   mitigationStatus?:
     | "Not Started"
     | "In Progress"
@@ -53,6 +54,7 @@ export const createRisk = async (input: CreateRiskInput) => {
       .insert(risks)
       .values({
         ...input,
+        riskLevel: calculateRiskLevel(input.severity, input.likelihood)!,
         mitigationStatus: input.mitigationStatus || "Not Started",
         categories: input.categories || [],
         metadata: input.metadata || {},
@@ -101,6 +103,11 @@ export const updateRisk = async (input: UpdateRiskInput) => {
     }
 
     const { id, ...updateData } = input;
+    const level = calculateRiskLevel(
+      updateData.severity ?? existingRisk.severity,
+      updateData.likelihood ?? existingRisk.likelihood,
+    );
+    if (level) updateData.riskLevel = level;
 
     const [risk] = await db
       .update(risks)

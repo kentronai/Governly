@@ -23,6 +23,12 @@ jest.mock("@/lib/actions/framework-controls", () => ({
     getAllFrameworkControls(...args),
   saveFrameworkControls: (...args: unknown[]) => saveFrameworkControls(...args),
 }));
+jest.mock("@/lib/actions/risk-links", () => ({
+  getRisksForControl: jest.fn().mockResolvedValue([]),
+  getTenantRisks: jest.fn().mockResolvedValue([]),
+  linkRisk: jest.fn(),
+  unlinkRisk: jest.fn(),
+}));
 jest.mock("@/lib/actions/evidence-autofill", () => ({
   autofillFromDocument: jest.fn(),
 }));

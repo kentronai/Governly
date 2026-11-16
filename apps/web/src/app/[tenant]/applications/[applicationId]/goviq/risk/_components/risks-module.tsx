@@ -26,7 +26,18 @@ import {
   Eye,
   Trash2,
   AlertTriangle,
+  ChevronDown,
+  Database,
+  PenLine,
 } from "lucide-react";
+import {
+  RiskCatalogPicker,
+  CATALOG_SOURCES,
+  type CatalogRisk,
+  type CatalogSource,
+} from "./RiskCatalogPicker";
+import { RiskLinksDialog } from "./RiskLinksDialog";
+import { getRiskLinkCounts } from "@/lib/actions/risk-links";
 import { getRisksByApplication } from "@/lib/actions/risks";
 import { createRisk, updateRisk, deleteRisk } from "@/lib/actions/risks";
 import { RiskModal } from "./RiskModal";
@@ -44,16 +55,6 @@ import { PageTitle } from "@/components/common/PageHeader";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
-interface RiskListItem {
-  id: string;
-  riskName: string;
-  description?: string | null;
-  severity?: string | null;
-  likelihood?: string | null;
-  createdAt?: string | null;
-  category?: string[] | null;
-}
-
 interface Risk {
   id: string;
   riskName: string;
@@ -101,7 +102,9 @@ const getRiskLevelStyle = (level: string) => {
     case "Medium":
       return "bg-yellow-500/10 text-yellow-500";
     case "High":
-      return "bg-red-500/10 text-red-500 ";
+      return "bg-orange-500/10 text-orange-600 ";
+    case "Critical":
+      return "bg-red-500/10 text-red-600 ";
     default:
       return "bg-gray-500/10 text-gray-500 ";
   }
@@ -136,10 +139,17 @@ export default function RisksModule({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
-  const [riskListItems, setRiskListItems] = useState<RiskListItem[]>([]);
-  const [isLoadingRiskList, setIsLoadingRiskList] = useState(false);
   const [isLoadingRisk, setIsLoadingRisk] = useState(false);
-  const [enableRiskFromDB, setEnableRiskFromDB] = useState(true);
+  const [catalogSource, setCatalogSource] = useState<CatalogSource | null>(null);
+  const [prefill, setPrefill] = useState<Partial<Risk> | null>(null);
+  const [prefillLabel, setPrefillLabel] = useState<string>();
+  const [linkTarget, setLinkTarget] = useState<{
+    risk: Risk;
+    type: "control" | "policy";
+  } | null>(null);
+  const [linkCounts, setLinkCounts] = useState<
+    Record<string, { control: number; policy: number }>
+  >({});
 
   const router = useRouter();
   const pathname = usePathname();
@@ -153,6 +163,9 @@ export default function RisksModule({
         useCaseId
       );
       setRisks(risk);
+      setLinkCounts(
+        await getRiskLinkCounts(tenantId, risk.map((r) => r.id)).catch(() => ({})),
+      );
     } catch (err) {
     } finally {
       setIsLoadingRisk(false);
@@ -175,26 +188,6 @@ export default function RisksModule({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [risks]);
-
-  // Fetch risk list when component mounts
-  useEffect(() => {
-    if (enableRiskFromDB) {
-      const loadRiskList = async () => {
-        setIsLoadingRiskList(true);
-        try {
-          const { getRiskListItems } = await import("@/lib/actions/risks");
-          const riskListItemsData = await getRiskListItems();
-          setRiskListItems(riskListItemsData || []);
-        } catch (error) {
-          console.error("Error loading risk list:", error);
-        } finally {
-          setIsLoadingRiskList(false);
-        }
-      };
-
-      loadRiskList();
-    }
-  }, [enableRiskFromDB]);
 
   // Fetch user names when risks change
   useEffect(() => {
@@ -359,8 +352,24 @@ export default function RisksModule({
     });
   };
 
-  const handleRiskItemSelect = (riskItem: RiskListItem) => {
-    // This will be handled in RiskModal
+  const openCustom = () => {
+    setPrefill(null);
+    setPrefillLabel(undefined);
+    setIsCreateModalOpen(true);
+  };
+
+  const pickFromCatalog = (r: CatalogRisk) => {
+    const source = catalogSource!;
+    setCatalogSource(null);
+    setPrefill({
+      riskName: r.riskName,
+      description: r.description ?? "",
+      severity: (r.severity ?? undefined) as Risk["severity"],
+      likelihood: (r.likelihood ?? undefined) as Risk["likelihood"],
+      categories: (r.category ?? []).filter(Boolean),
+    });
+    setPrefillLabel(`From ${CATALOG_SOURCES[source].title} (${r.sourceId})`);
+    setIsCreateModalOpen(true);
   };
 
   return (
@@ -368,10 +377,41 @@ export default function RisksModule({
       {/* Header */}
       <div className="flex justify-between items-start">
         <PageTitle className="mb-6">Risks</PageTitle>
-        <Button onClick={() => setIsCreateModalOpen(true)} disabled={isPending}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Risk
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={isPending}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Risk
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuItem onClick={openCustom} className="items-start gap-3 py-2">
+              <PenLine className="mt-0.5 h-4 w-4" />
+              <div>
+                <p className="font-medium">Add custom risk</p>
+                <p className="text-xs text-muted-foreground">Create a risk manually</p>
+              </div>
+            </DropdownMenuItem>
+            {(["ibm", "mit"] as const).map((src) => (
+              <DropdownMenuItem
+                key={src}
+                onClick={() => setCatalogSource(src)}
+                className="items-start gap-3 py-2"
+              >
+                <Database className="mt-0.5 h-4 w-4" />
+                <div>
+                  <p className="font-medium">Import from {CATALOG_SOURCES[src].title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {src === "ibm"
+                      ? "Generative and agentic AI risks: privacy, prompt attacks, governance"
+                      : "Research-based risks: safety, fairness, misuse, societal impact"}
+                  </p>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Search */}
@@ -397,6 +437,8 @@ export default function RisksModule({
             <TableHead>Status</TableHead>
             <TableHead>Owner</TableHead>
             <TableHead>Control Owner</TableHead>
+            <TableHead>Controls</TableHead>
+            <TableHead>Policies</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -405,7 +447,7 @@ export default function RisksModule({
             <>
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={10}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading Risk...
@@ -416,7 +458,7 @@ export default function RisksModule({
           {!isLoadingRisk && filteredRisks.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={8}
+                colSpan={10}
                 className="text-center py-12 text-muted-foreground"
               >
                 {search
@@ -471,6 +513,19 @@ export default function RisksModule({
                     ? userNames[risk.controlOwner] || risk.controlOwner
                     : "—"}
                 </TableCell>
+                {(["control", "policy"] as const).map((type) => (
+                  <TableCell key={type}>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                      onClick={() => setLinkTarget({ risk, type })}
+                    >
+                      {type === "control" ? "View controls" : "View policies"} (
+                      {linkCounts[risk.id]?.[type] ?? 0})
+                    </Button>
+                  </TableCell>
+                ))}
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -522,11 +577,22 @@ export default function RisksModule({
         onSubmit={handleCreate}
         isPending={isPending}
         tenantId={tenantId}
-        riskListItems={riskListItems}
-        enableRiskFromDB={enableRiskFromDB}
-        onToggleRiskFromDB={() => setEnableRiskFromDB(!enableRiskFromDB)}
-        onRiskItemSelect={handleRiskItemSelect}
-        isLoadingRiskList={isLoadingRiskList}
+        initial={prefill}
+        sourceLabel={prefillLabel}
+      />
+
+      <RiskCatalogPicker
+        source={catalogSource}
+        onClose={() => setCatalogSource(null)}
+        onPick={pickFromCatalog}
+      />
+
+      <RiskLinksDialog
+        tenant={tenantId}
+        risk={linkTarget?.risk ?? null}
+        type={linkTarget?.type ?? "control"}
+        onClose={() => setLinkTarget(null)}
+        onChanged={fetchRisk}
       />
 
       <DynamicDetailsViewModal
@@ -558,9 +624,6 @@ export default function RisksModule({
         onSubmit={handleUpdate}
         isPending={isPending}
         tenantId={tenantId}
-        riskListItems={riskListItems}
-        enableRiskFromDB={false}
-        isLoadingRiskList={isLoadingRiskList}
       />
 
       <DeleteConfirmationModal

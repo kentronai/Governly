@@ -2290,7 +2290,32 @@ export const riskList = pgTable("risk_list", {
     sql`CURRENT_TIMESTAMP`,
   ),
   category: text().array(),
+  // "ibm" | "mit" for catalog rows (scripts/risk-catalog), null for legacy rows.
+  source: text(),
+  sourceId: text("source_id"),
+  sourceRef: text("source_ref"),
 });
+
+/** A risk linked to a framework control ("<slug>:<key>") or a policy_center row. */
+export const riskLinks = pgTable(
+  "risk_links",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    riskId: uuid("risk_id")
+      .notNull()
+      .references(() => risks.id, { onDelete: "cascade" }),
+    targetType: text("target_type").$type<"control" | "policy">().notNull(),
+    targetId: text("target_id").notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("uq_risk_links").on(table.riskId, table.targetType, table.targetId),
+  ],
+);
 
 export const riskCategories = pgTable(
   "risk_categories",

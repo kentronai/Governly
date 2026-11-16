@@ -435,6 +435,20 @@
       "when": 1788600000000,
       "tag": "0061_trust_dossier_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788700000000,
+      "tag": "0062_risk_catalog_and_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788800000000,
+      "tag": "0063_risk_catalog_seed",
+      "breakpoints": true
     }
   ]
 }

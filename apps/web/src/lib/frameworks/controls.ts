@@ -398,3 +398,18 @@ export function mirrorWrites(
   }
   return out;
 }
+
+/** Display info for a control leaf id "slug:key" (what risk links store). */
+export function describeControl(id: string) {
+  const m = nodes.get(id);
+  if (!m) return null;
+  return {
+    id,
+    code: leafCodes.get(id) ?? id,
+    title: m.sub?.title ?? m.requirement.title,
+    framework: m.framework.name,
+  };
+}
+
+/** Leaf id of a control row, the id a risk link stores. */
+export const controlId = (c: Control) => idOf(c.primary);
