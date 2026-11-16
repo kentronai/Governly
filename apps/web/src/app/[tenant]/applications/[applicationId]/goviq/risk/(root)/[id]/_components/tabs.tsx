@@ -10,6 +10,10 @@ import EnvironmentalImpact from "./environmental-impact";
 import FairnessChecks from "./bias-and-fairness/FairnessChecks";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+/** Same flat underline tabs as the Controls page and AI Radar. */
+const UNDERLINE_TAB =
+  "h-auto flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2 text-muted-foreground shadow-none data-[state=active]:border-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:border-muted-foreground dark:data-[state=active]:bg-transparent";
+
 export default function Tab({ risk }: { risk: Risk }) {
   // Assessment tabs apply to serious risks: High and Critical.
   if (risk.riskLevel !== "High" && risk.riskLevel !== "Critical") {
@@ -18,16 +22,16 @@ export default function Tab({ risk }: { risk: Risk }) {
   return (
     <>
       <Tabs defaultValue="risks" className="w-full">
-        <TabsList className="mb-4 flex flex-wrap gap-2">
-          <TabsTrigger defaultChecked value="risks">
+        <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-0">
+          <TabsTrigger value="risks" className={UNDERLINE_TAB}>
             Risk Details
           </TabsTrigger>
-          <TabsTrigger value="transparency">Transparency</TabsTrigger>
-          <TabsTrigger value="human-oversight">Human Oversight</TabsTrigger>
-          <TabsTrigger value="bias-fairness">Bias & Fairness</TabsTrigger>
-          <TabsTrigger value="bias-monitoring">Bias Monitoring</TabsTrigger>
-          <TabsTrigger value="explainability">Explainability</TabsTrigger>
-          <TabsTrigger value="environmental-impact">
+          <TabsTrigger value="transparency" className={UNDERLINE_TAB}>Transparency</TabsTrigger>
+          <TabsTrigger value="human-oversight" className={UNDERLINE_TAB}>Human Oversight</TabsTrigger>
+          <TabsTrigger value="bias-fairness" className={UNDERLINE_TAB}>Bias & Fairness</TabsTrigger>
+          <TabsTrigger value="bias-monitoring" className={UNDERLINE_TAB}>Bias Monitoring</TabsTrigger>
+          <TabsTrigger value="explainability" className={UNDERLINE_TAB}>Explainability</TabsTrigger>
+          <TabsTrigger value="environmental-impact" className={UNDERLINE_TAB}>
             Environmental Impact
           </TabsTrigger>
         </TabsList>

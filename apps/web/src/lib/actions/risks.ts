@@ -30,7 +30,6 @@ interface CreateRiskInput {
     | "In Progress"
     | "Requires Review"
     | "Completed";
-  controlOwner: string | null;
   mitigationPlan?: string;
   targetDate?: string;
   lastReviewDate?: string;

@@ -37,9 +37,4 @@ export interface Risk {
     name: string;
     email: string;
   };
-
-  controlOwnerUser: {
-    name: string;
-    email: string;
-  };
 }

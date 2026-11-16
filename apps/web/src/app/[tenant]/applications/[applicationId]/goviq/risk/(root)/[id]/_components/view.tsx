@@ -47,7 +47,7 @@ export default function View({ risk }: { risk: Risk }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Owner */}
         <div className="p-6 h-48 rounded-xl border bg-card shadow relative flex flex-col justify-between">
           <div className="flex justify-between">
@@ -57,19 +57,6 @@ export default function View({ risk }: { risk: Risk }) {
             <p className="font-medium">{risk.ownerUser.name}</p>
             <p className="text-muted-foreground text-sm">
               {risk.ownerUser.email}
-            </p>
-          </div>
-        </div>
-
-    
-        <div className="p-6 h-48 rounded-xl border bg-card shadow relative flex flex-col justify-between">
-          <div className="flex justify-between">
-            <h3 className="text-lg font-semibold">Control Owner</h3>
-          </div>
-          <div>
-            <p className="font-medium">{risk.controlOwnerUser?.name}</p>
-            <p className="text-muted-foreground text-sm">
-              {risk.controlOwnerUser?.email}
             </p>
           </div>
         </div>

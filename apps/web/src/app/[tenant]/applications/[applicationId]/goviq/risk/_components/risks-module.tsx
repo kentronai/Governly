@@ -88,7 +88,6 @@ interface Risk {
   categories: string[];
   createdAt: string;
   updatedAt: string;
-  controlOwner: string | null;
   useCaseIds: string[];
   frameworkSlugs: string[];
   lifecyclePhase: string | null;
@@ -240,7 +239,6 @@ export default function RisksModule({
       // Collect all unique user IDs
       risks.forEach((risk) => {
         if (risk.owner) allUserIds.push(risk.owner);
-        if (risk.controlOwner) allUserIds.push(risk.controlOwner);
         if (risk.createdBy) allUserIds.push(risk.createdBy);
         if (risk.updatedBy) allUserIds.push(risk.updatedBy);
       });
@@ -277,7 +275,6 @@ export default function RisksModule({
     data: Partial<Risk> & {
       riskName: string;
       owner: string;
-      controlOwner?: string | null;
       severity: Risk["severity"];
       likelihood: Risk["likelihood"];
       riskLevel: Risk["riskLevel"];
@@ -293,7 +290,6 @@ export default function RisksModule({
           riskName: data.riskName,
           description: data.description ?? "",
           owner: data.owner,
-          controlOwner: data.controlOwner || null,
           severity: data.severity,
           likelihood: data.likelihood,
           riskLevel: data.riskLevel,
@@ -318,7 +314,6 @@ export default function RisksModule({
           mitigationPlan: newRisk.mitigationPlan ?? undefined,
           targetDate: newRisk.targetDate ?? undefined,
           lastReviewDate: newRisk.lastReviewDate ?? undefined,
-          controlOwner: newRisk.controlOwner ?? null,
           riskLevel: newRisk.riskLevel,
         };
         setRisks((prev) => [normalizedRisk as Risk, ...prev]);
@@ -335,7 +330,6 @@ export default function RisksModule({
     data: Partial<Risk> & {
       riskName: string;
       owner: string;
-      controlOwner?: string | null;
       severity: Risk["severity"];
       likelihood: Risk["likelihood"];
       riskLevel: Risk["riskLevel"];
@@ -354,7 +348,6 @@ export default function RisksModule({
           riskName: data.riskName,
           description: data.description,
           owner: data.owner,
-          controlOwner: data.controlOwner || selectedRisk?.controlOwner || null,
           severity: data.severity,
           likelihood: data.likelihood,
           riskLevel: data.riskLevel,
@@ -379,7 +372,6 @@ export default function RisksModule({
           mitigationPlan: updated.mitigationPlan ?? undefined,
           targetDate: updated.targetDate ?? undefined,
           lastReviewDate: updated.lastReviewDate ?? undefined,
-          controlOwner: updated.controlOwner ?? null,
           riskLevel: updated.riskLevel,
         };
         setRisks((prev) =>
@@ -581,7 +573,6 @@ export default function RisksModule({
             <TableHead>Likelihood</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Owner</TableHead>
-            <TableHead>Control Owner</TableHead>
             <TableHead>Controls</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -591,7 +582,7 @@ export default function RisksModule({
             <>
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={9}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading Risk...
@@ -602,7 +593,7 @@ export default function RisksModule({
           {!isLoadingRisk && filteredRisks.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={9}
                 className="text-center py-12 text-muted-foreground"
               >
                 {search || filtersActive
@@ -662,11 +653,6 @@ export default function RisksModule({
                 </TableCell>
                 <TableCell>
                   {userNames[risk.owner] || risk.owner}
-                </TableCell>
-                <TableCell>
-                  {risk.controlOwner
-                    ? userNames[risk.controlOwner] || risk.controlOwner
-                    : "—"}
                 </TableCell>
                 <TableCell>
                   <Button

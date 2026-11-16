@@ -432,25 +432,6 @@ export const createFieldConfig = {
       },
     },
     {
-      key: "controlOwner",
-      label: "Control Owner",
-      type: "custom",
-      showIfEmpty: true,
-      render: (value, data) => {
-        if (!value) return "N/A";
-        // value is the controlOwner ID (string) from getNestedValue(data, 'controlOwner')
-        // Check userNames mapping if available
-        if (data?.userNames && value) {
-          const name = data.userNames[value];
-          if (name) {
-            return name;
-          }
-        }
-        // Fallback to the ID if no mapping or name not found
-        return value || "N/A";
-      },
-    },
-    {
       key: "targetDate",
       label: "Review Date",
       type: "date",

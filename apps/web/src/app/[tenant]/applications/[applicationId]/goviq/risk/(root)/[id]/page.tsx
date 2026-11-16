@@ -19,9 +19,6 @@ export default async function Page({ params }: { params: { id: string } }) {
       ownerUser: {
         columns: { name: true, email: true },
       },
-      controlOwnerUser: {
-        columns: { name: true, email: true },
-      },
     },
   })) as Risk;
 

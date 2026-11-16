@@ -57,7 +57,6 @@ interface Risk {
   categories: string[];
   createdAt: string;
   updatedAt: string;
-  controlOwner: string | null;
   createdBy: string | null;
   updatedBy: string | null;
   useCaseIds: string[];
@@ -74,7 +73,6 @@ interface Risk {
 type Submit = Partial<Risk> & {
   riskName: string;
   owner: string;
-  controlOwner?: string | null;
   severity: Severity;
   likelihood: Likelihood;
   riskLevel: RiskLevel;
@@ -114,7 +112,6 @@ const RISK_TAB_FIELDS = ["riskName", "owner", "lifecyclePhase", "description", "
 const empty = (): Partial<Risk> => ({
   riskName: "",
   owner: "",
-  controlOwner: "",
   description: "",
   severity: undefined,
   likelihood: undefined,
@@ -251,7 +248,6 @@ export function RiskModal({
       setFormData({
         ...empty(),
         ...risk,
-        controlOwner: risk.controlOwner || "",
         description: risk.description || "",
         mitigationPlan: risk.mitigationPlan || "",
         potentialImpact: risk.potentialImpact || "",
@@ -528,7 +524,7 @@ export function RiskModal({
 
             {/* Treatment: what will be done about it, and what is left afterwards. */}
             <TabsContent value="treatment" className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <Field id="mitigationStatus" label="Treatment status" required error={errors.mitigationStatus}>
                   <ChoiceSelect
                     id="mitigationStatus"
@@ -547,17 +543,6 @@ export function RiskModal({
                     className={cn("h-9", errors.targetDate && "border-red-500")}
                     value={formData.targetDate ?? ""}
                     onChange={(e) => set("targetDate", e.target.value)}
-                    disabled={readOnly}
-                  />
-                </Field>
-                <Field id="controlOwner" label="Control owner">
-                  <UserSelect
-                    bare
-                    id="controlOwner"
-                    value={formData.controlOwner || ""}
-                    onChange={(v) => set("controlOwner", v || null)}
-                    placeholder="Select control owner"
-                    tenantId={tenantId}
                     disabled={readOnly}
                   />
                 </Field>
