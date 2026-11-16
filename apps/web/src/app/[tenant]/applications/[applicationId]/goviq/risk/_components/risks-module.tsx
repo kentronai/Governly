@@ -469,10 +469,10 @@ export default function RisksModule({
           ) : (
             filteredRisks.map((risk) => (
               <TableRow key={risk.id} className="">
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2 bg-text-500/10">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    {risk.riskName}
+                <TableCell className="max-w-[280px] font-medium">
+                  <div className="flex items-center gap-2" title={risk.riskName}>
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                    <span className="truncate">{risk.riskName}</span>
                   </div>
                 </TableCell>
                 <TableCell>

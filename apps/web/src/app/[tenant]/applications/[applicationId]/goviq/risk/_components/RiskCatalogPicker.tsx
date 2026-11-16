@@ -48,6 +48,9 @@ export const CATALOG_SOURCES: Record<
   },
 };
 
+/** MIT descriptions are verbatim quotes from papers; drop the wrapping quote marks for display. */
+const clean = (s: string | null) => (s ?? "").trim().replace(/^["“]+|["”]+$/g, "");
+
 export function RiskCatalogPicker({
   source,
   onClose,
@@ -111,64 +114,79 @@ export function RiskCatalogPicker({
 
         <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
           <RadioGroup value={selected} onValueChange={setSelected}>
-            <Table>
-              <TableHeader>
+            <Table className="table-fixed">
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead className="w-10" />
-                  <TableHead>Risk name</TableHead>
+                  <TableHead className="w-[110px]">ID</TableHead>
+                  <TableHead className="w-[22%]">Risk name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Likelihood</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead className="w-[105px]">Severity</TableHead>
+                  <TableHead className="w-[100px]">Likelihood</TableHead>
+                  <TableHead className="w-[20%]">Category</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && !rows.length ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center">
+                    <TableCell colSpan={7} className="py-10 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : !rows.length ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       No matching risks
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => (
-                    <TableRow
-                      key={r.id}
-                      onClick={() => setSelected(r.id)}
-                      className={cn("cursor-pointer", selected === r.id && "bg-muted")}
-                    >
-                      <TableCell>
-                        <RadioGroupItem value={r.id} aria-label={r.riskName} />
-                      </TableCell>
-                      <TableCell className="max-w-[220px] font-medium">{r.riskName}</TableCell>
-                      <TableCell className="max-w-[320px]">
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {r.description}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{r.severity}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{r.likelihood}</Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[200px]">
-                        <p className="line-clamp-2 text-sm">
-                          {r.category?.filter(Boolean).join("; ")}
-                        </p>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  rows.map((r) => {
+                    const description = clean(r.description);
+                    const category = r.category?.filter(Boolean).join("; ") || "—";
+                    return (
+                      <TableRow
+                        key={r.id}
+                        onClick={() => setSelected(r.id)}
+                        className={cn("cursor-pointer", selected === r.id && "bg-muted")}
+                      >
+                        <TableCell>
+                          <RadioGroupItem value={r.id} aria-label={r.riskName} />
+                        </TableCell>
+                        <TableCell className="truncate font-mono text-xs text-muted-foreground" title={r.sourceId ?? ""}>
+                          {r.sourceId}
+                        </TableCell>
+                        <TableCell className="truncate font-medium" title={r.riskName}>
+                          {r.riskName}
+                        </TableCell>
+                        <TableCell className="truncate text-muted-foreground" title={description}>
+                          {description}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{r.severity}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{r.likelihood}</Badge>
+                        </TableCell>
+                        <TableCell className="truncate" title={category}>
+                          {category}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </RadioGroup>
         </div>
+        {picked && (
+          <div className="max-h-32 overflow-y-auto rounded-md border bg-muted/40 p-3 text-sm">
+            <p className="font-medium">
+              {picked.riskName}{" "}
+              <span className="font-mono text-xs text-muted-foreground">{picked.sourceId}</span>
+            </p>
+            <p className="mt-1 text-muted-foreground">{clean(picked.description) || "No description in the source."}</p>
+          </div>
+        )}
         {rows.length === 200 && (
           <p className="text-xs text-muted-foreground">
             Showing the first 200 matches. Search to narrow the list.
@@ -179,7 +197,7 @@ export function RiskCatalogPicker({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={!picked} onClick={() => picked && onPick(picked)}>
+          <Button disabled={!picked} onClick={() => picked && onPick({ ...picked, description: clean(picked.description) })}>
             Use selected risk and edit
           </Button>
         </DialogFooter>
