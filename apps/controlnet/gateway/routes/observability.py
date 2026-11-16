@@ -2,7 +2,8 @@
 Observability routes for monitoring and debugging
 """
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from gateway.auth import require_tenant_auth, TenantContext
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from sqlalchemy import text
@@ -194,7 +195,7 @@ async def get_cache_statistics(request: Request):
 
 
 @router.get("/cached-policies")
-async def list_cached_policies(request: Request):
+async def list_cached_policies(request: Request, tenant: TenantContext = Depends(require_tenant_auth)):
     """
     List all cached policies with their cache levels
     
@@ -210,7 +211,12 @@ async def list_cached_policies(request: Request):
             )
         
         cache = request.app.state.policy_cache
-        policies = await cache.list_policies()
+        # Only the caller's own tenant ("<tenant>/<policy>" keys).
+        policies = {
+            key: value
+            for key, value in (await cache.list_policies()).items()
+            if key.startswith(f"{tenant.tenant_id}/")
+        }
         
         return JSONResponse(content={
             "status": "ok",

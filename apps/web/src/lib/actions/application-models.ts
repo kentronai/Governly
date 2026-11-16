@@ -5,7 +5,11 @@
 "use server";
 
 import { db, applicationModels } from "@db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import {
+  requireActiveTenant,
+  requireTenantApplication,
+} from "@/lib/server/tenant-access";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
@@ -30,6 +34,7 @@ interface CreateModelInput {
 }
 
 export const createApplicationModel = async (input: CreateModelInput) => {
+  await requireTenantApplication(input.tenantId, input.applicationId);
   return withApplicationTracking(input.applicationId, async () => {
     const { userId } = await auth();
 
@@ -46,7 +51,7 @@ export const createApplicationModel = async (input: CreateModelInput) => {
       })
       .returning();
 
-    revalidatePath(`/applications/${input.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -70,8 +75,9 @@ export const updateApplicationModel = async (
   input: Partial<CreateModelInput>,
 ) => {
   // Get the model first to get the applicationId
+  const { tenantId } = await requireActiveTenant();
   const existingModel = await db.query.applicationModels.findFirst({
-    where: eq(applicationModels.id, id),
+    where: and(eq(applicationModels.id, id), eq(applicationModels.tenantId, tenantId)),
   });
 
   if (!existingModel) {
@@ -88,7 +94,8 @@ export const updateApplicationModel = async (
     const [model] = await db
       .update(applicationModels)
       .set({
-        ...input,
+        // tenant/application are fixed once created
+        ...{ ...input, tenantId: undefined, applicationId: undefined },
         updatedBy: userId,
         updatedAt: new Date().toISOString(),
       })
@@ -99,7 +106,7 @@ export const updateApplicationModel = async (
       throw new Error("Model not found");
     }
 
-    revalidatePath(`/applications/${model.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -120,8 +127,9 @@ export const updateApplicationModel = async (
 
 export const deleteApplicationModel = async (id: string) => {
   // Get the model first to get the applicationId
+  const { tenantId } = await requireActiveTenant();
   const existingModel = await db.query.applicationModels.findFirst({
-    where: eq(applicationModels.id, id),
+    where: and(eq(applicationModels.id, id), eq(applicationModels.tenantId, tenantId)),
   });
 
   if (!existingModel) {
@@ -144,7 +152,7 @@ export const deleteApplicationModel = async (id: string) => {
       throw new Error("Model not found");
     }
 
-    revalidatePath(`/applications/${model.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({

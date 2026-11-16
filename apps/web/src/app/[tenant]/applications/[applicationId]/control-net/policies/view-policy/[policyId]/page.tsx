@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+import { notFound } from "next/navigation";
 import { getPolicyWithDetails } from "@/lib/queries/policies";
 
 import { PageTitle } from "@/components/common/PageHeader";
@@ -8,7 +10,10 @@ interface PageProps {
 export default async function PolicyDetails({ params }: PageProps) {
   const { policyId } = await params;
 
+  const { orgId } = await auth();
   const policy = await getPolicyWithDetails(policyId);
+  // The id comes from the URL: only show policies of the caller's own org.
+  if (!orgId || policy.tenantId !== orgId) notFound();
 
   return (
     <div className="space-y-6">

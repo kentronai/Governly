@@ -44,3 +44,26 @@ export async function pruneOrphanAgents(tenantId: string) {
       ),
     );
 }
+
+/**
+ * Marks agents a scan scope (one connection/integration) reported before but
+ * did not see this time as inactive. Only a complete scan proves an agent is
+ * gone: with any partial warning nothing is retired, so a transient failure
+ * never retires live agents. Returns whether retirement ran.
+ */
+export async function retireMissingAgents(
+  scope: SQL,
+  seenExternalIds: string[],
+  partialWarnings: string[],
+): Promise<boolean> {
+  if (partialWarnings.length) return false;
+  await db
+    .update(agents)
+    .set({ status: "inactive", updatedAt: new Date().toISOString() })
+    .where(
+      seenExternalIds.length
+        ? and(scope, notInArray(agents.externalAgentId, seenExternalIds))
+        : scope,
+    );
+  return true;
+}

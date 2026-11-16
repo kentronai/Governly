@@ -12,6 +12,11 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
 import { createAuditEvent } from "@/lib/server/audit";
+import {
+  requireActiveTenant,
+  requireTenantApplication,
+  requireTenantMember,
+} from "@/lib/server/tenant-access";
 import { calculateRiskLevel } from "@/lib/risk-level";
 
 interface CreateRiskInput {
@@ -92,6 +97,7 @@ async function assertTenant(tenantId: string) {
 
 // Create risk
 export const createRisk = async (input: CreateRiskInput) => {
+  await requireTenantApplication(input.tenantId, input.applicationId);
   return withApplicationTracking(input.applicationId, async () => {
     const { userId, orgId } = await auth();
 
@@ -118,7 +124,7 @@ export const createRisk = async (input: CreateRiskInput) => {
       })
       .returning();
 
-    revalidatePath(`/applications/${input.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     console.log("risk", risk);
     try {
@@ -183,7 +189,7 @@ export const updateRisk = async (input: UpdateRiskInput) => {
       throw new Error("Risk not found");
     }
 
-    revalidatePath(`/applications/${risk.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -218,7 +224,7 @@ export const deleteRisk = async (id: string) => {
 
     await db.delete(risks).where(eq(risks.id, id));
 
-    revalidatePath(`/applications/${existingRisk.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -244,8 +250,9 @@ export const getRisksByUseCase = async (useCaseId: string) => {
     throw new Error("Authentication required");
   }
 
+  const { tenantId } = await requireActiveTenant();
   const risksData = await db.query.risks.findMany({
-    where: eq(risks.useCaseId, useCaseId),
+    where: and(eq(risks.useCaseId, useCaseId), eq(risks.tenantId, tenantId)),
     with: {
       useCase: true,
       user_createdBy: {
@@ -286,6 +293,7 @@ export const getRisksByApplication = async (
   if (!userId) {
     throw new Error("Authentication required");
   }
+  await requireTenantMember(tenantSlugOrId);
 
   // Try to find tenant by ID first, then by slug
   let tenantRow = await db

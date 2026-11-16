@@ -27,10 +27,10 @@ guards:
     target: messages[*].content
     with:
       types: [EMAIL, PHONE]
-      threshold: 0
+      threshold: 1.0
       severity: high
   
-  - id: toxicity.block
+  - id: toxicity.detect
     target: output
     with:
       categories: [profanity, harassment]
@@ -38,8 +38,8 @@ guards:
       severity: critical
 
 compose:
-  input: pii_detect_pii
-  output: toxicity_block
+  input: pii_detect
+  output: toxicity_detect
   root: seq(input, output)
 """
         
@@ -64,7 +64,7 @@ policy: test_multiple
 description: Multiple non-ONNX guards
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types: [EMAIL, PHONE]
@@ -79,7 +79,7 @@ guards:
       severity: medium
 
 compose:
-  input: allOf(pii_detect_pii)
+  input: allOf(pii_detect)
   output: toxicity_detect
   root: seq(input, output)
 """
@@ -155,7 +155,7 @@ policy: test_pii_custom
 description: PII detection with custom types
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types:
@@ -167,7 +167,7 @@ guards:
       anonymize_mode: mask
 
 compose:
-  root: pii_detect_pii
+  root: pii_detect
 """
         
         try:
@@ -185,7 +185,7 @@ policy: test_toxicity_threshold
 description: Toxicity with custom threshold
 
 guards:
-  - id: toxicity.block
+  - id: toxicity.detect
     target: output
     with:
       categories:
@@ -196,7 +196,7 @@ guards:
       severity: critical
 
 compose:
-  root: toxicity_block
+  root: toxicity_detect
 """
         
         try:
@@ -219,7 +219,7 @@ policy: test_allof
 description: AllOf composition
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types: [EMAIL]
@@ -234,7 +234,7 @@ guards:
       severity: high
 
 compose:
-  root: allOf(pii_detect_pii, toxicity_detect)
+  root: allOf(pii_detect, toxicity_detect)
 """
         
         compiled_guards, metadata = compile_policy(policy_yaml.encode())
@@ -248,22 +248,22 @@ policy: test_seq
 description: Sequential composition
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types: [EMAIL]
       threshold: 1.0
       anonymize_mode: mask
   
-  - id: toxicity.block
+  - id: toxicity.detect
     target: output
     with:
       threshold: 0.3
       severity: high
 
 compose:
-  input: pii_detect_pii
-  output: toxicity_block
+  input: pii_detect
+  output: toxicity_detect
   root: seq(input, output)
 """
         
@@ -280,7 +280,7 @@ policy: test_anyof
 description: AnyOf composition
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types: [EMAIL]
@@ -294,7 +294,7 @@ guards:
       severity: medium
 
 compose:
-  root: anyOf(pii_detect_pii, toxicity_detect)
+  root: anyOf(pii_detect, toxicity_detect)
 """
         
         compiled_guards, metadata = compile_policy(policy_yaml.encode())
@@ -305,7 +305,7 @@ compose:
 class TestTierDistribution:
     """Test that tier distribution is calculated correctly"""
     # Note: conftest.py handles guard registration
-    # pii.guards = T0, toxicity.guards = T1
+    # pii.detect = T0; toxicity.detect, jailbreak.detect = T1
     
     def test_tier_counts(self):
         """Test that tier counts are correctly calculated"""
@@ -314,7 +314,7 @@ policy: test_tiers
 description: Test tier distribution
 
 guards:
-  - id: pii.detect_pii
+  - id: pii.detect
     target: messages[*].content
     with:
       types: [EMAIL]
@@ -327,15 +327,15 @@ guards:
       threshold: 0.5
       severity: medium
   
-  - id: toxicity.block
+  - id: jailbreak.detect
     target: output
     with:
       threshold: 0.3
       severity: high
 
 compose:
-  input: allOf(pii_detect_pii)
-  output: allOf(toxicity_detect, toxicity_block)
+  input: allOf(pii_detect)
+  output: allOf(toxicity_detect, jailbreak_detect)
   root: seq(input, output)
 """
         
@@ -343,9 +343,9 @@ compose:
         
         tier_counts = metadata.get("tier_counts", {})
         
-        # pii.detect_pii is T0
-        # toxicity.detect and toxicity.block are T1
-        assert tier_counts.get("T0", 0) == 1, "Should have 1 T0 guard (pii.detect_pii)"
+        # pii.detect is T0
+        # toxicity.detect and jailbreak.detect are T1
+        assert tier_counts.get("T0", 0) == 1, "Should have 1 T0 guard (pii.detect)"
         assert tier_counts.get("T1", 0) == 2, "Should have 2 T1 guards"
         assert tier_counts.get("T2", 0) == 0, "Should have 0 T2 guards (no ONNX)"
         

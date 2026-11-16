@@ -4,6 +4,7 @@ Each function is small, focused, and returns Either
 No fallbacks, fail-fast principle
 """
 
+from cga_core.message_text import messages_text
 import asyncio
 import uuid
 import structlog
@@ -97,21 +98,22 @@ async def extract_request_params(ctx: Ctx) -> Either:
             if policy_id:
                 logger.info(f"📋 Using policy_id from request body: {policy_id}")
         
-        if application_id:
-            from gateway.services.application_policy_service import resolve_application_policy
-            policy_id, policy_resolution_source = await resolve_application_policy(
-                tenant_id=context.tenant_id,
-                application_id=application_id,
-                explicit_policy_id=policy_id,
-            )
-            logger.info(
-                "application_policy_resolved",
-                application_id=application_id,
-                policy_id=policy_id,
-                source=policy_resolution_source,
-            )
-        else:
-            policy_resolution_source = "explicit" if policy_id else "system_default"
+        # Always resolve through the service so an enforced tenant default
+        # cannot be bypassed by naming another policy without an application.
+        from gateway.services.application_policy_service import resolve_application_policy
+        policy_id, policy_resolution_source = await resolve_application_policy(
+            tenant_id=context.tenant_id,
+            application_id=application_id,
+            explicit_policy_id=policy_id,
+        )
+        if policy_resolution_source == "unresolved":
+            policy_resolution_source = "system_default"
+        logger.info(
+            "application_policy_resolved",
+            application_id=application_id,
+            policy_id=policy_id,
+            source=policy_resolution_source,
+        )
 
         # Backward compatibility for clients that have not yet supplied an
         # application identifier. Application-aware clients never use this.
@@ -304,11 +306,8 @@ def extract_prompt_from_body(body: Dict[str, Any]) -> str:
     if not isinstance(messages, list) or not messages:
         return ""
     
-    last_message = messages[-1]
-    if not isinstance(last_message, dict) or "content" not in last_message:
-        return ""
-    
-    return last_message["content"]
+    # Route on everything the provider will see, not just a plain-string last message.
+    return messages_text(messages)
 
 
 # === PROMPT ROUTING ===

@@ -4,9 +4,13 @@
  * convention for those services — not a separate heuristic.
  */
 
-import { DescribeLogGroupsCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { paginateDescribeLogGroups } from "@aws-sdk/client-cloudwatch-logs";
 import type { AwsClientBundle } from "../client-factory";
-import type { RawDiscoveredResource } from "./types";
+import {
+  collectPages,
+  noteLookupFailure,
+  type RawDiscoveredResource,
+} from "./types";
 
 export async function discoverCloudWatchLogGroups(
   clients: AwsClientBundle,
@@ -22,10 +26,14 @@ export async function discoverCloudWatchLogGroups(
 
   for (const prefix of prefixesToCheck) {
     try {
-      const resp = await cloudWatchLogs.send(
-        new DescribeLogGroupsCommand({ logGroupNamePrefix: prefix }),
+      const groups = await collectPages(
+        paginateDescribeLogGroups(
+          { client: cloudWatchLogs },
+          { logGroupNamePrefix: prefix },
+        ),
+        (page) => page.logGroups,
       );
-      for (const group of resp.logGroups ?? []) {
+      for (const group of groups) {
         if (!group.logGroupName) continue;
         resources.push({
           resourceType: "cloudwatch_log_group",
@@ -40,8 +48,9 @@ export async function discoverCloudWatchLogGroups(
           },
         });
       }
-    } catch {
-      // a missing log group for a given prefix is expected, not an error
+    } catch (error) {
+      // A missing log group for a prefix is an empty page, not an error.
+      noteLookupFailure(clients, "CloudWatch DescribeLogGroups", error);
     }
   }
 

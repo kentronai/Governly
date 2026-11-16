@@ -25,19 +25,6 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
-const isTenantRoute = createRouteMatcher(["/[tenant](.*)"]);
-
-const extractTenantFromPath = (pathname: string): string | null => {
-  const parts = pathname.split("/").filter(Boolean);
-  if (
-    parts.length >= 1 &&
-    !parts[0].startsWith("admin") &&
-    !parts[0].startsWith("api")
-  ) {
-    return parts[0];
-  }
-  return null;
-};
 
 const isUserAdmin = (orgRole: string | undefined): boolean => {
   if (!orgRole) return false;
@@ -89,22 +76,9 @@ export default clerkMiddleware(async (auth, req) => {
   // Clerk's default session claims do not contain `email`, so middleware must
   // not reject the route based on sessionClaims.email.
 
-  // Handle tenant-based routing
-  if (isTenantRoute(req)) {
-    const tenantSlug = extractTenantFromPath(pathname);
-
-    if (!tenantSlug) {
-      return NextResponse.redirect(new URL("/unauthorized", req.url));
-    }
-
-    // For tenant routes, we need orgId to match the tenant
-    if (!orgId) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    // Note: We'll validate tenant access in the tenant layout
-    // Middleware just ensures user has an active org context
-  }
+  // Tenant routes: "no active org" is redirected above; membership of the
+  // URL's tenant is enforced by [tenant]/layout.tsx and by every server action
+  // (@/lib/server/tenant-access).
 
   // Check admin routes (except onboarding which is handled above)
   if (isAdminRoute(req) && pathname !== "/admin/client-onboarding") {
@@ -118,8 +92,11 @@ export default clerkMiddleware(async (auth, req) => {
   // Redirect root to appropriate page (handled in page.tsx)
   // Middleware just ensures auth, page.tsx handles smart redirect
 
-  // Allow access to all other authenticated routes
-  return NextResponse.next();
+  // Allow access to all other authenticated routes. Pass the full path on so
+  // server components ([tenant]/layout alias redirect, audit context) can see it.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", pathname + nextUrl.search);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 });
 
 export const config = {

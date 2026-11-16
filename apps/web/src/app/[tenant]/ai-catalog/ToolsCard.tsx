@@ -1,5 +1,5 @@
 import { Diff, CheckCircle, ExternalLink, Calendar } from "lucide-react";
-import { getScoreColor, getRiskColor } from "./page";
+import { getScoreColor, getRiskColor } from "./tools";
 import { Tool } from "./tools";
 import { Button } from "@/components/ui/button";
 

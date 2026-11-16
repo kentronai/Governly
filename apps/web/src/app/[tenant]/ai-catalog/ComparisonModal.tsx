@@ -6,7 +6,7 @@ import {
   DialogDescription,
 } from "@radix-ui/react-dialog";
 import { Shield, AlertTriangle, CheckCircle, Calendar } from "lucide-react";
-import { getScoreColor, getRiskColor } from "./page";
+import { getScoreColor, getRiskColor } from "./tools";
 import { Tool } from "./tools";
 
 const ComparisonModal: React.FC<{

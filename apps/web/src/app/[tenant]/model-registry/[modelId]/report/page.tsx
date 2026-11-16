@@ -142,15 +142,7 @@ export default function ModelReportPage() {
         // Fetch scan results using the actual model URL
         if (modelData.modelUrl) {
           console.log("Model has URL, fetching scan results...");
-          console.log(
-            "Calling getModelScanResultsByUrl with:",
-            modelData.modelUrl,
-            "org_33Rq6hGmoYcE9FbsueNNLL8Fpd4"
-          );
-          const results = await getModelScanResultsByUrl(
-            modelData.modelUrl,
-            "org_33Rq6hGmoYcE9FbsueNNLL8Fpd4"
-          );
+          const results = await getModelScanResultsByUrl(modelData.modelUrl);
           console.log("Scan results received:", results);
           setScanResult(results);
           console.log("Scan result state set");

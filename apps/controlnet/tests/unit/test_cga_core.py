@@ -194,8 +194,9 @@ class TestLens:
             ]
         }
         
+        # Wildcard targets yield one value per match (see tests/test_cga_lens.py)
         result = getter(ctx)
-        assert result == "Hello Hi there"
+        assert result == ["Hello", "Hi there"]
     
     def test_lens_setter(self):
         """Test lens setter"""

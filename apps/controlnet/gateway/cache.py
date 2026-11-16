@@ -10,6 +10,7 @@ Optimizations:
 """
 
 import asyncio
+import functools
 import hashlib
 import json
 import logging
@@ -35,6 +36,18 @@ logger = logging.getLogger(__name__)
 
 
 # === Pure Functions ===
+
+@functools.lru_cache(maxsize=256)
+def _compile_cached(policy_bytes: bytes) -> Tuple[Guard, Dict[str, Any]]:
+    """In-process (L1) compile cache keyed by the policy YAML itself, so a Redis
+    hit no longer recompiles on the event loop and an edited policy (new bytes)
+    can never be served stale from here."""
+    return compile_policy(policy_bytes)
+
+
+def _compile(policy_bytes: bytes) -> Tuple[Guard, Dict[str, Any]]:
+    compiled_guards, metadata = _compile_cached(policy_bytes)
+    return compiled_guards, dict(metadata)  # callers add per-request keys
 
 # === Cache Class ===
 
@@ -185,7 +198,7 @@ class PolicyCache:
                 if policy_yaml and metadata_json:
                     # Compile policy from cached YAML
                     policy_bytes = policy_yaml.encode('utf-8')
-                    compiled_guards, metadata = compile_policy(policy_bytes)
+                    compiled_guards, metadata = _compile(policy_bytes)
                     
                     # ALWAYS query categories FRESH from database (NEVER cached!)
                     # This ensures categories are always up-to-date and avoids cache bugs
@@ -279,7 +292,7 @@ class PolicyCache:
         
         # Compile policy
         try:
-            compiled_guards, metadata = compile_policy(policy_bytes)
+            compiled_guards, metadata = _compile(policy_bytes)
         except Exception as e:
             logger.error(f"Failed to compile policy {policy_id}: {e}")
             raise ValueError(f"Failed to compile policy '{policy_id}': {e}")
@@ -338,19 +351,21 @@ class PolicyCache:
         """
         Invalidate cached policy for specific tenant
         
-        Uses direct key deletion (efficient)
+        Entries are keyed by whatever identifier callers used (id, slug or
+        name, possibly a pre-rename name), so drop all of this tenant's policy
+        keys rather than only the id key.
         """
-        # Remove from Redis cache
+        # ponytail: clears the tenant's whole policy cache; they recompile on
+        # next use. Key by resolved id if per-tenant policy counts get large.
         if self.redis_client:
             try:
-                # Direct key deletion (known keys)
-                yaml_key = self._get_redis_key(tenant_id, policy_id, "yaml")
-                metadata_key = self._get_redis_key(tenant_id, policy_id, "metadata")
-                
-                pipe = self.redis_client.pipeline()
-                pipe.delete(yaml_key)
-                pipe.delete(metadata_key)
-                await pipe.execute()
+                keys = [
+                    key async for key in self.redis_client.scan_iter(
+                        match=f"policy:{tenant_id}:*", count=100
+                    )
+                ]
+                if keys:
+                    await self.redis_client.delete(*keys)
                 
                 logger.info(f"✅ Policy invalidated: {tenant_id}/{policy_id}")
             except Exception as e:

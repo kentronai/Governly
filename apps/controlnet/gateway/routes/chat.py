@@ -259,7 +259,6 @@ async def _handle_streaming(
         policy_hash = policy_metadata.get("hash", "unknown")
         settings = request.app.state.settings
         window_size = settings.streaming_window_size
-        streaming_window = deque(maxlen=window_size)
         
         # Send guardrails metadata chunk
         guardrails_chunk = {
@@ -275,70 +274,141 @@ async def _handle_streaming(
         yield f"data: {json.dumps(guardrails_chunk)}\n\n"
         
         try:
-            output_guard_start = time.time()
+            # Per-choice state: with n > 1 every choice is streamed to the
+            # client, so every choice gets its own window and checks.
+            windows: Dict[int, deque] = {}
+            full_text: Dict[int, List[str]] = {}
+            # Tool-call deltas are buffered (not forwarded) until the stream
+            # ends, then enforced like the non-streaming path. The provider's
+            # finish chunk is held back so it still arrives after the calls.
+            tool_buf: Dict[tuple, Dict[str, Any]] = {}
+            held_chunks: List[Dict[str, Any]] = []
+            last_chunk: Dict[str, Any] = {}
+
+            def _filtered_chunk(index: int) -> Dict[str, Any]:
+                return {
+                    **{k: last_chunk[k] for k in ("id", "object", "created", "model") if k in last_chunk},
+                    "choices": [{
+                        "index": index,
+                        "delta": {"content": "[Content filtered by policy]"},
+                        "finish_reason": "content_filter"
+                    }]
+                }
+
+            def _record_violation(violations: List[Dict[str, Any]]) -> None:
+                nonlocal streaming_violations
+                streaming_violations = violations
+                request.state.violations = violations
+                request.state.violation_phase = "output"
+                logger.warning(f"Streaming output blocked: {violations[0].get('rule_id')}")
+
             async for chunk in provider_client.stream_completions(body):
-                # Extract and guard output tokens
-                if chunk.get("choices") and chunk["choices"]:
-                    choice = chunk["choices"][0]
-                    if "delta" in choice and "content" in choice["delta"]:
-                        token = choice["delta"]["content"]
-                        if token:
-                            streaming_window.append(token)
-                            
-                            # Run T0/T1 guards on window
-                            window_text = "".join(streaming_window)
-                            guard_start = time.time()
-                            
-                            output_result = await run_output_guards(
-                                compiled_guards,
-                                {"output": window_text},
-                                tiers=["T0", "T1"],
-                                policy_metadata=policy_metadata
-                            )
-                            
-                            streaming_output_guard_time += (time.time() - guard_start) * 1000
-                            
-                            if is_left(output_result):
-                                violations = get_violations(output_result)
-                                streaming_violations = violations
-                                
-                                # Store for observability
-                                request.state.violations = violations
-                                request.state.violation_phase = "output"
-                                
-                                logger.warning(f"Streaming output blocked: {violations[0].get('rule_id')}")
-                                
-                                safe_chunk = {
-                                    "choices": [{
-                                        "delta": {"content": "[Content filtered by policy]"},
-                                        "finish_reason": "content_filter"
-                                    }]
-                                }
-                                yield f"data: {json.dumps(safe_chunk)}\n\n"
-                                break
-                
+                last_chunk = chunk
+                choices = chunk.get("choices") or []
+                has_tool_delta = False
+                blocked_index = None
+                for choice in choices:
+                    index = choice.get("index", 0)
+                    delta = choice.get("delta") or {}
+                    for tc in delta.get("tool_calls") or []:
+                        has_tool_delta = True
+                        buf = tool_buf.setdefault(
+                            (index, tc.get("index", 0)),
+                            {"id": None, "type": "function", "function": {"name": "", "arguments": ""}},
+                        )
+                        if tc.get("id"):
+                            buf["id"] = tc["id"]
+                        fn = tc.get("function") or {}
+                        buf["function"]["name"] += fn.get("name") or ""
+                        buf["function"]["arguments"] += fn.get("arguments") or ""
+
+                    token = delta.get("content")
+                    if not token:
+                        continue
+                    window = windows.setdefault(index, deque(maxlen=window_size))
+                    window.append(token)
+                    full_text.setdefault(index, []).append(token)
+
+                    # Run T0/T1 guards on window before this token is sent
+                    guard_start = time.time()
+                    output_result = await run_output_guards(
+                        compiled_guards,
+                        {"output": "".join(window)},
+                        tiers=["T0", "T1"],
+                        policy_metadata=policy_metadata
+                    )
+                    streaming_output_guard_time += (time.time() - guard_start) * 1000
+                    if is_left(output_result):
+                        _record_violation(get_violations(output_result))
+                        blocked_index = index
+                        break
+
+                if blocked_index is not None:
+                    yield f"data: {json.dumps(_filtered_chunk(blocked_index))}\n\n"
+                    break
+
+                if tool_buf and any(c.get("finish_reason") for c in choices):
+                    held_chunks.append(chunk)
+                    continue
+                if has_tool_delta:
+                    # Forward any content in this chunk, never the raw tool-call deltas.
+                    stripped = [
+                        {**c, "delta": {k: v for k, v in (c.get("delta") or {}).items() if k != "tool_calls"}}
+                        for c in choices
+                    ]
+                    if any(c["delta"].get("content") for c in stripped):
+                        yield f"data: {json.dumps({**chunk, 'choices': stripped})}\n\n"
+                    continue
                 yield f"data: {json.dumps(chunk)}\n\n"
-            
+
+            if not streaming_violations:
+                # Final T2 check on each choice's FULL text, before the stream
+                # is closed, so a violation can still be reported in-band.
+                for index, tokens in full_text.items():
+                    t2_start = time.time()
+                    final_result = await run_output_guards(
+                        compiled_guards,
+                        {"output": "".join(tokens)},
+                        tiers=["T2"],
+                        policy_metadata=policy_metadata
+                    )
+                    streaming_output_guard_time += (time.time() - t2_start) * 1000
+                    if is_left(final_result):
+                        _record_violation(get_violations(final_result))
+                        yield f"data: {json.dumps(_filtered_chunk(index))}\n\n"
+                        break
+
+            if not streaming_violations and tool_buf:
+                by_choice: Dict[int, List[tuple]] = {}
+                for (choice_index, tc_index), call in sorted(tool_buf.items()):
+                    by_choice.setdefault(choice_index, []).append((tc_index, call))
+                blocked_choices = set()
+                for choice_index, calls in by_choice.items():
+                    allowed = await _enforce_tool_args([c for _, c in calls], compiled_guards, request_id)
+                    allowed_ids = {id(c) for c in allowed}
+                    if allowed:
+                        delta_calls = [
+                            {"index": tc_index, **call}
+                            for tc_index, call in calls if id(call) in allowed_ids
+                        ]
+                        out = {
+                            **{k: last_chunk[k] for k in ("id", "object", "created", "model") if k in last_chunk},
+                            "choices": [{"index": choice_index, "delta": {"tool_calls": delta_calls}, "finish_reason": None}]
+                        }
+                        yield f"data: {json.dumps(out)}\n\n"
+                    else:
+                        blocked_choices.add(choice_index)
+                        yield f"data: {json.dumps({**_filtered_chunk(choice_index), 'choices': [{'index': choice_index, 'delta': {'content': 'Tool calls were blocked by policy'}, 'finish_reason': 'content_filter'}]})}\n\n"
+                for chunk in held_chunks:
+                    chunk_choices = [c for c in (chunk.get("choices") or []) if c.get("index", 0) not in blocked_choices]
+                    if chunk_choices or not chunk.get("choices"):
+                        yield f"data: {json.dumps({**chunk, 'choices': chunk_choices})}\n\n"
+            elif not streaming_violations:
+                for chunk in held_chunks:
+                    yield f"data: {json.dumps(chunk)}\n\n"
+
             yield "data: [DONE]\n\n"
-            
-            # Final T2 guard check
-            final_text = "".join(streaming_window)
-            if final_text and not streaming_violations:
-                t2_start = time.time()
-                final_result = await run_output_guards(
-                    compiled_guards,
-                    {"output": final_text},
-                    tiers=["T2"],
-                    policy_metadata=policy_metadata
-                )
-                streaming_output_guard_time += (time.time() - t2_start) * 1000
-                
-                if is_left(final_result):
-                    violations = get_violations(final_result)
-                    streaming_violations = violations
-                    request.state.violations = violations
-                    request.state.violation_phase = "output"
-        
+
         except Exception as e:
             from ..llm_client import ProviderAPIError
 
@@ -439,32 +509,41 @@ async def _handle_non_streaming(
         # Make request to provider
         response = await provider_client.create_completion(body)
         
+        # Every choice is returned to the client (n > 1), so every choice's
+        # tool calls and content must be guarded, not just choices[0].
+        choices = response.get("choices") or []
+
         # Handle tool calls
-        tool_calls = _extract_tool_calls(response)
-        if tool_calls:
+        for index, choice in enumerate(choices):
+            tool_calls = _extract_tool_calls(response, index)
+            if not tool_calls:
+                continue
             filtered_calls = await _enforce_tool_args(tool_calls, compiled_guards, request_id)
-            if "choices" in response and response["choices"]:
-                choice = response["choices"][0]
-                message = choice.get("message", {})
-                if filtered_calls:
-                    message["tool_calls"] = filtered_calls
-                else:
-                    message.pop("tool_calls", None)
-                    message.pop("function_call", None)
-                    message["content"] = "Tool calls were blocked by policy"
-                    choice["finish_reason"] = "content_filter"
+            message = choice.get("message", {})
+            if filtered_calls:
+                message["tool_calls"] = filtered_calls
+            else:
+                message.pop("tool_calls", None)
+                message.pop("function_call", None)
+                message["content"] = "Tool calls were blocked by policy"
+                choice["finish_reason"] = "content_filter"
         
         # Run output guards
         output_guard_start = time.time()
-        content = ""
-        if "choices" in response and response["choices"]:
-            content = response["choices"][0].get("message", {}).get("content", "")
-        
-        output_result = await run_output_guards(
-            compiled_guards,
-            {"output": content},
-            policy_metadata=policy_metadata
-        )
+        contents = [
+            (choice.get("message") or {}).get("content") or "" for choice in choices
+        ] or [""]
+        choice_results = await asyncio.gather(*[
+            run_output_guards(
+                compiled_guards,
+                {"output": text},
+                policy_metadata=policy_metadata
+            )
+            for text in contents
+        ])
+        # First violating choice decides the response; otherwise keep all results
+        # so each choice gets its own (possibly redacted) output.
+        output_result = next((r for r in choice_results if is_left(r)), choice_results[0])
         output_guard_time = (time.time() - output_guard_start) * 1000
         
         # Get output guards metadata
@@ -508,9 +587,10 @@ async def _handle_non_streaming(
         # the rewrite is computed and discarded. Only applies to non-streaming
         # responses - streamed chunks are already sent to the client by the
         # time later output guards would run, so this cannot redact a stream.
-        redacted_output = get_context(output_result).get("output", content)
-        if redacted_output != content and "choices" in response and response["choices"]:
-            response["choices"][0].setdefault("message", {})["content"] = redacted_output
+        for choice, text, result in zip(choices, contents, choice_results):
+            redacted_output = get_context(result).get("output", text)
+            if redacted_output != text:
+                choice.setdefault("message", {})["content"] = redacted_output
 
         # Success - populate request.state for observability
         request.state.output_guards_executed = output_guards_executed
@@ -577,14 +657,14 @@ async def _handle_non_streaming(
         )
 
 
-def _extract_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Extract tool calls from OpenAI response"""
+def _extract_tool_calls(response: Dict[str, Any], index: int = 0) -> List[Dict[str, Any]]:
+    """Extract tool calls from one choice of an OpenAI response"""
     tool_calls = []
     
-    if "choices" not in response or not response["choices"]:
+    if "choices" not in response or len(response["choices"]) <= index:
         return tool_calls
     
-    message = response["choices"][0].get("message", {})
+    message = response["choices"][index].get("message", {})
     
     # New format: tool_calls
     if "tool_calls" in message and message["tool_calls"]:
@@ -645,8 +725,14 @@ async def _enforce_tool_args(
                 continue
             
             # Get potentially modified args
+            # run_tool_args_guards nests the payload under ctx["tool_args"];
+            # fall back to a top-level "arguments" for older guards.
             ctx = get_context(result)
-            updated_args = ctx.get("arguments", args_dict)
+            tool_ctx = ctx.get("tool_args")
+            if isinstance(tool_ctx, dict) and "arguments" in tool_ctx:
+                updated_args = tool_ctx["arguments"]
+            else:
+                updated_args = ctx.get("arguments", args_dict)
             tc["function"]["arguments"] = json.dumps(updated_args)
         
         filtered.append(tc)

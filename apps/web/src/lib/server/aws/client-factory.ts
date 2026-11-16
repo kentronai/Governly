@@ -81,6 +81,8 @@ export interface AwsClientBundle {
   ecr: ECRClient;
   cloudtrail: CloudTrailClient;
   eks: EKSClient;
+  /** Scan-level partial warnings; swallowed transient lookup failures land here. */
+  warnings?: string[];
 }
 
 export async function resolveAwsCredentials(

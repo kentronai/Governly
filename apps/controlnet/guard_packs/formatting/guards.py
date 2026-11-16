@@ -4,6 +4,7 @@ Formatting Guard Implementations
 Data formatting and validation guards for JSON, XML, CSV, URLs, and emails.
 """
 
+from cga_core.message_text import last_message_text
 import re
 import json
 import csv
@@ -56,7 +57,7 @@ def json_validate(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -128,7 +129,7 @@ def xml_validate(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -196,7 +197,7 @@ def csv_validate(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -289,7 +290,7 @@ def url_format_validate(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -375,7 +376,7 @@ def email_validate(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)

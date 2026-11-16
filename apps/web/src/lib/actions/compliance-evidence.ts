@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
-import { applications, complianceEvidence, db, tenants } from "@db";
+import { applications, complianceEvidence, db, policyCenter, tenants } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import { encryptSecret } from "@/lib/server/crypto";
 
@@ -86,6 +86,18 @@ export async function createComplianceEvidence(
       ),
     });
     if (!application) throw new Error("Application not found");
+  }
+
+  if (input.policyId) {
+    // Must be this tenant's policy or a global catalog entry (tenantId null).
+    const policy = await db.query.policyCenter.findFirst({
+      where: and(
+        eq(policyCenter.id, input.policyId),
+        or(eq(policyCenter.tenantId, tenantId), isNull(policyCenter.tenantId)),
+      ),
+      columns: { id: true },
+    });
+    if (!policy) throw new Error("Policy not found");
   }
 
   if (input.externalUrl) {

@@ -11,7 +11,7 @@ import {
 } from "@aws-sdk/client-sfn";
 import type { AwsClientBundle } from "../client-factory";
 import { extractModelIds } from "../../agents/agent-profile";
-import type { RawDiscoveredResource } from "./types";
+import { noteLookupFailure, type RawDiscoveredResource } from "./types";
 
 export async function discoverStepFunctions(
   clients: AwsClientBundle,
@@ -36,8 +36,8 @@ export async function discoverStepFunctions(
           }),
         );
         definition = detail.definition ?? "";
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "Step Functions DescribeStateMachine", error);
       }
 
       const referencesAiLambda = Array.from(aiLambdaArns).some((arn) =>

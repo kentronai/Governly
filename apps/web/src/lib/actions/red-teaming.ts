@@ -100,7 +100,6 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
   // Server-to-server call — use the internal ControlNet address, not the
   // public-origin helper (that one is for client-side display/snippets only
   // and resolves incorrectly here, e.g. to NEXT_PUBLIC_APP_URL server-side).
-  // Same pattern as apps/web/src/lib/actions/default-launch-policy.ts.
   const controlnetUrl =
     process.env.CONTROLNET_INTERNAL_URL || "http://controlnet:8000";
   const gatewayUrl = `${controlnetUrl}/v1/chat/completions`;
@@ -210,7 +209,8 @@ export async function runRedTeamBatchTest(input: RunBatchTestInput) {
   }
 
   revalidatePath(
-    `/applications/${input.applicationId}/control-net/red-teaming`,
+    "/[tenant]/applications/[applicationId]/control-net/red-teaming",
+    "page",
   );
 
   try {

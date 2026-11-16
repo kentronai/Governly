@@ -1,5 +1,6 @@
 "use client";
 
+import { errorToast } from "@/lib/utils/toast";
 import { htmlToPlainText } from "@/lib/utils";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -95,7 +96,8 @@ export function ModelsInfoList({
         setIsModalOpen(false);
       } catch (error) {
         console.error("Failed to create model:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to create model");
       }
     });
   };
@@ -113,7 +115,8 @@ export function ModelsInfoList({
         setSelectedModel(null);
       } catch (error) {
         console.error("Failed to update model:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to update model");
       }
     });
   };
@@ -129,7 +132,8 @@ export function ModelsInfoList({
         setSelectedModel(null);
       } catch (error) {
         console.error("Failed to delete model:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to delete model");
       }
     });
   };

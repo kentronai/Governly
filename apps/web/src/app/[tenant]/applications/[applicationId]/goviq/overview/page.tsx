@@ -18,6 +18,12 @@ import ApplicationStatus from "@/components/applications/ApplicationStatus";
 import { useTenant } from "@/contexts/TenantContext";
 import { getApplicationDetails } from "@/lib/actions/applications";
 import { isEuAiActPolicyName } from "@/lib/policy-names";
+import {
+  getAllFrameworkControls,
+  type FrameworkControlData,
+} from "@/lib/actions/framework-controls";
+import { getFramework, type FrameworkDefinition } from "@/lib/frameworks";
+import { controlKeys, isDone, percent } from "@/lib/frameworks/helpers";
 
 import { PageTitle } from "@/components/common/PageHeader";
 // Custom Progress component to replace the imported one
@@ -161,6 +167,17 @@ export default function GovIQOverviewPage() {
     }
   }, [params.tenant, params.applicationId]);
 
+  const [frameworkControls, setFrameworkControls] = useState<Record<
+    string,
+    Record<string, FrameworkControlData>
+  > | null>(null);
+  useEffect(() => {
+    if (!params.tenant || (!isEUEnabled && !isISOEnabled)) return;
+    getAllFrameworkControls(params.tenant as string)
+      .then(setFrameworkControls)
+      .catch(() => setFrameworkControls({}));
+  }, [params.tenant, isEUEnabled, isISOEnabled]);
+
   // Format team members for display
   const formatRole = (role?: string | null) => {
     const value = (role ?? "").replace(/^org:/, "");
@@ -227,30 +244,29 @@ export default function GovIQOverviewPage() {
         teamMembers: "Loading...",
       };
 
-  const getComplianceData = () => {
-    return {
-      euAiAct: isEUEnabled
-        ? {
-            subcontrols: { completed: 45, total: 100, percentage: 45 },
-            assessments: { completed: 23, total: 70, percentage: 32 },
-          }
-        : null,
-      // nist: activeNist
-      //   ? {
-      //       frameworks: { completed: 8, total: 15, percentage: 53 },
-      //       controls: { completed: 12, total: 25, percentage: 48 },
-      //     }
-      //   : null,
-      iso42001: isISOEnabled
-        ? {
-            clauses: { completed: 3, total: 24, percentage: 12 },
-            annexes: { completed: 6, total: 37, percentage: 16 },
-          }
-        : null,
-    };
-  };
-
-  const complianceData = getComplianceData();
+  // Real completion from the tenant's saved framework controls (the same data
+  // and "done" rules the Admin Center framework trackers use).
+  const complianceCards = [
+    isEUEnabled && getFramework("eu-ai-act"),
+    isISOEnabled && getFramework("iso-42001"),
+  ]
+    .filter((fw): fw is FrameworkDefinition => Boolean(fw))
+    .map((fw) => {
+      const data = frameworkControls?.[fw.slug] ?? {};
+      const requirements = fw.sections.flatMap((sec) => sec.requirements);
+      const keys = requirements.flatMap(controlKeys);
+      const keysDone = keys.filter((k) => isDone(data, k)).length;
+      const reqsDone = requirements.filter((r) =>
+        controlKeys(r).every((k) => isDone(data, k)),
+      ).length;
+      return {
+        title: `${fw.navLabel} Completion Status`,
+        rows: [
+          { label: "Requirements", done: reqsDone, total: requirements.length },
+          { label: "Controls", done: keysDone, total: keys.length },
+        ],
+      };
+    });
 
   // Risk Data
   const risks = [
@@ -339,129 +355,33 @@ export default function GovIQOverviewPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {isEUEnabled && complianceData.euAiAct && (
-            <Card>
+          {complianceCards.map((card) => (
+            <Card key={card.title}>
               <CardHeader>
-                <CardTitle className="">EU AI Act Completion Status</CardTitle>
+                <CardTitle>{card.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.euAiAct.subcontrols.completed} Subcontrols
-                      out of {complianceData.euAiAct.subcontrols.total} is
-                      completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.euAiAct.subcontrols.percentage}%
-                    </span>
+                {card.rows.map((row) => (
+                  <div key={row.label}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-muted-foreground">
+                        {frameworkControls
+                          ? `${row.done} of ${row.total} ${row.label} completed`
+                          : "Loading..."}
+                      </span>
+                      <span className="text-2xl font-bold">
+                        {percent(row.done, row.total)}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={percent(row.done, row.total)}
+                      className="h-3"
+                    />
                   </div>
-                  <Progress
-                    value={complianceData.euAiAct.subcontrols.percentage}
-                    className="h-3"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.euAiAct.assessments.completed} Assessments
-                      out of {complianceData.euAiAct.assessments.total} is
-                      completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.euAiAct.assessments.percentage}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={complianceData.euAiAct.assessments.percentage}
-                    className="h-3"
-                  />
-                </div>
+                ))}
               </CardContent>
             </Card>
-          )}
-
-          {/* {complianceData.nist && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="">
-                  NIST AI RMF Completion Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.nist.frameworks.completed} Frameworks out
-                      of {complianceData.nist.frameworks.total} is completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.nist.frameworks.percentage}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={complianceData.nist.frameworks.percentage}
-                    className="h-3"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.nist.controls.completed} Controls out of{" "}
-                      {complianceData.nist.controls.total} is completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.nist.controls.percentage}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={complianceData.nist.controls.percentage}
-                    className="h-3"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )} */}
-
-          {isISOEnabled && complianceData.iso42001 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="">ISO 42001 Completion Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.iso42001.clauses.completed} Clauses out of{" "}
-                      {complianceData.iso42001.clauses.total} is completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.iso42001.clauses.percentage}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={complianceData.iso42001.clauses.percentage}
-                    className="h-3"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">
-                      {complianceData.iso42001.annexes.completed} Annexes out of{" "}
-                      {complianceData.iso42001.annexes.total} is completed
-                    </span>
-                    <span className="text-2xl font-bold ">
-                      {complianceData.iso42001.annexes.percentage}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={complianceData.iso42001.annexes.percentage}
-                    className="h-3"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          ))}
         </div>
 
         {/* Project Risks */}

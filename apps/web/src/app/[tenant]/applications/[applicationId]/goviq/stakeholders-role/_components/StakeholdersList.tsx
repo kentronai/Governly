@@ -1,5 +1,6 @@
 "use client";
 
+import { errorToast } from "@/lib/utils/toast";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,7 +100,8 @@ export function StakeholdersList({
         setIsModalOpen(false);
       } catch (error) {
         console.error("Failed to create stakeholder:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to create stakeholder");
       }
     });
   };
@@ -117,7 +119,8 @@ export function StakeholdersList({
         setSelectedStakeholder(null);
       } catch (error) {
         console.error("Failed to update stakeholder:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to update stakeholder");
       }
     });
   };
@@ -135,7 +138,8 @@ export function StakeholdersList({
         setSelectedStakeholder(null);
       } catch (error) {
         console.error("Failed to delete stakeholder:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to delete stakeholder");
       }
     });
   };

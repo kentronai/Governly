@@ -41,6 +41,7 @@ import { generateRecommendations } from "../agents/recommendations-engine";
 import type { RawDiscoveredResource } from "./discovery/types";
 import { composeProfile, readProfile } from "@/lib/server/agents/agent-profile";
 import { removeAgent } from "@/lib/server/github/discovery-orchestrator";
+import { retireMissingAgents } from "@/lib/server/agents/prune-orphans";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 
 export interface RunScanResult {
@@ -177,9 +178,15 @@ export async function runDiscoveryScan(
                 : (r.rawMetadata as { githubProfile?: unknown } | null)?.githubProfile,
             ),
           ),
+          undefined,
+          serviceWarnings,
         ),
       )
-      .catch(() => new Map<string, string>());
+      .catch((error) => {
+        // Without this map repo-linked EC2 agents vanish: mark the scan partial.
+        serviceWarnings.push(formatServiceWarning("global", "repo site lookup", error));
+        return new Map<string, string>();
+      });
 
     // Regional AWS APIs are independent. A small concurrency limit keeps the
     // scan fast without flooding the customer's account or exhausting sockets.
@@ -189,6 +196,8 @@ export async function runDiscoveryScan(
           region,
           credentials: regionResolution.credentials,
         });
+        // Swallowed transient lookup failures make the scan partial.
+        clients.warnings = serviceWarnings;
         accountId = clients.accountId;
 
         // Capture explicitly identified EC2 agents even in regions where
@@ -347,195 +356,215 @@ export async function runDiscoveryScan(
     const nowIso = new Date().toISOString();
 
     for (const agent of correlated) {
-      const ownership = await detectOwnership(agent);
-      const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
-      const autonomy = await classifyAutonomy(tenantId, facts);
-      const risk = await assessRisk(tenantId, facts);
-      const recommendations = generateRecommendations(
-        facts,
-        autonomy,
-        ownership,
-      );
+      try {
+        const ownership = await detectOwnership(agent);
+        const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
+        const autonomy = await classifyAutonomy(tenantId, facts);
+        const risk = await assessRisk(tenantId, facts);
+        const recommendations = generateRecommendations(
+          facts,
+          autonomy,
+          ownership,
+        );
 
-      const primaryModel = agent.resources.find(
-        (r) =>
-          r.resourceType === "bedrock_agent" ||
-          r.resourceType === "agentcore_runtime",
-      );
-      const primaryAnchor = agent.resources.find(
-        (r) => r.resourceType === agent.discoverySource,
-      );
-      const primaryRole = agent.resources.find(
-        (r) => r.resourceType === "iam_role",
-      );
-      const primaryKnowledgeBase = agent.resources.find(
-        (r) => r.resourceType === "knowledge_base",
-      );
+        const primaryModel = agent.resources.find(
+          (r) =>
+            r.resourceType === "bedrock_agent" ||
+            r.resourceType === "agentcore_runtime",
+        );
+        const primaryAnchor = agent.resources.find(
+          (r) => r.resourceType === agent.discoverySource,
+        );
+        const primaryRole = agent.resources.find(
+          (r) => r.resourceType === "iam_role",
+        );
+        const primaryKnowledgeBase = agent.resources.find(
+          (r) => r.resourceType === "knowledge_base",
+        );
 
-      const existing = await db.query.agents.findFirst({
-        where: and(
-          eq(agents.connectionId, connectionId),
-          eq(agents.externalAgentId, agent.externalAgentId),
-        ),
-      });
+        const existing = await db.query.agents.findFirst({
+          where: and(
+            eq(agents.connectionId, connectionId),
+            eq(agents.externalAgentId, agent.externalAgentId),
+          ),
+        });
 
-      // The repo this workload runs (its live site resolves here, or its image
-      // names it): fold the repo's own registry row into this agent, so it
-      // shows once, as the deployed instance, whichever provider scanned first.
-      const repoName = agent.resources
-        .map((r) => r.metadata.codeRepository)
-        .find((v): v is string => typeof v === "string");
-      const repoRow = repoName
-        ? await db.query.agents.findFirst({
-            where: and(
-              eq(agents.tenantId, tenantId),
-              eq(agents.platform, "github"),
-              sql`lower(${agents.profile}->>'repository') = ${repoName.toLowerCase()}`,
-            ),
-          })
-        : undefined;
-      const { profile, rawMetadata: profileMeta } = composeProfile(
-        agent,
-        repoRow
-          ? { ...((existing?.rawMetadata as object) ?? {}), githubProfile: repoRow.profile }
-          : existing?.rawMetadata,
-      );
+        // The repo this workload runs (its live site resolves here, or its image
+        // names it): fold the repo's own registry row into this agent, so it
+        // shows once, as the deployed instance, whichever provider scanned first.
+        const repoName = agent.resources
+          .map((r) => r.metadata.codeRepository)
+          .find((v): v is string => typeof v === "string");
+        const repoRow = repoName
+          ? await db.query.agents.findFirst({
+              where: and(
+                eq(agents.tenantId, tenantId),
+                eq(agents.platform, "github"),
+                sql`lower(${agents.profile}->>'repository') = ${repoName.toLowerCase()}`,
+              ),
+            })
+          : undefined;
+        const { profile, rawMetadata: profileMeta } = composeProfile(
+          agent,
+          repoRow
+            ? { ...((existing?.rawMetadata as object) ?? {}), githubProfile: repoRow.profile }
+            : existing?.rawMetadata,
+        );
 
-      const agentValues = {
-        tenantId,
-        connectionId,
-        externalAgentId: agent.externalAgentId,
-        name: agent.name,
-        platform: agent.platform,
-        region: agent.region,
-        accountId,
-        // The profile's LLM list also covers Lambda/EC2/Step Functions agents,
-        // whose model only appears in env config or the role's invoke policy.
-        model:
-          typeof primaryModel?.metadata.foundationModel === "string"
-            ? primaryModel.metadata.foundationModel
-            : typeof primaryModel?.metadata.modelId === "string"
-              ? primaryModel.metadata.modelId
-              : (profile.llms[0] ?? null),
-        profile,
-        knowledgeBaseId: primaryKnowledgeBase?.resourceId ?? null,
-        iamRoleArn:
-          primaryRole?.resourceArn ?? primaryAnchor?.linkedRoleArn ?? null,
-        credentialType:
-          connection.authMethod === "access_key"
-            ? ("api_key" as const)
-            : ("service_account" as const),
-        ownerUserId: ownership.ownerUserId,
-        ownerSource: ownership.ownerSource,
-        ownerConfidence: String(ownership.ownerConfidence),
-        businessFunction: ownership.businessFunction,
-        status: (facts.isDormant ? "dormant" : "active") as
-          | "dormant"
-          | "active",
-        // A discovery scan is not agent usage. Keep this field tied to actual
-        // AWS role activity (or previously attributed runtime traffic).
-        lastUsedAt:
-          typeof primaryRole?.metadata.lastUsedDate === "string"
-            ? primaryRole.metadata.lastUsedDate
-            : (existing?.lastUsedAt ?? null),
-        capabilities: facts,
-        autonomyLevel: autonomy.level,
-        autonomyReason: autonomy.reason,
-        autonomyEvidence: autonomy.evidence,
-        autonomyConfidence: String(autonomy.confidence),
-        autonomyClassifiedAt: nowIso,
-        riskScore: String(risk.score),
-        riskLevel: risk.level,
-        riskFactors: risk.factors,
-        discoverySource: agent.discoverySource,
-        lastSeenAt: nowIso,
-        syncStatus: "success" as const,
-        rawMetadata: {
-          ...profileMeta,
-          evidenceSource:
-            primaryAnchor?.metadata.evidenceSource ?? "provider_discovery",
-          resourceCount: agent.resources.length,
-          primaryModel:
+        const agentValues = {
+          tenantId,
+          connectionId,
+          externalAgentId: agent.externalAgentId,
+          name: agent.name,
+          platform: agent.platform,
+          region: agent.region,
+          accountId,
+          // The profile's LLM list also covers Lambda/EC2/Step Functions agents,
+          // whose model only appears in env config or the role's invoke policy.
+          model:
             typeof primaryModel?.metadata.foundationModel === "string"
               ? primaryModel.metadata.foundationModel
-              : (primaryModel?.metadata.modelId ?? null),
-          providerEvidence: primaryAnchor
-            ? {
-                resourceArn: primaryAnchor.resourceArn,
-                resourceName: primaryAnchor.resourceName,
-                resourceType: primaryAnchor.resourceType,
-                region: primaryAnchor.region,
-                createdAt: primaryAnchor.createdAt,
-                lastUpdatedAt: primaryAnchor.lastUpdatedAt,
-                tags: primaryAnchor.tags,
-                ...primaryAnchor.metadata,
-              }
-            : null,
-        },
-        updatedAt: nowIso,
-      };
+              : typeof primaryModel?.metadata.modelId === "string"
+                ? primaryModel.metadata.modelId
+                : (profile.llms[0] ?? null),
+          profile,
+          knowledgeBaseId: primaryKnowledgeBase?.resourceId ?? null,
+          iamRoleArn:
+            primaryRole?.resourceArn ?? primaryAnchor?.linkedRoleArn ?? null,
+          credentialType:
+            connection.authMethod === "access_key"
+              ? ("api_key" as const)
+              : ("service_account" as const),
+          ownerUserId: ownership.ownerUserId,
+          ownerSource: ownership.ownerSource,
+          ownerConfidence: String(ownership.ownerConfidence),
+          businessFunction: ownership.businessFunction,
+          status: (facts.isDormant ? "dormant" : "active") as
+            | "dormant"
+            | "active",
+          // A discovery scan is not agent usage. Keep this field tied to actual
+          // AWS role activity (or previously attributed runtime traffic).
+          lastUsedAt:
+            typeof primaryRole?.metadata.lastUsedDate === "string"
+              ? primaryRole.metadata.lastUsedDate
+              : (existing?.lastUsedAt ?? null),
+          capabilities: facts,
+          autonomyLevel: autonomy.level,
+          autonomyReason: autonomy.reason,
+          autonomyEvidence: autonomy.evidence,
+          autonomyConfidence: String(autonomy.confidence),
+          autonomyClassifiedAt: nowIso,
+          riskScore: String(risk.score),
+          riskLevel: risk.level,
+          riskFactors: risk.factors,
+          discoverySource: agent.discoverySource,
+          lastSeenAt: nowIso,
+          syncStatus: "success" as const,
+          rawMetadata: {
+            ...profileMeta,
+            evidenceSource:
+              primaryAnchor?.metadata.evidenceSource ?? "provider_discovery",
+            resourceCount: agent.resources.length,
+            primaryModel:
+              typeof primaryModel?.metadata.foundationModel === "string"
+                ? primaryModel.metadata.foundationModel
+                : (primaryModel?.metadata.modelId ?? null),
+            providerEvidence: primaryAnchor
+              ? {
+                  resourceArn: primaryAnchor.resourceArn,
+                  resourceName: primaryAnchor.resourceName,
+                  resourceType: primaryAnchor.resourceType,
+                  region: primaryAnchor.region,
+                  createdAt: primaryAnchor.createdAt,
+                  lastUpdatedAt: primaryAnchor.lastUpdatedAt,
+                  tags: primaryAnchor.tags,
+                  ...primaryAnchor.metadata,
+                }
+              : null,
+          },
+          updatedAt: nowIso,
+        };
 
-      let agentId: string;
-      if (existing) {
-        agentId = existing.id;
+        let agentId: string;
+        if (existing) {
+          agentId = existing.id;
+          await db
+            .update(agents)
+            .set(agentValues)
+            .where(eq(agents.id, existing.id));
+        } else {
+          const [inserted] = await db
+            .insert(agents)
+            .values({ ...agentValues, firstSeenAt: nowIso })
+            .returning();
+          agentId = inserted.id;
+        }
+        if (repoRow) {
+          await removeAgent(repoRow.id);
+        }
+
+        // Refresh the resource/recommendation snapshot for this agent.
         await db
-          .update(agents)
-          .set(agentValues)
-          .where(eq(agents.id, existing.id));
-      } else {
-        const [inserted] = await db
-          .insert(agents)
-          .values({ ...agentValues, firstSeenAt: nowIso })
-          .returning();
-        agentId = inserted.id;
-      }
-      if (repoRow) {
-        await removeAgent(repoRow.id);
-      }
+          .delete(agentResources)
+          .where(eq(agentResources.agentId, agentId));
+        if (agent.resources.length > 0) {
+          await db.insert(agentResources).values(
+            agent.resources.map((r) => ({
+              tenantId,
+              agentId,
+              resourceType: r.resourceType,
+              resourceArn: r.resourceArn,
+              resourceName: r.resourceName,
+              region: r.region,
+              rawData: r.metadata,
+            })),
+          );
+        }
 
-      // Refresh the resource/recommendation snapshot for this agent.
-      await db
-        .delete(agentResources)
-        .where(eq(agentResources.agentId, agentId));
-      if (agent.resources.length > 0) {
-        await db.insert(agentResources).values(
-          agent.resources.map((r) => ({
-            tenantId,
-            agentId,
-            resourceType: r.resourceType,
-            resourceArn: r.resourceArn,
-            resourceName: r.resourceName,
-            region: r.region,
-            rawData: r.metadata,
-          })),
-        );
-      }
+        await db
+          .delete(agentRecommendations)
+          .where(
+            and(
+              eq(agentRecommendations.agentId, agentId),
+              eq(agentRecommendations.status, "open"),
+            ),
+          );
+        if (recommendations.length > 0) {
+          await db.insert(agentRecommendations).values(
+            recommendations.map((rec) => ({
+              tenantId,
+              agentId,
+              recommendationType: rec.recommendationType,
+              reason: rec.reason,
+              severity: rec.severity,
+              suggestedFix: rec.suggestedFix,
+            })),
+          );
+        }
 
-      await db
-        .delete(agentRecommendations)
-        .where(
-          and(
-            eq(agentRecommendations.agentId, agentId),
-            eq(agentRecommendations.status, "open"),
-          ),
-        );
-      if (recommendations.length > 0) {
-        await db.insert(agentRecommendations).values(
-          recommendations.map((rec) => ({
-            tenantId,
-            agentId,
-            recommendationType: rec.recommendationType,
-            reason: rec.reason,
-            severity: rec.severity,
-            suggestedFix: rec.suggestedFix,
-          })),
-        );
+        // Every newly discovered or refreshed agent immediately inherits active
+        // tenant compliance policies and its linked application's runtime policy.
+        await syncAgentPolicyEvaluations(tenantId, agentId);
+      } catch (error) {
+        // One bad agent (e.g. deleted mid-scan) must not abort the scan; it
+        // makes the scan partial so nothing is retired this run.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[aws-discovery] agent ${agent.externalAgentId} failed:`, error);
+        serviceWarnings.push(`agent ${agent.externalAgentId}: ${message}`);
       }
-
-      // Every newly discovered or refreshed agent immediately inherits active
-      // tenant compliance policies and its linked application's runtime policy.
-      await syncAgentPolicyEvaluations(tenantId, agentId);
     }
+
+    // Agents this connection reported before but not now are retired, but only
+    // after a complete scan (every region enumerated and scanned cleanly).
+    await retireMissingAgents(
+      and(eq(agents.tenantId, tenantId), eq(agents.connectionId, connectionId))!,
+      correlated.map((a) => a.externalAgentId),
+      [
+        ...(regionResolution.warning ? [regionResolution.warning] : []),
+        ...regionErrors,
+        ...serviceWarnings,
+      ],
+    );
 
     const resourcesScanned: Record<string, number> = {
       bedrock_agent: bedrockResources.filter(

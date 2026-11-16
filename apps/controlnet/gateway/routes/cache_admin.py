@@ -4,17 +4,30 @@ Cache Administration Endpoints
 Provides endpoints to inspect and clear Redis cache for debugging.
 """
 
-from fastapi import APIRouter, Request, HTTPException
+import re
+
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import JSONResponse
 import structlog
+
+from gateway.auth import require_tenant_auth, TenantContext
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
 
+def _tenant_key_pattern(tenant: TenantContext) -> str:
+    """Redis SCAN pattern for the caller's own policy keys only. Every API key /
+    token belongs to one tenant, so these endpoints never touch other tenants."""
+    tenant_id = tenant.tenant_id or ""
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", tenant_id):
+        raise HTTPException(status_code=400, detail="Invalid tenant")
+    return f"policy:{tenant_id}:*"
+
+
 @router.get("/cache/inspect")
-async def inspect_cache(request: Request):
+async def inspect_cache(request: Request, tenant: TenantContext = Depends(require_tenant_auth)):
     """
     Inspect what's in the Redis cache
     
@@ -31,7 +44,7 @@ async def inspect_cache(request: Request):
         
         # Get all policy keys
         keys = []
-        async for key in policy_cache.redis_client.scan_iter(match="policy:*"):
+        async for key in policy_cache.redis_client.scan_iter(match=_tenant_key_pattern(tenant)):
             keys.append(key)
         
         # Get details for each key
@@ -64,7 +77,7 @@ async def inspect_cache(request: Request):
 
 
 @router.post("/cache/clear")
-async def clear_cache(request: Request):
+async def clear_cache(request: Request, tenant: TenantContext = Depends(require_tenant_auth)):
     """
     Clear all policy cache in Redis
     
@@ -81,7 +94,7 @@ async def clear_cache(request: Request):
         
         # Find all policy keys
         keys_to_delete = []
-        async for key in policy_cache.redis_client.scan_iter(match="policy:*"):
+        async for key in policy_cache.redis_client.scan_iter(match=_tenant_key_pattern(tenant)):
             keys_to_delete.append(key)
         
         # Delete all keys
@@ -101,6 +114,8 @@ async def clear_cache(request: Request):
             "deleted_keys": keys_to_delete
         })
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("cache_clear_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -110,7 +125,8 @@ async def clear_cache(request: Request):
 async def clear_specific_policy_cache(
     tenant_id: str,
     policy_id: str,
-    request: Request
+    request: Request,
+    tenant: TenantContext = Depends(require_tenant_auth),
 ):
     """
     Clear cache for a specific tenant/policy
@@ -126,6 +142,9 @@ async def clear_specific_policy_cache(
                 content={"error": "Redis not available"}
             )
         
+        if tenant_id != tenant.tenant_id:
+            raise HTTPException(status_code=403, detail="Cannot clear another tenant's cache")
+
         # Build keys
         yaml_key = f"policy:{tenant_id}:{policy_id}:yaml"
         metadata_key = f"policy:{tenant_id}:{policy_id}:metadata"
@@ -147,6 +166,8 @@ async def clear_specific_policy_cache(
             "deleted_count": deleted
         })
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("cache_clear_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

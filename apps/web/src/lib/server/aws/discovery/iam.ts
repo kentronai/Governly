@@ -16,7 +16,7 @@ import {
 } from "@aws-sdk/client-iam";
 import type { AwsClientBundle } from "../client-factory";
 import { extractModelIds } from "../../agents/agent-profile";
-import type { RawDiscoveredResource } from "./types";
+import { noteLookupFailure, type RawDiscoveredResource } from "./types";
 
 interface PolicyStatement {
   Effect?: string;
@@ -116,8 +116,9 @@ export async function discoverIamRoles(
             allActions.push(...actionsFromDocument(doc));
             allResourceArns.push(...resourcesFromDocument(doc));
           }
-        } catch {
+        } catch (error) {
           // an inaccessible managed policy shouldn't fail the whole role
+          noteLookupFailure(clients, "IAM policy", error);
         }
       }
 
@@ -184,8 +185,9 @@ export async function discoverIamRoles(
             role.Role?.RoleLastUsed?.LastUsedDate?.toISOString?.() ?? null,
         },
       });
-    } catch {
+    } catch (error) {
       // an inaccessible/deleted role shouldn't fail the whole scan
+      noteLookupFailure(clients, "IAM role", error);
     }
   }
 

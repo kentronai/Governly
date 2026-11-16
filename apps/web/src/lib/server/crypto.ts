@@ -11,6 +11,7 @@ import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
+const AUTH_TAG_LENGTH = 16;
 
 function getKey(): Buffer {
   const raw = process.env.AWS_CREDENTIALS_ENCRYPTION_KEY;
@@ -53,13 +54,19 @@ export function decryptSecret(payload: string): string {
   if (!ivB64 || !authTagB64 || !ciphertextB64) {
     throw new Error("Malformed encrypted secret payload.");
   }
+  const authTag = Buffer.from(authTagB64, "base64");
+  // A truncated tag would weaken GCM's integrity check: require the full 16 bytes.
+  if (authTag.length !== AUTH_TAG_LENGTH) {
+    throw new Error("Malformed encrypted secret payload.");
+  }
   const key = getKey();
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     key,
     Buffer.from(ivB64, "base64"),
+    { authTagLength: AUTH_TAG_LENGTH },
   );
-  decipher.setAuthTag(Buffer.from(authTagB64, "base64"));
+  decipher.setAuthTag(authTag);
   const plaintext = Buffer.concat([
     decipher.update(Buffer.from(ciphertextB64, "base64")),
     decipher.final(),

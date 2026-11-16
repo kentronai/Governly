@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default function AdminPage({ params }: { params: { tenant: string } }) {
-  redirect(`/${params.tenant}/admin/home`);
+export default async function AdminPage({
+  params,
+}: {
+  params: Promise<{ tenant: string }>;
+}) {
+  const { tenant } = await params;
+  redirect(`/${tenant}/admin/home`);
 }

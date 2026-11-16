@@ -190,14 +190,18 @@ def decode_jwt_with_secret(token: str, secret_key: str) -> Dict[str, Any]:
 
 def extract_user_info_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Extract user information from JWT payload"""
+    # Clerk session tokens v1 carry org_id/org_role; v2 nests them as
+    # "o": {"id", "rol", "slg"}. Read both so the org always comes from the
+    # signed token, never from a caller-supplied header.
+    org_claim = payload.get("o") if isinstance(payload.get("o"), dict) else {}
     return {
         "user_id": payload.get("sub"),
         "session_id": payload.get("sid"),
-        "organization_id": payload.get("org_id"),
+        "organization_id": payload.get("org_id") or org_claim.get("id"),
         "email": payload.get("email"),
         "username": payload.get("username"),
         "metadata": payload.get("metadata", {}),
-        "roles": payload.get("org_role") or payload.get("roles", []),
+        "roles": payload.get("org_role") or org_claim.get("rol") or payload.get("roles", []),
     }
 
 

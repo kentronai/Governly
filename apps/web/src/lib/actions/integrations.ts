@@ -4,6 +4,7 @@
 
 "use server";
 
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import { db, integrations, tenants } from "@db";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -84,21 +85,20 @@ const DEFAULT_CATALOG_ENTRIES: CatalogEntryDefinition[] = [
   },
 ];
 
+function withoutCredentials<T extends { credentialsEncrypted?: unknown }>(row: T) {
+  const { credentialsEncrypted, ...rest } = row;
+  return { ...rest, hasCredentials: Boolean(credentialsEncrypted) };
+}
+
 async function resolveTenant(tenantSlugOrId: string) {
-  let tenantRow = await db
+  // Must be the caller's own org: server actions are public endpoints.
+  const { tenantId } = await requireTenantMember(tenantSlugOrId);
+  const [tenantRow] = await db
     .select()
     .from(tenants)
-    .where(eq(tenants.id, tenantSlugOrId))
+    .where(eq(tenants.id, tenantId))
     .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, tenantSlugOrId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  return tenantRow[0];
+  return tenantRow;
 }
 
 async function ensureDefaultCatalogEntries(tenantId: string, userId: string) {
@@ -186,7 +186,8 @@ export const getIntegrations = async (tenantSlugOrId: string) => {
     .where(eq(integrations.tenantId, tenantId))
     .orderBy(integrations.name);
 
-  return { integrations: integrationsList };
+  // Ciphertext never goes to the browser; the UI only needs to know it exists.
+  return { integrations: integrationsList.map(withoutCredentials) };
 };
 
 export const getIntegrationsWithCatalog = async (tenantSlugOrId: string) => {
@@ -203,27 +204,15 @@ export const getIntegrationsWithCatalog = async (tenantSlugOrId: string) => {
     .where(eq(integrations.tenantId, tenant.id))
     .orderBy(integrations.name);
 
-  return { integrations: integrationsList };
+  // Ciphertext never goes to the browser; the UI only needs to know it exists.
+  return { integrations: integrationsList.map(withoutCredentials) };
 };
 
 export const createIntegration = async (input: CreateIntegrationInput) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantSlug))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
+  const tenantRow = [await resolveTenant(input.tenantSlug)];
   const tenantId = tenantRow[0].id;
 
   if (!input.name || !input.category) {
@@ -265,20 +254,7 @@ export const updateIntegration = async (input: UpdateIntegrationInput) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantSlug))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
+  const tenantRow = [await resolveTenant(input.tenantSlug)];
   const tenantId = tenantRow[0].id;
 
   const updateData: any = {
@@ -321,7 +297,10 @@ export const updateIntegration = async (input: UpdateIntegrationInput) => {
       action: "integration.updated",
       targetType: "integration",
       targetId: input.id,
-      metadata: { update: input },
+      // Never put the plaintext secret into the audit trail.
+      metadata: {
+        update: { ...input, apiKey: input.apiKey ? "[redacted]" : undefined },
+      },
     });
   } catch (e) {
     console.error("Failed to write audit event (integration.updated):", e);
@@ -337,19 +316,7 @@ export const saveEncryptedIntegrationCredentials = async (input: {
 }) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantSlug))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
+  const tenantRow = [await resolveTenant(input.tenantSlug)];
   const existing = await db.query.integrations.findFirst({
     where: and(
       eq(integrations.id, input.id),
@@ -395,19 +362,7 @@ export const clearIntegrationCredentials = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, tenantSlugOrId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, tenantSlugOrId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
+  const tenantRow = [await resolveTenant(tenantSlugOrId)];
   const [integration] = await db
     .update(integrations)
     .set({
@@ -430,20 +385,7 @@ export const deleteIntegration = async (tenantSlugOrId: string, id: string) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, tenantSlugOrId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, tenantSlugOrId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
+  const tenantRow = [await resolveTenant(tenantSlugOrId)];
   const tenantId = tenantRow[0].id;
 
   const deletedIntegration = await db

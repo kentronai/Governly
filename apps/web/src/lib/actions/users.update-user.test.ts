@@ -16,6 +16,7 @@
 const mockClerkUpdateUser = jest.fn();
 const mockGetUser = jest.fn();
 const mockFindFirst = jest.fn();
+const mockAuditRows = jest.fn(async (): Promise<unknown[]> => []);
 
 jest.mock("@clerk/nextjs/server", () => ({
   auth: jest.fn(),
@@ -48,6 +49,9 @@ jest.mock("@db", () => ({
       set: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
     })),
     delete: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
+    select: jest.fn(() => ({
+      from: () => ({ where: () => ({ limit: () => mockAuditRows() }) }),
+    })),
   },
   users: {},
   memberships: {},
@@ -130,5 +134,26 @@ describe("updateUser authorization", () => {
       updateUser("user_target", { firstName: "New" }, "org_1"),
     ).resolves.toEqual({ success: true });
     expect(mockClerkUpdateUser).toHaveBeenCalled();
+  });
+
+  it("allows reactivating a user this org deactivated (membership row is gone)", async () => {
+    mockedAuth.mockResolvedValue(ADMIN_IN_ORG_1);
+    // No membership at the guard; the row exists again after re-insert.
+    mockFindFirst.mockResolvedValueOnce(undefined);
+    mockAuditRows.mockResolvedValueOnce([{ id: "evt_1" }]);
+
+    await expect(
+      updateUser("user_target", { status: true, role: "member" }, "org_1"),
+    ).resolves.toEqual({ success: true });
+  });
+
+  it("still rejects reactivating a user this org never deactivated", async () => {
+    mockedAuth.mockResolvedValue(ADMIN_IN_ORG_1);
+    mockFindFirst.mockResolvedValue(undefined);
+    mockAuditRows.mockResolvedValueOnce([]);
+
+    await expect(
+      updateUser("user_in_org_2", { status: true }, "org_1"),
+    ).rejects.toThrow(/not a member of your organization/i);
   });
 });

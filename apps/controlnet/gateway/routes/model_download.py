@@ -246,6 +246,34 @@ async def check_model_status(model_id: str):
         }
 
 
+def _safe_segment(value: str) -> str:
+    """One path segment from caller input: no separators, no '..'."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value or "").strip("._-")
+    return cleaned or "uncategorized"
+
+
+async def _assert_public_url(request) -> None:
+    """httpx request hook: refuse non-http(s) URLs and any host that resolves to a
+    private, loopback, link-local or reserved address (e.g. cloud metadata at
+    169.254.169.254). Runs for every redirect hop too."""
+    import ipaddress
+    import socket
+
+    url = request.url
+    if url.scheme not in ("http", "https") or not url.host:
+        raise HTTPException(status_code=400, detail="Only public http(s) URLs are allowed")
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(url.host, url.port or 443)
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Model URL host could not be resolved")
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            # ponytail: resolve-then-connect check; a DNS-rebinding host could still
+            # flip between checks. Pin the resolved IP in the transport if that matters.
+            raise HTTPException(status_code=400, detail="Model URL must point to a public host")
+
+
 @router.post("/download-from-url")
 async def download_model_from_url(
     request: DownloadFromUrlRequest,
@@ -266,13 +294,20 @@ async def download_model_from_url(
     import httpx
     
     try:
-        # Use tenant_id from request (if provided) or from auth context
-        effective_tenant_id = request.tenant_id or tenant.tenant_id
+        # The tenant always comes from authentication; a tenant_id in the body
+        # would let a caller write models into another tenant.
+        effective_tenant_id = tenant.tenant_id
+        from gateway.config import Settings
+        max_bytes = Settings().max_onnx_model_size_mb * 1024 * 1024
         
         # Download from URL (follow redirects for HuggingFace)
         logger.info(f"Downloading model from: {request.url} for tenant: {effective_tenant_id}")
         
-        async with httpx.AsyncClient(follow_redirects=True, timeout=300.0) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=300.0,
+            event_hooks={"request": [_assert_public_url]},
+        ) as client:
             async with client.stream('GET', request.url) as response:
                 response.raise_for_status()
                 
@@ -282,12 +317,12 @@ async def download_model_from_url(
                 
                 # Determine base directory
                 if effective_tenant_id:
-                    base_dir = Path("models") / effective_tenant_id
+                    base_dir = Path("models") / _safe_segment(effective_tenant_id)
                 else:
                     base_dir = Path("models") / "shared"
                 
                 # Use provided family (from UI) or default to "uncategorized"
-                family = request.family or "uncategorized"
+                family = _safe_segment(request.family or "uncategorized")
                 
                 # Create category-specific folder
                 category_dir = base_dir / family
@@ -306,9 +341,16 @@ async def download_model_from_url(
                 output_path = category_dir / output_filename
                 
                 total_size = 0
-                async for chunk in response.aiter_bytes():
-                    total_size += len(chunk)
-                    with open(output_path, "ab") as f:
+                with open(output_path, "wb") as f:
+                    async for chunk in response.aiter_bytes():
+                        total_size += len(chunk)
+                        if total_size > max_bytes:
+                            f.close()
+                            output_path.unlink(missing_ok=True)
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"Model too large: exceeds limit of {max_bytes // (1024 * 1024)}MB"
+                            )
                         f.write(chunk)
         
         size_mb = round(output_path.stat().st_size / 1024 / 1024, 2)
@@ -512,6 +554,8 @@ async def download_model_from_url(
             "visibility": "tenant" if effective_tenant_id else "shared"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to download model from URL: {e}")
         raise HTTPException(

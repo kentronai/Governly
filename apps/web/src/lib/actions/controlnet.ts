@@ -1,4 +1,5 @@
 "use server";
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import {
   applicationModels,
   applicationPolicies,
@@ -41,6 +42,7 @@ export const getControlnetStats = async ({
   tenantId: string;
   applicationId: string;
 }): Promise<ControlnetStats> => {
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   // Get all policy IDs linked to this application
   const policyIds = (
     await db.query.applicationPolicies.findMany({

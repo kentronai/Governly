@@ -4,6 +4,7 @@
 
 "use server";
 
+import { requireActiveTenant } from "@/lib/server/tenant-access";
 import { db, policyCenter, applicationPolicyCenter } from "@db";
 import { eq, and, isNull, ilike, notInArray, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -120,15 +121,15 @@ export const createPolicyCenterPolicy = async (input: {
   type?: string;
   disable?: boolean;
 }) => {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  // Rows with tenantId null are the global catalog every tenant sees; a
+  // user-created policy always belongs to the creator's own org.
+  const { tenantId } = await requireActiveTenant();
 
   try {
     const newPolicy = await db
       .insert(policyCenter)
       .values({
+        tenantId,
         name: input.name,
         description: input.description,
         category: input.category,
@@ -158,16 +159,19 @@ export const createPolicyCenterPolicy = async (input: {
  * Get a specific policy center policy by ID
  */
 export const getPolicyCenterPolicyById = async (id: string) => {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  const { tenantId } = await requireActiveTenant();
 
   try {
     const policy = await db
       .select()
       .from(policyCenter)
-      .where(eq(policyCenter.id, id))
+      .where(
+        and(
+          eq(policyCenter.id, id),
+          // own policy or global catalog entry
+          or(eq(policyCenter.tenantId, tenantId), isNull(policyCenter.tenantId)),
+        ),
+      )
       .limit(1);
 
     if (policy.length === 0) {

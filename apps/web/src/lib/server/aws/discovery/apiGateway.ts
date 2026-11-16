@@ -6,15 +6,19 @@
  */
 
 import {
-  GetRestApisCommand,
-  GetResourcesCommand,
+  paginateGetRestApis,
+  paginateGetResources,
 } from "@aws-sdk/client-api-gateway";
 import {
   GetApisCommand,
   GetIntegrationsCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import type { AwsClientBundle } from "../client-factory";
-import type { RawDiscoveredResource } from "./types";
+import {
+  collectPages,
+  noteLookupFailure,
+  type RawDiscoveredResource,
+} from "./types";
 
 export async function discoverApiGateway(
   clients: AwsClientBundle,
@@ -26,15 +30,22 @@ export async function discoverApiGateway(
 
   // REST APIs (v1)
   try {
-    const restApis = await apiGateway.send(new GetRestApisCommand({}));
-    for (const api of restApis.items ?? []) {
+    const restApis = await collectPages(
+      paginateGetRestApis({ client: apiGateway, pageSize: 500 }, {}),
+      (page) => page.items,
+    );
+    for (const api of restApis) {
       if (!api.id) continue;
       let referencesAiLambda = false;
       try {
-        const apiResources = await apiGateway.send(
-          new GetResourcesCommand({ restApiId: api.id }),
+        const apiResources = await collectPages(
+          paginateGetResources(
+            { client: apiGateway, pageSize: 500 },
+            { restApiId: api.id, embed: ["methods"] },
+          ),
+          (page) => page.items,
         );
-        referencesAiLambda = (apiResources.items ?? []).some((resource) =>
+        referencesAiLambda = apiResources.some((resource) =>
           Object.values(resource.resourceMethods ?? {}).some((method) => {
             const uri = (method as any)?.methodIntegration?.uri as
               | string
@@ -44,8 +55,8 @@ export async function discoverApiGateway(
               : false;
           }),
         );
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "API Gateway GetResources", error);
       }
       if (!referencesAiLambda) continue;
 
@@ -63,14 +74,24 @@ export async function discoverApiGateway(
         },
       });
     }
-  } catch {
-    // best-effort
+  } catch (error) {
+    noteLookupFailure(clients, "API Gateway GetRestApis", error);
   }
 
   // HTTP / WebSocket APIs (v2)
   try {
-    const httpApis = await apiGatewayV2.send(new GetApisCommand({}));
-    for (const api of httpApis.Items ?? []) {
+    const httpApis = await collectPages(
+      (async function* () {
+        let NextToken: string | undefined;
+        do {
+          const page = await apiGatewayV2.send(new GetApisCommand({ NextToken }));
+          yield page;
+          NextToken = page.NextToken;
+        } while (NextToken);
+      })(),
+      (page) => page.Items,
+    );
+    for (const api of httpApis) {
       if (!api.ApiId) continue;
       let referencesAiLambda = false;
       try {
@@ -82,8 +103,8 @@ export async function discoverApiGateway(
             integration.IntegrationUri?.includes(arn),
           ),
         );
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "API Gateway GetIntegrations", error);
       }
       if (!referencesAiLambda) continue;
 
@@ -98,8 +119,8 @@ export async function discoverApiGateway(
         metadata: { protocolType: api.ProtocolType, apiVersion: "v2" },
       });
     }
-  } catch {
-    // best-effort
+  } catch (error) {
+    noteLookupFailure(clients, "API Gateway GetApis", error);
   }
 
   return resources;

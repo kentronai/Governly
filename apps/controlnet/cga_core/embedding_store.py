@@ -286,6 +286,9 @@ class EmbeddingStore:
             FROM router_prompts rp
             WHERE rp.is_active = true
               AND rp.category IS NOT NULL
+              -- the store is shared by every tenant: only global rows, never
+              -- tenant-tagged ones, may train it
+              AND rp.metadata->>'tenant_id' IS NULL
         """)
         
         result = await db_session.execute(query)

@@ -29,7 +29,7 @@ async function resolveTenant(tenantSlugOrId: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
@@ -57,6 +57,10 @@ export async function POST(request: NextRequest) {
   const tenant = await resolveTenant(tenantSlugOrId);
   if (!tenant) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  }
+  // Only members of the tenant may mint a Connect session that binds to it.
+  if (tenant.id !== orgId) {
+    return NextResponse.json({ error: "Tenant access denied" }, { status: 403 });
   }
 
   // Optional: validate the integration row belongs to this tenant so we only

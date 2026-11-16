@@ -1207,6 +1207,9 @@ const PoliciesTab = () => {
   const { tenant } = useTenant();
   const paramsFromHook = useParams();
   const applicationId = paramsFromHook.applicationId as string;
+  // Route slug is available immediately; tenant context loads async (links
+  // built from tenant?.slug pointed at /undefined/... until then).
+  const tenantSlug = paramsFromHook.tenant as string;
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const authAxios = useAuthAxios();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -1428,7 +1431,7 @@ const PoliciesTab = () => {
         <Button
           onClick={() =>
             router.push(
-              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/create-new-policy`,
+              `/${tenantSlug}/applications/${applicationId}/control-net/policies/create-new-policy`,
             )
           }
         >
@@ -1475,7 +1478,7 @@ const PoliciesTab = () => {
                       className="flex items-center gap-2  hover:text-blue-600 hover:underline transition-colors"
                       onClick={() =>
                         router.push(
-                          `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`,
+                          `/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}`,
                         )
                       }
                     >
@@ -1520,7 +1523,7 @@ const PoliciesTab = () => {
                         <DropdownMenuItem
                           onClick={() =>
                             router.push(
-                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}`,
+                              `/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}`,
                             )
                           }
                         >
@@ -1538,7 +1541,7 @@ const PoliciesTab = () => {
                         <DropdownMenuItem
                           onClick={() =>
                             router.push(
-                              `/${tenant?.slug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`,
+                              `/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`,
                             )
                           }
                         >

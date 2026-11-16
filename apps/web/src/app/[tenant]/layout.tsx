@@ -183,8 +183,8 @@ export default async function TenantLayout({
   const { tenant: tenantSlug } = await params;
   const { userId, orgId, sessionClaims } = await auth();
 
-  const pathname =
-    headersList.get("x-pathname") || headersList.get("referer") || "";
+  // Full request path + query, set by middleware (layouts get no pathname).
+  const requestPath = headersList.get("x-pathname") || "";
 
   // Redirect to sign-in if not authenticated
   if (!userId) {
@@ -212,7 +212,11 @@ export default async function TenantLayout({
     const activeTenant = orgId ? await ensureTenantForOrg(orgId) : null;
 
     if (activeTenant && tenantRouteAliases.has(tenantSlug)) {
-      redirect(`/${activeTenant.slug}/${tenantSlug}`);
+      // Keep the whole path and query, not just the first segment.
+      const rest = requestPath.startsWith(`/${tenantSlug}`)
+        ? requestPath
+        : `/${tenantSlug}`;
+      redirect(`/${activeTenant.slug}${rest}`);
     }
 
     redirect("/");

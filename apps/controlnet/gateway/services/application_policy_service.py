@@ -33,7 +33,9 @@ async def resolve_application_policy(
     Return (policy UUID, resolution source).
 
     Resolution order:
-      1. An explicit policy id, when the request names one for its application.
+      1. An explicit policy id, when the request names one actively linked to
+         its application. Without an application, an explicit id is honoured
+         only when the tenant has no enabled default.
       2. The application's active default policy.
       3. The tenant-wide default policy (policies.is_tenant_default) — this is
          the "enable once, enforce everywhere" fallback that applies whenever an
@@ -43,12 +45,16 @@ async def resolve_application_policy(
     that selects its own T0/T1/T2 policy is never overridden by the global one.
     """
     if not application_id:
-        if explicit_policy_id:
-            return explicit_policy_id, "explicit"
         async with get_session() as session:
             tenant_default = await _resolve_tenant_default_policy(session, tenant_id)
+        # An enabled tenant default is enforced on all traffic without an
+        # application: naming another (weaker) policy must not bypass it.
         if tenant_default:
             return tenant_default, "tenant_default"
+        if explicit_policy_id:
+            # Tenant ownership is enforced when PolicyCache loads it (the
+            # lookup is scoped by tenant_id), so a foreign id fails closed.
+            return explicit_policy_id, "explicit"
         return None, "unresolved"
 
     async with get_session() as session:
@@ -62,6 +68,7 @@ async def resolve_application_policy(
                   AND ap.application_id::text = :application_id
                   AND a.tenant_id = :tenant_id
                   AND a.deleted_at IS NULL
+                  AND ap.is_active = true
                   AND p.tenant_id = :tenant_id
                   AND p.is_active = true
                   AND p.deleted_at IS NULL

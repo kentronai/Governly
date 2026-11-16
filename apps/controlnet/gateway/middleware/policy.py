@@ -24,86 +24,47 @@ class PolicyMiddleware(BaseHTTPMiddleware):
     5. Pass through to next middleware
     """
     
+    # Only the guarded routes use a policy. Everything else (/v1/policies,
+    # /v1/guardrails, /v1/cache, /v1/observability, ...) passes straight through.
+    POLICY_PATHS = ("/v1/chat/completions", "/v1/guard/check")
+
     async def dispatch(self, request: Request, call_next):
-        # Skip for health checks and endpoints that don't need policies
-        skip_paths = [
-            "/healthz", 
-            "/readyz", 
-            "/health", 
-            "/",
-            "/v1/router/sync-to-lancedb",     # LanceDB sync doesn't need policy
-            "/v1/router/bulk-upload",         # Router training doesn't need policy
-            "/v1/router/test-prompt",        # Router test endpoint doesn't need policy
-            "/v1/router/config/",            # Router config endpoints don't need policy
-            "/v1/models/",                    # Model download endpoints
-            "/docs",                          # API documentation
-            "/redoc",                         # API documentation
-            "/openapi.json",                  # OpenAPI spec
-        ]
-        
-        # Check if path should skip policy loading
-        if any(request.url.path.startswith(skip_path) for skip_path in skip_paths):
+        if request.url.path not in self.POLICY_PATHS:
             return await call_next(request)
-        
+
+        policy_id = request.headers.get("x-policy-id")
+        application_id = request.headers.get("x-application-id")
+        tenant_id = getattr(request.state, "tenant_id", None)
+
+        # No header? The route resolves policy from its JSON body or the tenant
+        # default; never pre-load the global settings default here.
+        if not tenant_id or not (policy_id or application_id):
+            return await call_next(request)
+
         try:
-            # Get policy_id from header or use system default
-            policy_id = request.headers.get("x-policy-id")
-            application_id = request.headers.get("x-application-id")
-
-            # Ensure tenant_id is set (from AuthenticationMiddleware)
-            if not hasattr(request.state, 'tenant_id') or not request.state.tenant_id:
-                logger.warning(f"Policy middleware: tenant_id not set for {request.url.path}")
-                return await call_next(request)
-
             if application_id:
                 from gateway.services.application_policy_service import resolve_application_policy
                 policy_id, source = await resolve_application_policy(
-                    tenant_id=request.state.tenant_id,
+                    tenant_id=tenant_id,
                     application_id=application_id,
                     explicit_policy_id=policy_id,
                 )
                 request.state.application_id = application_id
                 request.state.policy_resolution_source = source
-            
-            if not policy_id and "/chat/completions" in request.url.path:
-                # The chat pipeline can also resolve application_id/policy_id
-                # from its JSON body. Do not pre-load an unrelated global
-                # policy before that body has been parsed.
-                return await call_next(request)
-            if not policy_id:
-                # Use system default policy (configured in settings)
-                # PolicyCache handles this via default_policy_id from settings
-                policy_id = None  # PolicyCache will use default_policy_id if None
-            
-            # Load policy from cache
-            policy_cache = request.app.state.policy_cache
-            compiled_guards, policy_metadata = await policy_cache.get_policy(
-                tenant_id=request.state.tenant_id,
-                policy_id=policy_id
-            )
-            
-            # Attach to request state
-            request.state.policy_id = policy_id
-            request.state.compiled_guards = compiled_guards
-            request.state.policy_metadata = policy_metadata
-            # Extract policy_hash from metadata for observability logging
-            request.state.policy_hash = policy_metadata.get("hash", "unknown")
-            
-            # Extract policy_hash from metadata for observability logging
-            request.state.policy_hash = policy_metadata.get("hash", "unknown") if policy_metadata else "unknown"
-            
+
+            if policy_id:
+                policy_cache = request.app.state.policy_cache
+                compiled_guards, policy_metadata = await policy_cache.get_policy(
+                    tenant_id=tenant_id,
+                    policy_id=policy_id,
+                )
+                request.state.policy_id = policy_id
+                request.state.compiled_guards = compiled_guards
+                request.state.policy_metadata = policy_metadata
+                request.state.policy_hash = (policy_metadata or {}).get("hash", "unknown")
         except Exception as e:
-            logger.error(f"Policy loading error: {e}")
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "error": {
-                        "type": "policy_not_found",
-                        "message": str(e)
-                    }
-                }
-            )
-        
-        # Continue to next middleware
+            # The route's own pipeline fails closed with a proper violation;
+            # this middleware only pre-populates observability state.
+            logger.warning(f"Policy pre-load skipped for {request.url.path}: {e}")
+
         return await call_next(request)

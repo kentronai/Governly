@@ -1,5 +1,5 @@
 import { Shield, X, AlertTriangle, CheckCircle, Calendar } from "lucide-react";
-import { getScoreColor, getRiskColor } from "./page";
+import { getScoreColor, getRiskColor } from "./tools";
 import { Tool } from "./tools";
 
 const MultiComparisonModal: React.FC<{

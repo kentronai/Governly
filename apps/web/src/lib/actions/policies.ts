@@ -9,6 +9,7 @@ import { eq, and, isNull, inArray } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createAuditEvent } from "@/lib/server/audit";
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import { getPolicyWithDetails } from "@/lib/queries/policies";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 
@@ -21,6 +22,7 @@ export interface UpdatePolicyInput {
 export const getPolicyById = async (tenantSlug: string, id: string) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlug);
 
   const tenantRow = await db
     .select()
@@ -68,6 +70,7 @@ export const getPolicyById = async (tenantSlug: string, id: string) => {
 export const updatePolicy = async (input: UpdatePolicyInput) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(input.tenantSlug);
 
   const tenantRow = await db
     .select()
@@ -87,7 +90,15 @@ export const updatePolicy = async (input: UpdatePolicyInput) => {
 
   if (!existingPolicy) throw new Error("Policy not found");
 
-  const { id, tenantSlug, ...updateData } = input;
+  // Never let the caller rewrite ownership fields via the open-ended input.
+  const {
+    id,
+    tenantSlug,
+    tenantId: _tenantId,
+    createdBy: _createdBy,
+    createdAt: _createdAt,
+    ...updateData
+  } = input;
 
   const updatedPolicy = await db
     .update(policies)
@@ -122,6 +133,7 @@ export const updatePolicy = async (input: UpdatePolicyInput) => {
 export const deletePolicy = async (tenantSlug: string, id: string) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlug);
 
   const tenantRow = await db
     .select()
@@ -167,6 +179,7 @@ export const getPolicyDetails = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlug);
 
   const tenantRow = await db
     .select()
@@ -207,6 +220,7 @@ export const getPolicyDetails = async (
 export const getTenantPolicies = async (tenantSlugOrId: string) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlugOrId);
 
   // Try to find tenant by ID first, then by slug
   let tenantRow = await db
@@ -269,6 +283,7 @@ export const getApplicationPolicies = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlugOrId);
 
   // Try to find tenant by ID first, then by slug
   let tenantRow = await db

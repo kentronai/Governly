@@ -4,6 +4,7 @@
 
 "use server";
 
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import { db, applicationDocumentation, applications, tenants } from "@db";
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -24,21 +25,8 @@ export const getDocumentation = async (input: GetDocumentationInput) => {
   if (!input.riskId) {
     input.riskId = "";
   }
-  // Try to find tenant by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  const tenantId = tenantRow[0].id;
+  // Must be the caller's own org: server actions are public endpoints.
+  const { tenantId } = await requireTenantMember(input.tenantId);
 
   // Verify application belongs to tenant
   const app = await db
@@ -98,21 +86,8 @@ export const upsertDocumentation = async (input: UpsertDocumentationInput) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find tenant by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  const tenantId = tenantRow[0].id;
+  // Must be the caller's own org: server actions are public endpoints.
+  const { tenantId } = await requireTenantMember(input.tenantId);
 
   // Verify application belongs to tenant
   const app = await db

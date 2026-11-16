@@ -5,7 +5,11 @@
 "use server";
 
 import { db, stakeholders } from "@db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import {
+  requireActiveTenant,
+  requireTenantApplication,
+} from "@/lib/server/tenant-access";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
@@ -22,6 +26,7 @@ interface CreateStakeholderInput {
 }
 
 export const createStakeholder = async (input: CreateStakeholderInput) => {
+  await requireTenantApplication(input.tenantId, input.applicationId);
   return withApplicationTracking(input.applicationId, async () => {
     const { userId } = await auth();
 
@@ -38,7 +43,7 @@ export const createStakeholder = async (input: CreateStakeholderInput) => {
       })
       .returning();
 
-    revalidatePath(`/applications/${input.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -62,8 +67,9 @@ export const updateStakeholder = async (
   input: Partial<CreateStakeholderInput>,
 ) => {
   // Get the stakeholder first to get the applicationId
+  const { tenantId } = await requireActiveTenant();
   const existingStakeholder = await db.query.stakeholders.findFirst({
-    where: eq(stakeholders.id, id),
+    where: and(eq(stakeholders.id, id), eq(stakeholders.tenantId, tenantId)),
   });
 
   if (!existingStakeholder) {
@@ -82,7 +88,8 @@ export const updateStakeholder = async (
       const [stakeholder] = await db
         .update(stakeholders)
         .set({
-          ...input,
+          // tenant/application are fixed once created
+          ...{ ...input, tenantId: undefined, applicationId: undefined },
           updatedBy: userId,
           updatedAt: new Date().toISOString(),
         })
@@ -93,7 +100,7 @@ export const updateStakeholder = async (
         throw new Error("Stakeholder not found");
       }
 
-      revalidatePath(`/applications/${stakeholder.applicationId}`);
+      revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
       try {
         await createAuditEvent({
@@ -115,8 +122,9 @@ export const updateStakeholder = async (
 
 export const deleteStakeholder = async (id: string) => {
   // Get the stakeholder first to get the applicationId
+  const { tenantId } = await requireActiveTenant();
   const existingStakeholder = await db.query.stakeholders.findFirst({
-    where: eq(stakeholders.id, id),
+    where: and(eq(stakeholders.id, id), eq(stakeholders.tenantId, tenantId)),
   });
 
   if (!existingStakeholder) {
@@ -141,7 +149,7 @@ export const deleteStakeholder = async (id: string) => {
         throw new Error("Stakeholder not found");
       }
 
-      revalidatePath(`/applications/${stakeholder.applicationId}`);
+      revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
       try {
         await createAuditEvent({

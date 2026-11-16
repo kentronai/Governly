@@ -1,4 +1,5 @@
 "use server";
+import { requireTenantMember } from "@/lib/server/tenant-access";
 
 import { db, observabilityLogs, applicationPolicies } from "@db";
 import { and, eq, desc, isNotNull, sql, ilike, gte, or } from "drizzle-orm";
@@ -43,6 +44,7 @@ export const getApplicationRecentEndpoints = async ({
   show?: string;
   search?: string;
 }): Promise<RecentEndpointsPaginatedResponse> => {
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   const offset = (page - 1) * limit;
 
   const filters: any[] = [
@@ -123,6 +125,7 @@ export const getTenantRecentEndpoints = async ({
   show?: string;
   search?: string;
 }): Promise<RecentEndpointsPaginatedResponse> => {
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   const offset = (page - 1) * limit;
 
   const filters: any[] = [
@@ -215,6 +218,7 @@ export const getApplicationGraphStats = async ({
   tenantId: string;
   applicationId: string;
 }): Promise<RequestStatsGraphResponse> => {
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 30);
   const startDateStr = startDate.toISOString(); // ✅ Convert to ISO string
@@ -331,6 +335,7 @@ export const getTenantGraphStats = async ({
 }: {
   tenantId: string;
 }): Promise<RequestStatsGraphResponse> => {
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 30);
   const startDateStr = startDate.toISOString(); // ✅ Convert to ISO string

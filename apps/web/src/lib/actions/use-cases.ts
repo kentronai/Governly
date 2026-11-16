@@ -11,6 +11,10 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
 import { createAuditEvent } from "@/lib/server/audit";
+import {
+  requireActiveTenant,
+  requireTenantApplication,
+} from "@/lib/server/tenant-access";
 
 interface CreateUseCaseInput {
   tenantId: string;
@@ -53,6 +57,7 @@ export const getApplicationUseCaseOptions = async (applicationId: string) => {
 
 // Create use case
 export const createUseCase = async (input: CreateUseCaseInput) => {
+  await requireTenantApplication(input.tenantId, input.applicationId);
   return withApplicationTracking(input.applicationId, async () => {
     const { userId } = await auth();
 
@@ -69,7 +74,7 @@ export const createUseCase = async (input: CreateUseCaseInput) => {
       })
       .returning();
 
-    revalidatePath(`/applications/${input.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -92,6 +97,7 @@ export const createUseCase = async (input: CreateUseCaseInput) => {
 export const createUseCaseWithRisks = async (
   useCaseInput: CreateUseCaseInput,
 ) => {
+  await requireTenantApplication(useCaseInput.tenantId, useCaseInput.applicationId);
   return withApplicationTracking(useCaseInput.applicationId, async () => {
     const { userId } = await auth();
 
@@ -109,7 +115,7 @@ export const createUseCaseWithRisks = async (
       })
       .returning();
 
-    revalidatePath(`/applications/${useCaseInput.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -137,8 +143,9 @@ export const updateUseCase = async (
   input: Partial<CreateUseCaseInput>,
 ) => {
   // Get the use case first to get the applicationId
+  const { tenantId } = await requireActiveTenant();
   const existingUseCase = await db.query.useCases.findFirst({
-    where: eq(useCases.id, id),
+    where: and(eq(useCases.id, id), eq(useCases.tenantId, tenantId)),
   });
 
   if (!existingUseCase) {
@@ -155,7 +162,8 @@ export const updateUseCase = async (
     const [useCase] = await db
       .update(useCases)
       .set({
-        ...input,
+        // tenant/application are fixed once created
+        ...{ ...input, tenantId: undefined, applicationId: undefined },
         updatedBy: userId,
         updatedAt: new Date().toISOString(),
       })
@@ -166,7 +174,7 @@ export const updateUseCase = async (
       throw new Error("Use case not found");
     }
 
-    revalidatePath(`/applications/${useCase.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({
@@ -188,8 +196,9 @@ export const updateUseCase = async (
 // Delete use case (hard delete) and cascade delete associated risk
 export const deleteUseCase = async (id: string) => {
   // Get the use case first to get the applicationId for revalidation
+  const { tenantId } = await requireActiveTenant();
   const existingUseCase = await db.query.useCases.findFirst({
-    where: eq(useCases.id, id),
+    where: and(eq(useCases.id, id), eq(useCases.tenantId, tenantId)),
   });
 
   if (!existingUseCase) {
@@ -209,7 +218,7 @@ export const deleteUseCase = async (id: string) => {
     // Then delete the use case (hard delete)
     await db.delete(useCases).where(eq(useCases.id, id));
 
-    revalidatePath(`/applications/${existingUseCase.applicationId}`);
+    revalidatePath("/[tenant]/applications/[applicationId]", "layout");
 
     try {
       await createAuditEvent({

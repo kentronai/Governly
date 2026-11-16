@@ -16,7 +16,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/debug/test-input-guards")
+@router.post("/test-input-guards")
 async def test_input_guards(
     request: Request,
     context: TenantContext = Depends(require_tenant_auth)

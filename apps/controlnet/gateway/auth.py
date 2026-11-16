@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 # This prevents DB calls on every request (was 10-50ms latency!)
 # Cache format: {api_key: (ApiKeyContext, expiry_timestamp)}
 _api_key_cache: Dict[str, tuple[ApiKeyContext, float]] = {}
-_API_KEY_CACHE_TTL = 300  # 5 minutes cache
+# ponytail: a revoked key stays valid up to this long on this instance; add a
+# Redis revocation channel if that window must be zero.
+_API_KEY_CACHE_TTL = 30
 
 
 @dataclass(frozen=True)
@@ -175,8 +177,12 @@ async def require_auth(request: Request) -> AuthContext:
             # Cache miss - resolve from DB and cache result
             async for db in get_db():
                 api_key_context = await resolve_api_key(api_key, db)
-                # Cache for 5 minutes
-                _api_key_cache[api_key] = (api_key_context, now + _API_KEY_CACHE_TTL)
+                # Never cache past the key's own expiry, so the cache-hit
+                # `now < expiry` check also enforces expires_at.
+                expiry = now + _API_KEY_CACHE_TTL
+                if api_key_context.expires_at is not None:
+                    expiry = min(expiry, api_key_context.expires_at.timestamp())
+                _api_key_cache[api_key] = (api_key_context, expiry)
                 return create_auth_context_from_api_key(
                     api_key_context, 
                     request.url.path
@@ -214,7 +220,7 @@ async def require_tenant_auth(request: Request) -> TenantContext:
     
     Tenant ID resolution:
     1. If API key mode: Use tenant_id from API key context
-    2. If Clerk JWT mode: Use organization_id from JWT (org_id claim), fallback to X-Tenant-ID header
+    2. If Clerk JWT mode: Use organization_id from the signed JWT only
     """
     try:
         auth_context = await require_auth(request)
@@ -229,16 +235,15 @@ async def require_tenant_auth(request: Request) -> TenantContext:
                 )
             tenant_id = auth_context.api_key_context.tenant_id
         else:
-            # Clerk JWT mode: use organization_id from JWT (primary), fallback to X-Tenant-ID header
+            # Clerk JWT mode: the tenant is the org in the signed token. An
+            # X-Tenant-ID header is caller-controlled and is never trusted on
+            # its own: a user with no active org could name any tenant.
             tenant_id = auth_context.organization_id
             if not tenant_id:
-                # Fallback to header if organization_id not in JWT
-                tenant_id = extract_tenant_id(request)
-                if not tenant_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Missing tenant identifier. JWT must contain 'org_id' claim or provide X-Tenant-ID header"
-                    )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No active organization in token. Select an organization and retry."
+                )
         
         return TenantContext(tenant_id=tenant_id, auth=auth_context)
         

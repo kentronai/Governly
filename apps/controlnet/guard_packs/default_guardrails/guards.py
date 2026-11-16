@@ -16,6 +16,7 @@ import re
 from typing import List, Literal, Optional, Dict, Any
 
 from cga_core import guard, Violation, Ctx, Either, Right_, Left_, Guard
+from cga_core.message_text import map_messages_text, messages_text
 
 
 # ============================================================================
@@ -92,8 +93,7 @@ def profanity_detect(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+                text = messages_text(messages)
         
         if not isinstance(text, str) or not text.strip():
             return Right_(ctx)
@@ -212,8 +212,7 @@ def jailbreak_detect(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+                text = messages_text(messages)
         
         if not isinstance(text, str) or not text.strip():
             return Right_(ctx)
@@ -343,8 +342,7 @@ def toxicity_detect(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+                text = messages_text(messages)
         
         if not isinstance(text, str) or not text.strip():
             return Right_(ctx)
@@ -507,12 +505,7 @@ def harmful_instructions_detect(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = (
-                    last_msg.get("content", "")
-                    if isinstance(last_msg, dict)
-                    else str(last_msg)
-                )
+                text = messages_text(messages)
 
         if not isinstance(text, str) or not text.strip():
             return Right_(ctx)
@@ -660,8 +653,7 @@ def pii_detect(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+                text = messages_text(messages)
         
         if not isinstance(text, str) or not text.strip():
             return Right_(ctx)
@@ -786,33 +778,35 @@ def pii_redact(
 
     async def run(ctx: Ctx) -> Either:
         """Redact PII from context text, always passing through."""
-        text = ctx.get("output", "")
 
-        if not text and "messages" in ctx:
-            messages = ctx.get("messages", [])
-            if isinstance(messages, list) and messages:
-                last_msg = messages[-1]
-                text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+        def redact(text: str) -> str:
+            all_spans = []
+            for pii_type in types:
+                pattern = PII_PATTERNS[pii_type]
+                for match in pattern.finditer(text):
+                    all_spans.append({"start": match.start(), "end": match.end(), "type": pii_type})
+            redacted_text = text
+            for span in sorted(all_spans, key=lambda s: s["start"], reverse=True):
+                replacement = f"[{span['type']}]" if mode == "mask" else ""
+                redacted_text = redacted_text[:span["start"]] + replacement + redacted_text[span["end"]:]
+            return redacted_text
 
-        if not isinstance(text, str) or not text.strip():
-            return Right_(ctx)
+        output = ctx.get("output", "")
+        if isinstance(output, str) and output.strip():
+            redacted = redact(output)
+            return Right_(ctx if redacted == output else {**ctx, "output": redacted})
 
-        all_spans = []
-        for pii_type in types:
-            pattern = PII_PATTERNS[pii_type]
-            for match in pattern.finditer(text):
-                all_spans.append({"start": match.start(), "end": match.end(), "type": pii_type})
-
-        if not all_spans:
-            return Right_(ctx)
-
-        redacted_text = text
-        for span in sorted(all_spans, key=lambda s: s["start"], reverse=True):
-            replacement = f"[{span['type']}]" if mode == "mask" else ""
-            redacted_text = redacted_text[:span["start"]] + replacement + redacted_text[span["end"]:]
-
-        new_ctx = dict(ctx)
-        new_ctx["output"] = redacted_text
-        return Right_(new_ctx)
+        # Input phase: rewrite the messages themselves (that is what the
+        # provider receives). System prompts are the app's own text; leave them.
+        messages = ctx.get("messages")
+        if isinstance(messages, list) and messages:
+            new_messages = [
+                m if isinstance(m, dict) and m.get("role") in ("system", "developer")
+                else map_messages_text([m], redact)[0]
+                for m in messages
+            ]
+            if new_messages != messages:
+                return Right_({**ctx, "messages": new_messages})
+        return Right_(ctx)
 
     return run

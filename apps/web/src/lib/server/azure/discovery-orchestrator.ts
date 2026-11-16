@@ -21,6 +21,7 @@ import {
   type AzureGraphResource,
 } from "./resource-normalizer";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
+import { retireMissingAgents } from "@/lib/server/agents/prune-orphans";
 
 export interface AzureConnectionRecord {
   azureTenantId: string;
@@ -157,114 +158,129 @@ export async function runAzureDiscoveryScan(
     const resources = await discoverAzureResources(connection);
     const correlated = correlateAzureResources(resources);
     const now = new Date().toISOString();
+    const warnings: string[] = [];
     for (const agent of correlated) {
-      const ownership = await detectOwnership(agent);
-      const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
-      const autonomy = await classifyAutonomy(tenantId, facts);
-      const risk = await assessRisk(tenantId, facts);
-      const recommendations = generateRecommendations(
-        facts,
-        autonomy,
-        ownership,
-      );
-      const existing = await db.query.agents.findFirst({
-        where: and(
-          eq(agents.azureConnectionId, connectionId),
-          eq(agents.externalAgentId, agent.externalAgentId),
-        ),
-      });
-      const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
-      const values = {
-        profile,
-        tenantId,
-        connectionId: null,
-        azureConnectionId: connectionId,
-        externalAgentId: agent.externalAgentId,
-        name: agent.name,
-        platform: agent.platform,
-        region: agent.region,
-        accountId: connection.subscriptionId,
-        model:
-          (agent.resources.find(
-            (resource) => resource.resourceType === "azure_openai_account",
-          )?.metadata.kind as string) ?? null,
-        knowledgeBaseId: null,
-        iamRoleArn: null,
-        credentialType: "service_account" as const,
-        ownerUserId: ownership.ownerUserId,
-        ownerSource: ownership.ownerSource,
-        ownerConfidence: String(ownership.ownerConfidence),
-        businessFunction: ownership.businessFunction,
-        status: (facts.isDormant ? "dormant" : "active") as
-          | "dormant"
-          | "active",
-        lastUsedAt: null,
-        capabilities: facts,
-        autonomyLevel: autonomy.level,
-        autonomyReason: autonomy.reason,
-        autonomyEvidence: autonomy.evidence,
-        autonomyConfidence: String(autonomy.confidence),
-        autonomyClassifiedAt: now,
-        riskScore: String(risk.score),
-        riskLevel: risk.level,
-        riskFactors: risk.factors,
-        discoverySource: agent.discoverySource,
-        lastSeenAt: now,
-        syncStatus: "success" as const,
-        rawMetadata: {
-          ...profileMeta,
-          resourceCount: agent.resources.length,
-          provider: "azure",
-        },
-        updatedAt: now,
-      };
-      let agentId: string;
-      if (existing) {
-        agentId = existing.id;
-        await db.update(agents).set(values).where(eq(agents.id, existing.id));
-      } else {
-        const [created] = await db
-          .insert(agents)
-          .values({ ...values, firstSeenAt: now })
-          .returning();
-        agentId = created.id;
-      }
-      await db
-        .delete(agentResources)
-        .where(eq(agentResources.agentId, agentId));
-      if (agent.resources.length)
-        await db.insert(agentResources).values(
-          agent.resources.map((resource) => ({
-            tenantId,
-            agentId,
-            resourceType: resource.resourceType,
-            resourceArn: resource.resourceArn,
-            resourceName: resource.resourceName,
-            region: resource.region,
-            rawData: resource.metadata,
-          })),
+      try {
+        const ownership = await detectOwnership(agent);
+        const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
+        const autonomy = await classifyAutonomy(tenantId, facts);
+        const risk = await assessRisk(tenantId, facts);
+        const recommendations = generateRecommendations(
+          facts,
+          autonomy,
+          ownership,
         );
-      await db
-        .delete(agentRecommendations)
-        .where(
-          and(
-            eq(agentRecommendations.agentId, agentId),
-            eq(agentRecommendations.status, "open"),
+        const existing = await db.query.agents.findFirst({
+          where: and(
+            eq(agents.azureConnectionId, connectionId),
+            eq(agents.externalAgentId, agent.externalAgentId),
           ),
-        );
-      if (recommendations.length)
-        await db.insert(agentRecommendations).values(
-          recommendations.map((item) => ({
-            tenantId,
-            agentId,
-            recommendationType: item.recommendationType,
-            reason: item.reason,
-            severity: item.severity,
-            suggestedFix: item.suggestedFix,
-          })),
-        );
-      await syncAgentPolicyEvaluations(tenantId, agentId);
+        });
+        const { profile, rawMetadata: profileMeta } = composeProfile(agent, existing?.rawMetadata);
+        const values = {
+          profile,
+          tenantId,
+          connectionId: null,
+          azureConnectionId: connectionId,
+          externalAgentId: agent.externalAgentId,
+          name: agent.name,
+          platform: agent.platform,
+          region: agent.region,
+          accountId: connection.subscriptionId,
+          model:
+            (agent.resources.find(
+              (resource) => resource.resourceType === "azure_openai_account",
+            )?.metadata.kind as string) ?? null,
+          knowledgeBaseId: null,
+          iamRoleArn: null,
+          credentialType: "service_account" as const,
+          ownerUserId: ownership.ownerUserId,
+          ownerSource: ownership.ownerSource,
+          ownerConfidence: String(ownership.ownerConfidence),
+          businessFunction: ownership.businessFunction,
+          status: (facts.isDormant ? "dormant" : "active") as
+            | "dormant"
+            | "active",
+          lastUsedAt: null,
+          capabilities: facts,
+          autonomyLevel: autonomy.level,
+          autonomyReason: autonomy.reason,
+          autonomyEvidence: autonomy.evidence,
+          autonomyConfidence: String(autonomy.confidence),
+          autonomyClassifiedAt: now,
+          riskScore: String(risk.score),
+          riskLevel: risk.level,
+          riskFactors: risk.factors,
+          discoverySource: agent.discoverySource,
+          lastSeenAt: now,
+          syncStatus: "success" as const,
+          rawMetadata: {
+            ...profileMeta,
+            resourceCount: agent.resources.length,
+            provider: "azure",
+          },
+          updatedAt: now,
+        };
+        let agentId: string;
+        if (existing) {
+          agentId = existing.id;
+          await db.update(agents).set(values).where(eq(agents.id, existing.id));
+        } else {
+          const [created] = await db
+            .insert(agents)
+            .values({ ...values, firstSeenAt: now })
+            .returning();
+          agentId = created.id;
+        }
+        await db
+          .delete(agentResources)
+          .where(eq(agentResources.agentId, agentId));
+        if (agent.resources.length)
+          await db.insert(agentResources).values(
+            agent.resources.map((resource) => ({
+              tenantId,
+              agentId,
+              resourceType: resource.resourceType,
+              resourceArn: resource.resourceArn,
+              resourceName: resource.resourceName,
+              region: resource.region,
+              rawData: resource.metadata,
+            })),
+          );
+        await db
+          .delete(agentRecommendations)
+          .where(
+            and(
+              eq(agentRecommendations.agentId, agentId),
+              eq(agentRecommendations.status, "open"),
+            ),
+          );
+        if (recommendations.length)
+          await db.insert(agentRecommendations).values(
+            recommendations.map((item) => ({
+              tenantId,
+              agentId,
+              recommendationType: item.recommendationType,
+              reason: item.reason,
+              severity: item.severity,
+              suggestedFix: item.suggestedFix,
+            })),
+          );
+        await syncAgentPolicyEvaluations(tenantId, agentId);
+      } catch (error) {
+        // One bad agent (e.g. deleted mid-scan) must not abort the scan; it
+        // makes the scan partial so nothing is retired this run.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[azure-discovery] agent ${agent.externalAgentId} failed:`, error);
+        warnings.push(`agent ${agent.externalAgentId}: ${message}`);
+      }
     }
+    // Only a complete scan (no per-agent failures) retires missing agents.
+    await retireMissingAgents(
+      and(eq(agents.tenantId, tenantId), eq(agents.azureConnectionId, connectionId))!,
+      correlated.map((a) => a.externalAgentId),
+      warnings,
+    );
     const resourceCounts = resources.reduce<Record<string, number>>(
       (result, resource) => ({
         ...result,
@@ -279,6 +295,7 @@ export async function runAzureDiscoveryScan(
         finishedAt: now,
         agentsDiscovered: correlated.length,
         resourcesScanned: resourceCounts,
+        errorMessage: warnings.length ? warnings.join("; ") : null,
       })
       .where(eq(discoveryScans.id, scan.id));
     await db

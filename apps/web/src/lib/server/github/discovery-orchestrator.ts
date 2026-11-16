@@ -10,7 +10,7 @@
  * dependency manifests show an agent framework or LLM SDK.
  */
 
-import { and, eq, ne, notInArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import {
   agentPolicyEvaluations,
   agentRecommendations,
@@ -386,8 +386,17 @@ export async function runGithubDiscoveryScan(
 
     const hosted = await hostedDeploysByRepo(tenantId);
     const found: Array<{ repo: GithubRepo; dir: string; evidence: RepoEvidence }> = [];
+    // Repos (or agent keys) that failed transiently this run: kept as they are,
+    // never retired, and the scan is reported as partial.
+    const failed = new Set<string>();
+    const warnings: string[] = [];
     await mapLimit(repos, REPO_CONCURRENCY, async (repo) => {
-      for (const unit of await gatherEvidence(conn, repo, hosted)) found.push({ repo, ...unit });
+      try {
+        for (const unit of await gatherEvidence(conn, repo, hosted)) found.push({ repo, ...unit });
+      } catch (error) {
+        failed.add(repo.full_name);
+        warnings.push(`${repo.full_name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
 
     const now = new Date().toISOString();
@@ -411,179 +420,201 @@ export async function runGithubDiscoveryScan(
     for (const { repo, dir, evidence } of found) {
       // A folder agent is keyed owner/repo/folder and named after its folder.
       const key = dir ? `${repo.full_name}/${dir}` : repo.full_name;
-      const agentName = dir ? dir.split("/").pop()! : repo.name;
-      if (dir) {
-        const whole = existingRepoRows.find((r) => r.externalAgentId === repo.full_name);
-        if (whole) {
-          await removeAgent(whole.id);
-          existingRepoRows.splice(existingRepoRows.indexOf(whole), 1);
-        }
-      }
-      const repoProfile = buildRepoProfile(evidence);
-      // Which cloud agents this repo is the code of, from strongest proof:
-      // 1. the deployed image is tagged with a commit of this repo;
-      // 2. the repo's deploy config names the IaC app the cloud resources carry
-      //    (SST app, CloudFormation stack, Serverless service…) — every agent of
-      //    that app is linked; 3. an explicit repo tag or identical name.
-      const targets: Array<(typeof cloudAgents)[number]> = [];
-      for (const candidate of dir ? [] : cloudAgents) {
-        const cp = readProfile(candidate.profile);
-        const shas = cp.packages
-          .map((p) => p.match(/:([0-9a-f]{40})$/)?.[1])
-          .filter((x): x is string => Boolean(x));
-        let hit = false;
-        for (const sha of Array.from(new Set(shas)).slice(0, 3)) {
-          if (await hasCommit(conn, repo.full_name, sha)) {
-            hit = true;
-            break;
+      try {
+        const agentName = dir ? dir.split("/").pop()! : repo.name;
+        if (dir) {
+          const whole = existingRepoRows.find((r) => r.externalAgentId === repo.full_name);
+          if (whole) {
+            await removeAgent(whole.id);
+            existingRepoRows.splice(existingRepoRows.indexOf(whole), 1);
           }
         }
-        if (!hit && cp.iacApp && (evidence.iacNames ?? []).some((n) => sameIacApp(n, cp.iacApp!))) hit = true;
-        if (hit) targets.push(candidate);
-      }
-      if (!targets.length) {
-        const byName = matchRepoToAgent(key, cloudAgents);
-        if (byName) targets.push(byName);
-      }
-      const target = targets[0] ?? null;
-
-      if (target) {
-        // The repo is the source of these cloud agents: enrich them instead.
-        for (const t of targets) {
-          const raw = (t.rawMetadata ?? {}) as { cloudProfile?: unknown };
-          const cloud = readProfile(raw.cloudProfile ?? t.profile);
-          const profile = mergeProfiles(cloud, repoProfile);
-          await db
-            .update(agents)
-            .set({
-              profile,
-              model: profile.llms[0] ?? undefined,
-              rawMetadata: {
-                ...(t.rawMetadata as object),
-                githubProfile: repoProfile,
-                cloudProfile: cloud,
-              },
-              updatedAt: now,
-            })
-            .where(eq(agents.id, t.id));
+        const repoProfile = buildRepoProfile(evidence);
+        // Which cloud agents this repo is the code of, from strongest proof:
+        // 1. the deployed image is tagged with a commit of this repo;
+        // 2. the repo's deploy config names the IaC app the cloud resources carry
+        //    (SST app, CloudFormation stack, Serverless service…) — every agent of
+        //    that app is linked; 3. an explicit repo tag or identical name.
+        const targets: Array<(typeof cloudAgents)[number]> = [];
+        for (const candidate of dir ? [] : cloudAgents) {
+          const cp = readProfile(candidate.profile);
+          const shas = cp.packages
+            .map((p) => p.match(/:([0-9a-f]{40})$/)?.[1])
+            .filter((x): x is string => Boolean(x));
+          let hit = false;
+          for (const sha of Array.from(new Set(shas)).slice(0, 3)) {
+            if (await hasCommit(conn, repo.full_name, sha)) {
+              hit = true;
+              break;
+            }
+          }
+          if (!hit && cp.iacApp && (evidence.iacNames ?? []).some((n) => sameIacApp(n, cp.iacApp!))) hit = true;
+          if (hit) targets.push(candidate);
         }
-        const stale = existingRepoRows.find((r) => r.externalAgentId === key);
-        if (stale) await removeAgent(stale.id);
-        linked += 1;
-        continue;
-      }
+        if (!targets.length) {
+          const byName = matchRepoToAgent(key, cloudAgents);
+          if (byName) targets.push(byName);
+        }
+        const target = targets[0] ?? null;
 
-      ownRepoNames.push(key);
-      const agent = toCorrelatedAgent(repo, key, agentName);
-      const ownership = await detectOwnership(agent);
-      const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
-      const autonomy = await classifyAutonomy(tenantId, facts);
-      const risk = await assessRisk(tenantId, facts);
-      const recommendations = generateRecommendations(facts, autonomy, ownership);
-      const existing = existingRepoRows.find((r) => r.externalAgentId === key);
+        if (target) {
+          // The repo is the source of these cloud agents: enrich them instead.
+          for (const t of targets) {
+            const raw = (t.rawMetadata ?? {}) as { cloudProfile?: unknown };
+            const cloud = readProfile(raw.cloudProfile ?? t.profile);
+            const profile = mergeProfiles(cloud, repoProfile);
+            await db
+              .update(agents)
+              .set({
+                profile,
+                model: profile.llms[0] ?? undefined,
+                rawMetadata: {
+                  ...(t.rawMetadata as object),
+                  githubProfile: repoProfile,
+                  cloudProfile: cloud,
+                },
+                updatedAt: now,
+              })
+              .where(eq(agents.id, t.id));
+          }
+          const stale = existingRepoRows.find((r) => r.externalAgentId === key);
+          if (stale) await removeAgent(stale.id);
+          linked += 1;
+          continue;
+        }
 
-      const values = {
-        tenantId,
-        connectionId: null,
-        azureConnectionId: null,
-        integrationId,
-        externalAgentId: key,
-        name: agentName,
-        platform: "github" as const,
-        region: "github",
-        accountId: repo.owner.login,
-        model: repoProfile.llms[0] ?? null,
-        knowledgeBaseId: null,
-        iamRoleArn: null,
-        credentialType: null,
-        ownerUserId: ownership.ownerUserId,
-        ownerSource: ownership.ownerSource,
-        ownerConfidence: String(ownership.ownerConfidence),
-        businessFunction: ownership.businessFunction,
-        status: (repoProfile.deployed ? "active" : "inactive") as "active" | "inactive",
-        lastUsedAt: repoProfile.deployedAt,
-        capabilities: facts,
-        autonomyLevel: autonomy.level,
-        autonomyReason: autonomy.reason,
-        autonomyEvidence: autonomy.evidence,
-        autonomyConfidence: String(autonomy.confidence),
-        autonomyClassifiedAt: now,
-        riskScore: String(risk.score),
-        riskLevel: risk.level,
-        riskFactors: risk.factors,
-        discoverySource: "github_repository" as const,
-        lastSeenAt: now,
-        syncStatus: "success" as const,
-        profile: repoProfile,
-        rawMetadata: {
-          provider: "github",
-          evidenceSource: "github_repository_scan",
-          repository: repo.full_name,
-          defaultBranch: repo.default_branch,
-          lastPushedAt: repo.pushed_at,
-        },
-        updatedAt: now,
-      };
+        ownRepoNames.push(key);
+        const agent = toCorrelatedAgent(repo, key, agentName);
+        const ownership = await detectOwnership(agent);
+        const facts = buildCapabilityFacts(agent, ownership.ownerUserId);
+        const autonomy = await classifyAutonomy(tenantId, facts);
+        const risk = await assessRisk(tenantId, facts);
+        const recommendations = generateRecommendations(facts, autonomy, ownership);
+        const existing = existingRepoRows.find((r) => r.externalAgentId === key);
 
-      let agentId: string;
-      if (existing) {
-        agentId = existing.id;
-        await db.update(agents).set(values).where(eq(agents.id, agentId));
-      } else {
-        const [created] = await db
-          .insert(agents)
-          .values({ ...values, firstSeenAt: now })
-          .returning();
-        agentId = created.id;
-      }
-      await db.delete(agentResources).where(eq(agentResources.agentId, agentId));
-      await db.insert(agentResources).values(
-        agent.resources.map((item) => ({
+        const values = {
           tenantId,
-          agentId,
-          resourceType: item.resourceType,
-          resourceArn: item.resourceArn,
-          resourceName: item.resourceName,
-          region: item.region,
-          rawData: { ...item.metadata, lastUpdatedAt: item.lastUpdatedAt },
-        })),
-      );
-      await db
-        .delete(agentRecommendations)
-        .where(and(eq(agentRecommendations.agentId, agentId), eq(agentRecommendations.status, "open")));
-      if (recommendations.length) {
-        await db.insert(agentRecommendations).values(
-          recommendations.map((item) => ({
+          connectionId: null,
+          azureConnectionId: null,
+          integrationId,
+          externalAgentId: key,
+          name: agentName,
+          platform: "github" as const,
+          region: "github",
+          accountId: repo.owner.login,
+          model: repoProfile.llms[0] ?? null,
+          knowledgeBaseId: null,
+          iamRoleArn: null,
+          credentialType: null,
+          ownerUserId: ownership.ownerUserId,
+          ownerSource: ownership.ownerSource,
+          ownerConfidence: String(ownership.ownerConfidence),
+          businessFunction: ownership.businessFunction,
+          status: (repoProfile.deployed ? "active" : "inactive") as "active" | "inactive",
+          lastUsedAt: repoProfile.deployedAt,
+          capabilities: facts,
+          autonomyLevel: autonomy.level,
+          autonomyReason: autonomy.reason,
+          autonomyEvidence: autonomy.evidence,
+          autonomyConfidence: String(autonomy.confidence),
+          autonomyClassifiedAt: now,
+          riskScore: String(risk.score),
+          riskLevel: risk.level,
+          riskFactors: risk.factors,
+          discoverySource: "github_repository" as const,
+          lastSeenAt: now,
+          syncStatus: "success" as const,
+          profile: repoProfile,
+          rawMetadata: {
+            provider: "github",
+            evidenceSource: "github_repository_scan",
+            repository: repo.full_name,
+            defaultBranch: repo.default_branch,
+            lastPushedAt: repo.pushed_at,
+          },
+          updatedAt: now,
+        };
+
+        let agentId: string;
+        if (existing) {
+          agentId = existing.id;
+          await db.update(agents).set(values).where(eq(agents.id, agentId));
+        } else {
+          const [created] = await db
+            .insert(agents)
+            .values({ ...values, firstSeenAt: now })
+            .returning();
+          agentId = created.id;
+        }
+        await db.delete(agentResources).where(eq(agentResources.agentId, agentId));
+        await db.insert(agentResources).values(
+          agent.resources.map((item) => ({
             tenantId,
             agentId,
-            recommendationType: item.recommendationType,
-            reason: item.reason,
-            severity: item.severity,
-            suggestedFix: item.suggestedFix,
+            resourceType: item.resourceType,
+            resourceArn: item.resourceArn,
+            resourceName: item.resourceName,
+            region: item.region,
+            rawData: { ...item.metadata, lastUpdatedAt: item.lastUpdatedAt },
           })),
         );
+        await db
+          .delete(agentRecommendations)
+          .where(and(eq(agentRecommendations.agentId, agentId), eq(agentRecommendations.status, "open")));
+        if (recommendations.length) {
+          await db.insert(agentRecommendations).values(
+            recommendations.map((item) => ({
+              tenantId,
+              agentId,
+              recommendationType: item.recommendationType,
+              reason: item.reason,
+              severity: item.severity,
+              suggestedFix: item.suggestedFix,
+            })),
+          );
+        }
+        await syncAgentPolicyEvaluations(tenantId, agentId);
+      } catch (error) {
+        // One bad agent (e.g. deleted mid-scan) must not abort the scan; it
+        // makes the scan partial so nothing is retired this run.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[github-discovery] agent ${key} failed:`, error);
+        failed.add(key);
+        warnings.push(`agent ${key}: ${message}`);
       }
-      await syncAgentPolicyEvaluations(tenantId, agentId);
     }
 
     // Repos that are gone (or no longer look like agents) retire, never delete.
-    await db
-      .update(agents)
-      .set({ status: "inactive", updatedAt: now })
-      .where(
-        and(
-          eq(agents.integrationId, integrationId),
-          ...(ownRepoNames.length
-            ? [notInArray(agents.externalAgentId, ownRepoNames)]
-            : []),
-        ),
-      );
+    // Only repos this run actually scanned can prove that: a repo that failed
+    // transiently, or fell outside the MAX_REPOS most recently pushed, keeps
+    // its row. When fewer than MAX_REPOS came back the list is complete, so a
+    // repo missing from it was deleted/archived/unshared and does retire.
+    const listComplete = repos.length < MAX_REPOS;
+    const scanned = new Set(repos.map((r) => r.full_name));
+    const repoOf = (key: string) => key.split("/").slice(0, 2).join("/");
+    const retire = existingRepoRows
+      .filter(
+        (r) =>
+          r.externalAgentId &&
+          !ownRepoNames.includes(r.externalAgentId) &&
+          !failed.has(r.externalAgentId) &&
+          !failed.has(repoOf(r.externalAgentId)) &&
+          (listComplete || scanned.has(repoOf(r.externalAgentId))),
+      )
+      .map((r) => r.id);
+    if (retire.length) {
+      await db
+        .update(agents)
+        .set({ status: "inactive", updatedAt: now })
+        .where(inArray(agents.id, retire));
+    }
 
     const resourcesScanned = { github_repository: repos.length };
     const agentsDiscovered = ownRepoNames.length + linked;
+    const partialWarning = warnings.length ? warnings.join("; ") : null;
     await db
       .update(discoveryScans)
-      .set({ status: "completed", finishedAt: now, agentsDiscovered, resourcesScanned, errorMessage: null })
+      .set({ status: "completed", finishedAt: now, agentsDiscovered, resourcesScanned, errorMessage: partialWarning })
       .where(eq(discoveryScans.id, scan.id));
     await db
       .update(integrations)
@@ -592,7 +623,7 @@ export async function runGithubDiscoveryScan(
         isCredentialsAdded: true,
         lastSyncAt: now,
         syncStatus: "success",
-        errorMessage: null,
+        errorMessage: partialWarning,
         configuration: {
           ...((connection.configuration as object) ?? {}),
           lastAgentsDiscovered: agentsDiscovered,
@@ -607,7 +638,7 @@ export async function runGithubDiscoveryScan(
       status: "completed" as const,
       agentsDiscovered,
       resourcesScanned,
-      errorMessage: undefined as string | undefined,
+      errorMessage: partialWarning ?? undefined,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "GitHub discovery failed";

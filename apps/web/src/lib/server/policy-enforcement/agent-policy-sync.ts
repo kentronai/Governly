@@ -494,8 +494,12 @@ export async function syncAgentPolicyEvaluations(
         eq(agentPolicyEvaluations.agentId, agentId),
       ),
     );
+  // Evaluations re-activated below; findings of every other (deactivated or
+  // unlinked) policy are resolved at the end so they don't stay open forever.
+  const activeKeys = new Set<string>();
   for (const policy of activeCompliancePolicies) {
     const policyId = policy.parentPolicyId ?? policy.id;
+    activeKeys.add(`compliance:${policyId}`);
     const evaluation = agent.applicationId
       ? await evaluateApplicationCompliancePolicy({
           tenantId,
@@ -523,6 +527,7 @@ export async function syncAgentPolicyEvaluations(
   }
   const runtime = await runtimeEvaluation(agent);
   if (runtime) {
+    activeKeys.add(`runtime:${runtime.runtimePolicy.id}`);
     await persistEvaluation({
       agent,
       policyType: "runtime",
@@ -531,6 +536,23 @@ export async function syncAgentPolicyEvaluations(
       assignmentSource: "linked_application_default",
       evaluation: runtime.evaluation,
     });
+  }
+  const orphaned = (
+    await db.query.policyFindings.findMany({
+      columns: { id: true, policyType: true, policyId: true },
+      where: and(
+        eq(policyFindings.tenantId, tenantId),
+        eq(policyFindings.agentId, agentId),
+        eq(policyFindings.source, "compliance_evaluation"),
+        eq(policyFindings.status, "open"),
+      ),
+    })
+  ).filter((f) => !activeKeys.has(`${f.policyType}:${f.policyId}`));
+  if (orphaned.length) {
+    await db
+      .update(policyFindings)
+      .set({ status: "resolved", resolvedAt: now, updatedAt: now })
+      .where(inArray(policyFindings.id, orphaned.map((f) => f.id)));
   }
   return {
     compliancePolicies: activeCompliancePolicies.length,

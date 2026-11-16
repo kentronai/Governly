@@ -1,5 +1,6 @@
 "use client";
 
+import { errorToast } from "@/lib/utils/toast";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -155,13 +156,12 @@ export function ModelRegistryList({
         if (res.model) {
           setModels((prev) => [res.model!, ...prev]);
           toast.success("Model created successfully!");
+          setIsModalOpen(false);
         } else {
           toast.error(res.message || "Failed to create model");
         }
       } catch (error: any) {
         toast.error(error.message || "Failed to create model");
-      } finally {
-        setIsModalOpen(false);
       }
     });
   };
@@ -179,7 +179,8 @@ export function ModelRegistryList({
         setSelectedModel(null);
       } catch (error) {
         console.error("Failed to update model:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to update model");
       }
     });
   };
@@ -195,7 +196,8 @@ export function ModelRegistryList({
         setSelectedModel(null);
       } catch (error) {
         console.error("Failed to delete model:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to delete model");
       }
     });
   };

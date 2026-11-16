@@ -6,7 +6,7 @@
  * credential handling and integration-row bookkeeping.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, integrations, langsmithRuns } from "@db";
 import { decryptSecret } from "@/lib/server/crypto";
 import { getConnectionCredentials } from "@/lib/server/nango/client";
@@ -405,6 +405,16 @@ export async function syncLangSmithRuns(
   try {
     // LangSmith caps /runs/query at 100 per page and 422s above it.
     const limit = Math.min(Math.max(options?.limit ?? 100, 1), 100);
+    // Incremental: resume from the newest run already stored (start_time is
+    // inclusive; the upsert below absorbs the overlap). Oldest-first so a sync
+    // that hits the cap resumes exactly where it stopped next time.
+    const [{ since }] = await db
+      .select({
+        // ISO-8601 UTC, the format LangSmith's start_time filter expects.
+        since: sql<string | null>`to_char(max(${langsmithRuns.startTime}) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+      })
+      .from(langsmithRuns)
+      .where(eq(langsmithRuns.integrationId, integrationId));
 
     const { runs, credentials, configuration, filterId, displayName } =
       await withAccess(connection, async (context) => {
@@ -438,19 +448,26 @@ export async function syncLangSmithRuns(
           }
         }
 
-        const query: Record<string, unknown> = {
-          limit,
-          order: "desc",
-          session: [filterId],
-        };
-        const payload = await langsmithApi<{ runs?: LangSmithRunRaw[] }>(
-          context.credentials,
-          "POST",
-          LANGSMITH_ENDPOINTS.runsQuery,
-          query,
-        );
+        // ponytail: at most 1000 runs per sync (first sync: the newest 1000);
+        // later syncs page forward from `since`, so a backlog drains over runs.
+        const runs: LangSmithRunRaw[] = [];
+        let cursor: string | undefined;
+        do {
+          const payload = await langsmithApi<{
+            runs?: LangSmithRunRaw[];
+            cursors?: { next?: string | null };
+          }>(context.credentials, "POST", LANGSMITH_ENDPOINTS.runsQuery, {
+            limit,
+            order: since ? "asc" : "desc",
+            session: [filterId],
+            ...(since ? { start_time: since } : {}),
+            ...(cursor ? { cursor } : {}),
+          });
+          runs.push(...(Array.isArray(payload?.runs) ? payload.runs : []));
+          cursor = payload?.cursors?.next ?? undefined;
+        } while (cursor && runs.length < 1000);
         return {
-          runs: Array.isArray(payload?.runs) ? payload.runs : [],
+          runs,
           ...context,
           configuration,
           filterId,

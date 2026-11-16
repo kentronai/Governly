@@ -14,6 +14,7 @@ from typing import List, Literal, Optional
 import numpy as np
 
 from cga_core import guard, Violation, Ctx, Either, Right_, Left_, Guard
+from cga_core.message_text import messages_text
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,7 @@ def _extract_text(ctx: Ctx) -> str:
     if not text and "messages" in ctx:
         messages = ctx.get("messages", [])
         if isinstance(messages, list) and messages:
-            last_msg = messages[-1]
-            text = last_msg.get("content", "") if isinstance(last_msg, dict) else str(last_msg)
+            text = messages_text(messages)
 
     return text if isinstance(text, str) else ""
 

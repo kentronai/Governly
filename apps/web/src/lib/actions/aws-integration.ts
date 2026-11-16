@@ -7,6 +7,7 @@
 
 "use server";
 
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import { db, awsDiscoveryConnections, integrations, tenants } from "@db";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -30,20 +31,8 @@ function pickAwsCredential(
 }
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, tenantSlugOrId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, tenantSlugOrId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  return tenantRow[0].id;
+  // Must be the caller's own org: server actions are public endpoints.
+  return (await requireTenantMember(tenantSlugOrId)).tenantId;
 }
 
 export interface CreateAwsConnectionInput {

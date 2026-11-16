@@ -40,7 +40,10 @@ const ADMIN_ORG_ROLES = ["org:admin", "admin", "org:owner"];
  * Returns the caller id and the verified tenant id, so callers audit against
  * the tenant we actually checked rather than one looked up from the target.
  */
-const requireOrgAdminOverTarget = async (targetUserId: string) => {
+const requireOrgAdminOverTarget = async (
+  targetUserId: string,
+  { allowDeactivatedFromOrg = false } = {},
+) => {
   const { userId: actorUserId, orgId, orgRole } = await auth();
 
   if (!actorUserId) {
@@ -64,7 +67,28 @@ const requireOrgAdminOverTarget = async (targetUserId: string) => {
     ),
   });
 
-  if (!targetMembership) {
+  // Deactivation deletes the local membership row, so for a reactivation the
+  // proof the target belongs here is the "user.deactivated" audit event this
+  // org recorded — the same signal getDeactivatedUsers lists them by.
+  const deactivatedFromOrg =
+    !targetMembership && allowDeactivatedFromOrg
+      ? (
+          await db
+            .select({ id: auditEvents.id })
+            .from(auditEvents)
+            .where(
+              and(
+                eq(auditEvents.tenantId, orgId),
+                eq(auditEvents.action, "user.deactivated"),
+                eq(auditEvents.targetType, "user"),
+                eq(auditEvents.targetId, targetUserId),
+              ),
+            )
+            .limit(1)
+        ).length > 0
+      : false;
+
+  if (!targetMembership && !deactivatedFromOrg) {
     // Deliberately the same message whether the user does not exist or belongs
     // to another tenant, so this cannot be used to probe for user ids.
     throw new Error("Access denied: user is not a member of your organization");
@@ -156,7 +180,7 @@ async function syncOrgMembersFromClerk(organizationId: string) {
  * Create a new user and add them to the organization
  */
 export const createUser = async (input: CreateUserInput) => {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId) {
     throw new Error("Authentication required");
@@ -166,6 +190,11 @@ export const createUser = async (input: CreateUserInput) => {
     throw new Error(
       "No active organization found. Please ensure you are logged into an organization.",
     );
+  }
+
+  // Creating users (possibly admins, with a chosen password) is admin-only.
+  if (!orgRole || !ADMIN_ORG_ROLES.includes(orgRole)) {
+    throw new Error("Access denied: organization admin role required");
   }
 
   // Use orgId from auth context instead of input.tenant_id to ensure we're using the active organization
@@ -405,8 +434,11 @@ export const updateUser = async (
   // admin/users/active and admin/users/deactivate) — there is no self-service
   // "edit my own profile" caller, so admin-only gating doesn't remove any
   // legitimate capability.
-  const { actorUserId, orgId: tenantId } =
-    await requireOrgAdminOverTarget(userId);
+  const { actorUserId, orgId: tenantId } = await requireOrgAdminOverTarget(
+    userId,
+    // Reactivation of someone this org deactivated; never an email change.
+    { allowDeactivatedFromOrg: input.status === true && !input.email },
+  );
 
   try {
     const clerk = await clerkClient();

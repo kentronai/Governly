@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, or } from "drizzle-orm";
 import { db, integrations, tenants } from "@db";
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import {
   getConnection,
   getConnectionCredentials,
@@ -95,15 +96,8 @@ function sleep(ms: number) {
 }
 
 async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
-  const [row] = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(
-      or(eq(tenants.id, tenantSlugOrId), eq(tenants.slug, tenantSlugOrId)),
-    )
-    .limit(1);
-  if (!row) throw new Error("Tenant not found");
-  return row.id;
+  // Must be the caller's own org; never trust the tenant named in the body.
+  return (await requireTenantMember(tenantSlugOrId)).tenantId;
 }
 
 /**
@@ -112,6 +106,7 @@ async function resolveTenantId(tenantSlugOrId: string): Promise<string> {
  * reconcile so downstream discovery always finds a connection.
  */
 async function persistNangoConnection(
+  tenantId: string,
   integrationId: string,
   connectionId: string,
   providerConfigKey: string,
@@ -127,7 +122,9 @@ async function persistNangoConnection(
       errorMessage: null,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(integrations.id, integrationId));
+    .where(
+      and(eq(integrations.id, integrationId), eq(integrations.tenantId, tenantId)),
+    );
   return {
     nangoConnectionId: connectionId,
     nangoProviderConfigKey: providerConfigKey,
@@ -150,13 +147,26 @@ async function reconcileFromNango(
   providerConfigKey: string,
   hintConnectionId?: string,
 ): Promise<{ nangoConnectionId: string; nangoProviderConfigKey: string } | null> {
+  // A connection belongs to this tenant only if Nango attributes it to the tenant
+  // (Connect sessions use endUserId = tenant id) or it was created by
+  // connectViaNango, whose ids are "<tenantId>--<key>". Anything else may be
+  // another tenant's credential and must never be bound here.
+  const ownedByTenant = (item: { connectionId: string; endUserId?: string | null }) =>
+    item.endUserId === tenantId || item.connectionId.startsWith(`${tenantId}--`);
+
   if (hintConnectionId) {
     try {
-      const verified = await getConnection(hintConnectionId, providerConfigKey);
-      if (verified.connectionId) {
+      const verified = hintConnectionId.startsWith(`${tenantId}--`)
+        ? (await getConnection(hintConnectionId, providerConfigKey)).connectionId
+        : (
+            await listConnections({ connectionId: hintConnectionId, providerConfigKey })
+          ).find((item) => item.connectionId === hintConnectionId && ownedByTenant(item))
+            ?.connectionId;
+      if (verified) {
         return persistNangoConnection(
+          tenantId,
           integrationId,
-          verified.connectionId,
+          verified,
           providerConfigKey,
         );
       }
@@ -170,7 +180,7 @@ async function reconcileFromNango(
   ): string | undefined =>
     items
       .filter((item) => item.providerConfigKey === providerConfigKey)
-      .filter((item) => !item.endUserId || item.endUserId === tenantId)
+      .filter(ownedByTenant)
       .sort((a, b) => {
         const at = a.createdAt ? Date.parse(a.createdAt) : 0;
         const bt = b.createdAt ? Date.parse(b.createdAt) : 0;
@@ -185,6 +195,7 @@ async function reconcileFromNango(
       const connectionId = pickNewest(await listConnections(params));
       if (connectionId) {
         return persistNangoConnection(
+          tenantId,
           integrationId,
           connectionId,
           providerConfigKey,
@@ -403,6 +414,8 @@ export async function POST(request: NextRequest) {
     if (typeof tenant !== "string" || !tenant.trim()) {
       throw new Error("tenantSlugOrId is required");
     }
+    // Every action below acts on this tenant: the caller must belong to it.
+    await requireTenantMember(tenant);
 
     if (action === "nangoConnected") {
       const integrationId = requiredString(body, "integrationId");

@@ -4,6 +4,7 @@
 
 "use server";
 
+import { requireTenantMember } from "@/lib/server/tenant-access";
 import { db, guardrails, tenants } from "@db";
 import { eq, and, isNull } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
@@ -33,21 +34,8 @@ export const getGuardrails = async (tenantSlugOrId: string) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, tenantSlugOrId))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, tenantSlugOrId))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  const tenantId = tenantRow[0].id;
+  // Must be the caller's own org: server actions are public endpoints.
+  const { tenantId, tenantSlug } = await requireTenantMember(tenantSlugOrId);
 
   const guardrailsList = await db.query.guardrails.findMany({
     where: and(eq(guardrails.tenantId, tenantId), isNull(guardrails.deletedAt)),
@@ -83,7 +71,7 @@ export const getGuardrails = async (tenantSlugOrId: string) => {
       updated_at: guardrail.updatedAt,
       deleted_at: guardrail.deletedAt,
     })),
-    tenant: { id: tenantId, slug: tenantRow[0].slug },
+    tenant: { id: tenantId, slug: tenantSlug },
   };
 };
 
@@ -91,21 +79,8 @@ export const createGuardrail = async (input: CreateGuardrailInput) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
 
-  // Try to find by ID first, then by slug
-  let tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.id, input.tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) {
-    tenantRow = await db
-      .select()
-      .from(tenants)
-      .where(eq(tenants.slug, input.tenantSlug))
-      .limit(1);
-  }
-  if (!tenantRow.length) throw new Error("Tenant not found");
-  const tenantId = tenantRow[0].id;
+  // Must be the caller's own org: server actions are public endpoints.
+  const { tenantId } = await requireTenantMember(input.tenantSlug);
 
   if (!input.key || !input.tier) {
     throw new Error("Key and tier are required");

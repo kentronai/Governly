@@ -4,9 +4,10 @@
 
 "use server";
 
-import { db, tenants, auditEvents, users } from "@db";
+import { db, auditEvents, users } from "@db";
 import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
+import { requireTenantMember } from "@/lib/server/tenant-access";
 
 export interface GetAuditLogsInput {
   tenantSlug: string;
@@ -25,19 +26,7 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
   const pageSize =
     input.pageSize && input.pageSize > 0 ? Math.min(input.pageSize, 200) : 20;
 
-  const tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.slug, input.tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) {
-    return {
-      results: [],
-      total: 0,
-      pagination: { page, pageSize, totalPages: 1 },
-    };
-  }
-  const tenantId = tenantRow[0].id;
+  const { tenantId } = await requireTenantMember(input.tenantSlug);
 
   const conditions: SQL[] = [eq(auditEvents.tenantId, tenantId)];
   if (input.search) {
@@ -147,13 +136,7 @@ export const getAuditLogs = async (input: GetAuditLogsInput) => {
 };
 
 export const getAuditLogById = async (tenantSlug: string, id: string) => {
-  const tenantRow = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.slug, tenantSlug))
-    .limit(1);
-  if (!tenantRow.length) return null;
-  const tenantId = tenantRow[0].id;
+  const { tenantId } = await requireTenantMember(tenantSlug);
 
   const rows = await db
     .select({

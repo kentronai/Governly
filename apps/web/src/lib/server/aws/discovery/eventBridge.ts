@@ -8,7 +8,7 @@ import {
   ListTargetsByRuleCommand,
 } from "@aws-sdk/client-eventbridge";
 import type { AwsClientBundle } from "../client-factory";
-import type { RawDiscoveredResource } from "./types";
+import { noteLookupFailure, type RawDiscoveredResource } from "./types";
 
 export async function discoverEventBridgeRules(
   clients: AwsClientBundle,
@@ -36,8 +36,8 @@ export async function discoverEventBridgeRules(
           .filter(
             (arn): arn is string => Boolean(arn) && aiTargetArns.has(arn!),
           );
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "EventBridge ListTargetsByRule", error);
       }
       if (matchedTargets.length === 0) continue;
 

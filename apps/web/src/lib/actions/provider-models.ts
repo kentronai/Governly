@@ -196,6 +196,7 @@ export const updateProviderModel = async (
     .update(providerModels)
     .set({
       ...input,
+      tenantId: orgId, // never let the caller move the model to another tenant
       updatedBy: userId,
       updatedAt: new Date().toISOString(),
     } as any)

@@ -44,6 +44,8 @@ export const FilterSection = ({
     router.push(`${pathname}?${params.toString()}`);
   };
   useEffect(() => {
+    // Only a real search change resets the page; mount/remount must not.
+    if (search.trim() === (searchParams.get("search") || "")) return;
     const timeout = setTimeout(() => {
       updateQueryParam("search", search.trim());
     }, 400);

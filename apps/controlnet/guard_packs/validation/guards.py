@@ -6,6 +6,7 @@ required string presence, and content validation patterns.
 """
 
 from typing import Literal, Optional, List, Union, Any
+from cga_core.message_text import last_message_text
 import re
 
 from cga_core import guard, Violation, Ctx, Either, Right_, Left_, Guard
@@ -50,7 +51,7 @@ def contains_string(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -114,7 +115,7 @@ def not_contains_string(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -177,7 +178,7 @@ def ends_with(
         if not value and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                value = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                value = last_message_text(messages)
         
         # Handle empty values
         if not value:
@@ -285,7 +286,7 @@ def lowercase(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -338,7 +339,7 @@ def uppercase(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -391,7 +392,7 @@ def one_line(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -458,7 +459,7 @@ def reading_time(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -532,7 +533,7 @@ def regex_match(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -607,7 +608,7 @@ def regex_block(
         if not text and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                text = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                text = last_message_text(messages)
         
         if not isinstance(text, str):
             return Right_(ctx)
@@ -669,7 +670,7 @@ def valid_choices(
         if not value and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                value = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                value = last_message_text(messages)
         
         # Handle string values - strip whitespace
         if isinstance(value, str):
@@ -736,7 +737,7 @@ def valid_length(
         if not value and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                value = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                value = last_message_text(messages)
         
         # Handle non-string/list values
         if not isinstance(value, (str, list)):
@@ -821,7 +822,7 @@ def valid_range(
         if not value and "messages" in ctx:
             messages = ctx.get("messages", [])
             if isinstance(messages, list) and messages:
-                value = messages[-1].get("content", "") if isinstance(messages[-1], dict) else str(messages[-1])
+                value = last_message_text(messages)
         
         # Try to convert to numeric if it's a string
         if isinstance(value, str):

@@ -203,25 +203,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ControlNet Gateway",
     description="AI Governance and Guardrails Gateway with Composable Guard Algebra",
-    version="1.7.2",
+    version="1.7.3",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS - Allow all origins since service is behind load balancer
-# The web application handles frontend security
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=False,  # Set to False when allowing all origins
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # === Middleware Stack (Trylon-inspired clean architecture) ===
 # Middleware executes in REVERSE order of registration (last registered = first executed)
-# Execution flow: Observability → Input Guards → Policy → Auth → Route Handler
+# Execution flow: CORS → Auth → Policy → Observability → Route Handler
 from gateway.middleware import (
     ObservabilityMiddleware,
     InputGuardsMiddleware, 
@@ -241,13 +231,25 @@ app.add_middleware(PolicyMiddleware)
 # 4. Authentication (validates tenant/API keys)
 app.add_middleware(AuthenticationMiddleware)
 
+# 5. CORS - registered last so it is OUTERMOST: preflight OPTIONS requests are
+# answered before auth, and error responses still carry CORS headers.
+# Allow all origins since service is behind load balancer; the web
+# application handles frontend security.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Set to False when allowing all origins
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 async def root():
     """Root endpoint."""
     return {
         "service": "ControlNet Gateway",
-        "version": "1.7.2",
+        "version": "1.7.3",
         "status": "operational",
         "docs": "/docs"
     }

@@ -19,6 +19,10 @@ import {
 } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import {
+  requireActiveTenant,
+  requireTenantMember,
+} from "@/lib/server/tenant-access";
+import {
   DEFAULT_APPLICATION_POLICIES,
   DEFAULT_APPLICATION_POLICY_VERSION,
   buildDefaultPolicyYaml,
@@ -62,7 +66,7 @@ export const createApplication = async (input: CreateApplicationInput) => {
     throw new Error("Authentication required");
   }
 
-  if (orgId && input.tenantId !== orgId) {
+  if (!orgId || input.tenantId !== orgId) {
     throw new Error("Tenant mismatch");
   }
 
@@ -374,7 +378,12 @@ export const updateApplication = async (input: UpdateApplicationInput) => {
     throw new Error("Authentication required");
   }
 
-  const { id, ...updateData } = input;
+  const { tenantId } = await requireActiveTenant();
+  // Server actions don't enforce TS types at runtime: copy only editable fields,
+  // so a caller can't rewrite tenantId/createdBy/etc.
+  const { id, name, description, status, goviqEnabled, controlnetEnabled, metadata } =
+    input;
+  const updateData = { name, description, status, goviqEnabled, controlnetEnabled, metadata };
   const [application] = await db
     .update(applications)
     .set({
@@ -382,14 +391,14 @@ export const updateApplication = async (input: UpdateApplicationInput) => {
       updatedBy: userId,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(applications.id, id))
+    .where(and(eq(applications.id, id), eq(applications.tenantId, tenantId)))
     .returning();
 
   if (!application) {
     throw new Error("Application not found");
   }
 
-  revalidatePath(`/applications`);
+  revalidatePath("/[tenant]/applications", "page");
 
   // Audit: application updated
   try {
@@ -411,6 +420,7 @@ export const updateApplication = async (input: UpdateApplicationInput) => {
 // Archive application
 export const archiveApplication = async (id: string, tenantId: string) => {
   const { userId } = await auth();
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
 
   if (!userId) {
     throw new Error("Authentication required");
@@ -430,7 +440,7 @@ export const archiveApplication = async (id: string, tenantId: string) => {
     throw new Error("Application not found");
   }
 
-  revalidatePath(`/${tenantId}/applications`);
+  revalidatePath("/[tenant]/applications", "page");
 
   // Audit: application archived
   try {
@@ -506,6 +516,7 @@ export const getApplications = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlug);
 
   const pageNum = page && page > 0 ? page : 1;
   const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 20;
@@ -578,6 +589,7 @@ export const getApplications = async (
 // Restore archived application
 export const restoreApplication = async (id: string, tenantId: string) => {
   const { userId } = await auth();
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   if (!userId) throw new Error("Authentication required");
 
   const app = await db
@@ -602,7 +614,7 @@ export const restoreApplication = async (id: string, tenantId: string) => {
     .where(eq(applications.id, id))
     .returning();
 
-  revalidatePath(`/${tenantId}/applications`);
+  revalidatePath("/[tenant]/applications", "page");
 
   try {
     await createAuditEvent({
@@ -622,6 +634,7 @@ export const restoreApplication = async (id: string, tenantId: string) => {
 // Hard delete application (permanently delete)
 export const hardDeleteApplication = async (id: string, tenantId: string) => {
   const { userId } = await auth();
+  tenantId = (await requireTenantMember(tenantId)).tenantId;
   if (!userId) throw new Error("Authentication required");
 
   const app = await db
@@ -639,7 +652,7 @@ export const hardDeleteApplication = async (id: string, tenantId: string) => {
   // Hard delete - permanently remove from database
   await db.delete(applications).where(eq(applications.id, id));
 
-  revalidatePath(`/${tenantId}/admin/archived-applications`);
+  revalidatePath("/[tenant]/admin/archived-applications", "page");
 
   try {
     await createAuditEvent({
@@ -666,6 +679,7 @@ export const getArchivedApplicationsAction = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlug);
 
   const pageNum = page && page > 0 ? page : 1;
   const limit = pageSize && pageSize > 0 ? Math.min(pageSize, 200) : 20;
@@ -750,6 +764,7 @@ export const getApplicationById = async (
 ) => {
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
+  await requireTenantMember(tenantSlugOrId);
 
   // Try to find tenant by ID first, then by slug
   let tenantRow = await db

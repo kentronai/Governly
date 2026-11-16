@@ -104,7 +104,8 @@ function toIntegration(integration: any): Integration {
     nangoConnectionId: integration.nangoConnectionId || undefined,
     nangoProviderConfigKey: integration.nangoProviderConfigKey || undefined,
     configuration: (integration.configuration as Record<string, any>) || {},
-    apiKey: integration.credentialsEncrypted || undefined,
+    // Secrets never reach the browser; only whether one is stored.
+    apiKey: integration.hasCredentials ? "stored" : undefined,
     logoUrl: integration.logoUrl || integration.metadata?.logoUrl || undefined,
     webhookUrl: integration.webhookUrl || undefined,
     lastSyncAt: integration.lastSyncAt || undefined,

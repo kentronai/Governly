@@ -1,5 +1,6 @@
 "use client";
 
+import { errorToast } from "@/lib/utils/toast";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +82,8 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
         setIsDisplayModalOpen(true);
       } catch (error) {
         console.error("Failed to create API key:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to create API key");
       }
     });
   };
@@ -99,7 +101,8 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
         );
       } catch (error) {
         console.error("Failed to revoke API key:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to revoke API key");
       }
     });
   };
@@ -115,7 +118,8 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
         setSelectedKey(null);
       } catch (error) {
         console.error("Failed to delete API key:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to delete API key");
       }
     });
   };

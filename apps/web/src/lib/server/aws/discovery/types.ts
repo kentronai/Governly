@@ -62,3 +62,38 @@ export interface RawDiscoveredResource {
   lastUpdatedAt?: string | null;
   metadata: Record<string, unknown>;
 }
+
+// ponytail: per-list cap of 1000 items so a huge account can't stall a scan;
+// raise it (or stream) if a real account outgrows it.
+export const MAX_LIST_ITEMS = 1000;
+
+const STABLE_ERROR =
+  /AccessDenied|UnauthorizedOperation|UnauthorizedAccess|not authorized|NotFound|NoSuchEntity/i;
+
+/**
+ * Records a swallowed (best-effort) lookup failure as a scan warning, so the
+ * scan counts as partial and no agent is retired because of it. Denied and
+ * not-found are stable answers (the same on every scan), so they stay silent.
+ */
+export function noteLookupFailure(
+  clients: { region: string; warnings?: string[] },
+  what: string,
+  error: unknown,
+): void {
+  const e = error as { name?: string; message?: string } | undefined;
+  if (STABLE_ERROR.test(`${e?.name ?? ""} ${e?.message ?? ""}`)) return;
+  clients.warnings?.push(`${clients.region} ${what}: ${e?.message ?? String(error)}`);
+}
+
+/** Drains an AWS SDK paginator (or any page iterator) up to MAX_LIST_ITEMS. */
+export async function collectPages<P, T>(
+  pages: AsyncIterable<P>,
+  pick: (page: P) => T[] | undefined,
+): Promise<T[]> {
+  const out: T[] = [];
+  for await (const page of pages) {
+    out.push(...(pick(page) ?? []));
+    if (out.length >= MAX_LIST_ITEMS) break;
+  }
+  return out;
+}

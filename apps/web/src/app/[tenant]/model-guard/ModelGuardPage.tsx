@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import {
   Shield,
   Upload,
@@ -30,6 +31,12 @@ export default function ModelGuardPage({ tenant }: ModelGuardPageProps) {
   const [error, setError] = useState<string | null>(null);
   const authFetch = useAuthFetch();
   const { tenant: tenantContext } = useTenant();
+  const { userId } = useAuth();
+  // The signed-in user's own org/user, never a hard-coded account.
+  const identityHeaders = {
+    "X-Tenant-ID": tenantContext?.id ?? "",
+    "X-User-ID": userId ?? "",
+  };
 
   const handleScan = async () => {
     if (!modelUrl.trim()) {
@@ -47,8 +54,7 @@ export default function ModelGuardPage({ tenant }: ModelGuardPageProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Tenant-ID": "org_33Rq6hGmoYcE9FbsueNNLL8Fpd4",
-          "X-User-ID": "user_33UwOCoxp9ADqk0SiE6KF0RAKM0",
+          ...identityHeaders,
         },
         body: JSON.stringify({
           uri: modelUrl.trim(),
@@ -75,8 +81,7 @@ export default function ModelGuardPage({ tenant }: ModelGuardPageProps) {
             {
               method: "GET",
               headers: {
-                "X-Tenant-ID": "org_33Rq6hGmoYcE9FbsueNNLL8Fpd4",
-                "X-User-ID": "user_33UwOCoxp9ADqk0SiE6KF0RAKM0",
+                ...identityHeaders,
               },
             }
           );

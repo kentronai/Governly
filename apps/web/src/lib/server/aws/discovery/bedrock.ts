@@ -6,16 +6,20 @@
 import {
   ListAgentsCommand,
   GetAgentCommand,
-  ListAgentAliasesCommand,
-  ListAgentActionGroupsCommand,
   GetAgentActionGroupCommand,
-  ListKnowledgeBasesCommand,
-  ListAgentKnowledgeBasesCommand,
-  ListPromptsCommand,
+  paginateListAgentAliases,
+  paginateListAgentActionGroups,
+  paginateListKnowledgeBases,
+  paginateListAgentKnowledgeBases,
+  paginateListPrompts,
 } from "@aws-sdk/client-bedrock-agent";
-import { ListGuardrailsCommand } from "@aws-sdk/client-bedrock";
+import { paginateListGuardrails } from "@aws-sdk/client-bedrock";
 import type { AwsClientBundle } from "../client-factory";
-import type { RawDiscoveredResource } from "./types";
+import {
+  collectPages,
+  noteLookupFailure,
+  type RawDiscoveredResource,
+} from "./types";
 
 export async function discoverBedrock(
   clients: AwsClientBundle,
@@ -43,22 +47,24 @@ export async function discoverBedrock(
         );
         linkedRoleArn = detail.agent?.agentResourceRoleArn ?? null;
         foundationModel = detail.agent?.foundationModel ?? null;
-      } catch {
+      } catch (error) {
         // The summary still represents a valid discovered agent when the
         // connection lacks optional GetAgent detail permission.
+        noteLookupFailure(clients, "Bedrock GetAgent", error);
       }
 
       // Action groups tell us which Lambda functions this agent can invoke —
       // the correlation engine uses this to attach Lambda/API/EventBridge
       // resources to the same logical agent.
       try {
-        const actionGroups = await bedrockAgent.send(
-          new ListAgentActionGroupsCommand({
-            agentId: agent.agentId,
-            agentVersion: "DRAFT",
-          }),
+        const actionGroups = await collectPages(
+          paginateListAgentActionGroups(
+            { client: bedrockAgent },
+            { agentId: agent.agentId, agentVersion: "DRAFT" },
+          ),
+          (page) => page.actionGroupSummaries,
         );
-        for (const summary of actionGroups.actionGroupSummaries ?? []) {
+        for (const summary of actionGroups) {
           if (!summary.actionGroupId) continue;
           if (summary.actionGroupName) actionGroupNames.push(summary.actionGroupName);
           const detail = await bedrockAgent.send(
@@ -72,9 +78,10 @@ export async function discoverBedrock(
             detail.agentActionGroup?.actionGroupExecutor?.lambda;
           if (lambdaArn) linkedFunctionArns.push(lambdaArn);
         }
-      } catch {
+      } catch (error) {
         // Action group inspection is best-effort; a permissions gap here
         // shouldn't fail discovery of the agent itself.
+        noteLookupFailure(clients, "Bedrock action groups", error);
       }
 
       resources.push({
@@ -101,10 +108,14 @@ export async function discoverBedrock(
 
       // Aliases (deployment stages of an agent)
       try {
-        const aliases = await bedrockAgent.send(
-          new ListAgentAliasesCommand({ agentId: agent.agentId }),
+        const aliases = await collectPages(
+          paginateListAgentAliases(
+            { client: bedrockAgent },
+            { agentId: agent.agentId },
+          ),
+          (page) => page.agentAliasSummaries,
         );
-        for (const alias of aliases.agentAliasSummaries ?? []) {
+        for (const alias of aliases) {
           if (!alias.agentAliasId) continue;
           resources.push({
             resourceType: "bedrock_agent_alias",
@@ -120,19 +131,20 @@ export async function discoverBedrock(
             },
           });
         }
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "Bedrock ListAgentAliases", error);
       }
 
       // Knowledge bases associated with this agent
       try {
-        const kbs = await bedrockAgent.send(
-          new ListAgentKnowledgeBasesCommand({
-            agentId: agent.agentId,
-            agentVersion: "DRAFT",
-          }),
+        const kbs = await collectPages(
+          paginateListAgentKnowledgeBases(
+            { client: bedrockAgent },
+            { agentId: agent.agentId, agentVersion: "DRAFT" },
+          ),
+          (page) => page.agentKnowledgeBaseSummaries,
         );
-        for (const kb of kbs.agentKnowledgeBaseSummaries ?? []) {
+        for (const kb of kbs) {
           if (!kb.knowledgeBaseId) continue;
           resources.push({
             resourceType: "knowledge_base",
@@ -147,8 +159,8 @@ export async function discoverBedrock(
             },
           });
         }
-      } catch {
-        // best-effort
+      } catch (error) {
+        noteLookupFailure(clients, "Bedrock ListAgentKnowledgeBases", error);
       }
     }
     agentNextToken = agentsResp.nextToken;
@@ -157,8 +169,11 @@ export async function discoverBedrock(
   // All knowledge bases in the account (covers ones not yet linked to an
   // agent, so the correlation engine can still surface them).
   try {
-    const allKbs = await bedrockAgent.send(new ListKnowledgeBasesCommand({}));
-    for (const kb of allKbs.knowledgeBaseSummaries ?? []) {
+    const allKbs = await collectPages(
+      paginateListKnowledgeBases({ client: bedrockAgent }, {}),
+      (page) => page.knowledgeBaseSummaries,
+    );
+    for (const kb of allKbs) {
       if (!kb.knowledgeBaseId) continue;
       if (
         resources.some(
@@ -179,14 +194,17 @@ export async function discoverBedrock(
         metadata: { status: kb.status },
       });
     }
-  } catch {
-    // best-effort
+  } catch (error) {
+    noteLookupFailure(clients, "Bedrock ListKnowledgeBases", error);
   }
 
   // Guardrails (Bedrock control-plane resource, not agent-scoped)
   try {
-    const guardrails = await bedrock.send(new ListGuardrailsCommand({}));
-    for (const guardrail of guardrails.guardrails ?? []) {
+    const guardrails = await collectPages(
+      paginateListGuardrails({ client: bedrock }, {}),
+      (page) => page.guardrails,
+    );
+    for (const guardrail of guardrails) {
       if (!guardrail.id) continue;
       resources.push({
         resourceType: "guardrail",
@@ -198,14 +216,18 @@ export async function discoverBedrock(
         metadata: { status: guardrail.status, version: guardrail.version },
       });
     }
-  } catch {
-    // best-effort — guardrails may not be enabled for this account/region
+  } catch (error) {
+    // guardrails may not be enabled for this account/region
+    noteLookupFailure(clients, "Bedrock ListGuardrails", error);
   }
 
   // Prompt Management resources
   try {
-    const prompts = await bedrockAgent.send(new ListPromptsCommand({}));
-    for (const prompt of prompts.promptSummaries ?? []) {
+    const prompts = await collectPages(
+      paginateListPrompts({ client: bedrockAgent }, {}),
+      (page) => page.promptSummaries,
+    );
+    for (const prompt of prompts) {
       if (!prompt.id) continue;
       resources.push({
         resourceType: "prompt",
@@ -217,8 +239,8 @@ export async function discoverBedrock(
         metadata: { description: prompt.description, version: prompt.version },
       });
     }
-  } catch {
-    // best-effort
+  } catch (error) {
+    noteLookupFailure(clients, "Bedrock ListPrompts", error);
   }
 
   return resources;

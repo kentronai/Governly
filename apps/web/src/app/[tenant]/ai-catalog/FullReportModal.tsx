@@ -12,7 +12,7 @@ import {
   Link,
 } from "lucide-react";
 import { Tool } from "./tools";
-import { getScoreColor, getRiskColor } from "./page";
+import { getScoreColor, getRiskColor } from "./tools";
 
 const FullReportModal: React.FC<{
   tool: Tool;

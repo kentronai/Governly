@@ -121,12 +121,19 @@ class SmartGuardScheduler:
             f"T2={len(t2_guards)}, risk_level={risk_level}, similarity={max_similarity}"
         )
         
+        # Lower-severity violations don't stop later tiers from running, but they
+        # are still violations: they must be returned, never dropped.
+        pending_violations: List[Dict[str, Any]] = []
+
         # Execute T0 guards (always run, parallel)
         if t0_guards:
             t0_result = await self._execute_parallel(t0_guards, context, "T0")
             if t0_result.violations and (enforce_all or t0_result.has_critical_violations()):
                 logger.info("Early exit: T0 policy violation detected")
                 return t0_result.result
+            pending_violations.extend(t0_result.violations)
+            if not t0_result.violations:
+                context = t0_result.result["right"]  # carry rewrites (e.g. redaction) forward
         
         # Execute T1 guards (check similarity bounds)
         if t1_guards and (enforce_all or self._should_run_t1(max_similarity)):
@@ -134,6 +141,9 @@ class SmartGuardScheduler:
             if t1_result.violations and (enforce_all or t1_result.has_critical_violations()):
                 logger.info("Early exit: T1 policy violation detected")
                 return t1_result.result
+            pending_violations.extend(t1_result.violations)
+            if not t1_result.violations:
+                context = t1_result.result["right"]
         elif t1_guards:
             logger.info(f"⚡ Skipping T1: similarity {max_similarity} out of bounds")
         
@@ -141,10 +151,14 @@ class SmartGuardScheduler:
         if t2_guards and (enforce_all or self._should_run_t2(max_similarity)):
             logger.info(f"Running T2 guards: {len(t2_guards)} ONNX models...")
             t2_result = await self._execute_parallel(t2_guards, context, "T2")
-            return t2_result.result
+            pending_violations.extend(t2_result.violations)
+            if not t2_result.violations:
+                context = t2_result.result["right"]
         elif t2_guards:
             logger.info(f"⚡ Skipping T2 (ONNX): similarity {max_similarity} out of bounds")
         
+        if pending_violations:
+            return Left_(pending_violations)
         return Right_(context)
     
     async def _execute_parallel(
@@ -196,8 +210,17 @@ class SmartGuardScheduler:
                     logger.info(f"Early exit in batch {i//batch_size + 1}/{(len(guards) + batch_size - 1)//batch_size}")
                     break
         
-        # Aggregate results
+        # Aggregate results. Guards may rewrite the context (e.g. pii.redact);
+        # merge every key a guard changed so those rewrites reach the caller.
         all_violations = []
+        merged = dict(context)
+        for result in results:
+            if isinstance(result, dict) and result.get("_tag") == "Right":
+                rewritten = result.get("right")
+                if isinstance(rewritten, dict) and rewritten is not context:
+                    for key, value in rewritten.items():
+                        if key not in context or context[key] is not value:
+                            merged[key] = value
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"Guard execution error: {result}")
@@ -210,7 +233,7 @@ class SmartGuardScheduler:
             elif result["_tag"] == "Left":
                 all_violations.extend(result["left"])
         
-        final_result = Left_(all_violations) if all_violations else Right_(context)
+        final_result = Left_(all_violations) if all_violations else Right_(merged)
         return ExecutionResult(final_result, {"tier": tier, "count": len(guards)})
     
     def _check_similarity_bounds(

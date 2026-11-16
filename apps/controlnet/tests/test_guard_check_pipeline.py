@@ -114,6 +114,17 @@ def stub_identity_service(monkeypatch):
     monkeypatch.setitem(
         sys.modules, "gateway.services.agent_identity_service", module
     )
+
+    # Policy resolution needs a database too; model a tenant with no default.
+    policy_module = types.ModuleType("gateway.services.application_policy_service")
+
+    async def resolve_application_policy(tenant_id, application_id, explicit_policy_id=None):
+        return (explicit_policy_id, "explicit") if explicit_policy_id else (None, "unresolved")
+
+    policy_module.resolve_application_policy = resolve_application_policy
+    monkeypatch.setitem(
+        sys.modules, "gateway.services.application_policy_service", policy_module
+    )
     return module
 
 

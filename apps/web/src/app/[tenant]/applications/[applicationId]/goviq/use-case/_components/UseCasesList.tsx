@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { errorToast } from '@/lib/utils/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -81,7 +82,8 @@ export function UseCasesList({ initialUseCases, applicationId, tenantId, userId 
         setIsModalOpen(false);
       } catch (error) {
         console.error('Failed to create use case:', error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : 'Failed to create use case');
       }
     });
   };
@@ -97,7 +99,8 @@ export function UseCasesList({ initialUseCases, applicationId, tenantId, userId 
         setSelectedUseCase(null);
       } catch (error) {
         console.error('Failed to update use case:', error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : 'Failed to update use case');
       }
     });
   };
@@ -110,7 +113,8 @@ export function UseCasesList({ initialUseCases, applicationId, tenantId, userId 
         setOpenDropdownId(null);
       } catch (error) {
         console.error('Failed to delete use case:', error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : 'Failed to delete use case');
       }
     });
   };

@@ -2053,7 +2053,13 @@ export async function runDatabricksDiscoveryScan(
             eq(agents.tenantId, tenantId),
             eq(agents.integrationId, integrationId),
           );
-    await db.delete(agents).where(staleWhere);
+    // Only a complete scan can prove an agent is gone. If any surface failed
+    // (5xx, 429, timeout, 403 → recorded as a partial warning), its agents look
+    // "missing" and deleting would destroy their history; keep them until a
+    // clean scan.
+    if (!discovery.counts.databricks_partial_warnings) {
+      await db.delete(agents).where(staleWhere);
+    }
 
     await db
       .update(discoveryScans)

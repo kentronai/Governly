@@ -112,11 +112,9 @@ async def create_prompt(
     
     query = text("""
         INSERT INTO router_prompts (
-            id, prompt, category, is_active, 
-            metadata, created_by
+            id, prompt, category, is_active, metadata
         ) VALUES (
-            :id, :prompt, :risk_category, true,
-            :metadata, :created_by
+            :id, :prompt, :risk_category, true, :metadata
         )
         RETURNING id, prompt, category as risk_category, is_active, created_at, updated_at
     """)
@@ -125,8 +123,9 @@ async def create_prompt(
         "id": prompt_id,
         "prompt": prompt.prompt,
         "risk_category": prompt.risk_category,
-        "metadata": json.dumps({}),  # Proper JSONB
-        "created_by": user_id
+        # router_prompts has no tenant column (global by design); the owning
+        # tenant is tagged in metadata so only it can delete the row.
+        "metadata": json.dumps({"tenant_id": tenant.tenant_id, "created_by": user_id}),
     })
     await db.commit()
     
@@ -159,10 +158,12 @@ async def list_prompts(
             FROM router_prompts
             WHERE category = :risk_category
               AND is_active = true
+              AND (metadata->>'tenant_id' IS NULL OR metadata->>'tenant_id' = :tenant_id)
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
         """)
         params = {
+            "tenant_id": tenant.tenant_id,
             "risk_category": risk_category,
             "limit": limit,
             "offset": offset
@@ -172,10 +173,12 @@ async def list_prompts(
             SELECT id, prompt, category as risk_category, is_active, created_at, updated_at
             FROM router_prompts
             WHERE is_active = true
+              AND (metadata->>'tenant_id' IS NULL OR metadata->>'tenant_id' = :tenant_id)
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
         """)
         params = {
+            "tenant_id": tenant.tenant_id,
             "limit": limit,
             "offset": offset
         }
@@ -203,13 +206,18 @@ async def delete_prompt(
     query = text("""
         UPDATE router_prompts
         SET is_active = false, updated_at = NOW()
-        WHERE id = :prompt_id
+        WHERE id::text = :prompt_id
+          AND metadata->>'tenant_id' = :tenant_id
     """)
     
-    await db.execute(query, {
-        "prompt_id": prompt_id
+    # Global (untagged) prompts are read-only for tenants.
+    result = await db.execute(query, {
+        "prompt_id": prompt_id,
+        "tenant_id": tenant.tenant_id,
     })
     await db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Prompt not found")
     
     return {"success": True, "message": "Prompt deleted"}
 
@@ -687,11 +695,9 @@ async def bulk_upload_to_lancedb(
             try:
                 query = text("""
                     INSERT INTO router_prompts (
-                        id, prompt, category, is_active, 
-                        metadata, created_by
+                        id, prompt, category, is_active, metadata
                     ) VALUES (
-                        :id, :prompt, :risk_category, true,
-                        :metadata, :created_by
+                        :id, :prompt, :risk_category, true, :metadata
                     )
                     ON CONFLICT (id) DO NOTHING
                 """)
@@ -700,8 +706,11 @@ async def bulk_upload_to_lancedb(
                     "id": prompt_id,
                     "prompt": prompt_data["prompt"],
                     "risk_category": prompt_data["risk_category"],
-                    "metadata": json.dumps({"severity": prompt_data["severity"]}),  # Store severity in metadata
-                    "created_by": user_id
+                    "metadata": json.dumps({
+                        "severity": prompt_data["severity"],
+                        "tenant_id": tenant.tenant_id,
+                        "created_by": user_id,
+                    }),
                 })
                 inserted_count += 1
             except Exception as e:

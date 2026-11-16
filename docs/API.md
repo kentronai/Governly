@@ -30,9 +30,12 @@ Where:
 
 ```
 Authorization: Bearer <clerk-jwt>
-X-Tenant-ID: <tenant-id>
 X-Policy-ID: <policy-id>
 ```
+
+The organization always comes from the signed credential: the Clerk token's active organization
+(`org_id`, or `o.id` in v2 session tokens) or the API key's tenant. An `X-Tenant-ID` header is
+ignored, and a Clerk token with no active organization is rejected with `403`.
 
 ## Chat Completions
 

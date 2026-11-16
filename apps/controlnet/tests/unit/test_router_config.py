@@ -11,10 +11,11 @@ from gateway.config import Settings
 class TestRouterConfiguration:
     """Test Layer 0: Embedding Router Configuration"""
     
-    def test_default_router_disabled(self):
-        """Test router is disabled by default"""
+    def test_default_router_enabled(self, monkeypatch):
+        """Router is on by default (matches .env.example); opt out via env."""
+        monkeypatch.delenv("ENABLE_EMBEDDING_ROUTER", raising=False)
         settings = Settings()
-        assert settings.enable_embedding_router is False
+        assert settings.enable_embedding_router is True
     
     def test_router_default_threshold(self):
         """Test default routing threshold"""
@@ -166,10 +167,11 @@ class TestRouterConfigValidation:
 class TestRouterConfigBackwardCompatibility:
     """Test backward compatibility - router disabled by default"""
     
-    def test_router_disabled_default_no_env(self):
-        """Test router is disabled when no env vars set"""
+    def test_router_enabled_default_no_env(self, monkeypatch):
+        """Test router is enabled when no env vars set"""
+        monkeypatch.delenv("ENABLE_EMBEDDING_ROUTER", raising=False)
         settings = Settings()
-        assert settings.enable_embedding_router is False
+        assert settings.enable_embedding_router is True
     
     def test_existing_functionality_unaffected(self):
         """Test existing settings still work with router config added"""

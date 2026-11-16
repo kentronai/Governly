@@ -4,6 +4,7 @@ Resolves ControlNet API keys to user context without storing provider keys
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -22,6 +23,7 @@ class ApiKeyContext:
     rate_limit_per_minute: int
     permissions: list[str]
     is_active: bool
+    expires_at: Optional[datetime] = None
 
 
 def hash_api_key(api_key: str) -> str:
@@ -111,7 +113,8 @@ async def resolve_api_key(
         tenant_id=row[2],
         rate_limit_per_minute=row[3] or 1000,
         permissions=row[4] or [],
-        is_active=row[5]
+        is_active=row[5],
+        expires_at=row[6],
     )
 
 

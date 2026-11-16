@@ -1,5 +1,5 @@
 "use client";
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "@/components/admin/admin.css";
 import { successToast, errorToast } from "@/lib/utils/toast";
 
@@ -173,98 +173,71 @@ const DeactivatedUsers = () => {
   // No client-side filtering needed - API handles search filtering
   const filteredItems = allUsersData.users || [];
 
-  const TopContent = memo(() => {
-    const [searchValue, setSearchValue] = useState(filterValue);
-    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const isInternalUpdateRef = useRef(false);
-
-    // Sync searchValue with filterValue when it changes externally
-    React.useEffect(() => {
-      if (!isInternalUpdateRef.current) {
-        setSearchValue(filterValue);
-      }
-      isInternalUpdateRef.current = false;
-    }, [filterValue]);
-
-    // Debounce search with useEffect
-    React.useEffect(() => {
-      // Clear previous timeout
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-
-      // Set new timeout for debounced search
-      debounceTimerRef.current = setTimeout(() => {
-        isInternalUpdateRef.current = true;
-        setFilterValue(searchValue);
-        setPage(1);
-      }, 500); // 500ms debounce delay
-
-      // Cleanup on unmount or when searchValue changes
-      return () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-        }
-      };
-    }, [searchValue]);
-
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setSearchValue(value);
-    };
-
-    const handleClearSearch = () => {
-      setSearchValue("");
-      setFilterValue("");
+  // Search state lives in the page (not a nested component) so the input keeps
+  // focus and mount/re-render never resets pagination.
+  const [searchValue, setSearchValue] = useState(filterValue);
+  useEffect(() => {
+    if (searchValue === filterValue) return;
+    const timer = setTimeout(() => {
+      setFilterValue(searchValue);
       setPage(1);
-    };
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return (
-      <div className="flex flex-col gap-4 ">
-        <div className="flex items-center justify-between">
-          <div className="relative">
-            <InputUI
-              type="search"
-              placeholder="Search by name...."
-              className="rounded-md w-[343px] pl-10  text-sm font-normal  focus:ring-0 focus:outline-none"
-              aria-label="Search Query"
-              value={searchValue}
-              onChange={handleSearchChange}
-            />
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-            />
-            {searchValue && (
-              <button
-                onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                aria-label="Clear search"
-              >
-                <IoCloseCircleSharp className="h-4 w-4 text-muted-foreground " />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <ButtonUI
-              onClick={handleExport}
-              className="h-9 px-4  flex items-center gap-2"
-              disabled={isLoading}
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+  };
+
+  const handleClearSearch = () => {
+    setSearchValue("");
+    setFilterValue("");
+    setPage(1);
+  };
+
+  const topContent = (
+    <div className="flex flex-col gap-4 ">
+      <div className="flex items-center justify-between">
+        <div className="relative">
+          <InputUI
+            type="search"
+            placeholder="Search by name...."
+            className="rounded-md w-[343px] pl-10  text-sm font-normal  focus:ring-0 focus:outline-none"
+            aria-label="Search Query"
+            value={searchValue}
+            onChange={handleSearchChange}
+          />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+          />
+          {searchValue && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              aria-label="Clear search"
             >
-              {isLoading ? (
-                <RotateCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileSymlink className="h-4 w-4" />
-              )}
-              <span className="text-sm">Export</span>
-            </ButtonUI>
-          </div>
+              <IoCloseCircleSharp className="h-4 w-4 text-muted-foreground " />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <ButtonUI
+            onClick={handleExport}
+            className="h-9 px-4  flex items-center gap-2"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <RotateCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSymlink className="h-4 w-4" />
+            )}
+            <span className="text-sm">Export</span>
+          </ButtonUI>
         </div>
       </div>
-    );
-  });
-
-  TopContent.displayName = "TopContent";
+    </div>
+  );
 
   const handlePageChange = (newPage: number) => {
     if (
@@ -334,7 +307,7 @@ const DeactivatedUsers = () => {
     return (
       <div>
         <div className="pb-4">
-          <TopContent />
+          {topContent}
         </div>
         <div className="border-b">
           <Table>

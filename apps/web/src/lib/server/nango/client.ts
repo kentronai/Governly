@@ -16,6 +16,8 @@ const NANGO_HOST = (
   process.env.NANGO_HOST ?? "http://nango-server:3003"
 ).replace(/\/+$/, "");
 const NANGO_SECRET_KEY = process.env.NANGO_SECRET_KEY ?? "";
+// A hung Nango call must fail the scan, not leave it "running" forever.
+const NANGO_TIMEOUT_MS = 30_000;
 
 function assertConfigured() {
   if (!NANGO_SECRET_KEY) {
@@ -102,6 +104,7 @@ export async function createConnectSession(
       ...(input.tags ? { tags: input.tags } : {}),
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
 
   const body = (await parseBody(res)) as {
@@ -139,6 +142,7 @@ export async function getConnection(
     method: "GET",
     headers: authHeaders(),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   const body = (await parseBody(res)) as any;
   if (!res.ok) {
@@ -226,6 +230,7 @@ export async function listConnections(params?: {
     method: "GET",
     headers: authHeaders(),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   const body = (await parseBody(res)) as any;
   if (!res.ok) {
@@ -274,6 +279,7 @@ export async function deleteConnection(
     method: "DELETE",
     headers: authHeaders(),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   if (!res.ok && res.status !== 404) {
     const body = await parseBody(res);
@@ -310,6 +316,7 @@ export async function createConnectionWithCredentials(input: {
       ...(input.metadata ? { metadata: input.metadata } : {}),
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   const body = (await parseBody(res)) as any;
   if (!res.ok) {
@@ -328,6 +335,7 @@ export async function listIntegrationKeys(): Promise<Set<string>> {
   const res = await fetch(`${NANGO_HOST}/integrations`, {
     headers: authHeaders(),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   const body = (await parseBody(res)) as any;
   if (!res.ok) {
@@ -354,6 +362,7 @@ export async function createIntegration(input: {
       ...(input.credentials ? { credentials: input.credentials } : {}),
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
   const body = (await parseBody(res)) as any;
   if (!res.ok) {
@@ -424,6 +433,7 @@ export async function proxy<T = unknown>(
         ? undefined
         : JSON.stringify(input.data),
     cache: "no-store",
+    signal: AbortSignal.timeout(NANGO_TIMEOUT_MS),
   });
 
   const data = (await parseBody(res)) as T;

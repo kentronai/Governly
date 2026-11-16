@@ -4,8 +4,10 @@
  * `providerConfigKey` of whichever GitHub provider the admin enabled
  * (`github-pat`, `github` OAuth, `github-app`, `github-app-oauth`).
  *
- * Every helper is best-effort and returns null on failure: a repo that
- * 404s, is empty, or lacks Actions access must not abort the whole scan.
+ * Helpers return null when GitHub says the thing is absent (any 4xx but 429:
+ * a repo that 404s, is empty, or lacks Actions access). Transient failures
+ * (5xx, network, timeout, exhausted 429 retries) throw, so the caller can treat
+ * the repo as unscanned instead of "not an agent" and retiring it.
  */
 
 import { proxy } from "@/lib/server/nango/client";
@@ -54,7 +56,9 @@ async function get<T>(
       });
       return res.data;
     } catch (e) {
-      if ((e as { status?: number }).status !== 429 || attempt >= 5) return null;
+      const status = (e as { status?: number }).status;
+      if (status && status >= 400 && status < 500 && status !== 429) return null;
+      if (status !== 429 || attempt >= 5) throw e;
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
   }

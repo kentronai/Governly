@@ -17,7 +17,7 @@ import {
   isManifestPath,
   isSourcePath,
 } from "../../agents/agent-profile";
-import type { RawDiscoveredResource } from "./types";
+import { noteLookupFailure, type RawDiscoveredResource } from "./types";
 import { isDenied } from "./ec2";
 import { lastDeployer } from "./cloudtrail";
 
@@ -97,8 +97,9 @@ export async function discoverLambda(
           new ListTagsCommand({ Resource: fn.FunctionArn }),
         );
         tags = (tagResp.Tags as Record<string, string>) ?? {};
-      } catch {
-        // tag lookup is best-effort
+      } catch (error) {
+        // Tags can be the only AI signal: a transient miss must not retire it.
+        noteLookupFailure(clients, "Lambda ListTags", error);
       }
 
       const isKnown = knownArns.has(fn.FunctionArn);

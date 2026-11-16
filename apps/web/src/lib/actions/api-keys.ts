@@ -5,8 +5,11 @@
 "use server";
 
 import { db, apiKeys } from "@db";
-import { eq } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { and, eq } from "drizzle-orm";
+import {
+  requireActiveTenant,
+  requireTenantMember,
+} from "@/lib/server/tenant-access";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { createAuditEvent } from "@/lib/server/audit";
@@ -30,18 +33,14 @@ function generateApiKey(): { key: string; hash: string; prefix: string } {
 }
 
 export const createApiKey = async (input: CreateApiKeyInput) => {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  const { userId, tenantId } = await requireTenantMember(input.tenantId);
 
   const { key, hash, prefix } = generateApiKey();
 
   const [apiKey] = await db
     .insert(apiKeys)
     .values({
-      tenantId: input.tenantId,
+      tenantId,
       name: input.name,
       keyHash: hash,
       keyPrefix: prefix,
@@ -53,11 +52,11 @@ export const createApiKey = async (input: CreateApiKeyInput) => {
     })
     .returning();
 
-  revalidatePath("/api-keys");
+  revalidatePath("/[tenant]/api-keys", "page");
 
   try {
     await createAuditEvent({
-      tenantId: input.tenantId,
+      tenantId,
       actorUserId: userId,
       action: "api_key.created",
       targetType: "api_key",
@@ -76,11 +75,7 @@ export const createApiKey = async (input: CreateApiKeyInput) => {
 };
 
 export const revokeApiKey = async (keyId: string) => {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  const { userId, tenantId } = await requireActiveTenant();
 
   const [apiKey] = await db
     .update(apiKeys)
@@ -89,14 +84,14 @@ export const revokeApiKey = async (keyId: string) => {
       revokedBy: userId,
       revokedAt: new Date().toISOString(),
     })
-    .where(eq(apiKeys.id, keyId))
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.tenantId, tenantId)))
     .returning();
 
   if (!apiKey) {
     throw new Error("API key not found");
   }
 
-  revalidatePath("/api-keys");
+  revalidatePath("/[tenant]/api-keys", "page");
 
   try {
     await createAuditEvent({
@@ -114,22 +109,18 @@ export const revokeApiKey = async (keyId: string) => {
 };
 
 export const deleteApiKey = async (keyId: string) => {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  const { userId, tenantId } = await requireActiveTenant();
 
   const [apiKey] = await db
     .delete(apiKeys)
-    .where(eq(apiKeys.id, keyId))
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.tenantId, tenantId)))
     .returning();
 
   if (!apiKey) {
     throw new Error("API key not found");
   }
 
-  revalidatePath("/api-keys");
+  revalidatePath("/[tenant]/api-keys", "page");
 
   try {
     await createAuditEvent({
@@ -150,11 +141,7 @@ export const updateApiKey = async (
   keyId: string,
   input: Partial<CreateApiKeyInput>,
 ) => {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error("Authentication required");
-  }
+  const { userId, tenantId } = await requireActiveTenant();
 
   const [apiKey] = await db
     .update(apiKeys)
@@ -164,14 +151,14 @@ export const updateApiKey = async (
       rateLimitPerMinute: input.rateLimitPerMinute,
       expiresAt: input.expiresAt,
     })
-    .where(eq(apiKeys.id, keyId))
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.tenantId, tenantId)))
     .returning();
 
   if (!apiKey) {
     throw new Error("API key not found");
   }
 
-  revalidatePath("/api-keys");
+  revalidatePath("/[tenant]/api-keys", "page");
 
   try {
     await createAuditEvent({

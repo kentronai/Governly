@@ -16,6 +16,8 @@ type Resolver = (hostname: string) => Promise<string[]>;
 export async function mapRepoIps(
   repos: Array<{ repository: string | null; deployedOn: string | null }>,
   resolve: Resolver = resolve4,
+  /** Transient DNS failures (not NXDOMAIN); the scan is partial when non-empty. */
+  failures: string[] = [],
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   await Promise.all(
@@ -24,8 +26,11 @@ export async function mapRepoIps(
       if (!repository || !url) return;
       try {
         for (const ip of await resolve(new URL(url).hostname)) out.set(ip, repository);
-      } catch {
-        // Unresolvable host: it simply links nothing.
+      } catch (error) {
+        // A host that no longer exists simply links nothing; a DNS hiccup
+        // could hide a repo-linked EC2 agent, so it is reported.
+        const code = (error as { code?: string })?.code ?? String(error);
+        if (!/ENOTFOUND|ENODATA/.test(code)) failures.push(`DNS ${url}: ${code}`);
       }
     }),
   );

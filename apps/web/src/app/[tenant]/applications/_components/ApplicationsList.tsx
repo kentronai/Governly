@@ -189,8 +189,8 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
           errorToast(newApp.message);
           return;
         }
-        // @ts-ignore
-        setApplications((prev) => [newApp.application, ...prev]);
+        // No optimistic insert: the raw row lacks the joined user objects the
+        // table renders, and we navigate to the new app's overview anyway.
         // Standard, Strict, and Development policies are created atomically by
         // the server-side createApplication action.
         const overviewPath = getApplicationOverviewPath(
@@ -222,21 +222,19 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
 
     startTransition(async () => {
       try {
-        const updated = await updateApplication({
+        await updateApplication({
           id: selectedApp.id,
           ...data,
         });
-        // @ts-ignore
-        setApplications((prev) =>
-          prev.map((app) =>
-            app.id === updated.id ? { ...app, ...updated } : app
-          )
-        );
+        // The action returns the raw row (createdBy/updatedBy are ids), so
+        // refetch rather than merge it — merging blanked "Modified By".
+        await fetchApplications();
         setIsEditModalOpen(false);
         setSelectedApp(null);
       } catch (error) {
         console.error("Failed to update application:", error);
-        throw error;
+        // Rethrowing inside a transition hits the error boundary; toast instead.
+        errorToast(error instanceof Error ? error.message : "Failed to update application");
       }
     });
   };

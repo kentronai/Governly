@@ -23,6 +23,17 @@ _SECRET_PATTERN = re.compile(r"\b(sk|sk-proj|sk-live|sk_live|sk_test|AIza)[-_A-Z
 _MAX_PROVIDER_MESSAGE = 500
 
 
+# Gateway-only request fields; OpenAI-compatible providers 400 on unknown args.
+_GATEWAY_FIELDS = frozenset({"policy_id", "application_id", "agent_id"})
+
+
+def _provider_body(request_body: Dict[str, Any], **overrides: Any) -> Dict[str, Any]:
+    """Copy of the request without gateway-only fields (caller's dict untouched)."""
+    body = {k: v for k, v in request_body.items() if k not in _GATEWAY_FIELDS}
+    body.update(overrides)
+    return body
+
+
 def _redact(text: str) -> str:
     return _SECRET_PATTERN.sub("[redacted]", text)
 
@@ -168,7 +179,7 @@ class OpenAIClient:
             response = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=self.headers,
-                json=request_body
+                json=_provider_body(request_body)
             )
             
             if response.status_code != 200:
@@ -200,9 +211,6 @@ class OpenAIClient:
         Raises:
             httpx.HTTPStatusError: If API request fails
         """
-        # Force streaming mode
-        request_body["stream"] = True
-        
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(45.0),
             http2=True
@@ -211,7 +219,7 @@ class OpenAIClient:
                 "POST",
                 f"{self.base_url}/chat/completions",
                 headers=self.headers,
-                json=request_body
+                json=_provider_body(request_body, stream=True)  # force streaming
             ) as response:
                 if response.status_code != 200:
                     await response.aread()
