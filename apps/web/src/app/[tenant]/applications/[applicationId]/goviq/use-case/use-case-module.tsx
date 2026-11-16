@@ -660,7 +660,7 @@ export default function UseCaseModule({
       </Dialog>
 
       {/* Use Cases List */}
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {useCases?.length === 0 ? (
           <Card className="">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -690,16 +690,18 @@ export default function UseCaseModule({
         ) : (
           useCases?.map((useCaseItem) => (
             <Card key={useCaseItem.id}>
-              <CardHeader className="flex gap-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
                 <div className="flex gap-3 flex-col">
-                  <CardTitle className="text-xl font-semibold">
+                  <CardTitle className="text-base font-semibold">
                     {useCaseItem.useCase}
                   </CardTitle>
-                  <CardDescription>{htmlToPlainText(useCaseItem.whatItDoes)}</CardDescription>
+                  <CardDescription className="line-clamp-2">{htmlToPlainText(useCaseItem.whatItDoes)}</CardDescription>
                 </div>
                 <div className="flex gap-2 items-center">
                   <Button
                     variant={"outline"}
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => {
                       setUseCase(useCaseItem);
                       setFormData(useCaseItem);
@@ -711,6 +713,8 @@ export default function UseCaseModule({
                   </Button>
                   <Button
                     variant="destructive"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => {
                       setUseCase(useCaseItem);
                       setDeleteUseCaseModal(true);
@@ -720,20 +724,20 @@ export default function UseCaseModule({
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="grid gap-x-6 gap-y-3 pb-2 sm:grid-cols-2 lg:grid-cols-3">
                 {/* Function Section */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-blue-500/10 rounded-md">
-                      <Target className="h-4 w-4 text-blue-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-blue-500/10 rounded-md">
+                      <Target className="h-3.5 w-3.5 text-blue-500" />
                     </div>
-                    <h4 className="font-semibold  text-sm">
+                    <h4 className="text-xs font-semibold text-muted-foreground">
                       Business Function
                     </h4>
                   </div>
                   <Badge
                     variant="secondary"
-                    className="bg-blue-500/10 text-blue-500 text-sm font-medium px-3 py-1"
+                    className="bg-blue-500/10 text-blue-500 text-xs font-medium"
                   >
                     {useCaseItem.function}
                   </Badge>
@@ -742,12 +746,12 @@ export default function UseCaseModule({
                 {/* AI System Types */}
                 {useCaseItem.agentPatterns &&
                   useCaseItem.agentPatterns.length > 0 && (
-                    <div className=" rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="p-1.5 bg-purple-500/10 rounded-md">
-                          <Activity className="h-4 w-4 text-purple-500" />
+                    <div>
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <div className="p-1 bg-purple-500/10 rounded-md">
+                          <Activity className="h-3.5 w-3.5 text-purple-500" />
                         </div>
-                        <h4 className="font-semibold  text-sm">
+                        <h4 className="text-xs font-semibold text-muted-foreground">
                           AI System Types
                         </h4>
                       </div>
@@ -756,7 +760,7 @@ export default function UseCaseModule({
                           <Badge
                             key={idx}
                             variant="secondary"
-                            className="bg-purple-500/10 text-purple-500 text-sm font-medium px-3 py-1"
+                            className="bg-purple-500/10 text-purple-500 text-xs font-medium"
                           >
                             {pattern}
                           </Badge>
@@ -766,19 +770,19 @@ export default function UseCaseModule({
                   )}
 
                 {/* Key Inputs */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-orange-500/10 rounded-md">
-                      <Target className="h-4 w-4 text-orange-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-orange-500/10 rounded-md">
+                      <Target className="h-3.5 w-3.5 text-orange-500" />
                     </div>
-                    <h4 className="font-semibold  text-sm">Key Inputs</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground">Key Inputs</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {useCaseItem.keyInputs?.map((input) => (
                       <Badge
                         key={input}
                         variant="secondary"
-                        className="bg-orange-500/10 text-orange-500 text-sm font-medium px-3 py-1"
+                        className="bg-orange-500/10 text-orange-500 text-xs font-medium"
                       >
                         {input}
                       </Badge>
@@ -787,19 +791,19 @@ export default function UseCaseModule({
                 </div>
 
                 {/* Primary Outputs */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-amber-500/10 rounded-md">
-                      <TrendingUp className="h-4 w-4 text-amber-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-amber-500/10 rounded-md">
+                      <TrendingUp className="h-3.5 w-3.5 text-amber-500" />
                     </div>
-                    <h4 className="font-semibold text-sm">Primary Outputs</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground">Primary Outputs</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {useCaseItem.primaryOutputs?.map((output) => (
                       <Badge
                         key={output}
                         variant="secondary"
-                        className="bg-amber-500/10 text-amber-500 text-sm font-medium px-3 py-1"
+                        className="bg-amber-500/10 text-amber-500 text-xs font-medium"
                       >
                         {output}
                       </Badge>
@@ -808,19 +812,19 @@ export default function UseCaseModule({
                 </div>
 
                 {/* Business Impact */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-cyan-500/10 rounded-md">
-                      <TrendingUp className="h-4 w-4 text-cyan-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-cyan-500/10 rounded-md">
+                      <TrendingUp className="h-3.5 w-3.5 text-cyan-500" />
                     </div>
-                    <h4 className="font-semibold  text-sm">Business Impact</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground">Business Impact</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {useCaseItem.businessImpact?.map((impact) => (
                       <Badge
                         key={impact}
                         variant="secondary"
-                        className="bg-cyan-500/10 text-cyan-500 text-sm font-medium px-3 py-1"
+                        className="bg-cyan-500/10 text-cyan-500 text-xs font-medium"
                       >
                         {impact}
                       </Badge>
@@ -829,19 +833,19 @@ export default function UseCaseModule({
                 </div>
 
                 {/* Region */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-pink-500/10 rounded-md">
-                      <TrendingUp className="h-4 w-4 text-pink-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-pink-500/10 rounded-md">
+                      <TrendingUp className="h-3.5 w-3.5 text-pink-500" />
                     </div>
-                    <h4 className="font-semibold text-sm">Region</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground">Region</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {useCaseItem.region?.map((impact) => (
                       <Badge
                         key={impact}
                         variant="secondary"
-                        className="bg-pink-500/10 text-pink-500 text-sm font-medium px-3 py-1"
+                        className="bg-pink-500/10 text-pink-500 text-xs font-medium"
                       >
                         {impact}
                       </Badge>
@@ -850,12 +854,12 @@ export default function UseCaseModule({
                 </div>
 
                 {/* KPIs */}
-                <div className=" rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-indigo-500/10 rounded-md">
-                      <Target className="h-4 w-4 text-indigo-500" />
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <div className="p-1 bg-indigo-500/10 rounded-md">
+                      <Target className="h-3.5 w-3.5 text-indigo-500" />
                     </div>
-                    <h4 className="font-semibold text-sm">
+                    <h4 className="text-xs font-semibold text-muted-foreground">
                       Key Performance Indicators
                     </h4>
                   </div>
@@ -864,7 +868,7 @@ export default function UseCaseModule({
                       <Badge
                         key={kpi}
                         variant="secondary"
-                        className="bg-indigo-500/10 text-indigo-500 text-sm font-medium px-3 py-1"
+                        className="bg-indigo-500/10 text-indigo-500 text-xs font-medium"
                       >
                         {kpi}
                       </Badge>
@@ -873,7 +877,7 @@ export default function UseCaseModule({
                 </div>
               </CardContent>
               <CardFooter>
-                <div className="flex text-muted-foreground flex-row gap-2 flex-wrap my-2 text-sm">
+                <div className="flex flex-row flex-wrap gap-2 text-xs text-muted-foreground">
                   <div className="flex flex-row items-center gap-1 pr-2 border-r border-r-muted">
                     <User className="h-4 w-4" />
                     <span>

@@ -2742,6 +2742,15 @@ export const risks = pgTable(
     }),
     categories: text().array().default([""]).notNull(),
     controlOwner: text(),
+    useCaseIds: uuid("use_case_ids").array().notNull().default(sql`'{}'`),
+    frameworkSlugs: text("framework_slugs").array().notNull().default(sql`'{}'`),
+    lifecyclePhase: text("lifecycle_phase"),
+    potentialImpact: text("potential_impact"),
+    reviewNotes: text("review_notes"),
+    implementationStrategy: text("implementation_strategy"),
+    residualSeverity: riskSeverity("residual_severity"),
+    residualLikelihood: riskLikelihood("residual_likelihood"),
+    residualLevel: riskLevel("residual_level"),
   },
   (table) => [
     index("idx_risks_app").using(

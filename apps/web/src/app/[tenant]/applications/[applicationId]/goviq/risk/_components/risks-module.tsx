@@ -88,6 +88,15 @@ interface Risk {
   createdAt: string;
   updatedAt: string;
   controlOwner: string | null;
+  useCaseIds: string[];
+  frameworkSlugs: string[];
+  lifecyclePhase: string | null;
+  potentialImpact: string | null;
+  reviewNotes: string | null;
+  implementationStrategy: string | null;
+  residualSeverity: Risk["severity"] | null;
+  residualLikelihood: Risk["likelihood"] | null;
+  residualLevel: Risk["riskLevel"] | null;
   createdBy: string | null;
   updatedBy: string | null;
   createdByUser?: {
@@ -286,6 +295,14 @@ export default function RisksModule({
           mitigationPlan: data.mitigationPlan,
           targetDate: data.targetDate,
           categories: data.categories || [],
+          useCaseIds: data.useCaseIds ?? [],
+          frameworkSlugs: data.frameworkSlugs ?? [],
+          lifecyclePhase: data.lifecyclePhase ?? null,
+          potentialImpact: data.potentialImpact || null,
+          reviewNotes: data.reviewNotes || null,
+          implementationStrategy: data.implementationStrategy || null,
+          residualSeverity: data.residualSeverity ?? null,
+          residualLikelihood: data.residualLikelihood ?? null,
         };
         // @ts-ignore
         const newRisk = await createRisk(riskData);
@@ -339,6 +356,14 @@ export default function RisksModule({
           mitigationPlan: data.mitigationPlan,
           targetDate: data.targetDate,
           categories: data.categories || [],
+          useCaseIds: data.useCaseIds ?? [],
+          frameworkSlugs: data.frameworkSlugs ?? [],
+          lifecyclePhase: data.lifecyclePhase ?? null,
+          potentialImpact: data.potentialImpact || null,
+          reviewNotes: data.reviewNotes || null,
+          implementationStrategy: data.implementationStrategy || null,
+          residualSeverity: data.residualSeverity ?? null,
+          residualLikelihood: data.residualLikelihood ?? null,
         };
         // @ts-ignore
         const updated = await updateRisk(riskData);
@@ -398,6 +423,14 @@ export default function RisksModule({
       severity: (r.severity ?? undefined) as Risk["severity"],
       likelihood: (r.likelihood ?? undefined) as Risk["likelihood"],
       categories: (r.category ?? []).filter(Boolean),
+      reviewNotes: [
+        `Imported from the ${CATALOG_SOURCES[source].title}, #${r.catalogNo} (source reference ${r.sourceId}).`,
+        r.category?.filter(Boolean).length
+          ? `Category: ${r.category.filter(Boolean).join("; ")}.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
     });
     setPrefillLabel(`From ${CATALOG_SOURCES[source].title}, #${r.catalogNo}`);
     setIsCreateModalOpen(true);
@@ -530,6 +563,7 @@ export default function RisksModule({
           <TableRow>
             <TableHead>Risk Name</TableHead>
             <TableHead>Risk Level</TableHead>
+            <TableHead>Residual</TableHead>
             <TableHead>Severity</TableHead>
             <TableHead>Likelihood</TableHead>
             <TableHead>Status</TableHead>
@@ -544,7 +578,7 @@ export default function RisksModule({
             <>
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading Risk...
@@ -555,7 +589,7 @@ export default function RisksModule({
           {!isLoadingRisk && filteredRisks.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={9}
+                colSpan={10}
                 className="text-center py-12 text-muted-foreground"
               >
                 {search || filtersActive
@@ -578,6 +612,17 @@ export default function RisksModule({
                   >
                     {toLabel(risk.riskLevel)}
                   </div>
+                </TableCell>
+                <TableCell>
+                  {risk.residualLevel ? (
+                    <div
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getRiskLevelStyle(risk.residualLevel)}`}
+                    >
+                      {toLabel(risk.residualLevel)}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Not scored</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -677,6 +722,7 @@ export default function RisksModule({
         onSubmit={handleCreate}
         isPending={isPending}
         tenantId={tenantId}
+        applicationId={applicationId}
         initial={prefill}
         sourceLabel={prefillLabel}
       />
@@ -724,6 +770,7 @@ export default function RisksModule({
         onSubmit={handleUpdate}
         isPending={isPending}
         tenantId={tenantId}
+        applicationId={applicationId}
       />
 
       <DeleteConfirmationModal

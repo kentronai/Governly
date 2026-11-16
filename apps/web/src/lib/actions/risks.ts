@@ -6,7 +6,7 @@
 "use server";
 
 import { db, risks, tenants, applications, riskList } from "@db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or, arrayContains } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
@@ -35,6 +35,16 @@ interface CreateRiskInput {
   lastReviewDate?: string;
   categories?: string[];
   metadata?: Record<string, any>;
+  useCaseIds?: string[];
+  frameworkSlugs?: string[];
+  lifecyclePhase?: string | null;
+  potentialImpact?: string | null;
+  reviewNotes?: string | null;
+  implementationStrategy?: string | null;
+  residualSeverity?: "Minor" | "Moderate" | "Major" | "Catastrophic" | null;
+  residualLikelihood?: "Rare" | "Unlikely" | "Possible" | "Likely" | null;
+  /** Ignored: always derived from residual severity x likelihood. */
+  residualLevel?: "Low" | "Medium" | "High" | "Critical" | null;
 }
 
 interface UpdateRiskInput extends Partial<CreateRiskInput> {
@@ -44,10 +54,13 @@ interface UpdateRiskInput extends Partial<CreateRiskInput> {
 // Create risk
 export const createRisk = async (input: CreateRiskInput) => {
   return withApplicationTracking(input.applicationId, async () => {
-    const { userId } = await auth();
+    const { userId, orgId } = await auth();
 
     if (!userId) {
       throw new Error("Authentication required");
+    }
+    if (orgId !== input.tenantId) {
+      throw new Error("Tenant access denied");
     }
 
     const [risk] = await db
@@ -55,6 +68,8 @@ export const createRisk = async (input: CreateRiskInput) => {
       .values({
         ...input,
         riskLevel: calculateRiskLevel(input.severity, input.likelihood)!,
+        residualLevel:
+          calculateRiskLevel(input.residualSeverity, input.residualLikelihood) ?? null,
         mitigationStatus: input.mitigationStatus || "Not Started",
         categories: input.categories || [],
         metadata: input.metadata || {},
@@ -108,6 +123,11 @@ export const updateRisk = async (input: UpdateRiskInput) => {
       updateData.likelihood ?? existingRisk.likelihood,
     );
     if (level) updateData.riskLevel = level;
+    updateData.residualLevel =
+      calculateRiskLevel(
+        "residualSeverity" in updateData ? updateData.residualSeverity : existingRisk.residualSeverity,
+        "residualLikelihood" in updateData ? updateData.residualLikelihood : existingRisk.residualLikelihood,
+      ) ?? null;
 
     const [risk] = await db
       .update(risks)
@@ -265,7 +285,9 @@ export const getRisksByApplication = async (
 
   // If useCaseId is provided, filter by it as well
   if (useCaseId) {
-    conditions.push(eq(risks.useCaseId, useCaseId));
+    conditions.push(
+      or(eq(risks.useCaseId, useCaseId), arrayContains(risks.useCaseIds, [useCaseId]))!,
+    );
   }
 
   // Get risks for the application (and optionally filtered by use case)

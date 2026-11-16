@@ -21,3 +21,17 @@ export function calculateRiskLevel(
   if (score >= 4) return "Medium";
   return "Low";
 }
+
+/**
+ * Where in an AI system's life a risk arises. Stages follow the AI system life cycle in
+ * ISO/IEC 22989 and the OECD AI lifecycle, in our own wording.
+ */
+export const AI_LIFECYCLE_PHASES = [
+  "Planning and design",
+  "Data collection and preparation",
+  "Model building and training",
+  "Testing and validation",
+  "Deployment",
+  "Operation and monitoring",
+  "Retirement",
+] as const;

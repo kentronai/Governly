@@ -6,7 +6,7 @@
 "use server";
 
 import { db, useCases, risks } from "@db";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
@@ -39,6 +39,17 @@ interface CreateRiskInput {
   targetDate?: string;
   categories?: string[];
 }
+
+/** The application's use cases, for the risk form's "Applies to use cases" picker. */
+export const getApplicationUseCaseOptions = async (applicationId: string) => {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) throw new Error("Authentication required");
+  return db
+    .select({ id: useCases.id, name: useCases.useCase })
+    .from(useCases)
+    .where(and(eq(useCases.applicationId, applicationId), eq(useCases.tenantId, orgId)))
+    .orderBy(asc(useCases.useCase));
+};
 
 // Create use case
 export const createUseCase = async (input: CreateUseCaseInput) => {
