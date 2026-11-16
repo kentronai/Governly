@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, MoreHorizontal, Search } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -106,7 +107,7 @@ export function RiskCatalogPicker({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search by name, category, or description..."
+            placeholder="Search by number, name, category, or description..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -118,12 +119,12 @@ export function RiskCatalogPicker({
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead className="w-10" />
-                  <TableHead className="w-[110px]">ID</TableHead>
-                  <TableHead className="w-[22%]">Risk name</TableHead>
+                  <TableHead className="w-14">#</TableHead>
+                  <TableHead className="w-[26%]">Risk name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="w-[105px]">Severity</TableHead>
                   <TableHead className="w-[100px]">Likelihood</TableHead>
-                  <TableHead className="w-[20%]">Category</TableHead>
+                  <TableHead className="w-[72px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -142,7 +143,7 @@ export function RiskCatalogPicker({
                 ) : (
                   rows.map((r) => {
                     const description = clean(r.description);
-                    const category = r.category?.filter(Boolean).join("; ") || "—";
+                    const categories = (r.category ?? []).filter(Boolean);
                     return (
                       <TableRow
                         key={r.id}
@@ -152,9 +153,7 @@ export function RiskCatalogPicker({
                         <TableCell>
                           <RadioGroupItem value={r.id} aria-label={r.riskName} />
                         </TableCell>
-                        <TableCell className="truncate font-mono text-xs text-muted-foreground" title={r.sourceId ?? ""}>
-                          {r.sourceId}
-                        </TableCell>
+                        <TableCell className="tabular-nums text-muted-foreground">{r.catalogNo}</TableCell>
                         <TableCell className="truncate font-medium" title={r.riskName}>
                           {r.riskName}
                         </TableCell>
@@ -167,8 +166,34 @@ export function RiskCatalogPicker({
                         <TableCell>
                           <Badge variant="outline">{r.likelihood}</Badge>
                         </TableCell>
-                        <TableCell className="truncate" title={category}>
-                          {category}
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Details of ${r.riskName}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-80 space-y-3 text-sm">
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground">Category</p>
+                                {categories.length ? (
+                                  <ul className="mt-1 space-y-1">
+                                    {categories.map((c) => (
+                                      <li key={c}>{c}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="mt-1 text-muted-foreground">
+                                    Not classified by the {meta?.title}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground">Source reference</p>
+                                <p className="mt-1 font-mono text-xs">{r.sourceId}</p>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
                       </TableRow>
                     );
@@ -181,8 +206,7 @@ export function RiskCatalogPicker({
         {picked && (
           <div className="max-h-32 overflow-y-auto rounded-md border bg-muted/40 p-3 text-sm">
             <p className="font-medium">
-              {picked.riskName}{" "}
-              <span className="font-mono text-xs text-muted-foreground">{picked.sourceId}</span>
+              <span className="text-muted-foreground">#{picked.catalogNo}</span> {picked.riskName}
             </p>
             <p className="mt-1 text-muted-foreground">{clean(picked.description) || "No description in the source."}</p>
           </div>

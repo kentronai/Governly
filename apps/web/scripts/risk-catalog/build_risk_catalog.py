@@ -18,6 +18,16 @@ import sys
 import openpyxl
 import yaml
 
+NUMBER_NEW_RISKS = """UPDATE risk_list r SET catalog_no = n.no
+FROM (
+  SELECT id,
+    (SELECT coalesce(max(catalog_no), 0) FROM risk_list m WHERE m.source = t.source)
+      + row_number() OVER (PARTITION BY source ORDER BY source_id) AS no
+  FROM risk_list t
+  WHERE source IS NOT NULL AND catalog_no IS NULL
+) n
+WHERE r.id = n.id;"""
+
 # ponytail: rule-based defaults by category, refine per risk if a reviewer wants to.
 IBM_SEVERITY = {  # by IBM risk group
     "Privacy": "Major", "Data laws": "Major", "Legal compliance": "Major",
@@ -102,6 +112,8 @@ def main(ibm_path, mit_path):
     # Severity/likelihood are not overwritten on refresh, so later tuning survives.
     print("ON CONFLICT (source, source_id) DO UPDATE SET risk_name = EXCLUDED.risk_name, "
           "description = EXCLUDED.description, category = EXCLUDED.category, source_ref = EXCLUDED.source_ref;")
+    # Give new risks the next catalog numbers (same statement as migration 0064; existing numbers never change).
+    print(NUMBER_NEW_RISKS)
     print(f"-- {sum(k[0] == 'ibm' for k in keys)} IBM + {sum(k[0] == 'mit' for k in keys)} MIT", file=sys.stderr)
 
 

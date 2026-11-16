@@ -399,7 +399,7 @@ export default function RisksModule({
       likelihood: (r.likelihood ?? undefined) as Risk["likelihood"],
       categories: (r.category ?? []).filter(Boolean),
     });
-    setPrefillLabel(`From ${CATALOG_SOURCES[source].title} (${r.sourceId})`);
+    setPrefillLabel(`From ${CATALOG_SOURCES[source].title}, #${r.catalogNo}`);
     setIsCreateModalOpen(true);
   };
 

@@ -209,6 +209,7 @@ export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
   return db
     .select({
       id: riskList.id,
+      catalogNo: riskList.catalogNo,
       sourceId: riskList.sourceId,
       riskName: riskList.riskName,
       description: riskList.description,
@@ -224,6 +225,9 @@ export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
         isNotNull(riskList.sourceId),
         query.trim()
           ? or(
+              /^\d+$/.test(query.trim())
+                ? eq(riskList.catalogNo, Number(query.trim()))
+                : undefined,
               ilike(riskList.riskName, q),
               ilike(riskList.description, q),
               sql`array_to_string(${riskList.category}, ' ') ILIKE ${q}`,
@@ -231,7 +235,7 @@ export async function searchRiskCatalog(source: "ibm" | "mit", query: string) {
           : undefined,
       ),
     )
-    .orderBy(riskList.riskName)
+    .orderBy(riskList.catalogNo)
     .limit(200);
 }
 

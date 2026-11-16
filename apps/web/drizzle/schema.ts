@@ -2294,6 +2294,7 @@ export const riskList = pgTable("risk_list", {
   source: text(),
   sourceId: text("source_id"),
   sourceRef: text("source_ref"),
+  catalogNo: integer("catalog_no"),
 });
 
 /** A risk linked to a framework control ("<slug>:<key>") or a policy_center row. */

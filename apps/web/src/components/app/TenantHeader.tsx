@@ -4,7 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { OrganizationSwitcher } from "@/components/common/OrganizationSwitcher";
 import Image from "next/image";
 import Link from "next/link";
-import kentronIcon from "@/assets/images/hlogo.svg";
+import governlyLogo from "@/assets/images/governly-logo.svg";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "../ui/button";
@@ -109,9 +109,9 @@ export function TenantHeader() {
             className="flex items-center justify-center bg-white rounded-full h-9  w-9"
           >
             <Image
-              src={kentronIcon}
+              src={governlyLogo}
               className="h-8 w-8"
-              alt="Kentron AI"
+              alt="Governly"
               width={32}
               height={32}
             />
