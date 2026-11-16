@@ -32,7 +32,6 @@ import {
   Layers,
   ShieldAlert,
   ShieldCheck,
-  FileText,
   X,
 } from "lucide-react";
 import {
@@ -690,12 +689,7 @@ export default function RisksModule({
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setLinkTarget({ risk, type: "policy" })}
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Linked policies ({linkCounts[risk.id]?.policy ?? 0})
-                      </DropdownMenuItem>
+                      {/* ponytail: "Linked policies" hidden for now; RiskLinksDialog type="policy" still works. */}
                       <DropdownMenuItem
                         onClick={() => {
                           setSelectedRisk(risk);

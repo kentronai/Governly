@@ -2712,5 +2712,1185 @@ exports[`permanent control IDs match the committed list: only append, never renu
     "id": "soc-2-type-ii:5.3",
     "kind": "framework",
   },
+  {
+    "code": "KN0056.1.1",
+    "id": "nist-csf:1.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.1.2",
+    "id": "nist-csf:1.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.1.3",
+    "id": "nist-csf:1.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.1.4",
+    "id": "nist-csf:1.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.1.5",
+    "id": "nist-csf:1.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.1",
+    "id": "nist-csf:1.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.2",
+    "id": "nist-csf:1.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.3",
+    "id": "nist-csf:1.2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.4",
+    "id": "nist-csf:1.2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.5",
+    "id": "nist-csf:1.2.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.6",
+    "id": "nist-csf:1.2.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.2.7",
+    "id": "nist-csf:1.2.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.3.1",
+    "id": "nist-csf:1.3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.3.2",
+    "id": "nist-csf:1.3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.3.3",
+    "id": "nist-csf:1.3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.3.4",
+    "id": "nist-csf:1.3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.4.1",
+    "id": "nist-csf:1.4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.4.2",
+    "id": "nist-csf:1.4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.5.1",
+    "id": "nist-csf:1.5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.5.2",
+    "id": "nist-csf:1.5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.5.3",
+    "id": "nist-csf:1.5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.1",
+    "id": "nist-csf:1.6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.2",
+    "id": "nist-csf:1.6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.3",
+    "id": "nist-csf:1.6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.4",
+    "id": "nist-csf:1.6.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.5",
+    "id": "nist-csf:1.6.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.6",
+    "id": "nist-csf:1.6.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.7",
+    "id": "nist-csf:1.6.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.8",
+    "id": "nist-csf:1.6.8",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.9",
+    "id": "nist-csf:1.6.9",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0056.6.10",
+    "id": "nist-csf:1.6.10",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.1",
+    "id": "nist-csf:2.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.2",
+    "id": "nist-csf:2.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.3",
+    "id": "nist-csf:2.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.4",
+    "id": "nist-csf:2.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.5",
+    "id": "nist-csf:2.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.6",
+    "id": "nist-csf:2.1.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.1.7",
+    "id": "nist-csf:2.1.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.1",
+    "id": "nist-csf:2.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.2",
+    "id": "nist-csf:2.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.3",
+    "id": "nist-csf:2.2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.4",
+    "id": "nist-csf:2.2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.5",
+    "id": "nist-csf:2.2.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.6",
+    "id": "nist-csf:2.2.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.7",
+    "id": "nist-csf:2.2.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.8",
+    "id": "nist-csf:2.2.8",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.9",
+    "id": "nist-csf:2.2.9",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.2.10",
+    "id": "nist-csf:2.2.10",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.3.1",
+    "id": "nist-csf:2.3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.3.2",
+    "id": "nist-csf:2.3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.3.3",
+    "id": "nist-csf:2.3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0057.3.4",
+    "id": "nist-csf:2.3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.1",
+    "id": "nist-csf:3.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.2",
+    "id": "nist-csf:3.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.3",
+    "id": "nist-csf:3.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.4",
+    "id": "nist-csf:3.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.5",
+    "id": "nist-csf:3.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.1.6",
+    "id": "nist-csf:3.1.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.2.1",
+    "id": "nist-csf:3.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.2.2",
+    "id": "nist-csf:3.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.3.1",
+    "id": "nist-csf:3.3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.3.2",
+    "id": "nist-csf:3.3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.3.3",
+    "id": "nist-csf:3.3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.3.4",
+    "id": "nist-csf:3.3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.1",
+    "id": "nist-csf:3.4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.2",
+    "id": "nist-csf:3.4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.3",
+    "id": "nist-csf:3.4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.4",
+    "id": "nist-csf:3.4.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.5",
+    "id": "nist-csf:3.4.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.4.6",
+    "id": "nist-csf:3.4.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.5.1",
+    "id": "nist-csf:3.5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.5.2",
+    "id": "nist-csf:3.5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.5.3",
+    "id": "nist-csf:3.5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0058.5.4",
+    "id": "nist-csf:3.5.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.1.1",
+    "id": "nist-csf:4.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.1.2",
+    "id": "nist-csf:4.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.1.3",
+    "id": "nist-csf:4.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.1.4",
+    "id": "nist-csf:4.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.1.5",
+    "id": "nist-csf:4.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.1",
+    "id": "nist-csf:4.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.2",
+    "id": "nist-csf:4.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.3",
+    "id": "nist-csf:4.2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.4",
+    "id": "nist-csf:4.2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.5",
+    "id": "nist-csf:4.2.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0059.2.6",
+    "id": "nist-csf:4.2.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.1.1",
+    "id": "nist-csf:5.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.1.2",
+    "id": "nist-csf:5.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.1.3",
+    "id": "nist-csf:5.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.1.4",
+    "id": "nist-csf:5.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.1.5",
+    "id": "nist-csf:5.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.2.1",
+    "id": "nist-csf:5.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.2.2",
+    "id": "nist-csf:5.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.2.3",
+    "id": "nist-csf:5.2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.2.4",
+    "id": "nist-csf:5.2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.3.1",
+    "id": "nist-csf:5.3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.3.2",
+    "id": "nist-csf:5.3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.4.1",
+    "id": "nist-csf:5.4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0060.4.2",
+    "id": "nist-csf:5.4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.1",
+    "id": "nist-csf:6.1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.2",
+    "id": "nist-csf:6.1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.3",
+    "id": "nist-csf:6.1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.4",
+    "id": "nist-csf:6.1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.5",
+    "id": "nist-csf:6.1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.1.6",
+    "id": "nist-csf:6.1.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.2.1",
+    "id": "nist-csf:6.2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0061.2.2",
+    "id": "nist-csf:6.2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0062.1",
+    "id": "eeoc-ada-ai:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0062.2",
+    "id": "eeoc-ada-ai:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0063.1",
+    "id": "eeoc-ada-ai:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0063.2",
+    "id": "eeoc-ada-ai:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0063.3",
+    "id": "eeoc-ada-ai:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0063.4",
+    "id": "eeoc-ada-ai:2.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0063.5",
+    "id": "eeoc-ada-ai:2.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.1",
+    "id": "eeoc-ada-ai:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.2",
+    "id": "eeoc-ada-ai:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.3",
+    "id": "eeoc-ada-ai:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.4",
+    "id": "eeoc-ada-ai:3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.5",
+    "id": "eeoc-ada-ai:3.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0064.6",
+    "id": "eeoc-ada-ai:3.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0065.1",
+    "id": "eeoc-ada-ai:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0065.2",
+    "id": "eeoc-ada-ai:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0066.1",
+    "id": "uk-ai-white-paper:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0066.2",
+    "id": "uk-ai-white-paper:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0066.3",
+    "id": "uk-ai-white-paper:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0067.1",
+    "id": "uk-ai-white-paper:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0067.2",
+    "id": "uk-ai-white-paper:2.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0067.3",
+    "id": "uk-ai-white-paper:2.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0068.1",
+    "id": "uk-ai-white-paper:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0068.2",
+    "id": "uk-ai-white-paper:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0068.3",
+    "id": "uk-ai-white-paper:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0069.1",
+    "id": "uk-ai-white-paper:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0069.2",
+    "id": "uk-ai-white-paper:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0069.3",
+    "id": "uk-ai-white-paper:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0070.1",
+    "id": "uk-ai-white-paper:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0070.2",
+    "id": "uk-ai-white-paper:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0071.1",
+    "id": "unesco-ai-ethics:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0071.2",
+    "id": "unesco-ai-ethics:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0072.1",
+    "id": "unesco-ai-ethics:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0073.1",
+    "id": "unesco-ai-ethics:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0073.2",
+    "id": "unesco-ai-ethics:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0073.3",
+    "id": "unesco-ai-ethics:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0074.1",
+    "id": "unesco-ai-ethics:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0074.2",
+    "id": "unesco-ai-ethics:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0074.3",
+    "id": "unesco-ai-ethics:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0075.1",
+    "id": "unesco-ai-ethics:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0075.2",
+    "id": "unesco-ai-ethics:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0075.3",
+    "id": "unesco-ai-ethics:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0075.4",
+    "id": "unesco-ai-ethics:5.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0076.1",
+    "id": "unesco-ai-ethics:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0076.2",
+    "id": "unesco-ai-ethics:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0077.1",
+    "id": "unesco-ai-ethics:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0077.2",
+    "id": "unesco-ai-ethics:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0077.3",
+    "id": "unesco-ai-ethics:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0078.1",
+    "id": "unesco-ai-ethics:8.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0078.2",
+    "id": "unesco-ai-ethics:8.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0078.3",
+    "id": "unesco-ai-ethics:8.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0079.1",
+    "id": "unesco-ai-ethics:9.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0080.1",
+    "id": "unesco-ai-ethics:10.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0081.1",
+    "id": "unesco-ai-ethics:11.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0081.2",
+    "id": "unesco-ai-ethics:11.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0081.3",
+    "id": "unesco-ai-ethics:11.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0081.4",
+    "id": "unesco-ai-ethics:11.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0082.1",
+    "id": "unesco-ai-ethics:12.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0082.2",
+    "id": "unesco-ai-ethics:12.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0083.1",
+    "id": "unesco-ai-ethics:13.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0083.2",
+    "id": "unesco-ai-ethics:13.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0083.3",
+    "id": "unesco-ai-ethics:13.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0084.1",
+    "id": "unesco-ai-ethics:14.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0085.1",
+    "id": "unesco-ai-ethics:15.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0086.1",
+    "id": "unesco-ai-ethics:16.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0086.2",
+    "id": "unesco-ai-ethics:16.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0087.1",
+    "id": "ai-verify:1.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0087.2",
+    "id": "ai-verify:1.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0087.3",
+    "id": "ai-verify:1.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0087.4",
+    "id": "ai-verify:1.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0087.5",
+    "id": "ai-verify:1.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0088.1",
+    "id": "ai-verify:2.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.1",
+    "id": "ai-verify:3.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.2",
+    "id": "ai-verify:3.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.3",
+    "id": "ai-verify:3.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.4",
+    "id": "ai-verify:3.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.5",
+    "id": "ai-verify:3.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.6",
+    "id": "ai-verify:3.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.7",
+    "id": "ai-verify:3.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.8",
+    "id": "ai-verify:3.8",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.9",
+    "id": "ai-verify:3.9",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.10",
+    "id": "ai-verify:3.10",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.11",
+    "id": "ai-verify:3.11",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.12",
+    "id": "ai-verify:3.12",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.13",
+    "id": "ai-verify:3.13",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0089.14",
+    "id": "ai-verify:3.14",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.1",
+    "id": "ai-verify:4.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.2",
+    "id": "ai-verify:4.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.3",
+    "id": "ai-verify:4.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.4",
+    "id": "ai-verify:4.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.5",
+    "id": "ai-verify:4.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0090.6",
+    "id": "ai-verify:4.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.1",
+    "id": "ai-verify:5.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.2",
+    "id": "ai-verify:5.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.3",
+    "id": "ai-verify:5.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.4",
+    "id": "ai-verify:5.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.5",
+    "id": "ai-verify:5.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.6",
+    "id": "ai-verify:5.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0091.7",
+    "id": "ai-verify:5.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0092.1",
+    "id": "ai-verify:6.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0092.2",
+    "id": "ai-verify:6.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0092.3",
+    "id": "ai-verify:6.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0092.4",
+    "id": "ai-verify:6.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0092.5",
+    "id": "ai-verify:6.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.1",
+    "id": "ai-verify:7.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.2",
+    "id": "ai-verify:7.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.3",
+    "id": "ai-verify:7.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.4",
+    "id": "ai-verify:7.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.5",
+    "id": "ai-verify:7.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.6",
+    "id": "ai-verify:7.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.7",
+    "id": "ai-verify:7.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.8",
+    "id": "ai-verify:7.8",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0093.9",
+    "id": "ai-verify:7.9",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0094.1",
+    "id": "ai-verify:8.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0094.2",
+    "id": "ai-verify:8.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0094.3",
+    "id": "ai-verify:8.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0094.4",
+    "id": "ai-verify:8.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.1",
+    "id": "ai-verify:9.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.2",
+    "id": "ai-verify:9.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.3",
+    "id": "ai-verify:9.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.4",
+    "id": "ai-verify:9.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.5",
+    "id": "ai-verify:9.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.6",
+    "id": "ai-verify:9.6",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.7",
+    "id": "ai-verify:9.7",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0095.8",
+    "id": "ai-verify:9.8",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0096.1",
+    "id": "ai-verify:10.1",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0096.2",
+    "id": "ai-verify:10.2",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0096.3",
+    "id": "ai-verify:10.3",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0096.4",
+    "id": "ai-verify:10.4",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0096.5",
+    "id": "ai-verify:10.5",
+    "kind": "framework",
+  },
+  {
+    "code": "KN0097.1",
+    "id": "ai-verify:11.1",
+    "kind": "framework",
+  },
 ]
 `;

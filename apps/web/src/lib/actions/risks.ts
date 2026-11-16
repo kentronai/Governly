@@ -5,8 +5,9 @@
 
 "use server";
 
-import { db, risks, tenants, applications, riskList } from "@db";
-import { eq, and, isNull, or, arrayContains } from "drizzle-orm";
+import { db, risks, tenants, applications, riskList, useCases } from "@db";
+import { eq, and, isNull, or, arrayContains, inArray } from "drizzle-orm";
+import { FRAMEWORK_SLUGS } from "@/lib/frameworks";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { withApplicationTracking } from "@/lib/utils/application-tracking";
@@ -51,6 +52,45 @@ interface UpdateRiskInput extends Partial<CreateRiskInput> {
   id: string;
 }
 
+/**
+ * Keep only references the user may make: use cases of this tenant's application, and
+ * regulation/framework slugs that exist. A graph built from these links can then trust them.
+ */
+async function cleanLinks(
+  tenantId: string,
+  applicationId: string,
+  input: { useCaseIds?: string[]; frameworkSlugs?: string[] },
+) {
+  const out: { useCaseIds?: string[]; frameworkSlugs?: string[] } = {};
+  if (input.useCaseIds) {
+    out.useCaseIds = input.useCaseIds.length
+      ? (
+          await db
+            .select({ id: useCases.id })
+            .from(useCases)
+            .where(
+              and(
+                inArray(useCases.id, input.useCaseIds),
+                eq(useCases.tenantId, tenantId),
+                eq(useCases.applicationId, applicationId),
+              ),
+            )
+        ).map((r) => r.id)
+      : [];
+  }
+  if (input.frameworkSlugs)
+    out.frameworkSlugs = input.frameworkSlugs.filter((s) => FRAMEWORK_SLUGS.includes(s));
+  return out;
+}
+
+/** The signed-in user must belong to the risk's organisation. */
+async function assertTenant(tenantId: string) {
+  const { userId, orgId } = await auth();
+  if (!userId) throw new Error("Authentication required");
+  if (orgId !== tenantId) throw new Error("Tenant access denied");
+  return userId;
+}
+
 // Create risk
 export const createRisk = async (input: CreateRiskInput) => {
   return withApplicationTracking(input.applicationId, async () => {
@@ -67,6 +107,7 @@ export const createRisk = async (input: CreateRiskInput) => {
       .insert(risks)
       .values({
         ...input,
+        ...(await cleanLinks(input.tenantId, input.applicationId, input)),
         riskLevel: calculateRiskLevel(input.severity, input.likelihood)!,
         residualLevel:
           calculateRiskLevel(input.residualSeverity, input.residualLikelihood) ?? null,
@@ -111,13 +152,13 @@ export const updateRisk = async (input: UpdateRiskInput) => {
   }
 
   return withApplicationTracking(existingRisk.applicationId, async () => {
-    const { userId } = await auth();
+    const userId = await assertTenant(existingRisk.tenantId);
 
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
-
-    const { id, ...updateData } = input;
+    const { id, tenantId: _t, applicationId: _a, ...rest } = input;
+    const updateData = {
+      ...rest,
+      ...(await cleanLinks(existingRisk.tenantId, existingRisk.applicationId, rest)),
+    };
     const level = calculateRiskLevel(
       updateData.severity ?? existingRisk.severity,
       updateData.likelihood ?? existingRisk.likelihood,
@@ -174,11 +215,7 @@ export const deleteRisk = async (id: string) => {
   }
 
   return withApplicationTracking(existingRisk.applicationId, async () => {
-    const { userId } = await auth();
-
-    if (!userId) {
-      throw new Error("Authentication required");
-    }
+    const userId = await assertTenant(existingRisk.tenantId);
 
     await db.delete(risks).where(eq(risks.id, id));
 

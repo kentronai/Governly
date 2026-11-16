@@ -24,6 +24,11 @@ import { uaePdpl } from "./content/uae-pdpl";
 import { saudiPdpl } from "./content/saudi-pdpl";
 import { qatarPdppl } from "./content/qatar-pdppl";
 import { bahrainPdpl } from "./content/bahrain-pdpl";
+import { nistCsf } from "./content/nist-csf";
+import { eeocAdaAi } from "./content/eeoc-ada-ai";
+import { ukAiWhitePaper } from "./content/uk-ai-white-paper";
+import { unescoAiEthics } from "./content/unesco-ai-ethics";
+import { aiVerify } from "./content/ai-verify";
 
 export type * from "./types";
 
@@ -55,6 +60,12 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
   saudiPdpl,
   qatarPdppl,
   bahrainPdpl,
+  // Added in 1.7.0.
+  nistCsf,
+  eeocAdaAi,
+  ukAiWhitePaper,
+  unescoAiEthics,
+  aiVerify,
 ];
 
 export const FRAMEWORK_SLUGS = FRAMEWORKS.map((f) => f.slug);

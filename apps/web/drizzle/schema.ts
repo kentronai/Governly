@@ -2297,6 +2297,25 @@ export const riskList = pgTable("risk_list", {
   catalogNo: integer("catalog_no"),
 });
 
+/** A fairness check on a risk; `result` is a FairnessResult (src/lib/fairness.ts). */
+export const fairnessChecks = pgTable("fairness_checks", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  tenantId: text("tenant_id").notNull(),
+  riskId: uuid("risk_id")
+    .notNull()
+    .references(() => risks.id, { onDelete: "cascade" }),
+  name: text().notNull(),
+  fileName: text("file_name").notNull(),
+  groupColumn: text("group_column").notNull(),
+  decisionColumn: text("decision_column").notNull(),
+  positiveValue: text("positive_value").notNull(),
+  labelColumn: text("label_column"),
+  result: jsonb().notNull(),
+  passed: boolean().notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+});
+
 /** A risk linked to a framework control ("<slug>:<key>") or a policy_center row. */
 export const riskLinks = pgTable(
   "risk_links",
