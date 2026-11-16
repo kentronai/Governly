@@ -28,6 +28,9 @@ interface UserSelectProps {
   required?: boolean;
   tenantId: string;
   disabled?: boolean;
+  /** Render only the dropdown at the standard input height (h-9); the form supplies the label. */
+  bare?: boolean;
+  id?: string;
 }
 
 /**
@@ -44,6 +47,8 @@ export const UserSelect: React.FC<UserSelectProps> = ({
   required = false,
   tenantId,
   disabled = false,
+  bare = false,
+  id,
 }) => {
   const [users, setUsers] = useState<ClerkUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +78,49 @@ export const UserSelect: React.FC<UserSelectProps> = ({
       fetchUsers();
     }
   }, [tenantId]);
+
+  if (bare && (loading || errorMessage)) {
+    return (
+      <div
+        className={`flex h-9 items-center gap-2 rounded-md border px-3 text-sm ${errorMessage ? "text-red-500" : "text-muted-foreground"}`}
+      >
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        {errorMessage ?? "Loading members..."}
+      </div>
+    );
+  }
+
+  if (bare) {
+    return (
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger
+          id={id}
+          className={`h-9 w-full ${error ? "border-red-500" : ""} ${className}`}
+        >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {users.length === 0 ? (
+            <SelectItem value="none" disabled>
+              No organization members available
+            </SelectItem>
+          ) : (
+            users.map((user) => (
+              <SelectItem key={user.id} value={user.id}>
+                <span className="flex min-w-0 items-center gap-2">
+                  {user.imageUrl && (
+                    <img src={user.imageUrl} alt="" className="h-5 w-5 rounded-full" />
+                  )}
+                  <span className="truncate">{user.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                </span>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   if (loading) {
     return (

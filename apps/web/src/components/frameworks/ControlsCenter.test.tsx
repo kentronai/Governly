@@ -83,6 +83,9 @@ const openActions = async (code: string) => {
 };
 
 describe("ControlsCenter", () => {
+  // The full catalog renders ~550 controls; under parallel load 5s is too tight.
+  jest.setTimeout(20000);
+
   it("asks to enable a policy when none is enabled", async () => {
     activePolicyNames = [];
     render(<ControlsCenter />);

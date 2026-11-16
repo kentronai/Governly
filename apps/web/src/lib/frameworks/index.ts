@@ -16,6 +16,14 @@ import { soc2TypeII } from "./content/soc-2-type-ii";
 import { gdpr } from "./content/gdpr";
 import { ccpa } from "./content/ccpa";
 import { dora } from "./content/dora";
+import { caAb2839 } from "./content/ca-ab-2839";
+import { ilHb3773 } from "./content/il-hb-3773";
+import { coSb21169 } from "./content/co-sb21-169";
+import { quebecLaw25 } from "./content/quebec-law-25";
+import { uaePdpl } from "./content/uae-pdpl";
+import { saudiPdpl } from "./content/saudi-pdpl";
+import { qatarPdppl } from "./content/qatar-pdppl";
+import { bahrainPdpl } from "./content/bahrain-pdpl";
 
 export type * from "./types";
 
@@ -38,6 +46,15 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
   nistAiRmf,
   iso27001,
   soc2TypeII,
+  // Added in 1.6.0. Keep new frameworks at the end: control IDs (KN0001…) follow this order.
+  caAb2839,
+  ilHb3773,
+  coSb21169,
+  quebecLaw25,
+  uaePdpl,
+  saudiPdpl,
+  qatarPdppl,
+  bahrainPdpl,
 ];
 
 export const FRAMEWORK_SLUGS = FRAMEWORKS.map((f) => f.slug);

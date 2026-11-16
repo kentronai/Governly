@@ -1053,6 +1053,746 @@ exports[`permanent control IDs match the committed list: only append, never renu
     "kind": "regulation",
   },
   {
+    "code": "KN0054.1",
+    "id": "ca-ab-2839:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0055.1",
+    "id": "ca-ab-2839:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0056.1",
+    "id": "ca-ab-2839:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0056.2",
+    "id": "ca-ab-2839:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0056.3",
+    "id": "ca-ab-2839:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0057.1",
+    "id": "ca-ab-2839:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0058.1",
+    "id": "il-hb-3773:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0059.1",
+    "id": "il-hb-3773:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0059.2",
+    "id": "il-hb-3773:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0060.1",
+    "id": "il-hb-3773:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0061.1",
+    "id": "co-sb21-169:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0061.2",
+    "id": "co-sb21-169:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0062.1",
+    "id": "co-sb21-169:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0062.2",
+    "id": "co-sb21-169:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0062.3",
+    "id": "co-sb21-169:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0062.4",
+    "id": "co-sb21-169:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0062.5",
+    "id": "co-sb21-169:2.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0063.1",
+    "id": "co-sb21-169:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0063.2",
+    "id": "co-sb21-169:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0063.3",
+    "id": "co-sb21-169:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0064.1",
+    "id": "co-sb21-169:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0064.2",
+    "id": "co-sb21-169:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0064.3",
+    "id": "co-sb21-169:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0064.4",
+    "id": "co-sb21-169:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0065.1",
+    "id": "co-sb21-169:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0066.1",
+    "id": "co-sb21-169:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0066.2",
+    "id": "co-sb21-169:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0066.3",
+    "id": "co-sb21-169:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0066.4",
+    "id": "co-sb21-169:6.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0067.1",
+    "id": "quebec-law-25:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0067.2",
+    "id": "quebec-law-25:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0067.3",
+    "id": "quebec-law-25:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0068.1",
+    "id": "quebec-law-25:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0068.2",
+    "id": "quebec-law-25:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0068.3",
+    "id": "quebec-law-25:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0069.1",
+    "id": "quebec-law-25:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0069.2",
+    "id": "quebec-law-25:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0069.3",
+    "id": "quebec-law-25:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0069.4",
+    "id": "quebec-law-25:3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0069.5",
+    "id": "quebec-law-25:3.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.1",
+    "id": "quebec-law-25:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.2",
+    "id": "quebec-law-25:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.3",
+    "id": "quebec-law-25:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.4",
+    "id": "quebec-law-25:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.5",
+    "id": "quebec-law-25:4.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.6",
+    "id": "quebec-law-25:4.6",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.7",
+    "id": "quebec-law-25:4.7",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0070.8",
+    "id": "quebec-law-25:4.8",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0071.1",
+    "id": "quebec-law-25:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0071.2",
+    "id": "quebec-law-25:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0071.3",
+    "id": "quebec-law-25:5.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0071.4",
+    "id": "quebec-law-25:5.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0072.1",
+    "id": "quebec-law-25:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0072.2",
+    "id": "quebec-law-25:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0072.3",
+    "id": "quebec-law-25:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0072.4",
+    "id": "quebec-law-25:6.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0073.1",
+    "id": "quebec-law-25:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0073.2",
+    "id": "quebec-law-25:7.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0073.3",
+    "id": "quebec-law-25:7.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0073.4",
+    "id": "quebec-law-25:7.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0074.1",
+    "id": "quebec-law-25:8.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0075.1",
+    "id": "uae-pdpl:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0075.2",
+    "id": "uae-pdpl:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0075.3",
+    "id": "uae-pdpl:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0076.1",
+    "id": "uae-pdpl:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0076.2",
+    "id": "uae-pdpl:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0076.3",
+    "id": "uae-pdpl:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0076.4",
+    "id": "uae-pdpl:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0077.1",
+    "id": "uae-pdpl:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0077.2",
+    "id": "uae-pdpl:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.1",
+    "id": "uae-pdpl:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.2",
+    "id": "uae-pdpl:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.3",
+    "id": "uae-pdpl:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.4",
+    "id": "uae-pdpl:4.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.5",
+    "id": "uae-pdpl:4.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.6",
+    "id": "uae-pdpl:4.6",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0078.7",
+    "id": "uae-pdpl:4.7",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0079.1",
+    "id": "uae-pdpl:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0079.2",
+    "id": "uae-pdpl:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0079.3",
+    "id": "uae-pdpl:5.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0080.1",
+    "id": "uae-pdpl:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0081.1",
+    "id": "uae-pdpl:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0081.2",
+    "id": "uae-pdpl:7.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0082.1",
+    "id": "uae-pdpl:8.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0083.1",
+    "id": "saudi-pdpl:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0083.2",
+    "id": "saudi-pdpl:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0083.3",
+    "id": "saudi-pdpl:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0083.4",
+    "id": "saudi-pdpl:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0083.5",
+    "id": "saudi-pdpl:1.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0084.1",
+    "id": "saudi-pdpl:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0084.2",
+    "id": "saudi-pdpl:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0084.3",
+    "id": "saudi-pdpl:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0084.4",
+    "id": "saudi-pdpl:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0085.1",
+    "id": "saudi-pdpl:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0085.2",
+    "id": "saudi-pdpl:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0086.1",
+    "id": "saudi-pdpl:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0086.2",
+    "id": "saudi-pdpl:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0086.3",
+    "id": "saudi-pdpl:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0087.1",
+    "id": "saudi-pdpl:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0087.2",
+    "id": "saudi-pdpl:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0087.3",
+    "id": "saudi-pdpl:5.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0087.4",
+    "id": "saudi-pdpl:5.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0087.5",
+    "id": "saudi-pdpl:5.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0088.1",
+    "id": "saudi-pdpl:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0088.2",
+    "id": "saudi-pdpl:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0088.3",
+    "id": "saudi-pdpl:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0089.1",
+    "id": "saudi-pdpl:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0089.2",
+    "id": "saudi-pdpl:7.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0089.3",
+    "id": "saudi-pdpl:7.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0090.1",
+    "id": "qatar-pdppl:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0090.2",
+    "id": "qatar-pdppl:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0090.3",
+    "id": "qatar-pdppl:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0090.4",
+    "id": "qatar-pdppl:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0091.1",
+    "id": "qatar-pdppl:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0091.2",
+    "id": "qatar-pdppl:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0091.3",
+    "id": "qatar-pdppl:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0091.4",
+    "id": "qatar-pdppl:2.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0092.1",
+    "id": "qatar-pdppl:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0092.2",
+    "id": "qatar-pdppl:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0092.3",
+    "id": "qatar-pdppl:3.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0092.4",
+    "id": "qatar-pdppl:3.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0093.1",
+    "id": "qatar-pdppl:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0093.2",
+    "id": "qatar-pdppl:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0093.3",
+    "id": "qatar-pdppl:4.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0094.1",
+    "id": "qatar-pdppl:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0094.2",
+    "id": "qatar-pdppl:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0095.1",
+    "id": "qatar-pdppl:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0096.1",
+    "id": "qatar-pdppl:7.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0097.1",
+    "id": "bahrain-pdpl:1.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0097.2",
+    "id": "bahrain-pdpl:1.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0097.3",
+    "id": "bahrain-pdpl:1.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0097.4",
+    "id": "bahrain-pdpl:1.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0097.5",
+    "id": "bahrain-pdpl:1.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0098.1",
+    "id": "bahrain-pdpl:2.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0098.2",
+    "id": "bahrain-pdpl:2.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0098.3",
+    "id": "bahrain-pdpl:2.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0099.1",
+    "id": "bahrain-pdpl:3.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0099.2",
+    "id": "bahrain-pdpl:3.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0100.1",
+    "id": "bahrain-pdpl:4.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0100.2",
+    "id": "bahrain-pdpl:4.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0101.1",
+    "id": "bahrain-pdpl:5.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0101.2",
+    "id": "bahrain-pdpl:5.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.1",
+    "id": "bahrain-pdpl:6.1",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.2",
+    "id": "bahrain-pdpl:6.2",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.3",
+    "id": "bahrain-pdpl:6.3",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.4",
+    "id": "bahrain-pdpl:6.4",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.5",
+    "id": "bahrain-pdpl:6.5",
+    "kind": "regulation",
+  },
+  {
+    "code": "KN0102.6",
+    "id": "bahrain-pdpl:6.6",
+    "kind": "regulation",
+  },
+  {
     "code": "KN0001.1",
     "id": "ftc-ai:1.1",
     "kind": "framework",

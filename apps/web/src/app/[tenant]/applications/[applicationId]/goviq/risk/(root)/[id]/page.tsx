@@ -1,14 +1,17 @@
 import { db, riskMitigationStatus, risks } from "@/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import Tab from "./_components/tabs";
 import { Risk } from "./type";
 import View from "./view";
 export default async function Page({ params }: { params: { id: string } }) {
   const { id } = params;
+  const { orgId } = await auth();
+  if (!orgId) return notFound();
 
   const risk = (await db.query.risks.findFirst({
-    where: eq(risks.id, id),
+    where: and(eq(risks.id, id), eq(risks.tenantId, orgId)),
     with: {
       useCase: {
         columns: { id: true, whatItDoes: true, useCase: true },

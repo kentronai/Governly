@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Loader } from "lucide-react";
+import { ArrowRight, Loader, Plus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -97,6 +97,9 @@ interface Props {
 }
 
 const STATUS_OPTIONS: Status[] = ["Not Started", "In Progress", "Requires Review", "Completed"];
+
+/** Every text box in the form has the same fixed height; long text scrolls inside. */
+const TEXTAREA = "h-24 min-h-24 resize-none field-sizing-fixed";
 
 const LEVEL_STYLE: Record<RiskLevel, string> = {
   Low: "bg-green-500/10 text-green-600",
@@ -226,9 +229,13 @@ export function RiskModal({
 
   const frameworkOptions = useMemo(
     () =>
-      enabledFrameworks(policyStatus.activePolicyNames, policyStatus.enabledFrameworkSlugs).map(
-        (f) => ({ value: f.slug, label: f.name }),
-      ),
+      enabledFrameworks(policyStatus.activePolicyNames, policyStatus.enabledFrameworkSlugs)
+        .map((f) => ({
+          value: f.slug,
+          label: f.name,
+          group: f.kind === "regulation" ? "Regulations" : "Frameworks",
+        }))
+        .sort((a, b) => a.group.localeCompare(b.group) * -1),
     [policyStatus.activePolicyNames, policyStatus.enabledFrameworkSlugs],
   );
 
@@ -261,6 +268,14 @@ export function RiskModal({
     setErrors({});
     setTab("risk");
   }, [mode, risk, isOpen, initial]);
+
+  const [newCategory, setNewCategory] = useState("");
+  const addCategory = () => {
+    const c = newCategory.trim();
+    if (c && !(formData.categories ?? []).includes(c))
+      set("categories", [...(formData.categories ?? []).filter(Boolean), c]);
+    setNewCategory("");
+  };
 
   const set = <K extends keyof Risk>(key: K, value: Risk[K] | undefined) =>
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -336,14 +351,14 @@ export function RiskModal({
                     disabled={readOnly}
                   />
                 </Field>
-                <Field id="frameworks" label="Applies to frameworks">
+                <Field id="frameworks" label="Applies to regulations & frameworks">
                   <ChipMultiSelect
                     id="frameworks"
                     options={frameworkOptions}
                     value={formData.frameworkSlugs ?? []}
                     onChange={(v) => set("frameworkSlugs", v)}
-                    placeholder="Select frameworks"
-                    emptyText="No frameworks enabled. Turn one on in Admin Center."
+                    placeholder="Select regulations or frameworks"
+                    emptyText="None enabled. Turn on a regulation or framework in Admin Center."
                     disabled={readOnly}
                   />
                 </Field>
@@ -360,20 +375,18 @@ export function RiskModal({
                     disabled={readOnly}
                   />
                 </Field>
-                <div className="space-y-1.5">
+                <Field id="owner" label="Owner" required error={errors.owner}>
                   <UserSelect
+                    bare
+                    id="owner"
                     value={formData.owner || ""}
                     onChange={(v) => set("owner", v)}
                     placeholder="Select risk owner"
-                    className={errors.owner ? "border-red-500" : ""}
                     error={!!errors.owner}
-                    label="Owner"
-                    required
                     tenantId={tenantId}
                     disabled={readOnly}
                   />
-                  {errors.owner && <p className="text-xs text-red-500">{errors.owner}</p>}
-                </div>
+                </Field>
                 <Field id="lifecyclePhase" label="AI lifecycle phase" required error={errors.lifecyclePhase}>
                   <ChoiceSelect
                     id="lifecyclePhase"
@@ -391,8 +404,8 @@ export function RiskModal({
                 <Field id="description" label="Description" required error={errors.description}>
                   <Textarea
                     id="description"
-                    rows={3}
-                    className={cn(errors.description && "border-red-500")}
+                    rows={4}
+                    className={cn(TEXTAREA, errors.description && "border-red-500")}
                     placeholder="What could go wrong, and how?"
                     value={formData.description ?? ""}
                     onChange={(e) => set("description", e.target.value)}
@@ -402,7 +415,8 @@ export function RiskModal({
                 <Field id="potentialImpact" label="Potential impact">
                   <Textarea
                     id="potentialImpact"
-                    rows={3}
+                    rows={4}
+                    className={TEXTAREA}
                     placeholder="What happens if it occurs? e.g. personal data exposed, regulatory fine"
                     value={formData.potentialImpact ?? ""}
                     onChange={(e) => set("potentialImpact", e.target.value)}
@@ -411,17 +425,53 @@ export function RiskModal({
                 </Field>
               </div>
 
-              {!!formData.categories?.filter(Boolean).length && (
-                <Field label="Categories">
-                  <div className="flex flex-wrap gap-1.5">
-                    {formData.categories.filter(Boolean).map((c) => (
-                      <Badge key={c} variant="outline">
-                        {c}
-                      </Badge>
-                    ))}
-                  </div>
-                </Field>
-              )}
+              <Field id="newCategory" label="Categories">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(formData.categories ?? []).filter(Boolean).map((c) => (
+                    <Badge key={c} variant="outline" className="gap-1">
+                      {c}
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          aria-label={`Remove category ${c}`}
+                          onClick={() =>
+                            set("categories", (formData.categories ?? []).filter((x) => x !== c))
+                          }
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </Badge>
+                  ))}
+                  {!readOnly && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        id="newCategory"
+                        className="h-8 w-48"
+                        placeholder="Add a category"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addCategory();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Add category"
+                        onClick={addCategory}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Field>
 
               <Separator />
 
@@ -466,7 +516,8 @@ export function RiskModal({
               <Field id="reviewNotes" label="Review notes">
                 <Textarea
                   id="reviewNotes"
-                  rows={2}
+                  rows={4}
+                  className={TEXTAREA}
                   placeholder="Context for reviewers, e.g. where this risk came from"
                   value={formData.reviewNotes ?? ""}
                   onChange={(e) => set("reviewNotes", e.target.value)}
@@ -499,17 +550,17 @@ export function RiskModal({
                     disabled={readOnly}
                   />
                 </Field>
-                <UserSelect
-                  value={formData.controlOwner || ""}
-                  onChange={(v) => set("controlOwner", v || null)}
-                  placeholder="Select control owner"
-                  className=""
-                  error={false}
-                  label="Control owner"
-                  required={false}
-                  tenantId={tenantId}
-                  disabled={readOnly}
-                />
+                <Field id="controlOwner" label="Control owner">
+                  <UserSelect
+                    bare
+                    id="controlOwner"
+                    value={formData.controlOwner || ""}
+                    onChange={(v) => set("controlOwner", v || null)}
+                    placeholder="Select control owner"
+                    tenantId={tenantId}
+                    disabled={readOnly}
+                  />
+                </Field>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -517,6 +568,7 @@ export function RiskModal({
                   <Textarea
                     id="mitigationPlan"
                     rows={4}
+                    className={TEXTAREA}
                     placeholder="What will be done to reduce this risk?"
                     value={formData.mitigationPlan ?? ""}
                     onChange={(e) => set("mitigationPlan", e.target.value)}
@@ -527,6 +579,7 @@ export function RiskModal({
                   <Textarea
                     id="implementationStrategy"
                     rows={4}
+                    className={TEXTAREA}
                     placeholder="How: steps, tools, owners and checkpoints"
                     value={formData.implementationStrategy ?? ""}
                     onChange={(e) => set("implementationStrategy", e.target.value)}

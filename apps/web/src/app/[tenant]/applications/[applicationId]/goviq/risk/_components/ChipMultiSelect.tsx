@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Command,
   CommandEmpty,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -25,7 +26,8 @@ export function ChipMultiSelect({
   disabled,
 }: {
   id?: string;
-  options: { value: string; label: string }[];
+  /** Options with a `group` are listed under that heading, in first-seen order. */
+  options: { value: string; label: string; group?: string }[];
   value: string[];
   onChange: (value: string[]) => void;
   placeholder: string;
@@ -77,13 +79,22 @@ export function ChipMultiSelect({
           <CommandInput placeholder="Search..." />
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
-            {options.map((o) => (
-              <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
-                <Check
-                  className={cn("mr-2 h-4 w-4", value.includes(o.value) ? "opacity-100" : "opacity-0")}
-                />
-                {o.label}
-              </CommandItem>
+            {[...new Set(options.map((o) => o.group))].map((group) => (
+              <CommandGroup key={group ?? ""} heading={group}>
+                {options
+                  .filter((o) => o.group === group)
+                  .map((o) => (
+                    <CommandItem key={o.value} value={o.label} onSelect={() => toggle(o.value)}>
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value.includes(o.value) ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      {o.label}
+                    </CommandItem>
+                  ))}
+              </CommandGroup>
             ))}
           </CommandList>
         </Command>
