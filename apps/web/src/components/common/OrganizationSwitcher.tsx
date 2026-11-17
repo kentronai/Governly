@@ -6,7 +6,7 @@ import {
   UserButton as ClerkUserButton,
 } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
-import { shadcn } from "@clerk/themes";
+import { shadcn } from "@clerk/ui/themes";
 import { isKentronEmail } from "@/lib/utils/validateEmail";
 import { useState, useEffect } from "react";
 
@@ -32,7 +32,7 @@ export function OrganizationSwitcher() {
 
   return (
     <ClerkOrganizationSwitcher
-      appearance={{ baseTheme: shadcn }}
+      appearance={{ theme: shadcn }}
       createOrganizationMode="navigation"
       createOrganizationUrl={createUrl}
       afterCreateOrganizationUrl="/"
