@@ -5,6 +5,7 @@ import {
   applicationPolicies,
   applications,
   db,
+  fairnessChecks,
   observabilityLogs,
   policies,
   complianceEvidence,
@@ -145,6 +146,7 @@ export async function evaluateApplicationCompliancePolicy(input: {
     runtimeRows,
     defaultPolicyRows,
     uploadedEvidenceRows,
+    passedFairnessRows,
   ] = await Promise.all([
     db
       .select()
@@ -275,6 +277,18 @@ export async function evaluateApplicationCompliancePolicy(input: {
             isNull(complianceEvidence.policyId),
             eq(complianceEvidence.policyId, policy.id),
           ),
+        ),
+      ),
+    // Passing fairness checks (four-fifths rule) on this application's risks.
+    db
+      .select({ id: fairnessChecks.id })
+      .from(fairnessChecks)
+      .innerJoin(risks, eq(fairnessChecks.riskId, risks.id))
+      .where(
+        and(
+          eq(fairnessChecks.tenantId, tenantId),
+          eq(fairnessChecks.passed, true),
+          eq(risks.applicationId, applicationId),
         ),
       ),
   ]);
@@ -577,12 +591,15 @@ export async function evaluateApplicationCompliancePolicy(input: {
       case "bias_assessment": {
         const biasTests = testRows.filter((row) => row.type === "bias");
         const passed = biasTests.filter((row) => row.status === "passed");
-        return passed.length
-          ? result(
-              "verified",
-              "A recorded bias assessment passed.",
-              passed.map((row) => ({ type: "bias_test", id: row.id })),
-            )
+        const evidence = [
+          ...passed.map((row) => ({ type: "bias_test", id: row.id })),
+          ...passedFairnessRows.map((row) => ({
+            type: "fairness_check",
+            id: row.id,
+          })),
+        ];
+        return evidence.length
+          ? result("verified", "A recorded bias assessment passed.", evidence)
           : result("missing", "Run and record a passing bias assessment.");
       }
       case "transparency_notice": {

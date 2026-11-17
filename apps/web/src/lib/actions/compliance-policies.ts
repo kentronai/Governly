@@ -5,11 +5,12 @@
 "use server";
 
 import { db, applicationPolicyCenter, policyCenter, tenants } from "@db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, notInArray } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createAuditEvent } from "@/lib/server/audit";
 import { evaluateApplicationCompliancePolicy } from "@/lib/server/compliance/evaluation-engine";
+import { FRAMEWORK_ONLY_POLICIES } from "@/lib/frameworks/framework-only-policies";
 
 /**
  * Get compliance policies for an application
@@ -47,10 +48,13 @@ export const getApplicationCompliancePolicies = async (
   }
 
   try {
+    // Framework-only policies are hidden from Admin → Regulations, so they can't be
+    // turned off there; showing them here left them stuck on the grid.
     const orgActivePolicies = await db.query.policyCenter.findMany({
       where: and(
         eq(policyCenter.tenantId, orgId),
         eq(policyCenter.isActive, true),
+        notInArray(policyCenter.name, FRAMEWORK_ONLY_POLICIES),
       ),
     });
 
