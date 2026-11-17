@@ -1,6 +1,6 @@
 {
   "name": "@ai-governance/web",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "scripts": {
     "db:studio": "drizzle-kit studio --config=src/drizzle.config.ts",

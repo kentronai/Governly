@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.7.3**](#173---2026-11-16) | 2026-11-16 | Security fixes: tenant isolation across the app, guardrail bypasses closed, safer agent discovery |
+| [**1.7.4**](#174---2026-11-17) | 2026-11-17 | Compliance grid fixes: bias testing for EU AI Act and more, controls for 10 regulations that had none, fairness checks count as evidence |
+| [1.7.3](#173---2026-11-16) | 2026-11-16 | Security fixes: tenant isolation across the app, guardrail bypasses closed, safer agent discovery |
 | [1.7.2](#172---2026-11-16) | 2026-11-16 | Control Owner removed from risks, underline tabs on the risk page |
 | [1.7.1](#171---2026-11-16) | 2026-11-16 | Risk catalog picker shows all IBM and MIT risks when scrolling |
 | [1.7.0](#170---2026-11-16) | 2026-11-16 | Real fairness testing on risks, controls for 5 more frameworks, risk security fixes |
@@ -19,6 +20,24 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.7.4] - 2026-11-17
+
+### Fixed
+
+- **Standards stuck on the compliance grid.** ISO/IEC 42001, ISO/IEC 27001, NIST AI RMF and the other
+  voluntary standards moved to Admin Center → Frameworks and were hidden from the Regulations list, so
+  organizations that had enabled them earlier could no longer turn them off, yet they kept showing on
+  every application's compliance grid. The grid now hides the same standards the Regulations list hides.
+- **Bias testing where the law requires it.** The EU AI Act (Art. 10), Texas TRAIGA, CCPA and Canada AIDA
+  now include the "Bias and discrimination assessment completed" control, like NYC Local Law 144,
+  Colorado and Illinois already did.
+- **Regulations that checked nothing.** GDPR, CCPA, DORA, Texas TRAIGA, HIPAA Security, Quebec Law 25 and
+  the UAE, Saudi, Qatar and Bahrain data-protection laws had no controls, so they always showed 0% and
+  "Non compliant" with no gaps to fix. Each now has its own control list (migration
+  `0067_regulation_bias_and_missing_controls`).
+- **Fairness checks count as bias evidence.** A passing fairness check on any of an application's risks
+  now satisfies the bias assessment control, as a passing red-team bias test already did.
 
 ## [1.7.3] - 2026-11-16
 
