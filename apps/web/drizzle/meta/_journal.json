@@ -477,6 +477,13 @@
       "when": 1789200000000,
       "tag": "0067_regulation_bias_and_missing_controls",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1789300000000,
+      "tag": "0068_machine_scans",
+      "breakpoints": true
     }
   ]
 }

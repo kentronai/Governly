@@ -14,6 +14,7 @@ import {
   Bot,
   ChevronDown,
   CircleHelp,
+  Radar,
 } from "lucide-react";
 import { usePathname, useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -196,6 +197,13 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
           isActive={isActive(`/${tenant}/observability`)}
         >
           Observability
+        </NavItem>
+        <NavItem
+          href={`/${tenant}/shadow-ai`}
+          icon={<Radar className="h-4 w-4" />}
+          isActive={isActive(`/${tenant}/shadow-ai`)}
+        >
+          Shadow AI
         </NavItem>
         {orgRole === "org:admin" && (
           <AdminCenterNav tenant={tenant as string} pathname={pathname} />

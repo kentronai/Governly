@@ -3810,3 +3810,18 @@ export const trustDossierSubprocessors = pgTable("trust_dossier_subprocessors", 
     .notNull(),
   lastError: text("last_error"),
 });
+
+/** Shadow AI: latest AI environment scan per machine (migration 0068). */
+export const machineScans = pgTable(
+  "machine_scans",
+  {
+    tenantId: text("tenant_id").notNull(),
+    machineId: text("machine_id").notNull(),
+    hostname: text().notNull(),
+    platform: text().notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    result: jsonb().notNull(),
+    scannedAt: timestamp("scanned_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.machineId] })],
+);

@@ -166,6 +166,8 @@ const ApplicationSidebar = ({
           return "stakeholders-role";
         case lastSegment === "compliance-grid":
           return "compliance-grid";
+        case lastSegment === "bias-monitoring":
+          return "bias-monitoring";
         case lastSegment === "information-protection":
           return "information-protection";
         default:
@@ -311,6 +313,15 @@ const ApplicationSidebar = ({
                   active={component === "risk"}
                 >
                   <SubNavItem active={component === "risk"}>Risks</SubNavItem>
+                </NavItem>
+                <NavItem
+                  onClick={() => navigateToRoute("goviq/bias-monitoring")}
+                  icon={<Scale size={16} strokeWidth={1.5} />}
+                  active={component === "bias-monitoring"}
+                >
+                  <SubNavItem active={component === "bias-monitoring"}>
+                    Bias Monitoring
+                  </SubNavItem>
                 </NavItem>
                 <NavItem
                   onClick={() => navigateToRoute("goviq/technology-details")}

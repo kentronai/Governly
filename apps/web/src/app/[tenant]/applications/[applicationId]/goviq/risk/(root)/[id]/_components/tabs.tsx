@@ -7,7 +7,7 @@ import HumanOversight from "./human-oversight";
 import BiasMonitoringTab from "./bias-monitoring-mitigation/bias-monitoring-mitigation-tab";
 import Explainability from "./explainability";
 import EnvironmentalImpact from "./environmental-impact";
-import FairnessChecks from "./bias-and-fairness/FairnessChecks";
+import FairnessChecks from "@/components/fairness/FairnessChecks";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** Same flat underline tabs as the Controls page and AI Radar. */

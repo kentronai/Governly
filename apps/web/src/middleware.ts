@@ -8,6 +8,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/webhooks(.*)",
   "/api/health",
+  // Shadow AI: the scanner script (public) and its upload, which verifies a scan-only API key.
+  "/shadow-ai-scan.py",
+  "/api/shadow-ai/upload",
   // Machine-to-machine cron entrypoints. These are not unauthenticated: each
   // route verifies AGENT_DISCOVERY_CRON_SECRET / CRON_SECRET with a
   // timing-safe compare. Without this exemption Clerk 302s them to /sign-in

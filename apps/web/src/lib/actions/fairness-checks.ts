@@ -3,7 +3,7 @@
 /** Fairness checks stored on a risk. Metrics are computed in the browser (src/lib/fairness.ts). */
 
 import { auth } from "@clerk/nextjs/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db, fairnessChecks, risks } from "@db";
 import { createAuditEvent } from "@/lib/server/audit";
 import type { FairnessResult } from "@/lib/fairness";
@@ -29,6 +29,34 @@ export async function listFairnessChecks(riskId: string) {
     .where(and(eq(fairnessChecks.tenantId, tenantId), eq(fairnessChecks.riskId, riskId)))
     .orderBy(desc(fairnessChecks.createdAt));
   return rows.map((r) => ({ ...r, result: r.result as FairnessResult }));
+}
+
+/** Every fairness check on an application's risks, plus those risks (to attach new checks to). */
+export async function listApplicationFairnessChecks(applicationId: string) {
+  const { userId, orgId } = await auth();
+  if (!userId || !orgId) throw new Error("Authentication required");
+  const inApp = and(eq(risks.tenantId, orgId), eq(risks.applicationId, applicationId));
+  const [appRisks, rows] = await Promise.all([
+    db
+      .select({ id: risks.id, riskName: risks.riskName })
+      .from(risks)
+      .where(inApp)
+      .orderBy(asc(risks.riskName)),
+    db
+      .select({ check: fairnessChecks, riskName: risks.riskName })
+      .from(fairnessChecks)
+      .innerJoin(risks, eq(fairnessChecks.riskId, risks.id))
+      .where(and(eq(fairnessChecks.tenantId, orgId), inApp))
+      .orderBy(desc(fairnessChecks.createdAt)),
+  ]);
+  return {
+    risks: appRisks,
+    checks: rows.map((r) => ({
+      ...r.check,
+      result: r.check.result as FairnessResult,
+      riskName: r.riskName as string | undefined,
+    })),
+  };
 }
 
 export async function saveFairnessCheck(input: {

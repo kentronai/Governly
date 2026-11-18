@@ -36,18 +36,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
-import { PageTitle } from "@/components/common/PageHeader";
+import { PageHeader } from "@/components/common/PageHeader";
 import { errorToast, successToast } from "@/lib/utils/toast";
 import { getFormattedDateString } from "@/lib/utils/helpers";
 import { cn } from "@/lib/utils";
 import { computeFairness, FOUR_FIFTHS, type FairnessResult } from "@/lib/fairness";
 import {
   deleteFairnessCheck,
+  listApplicationFairnessChecks,
   listFairnessChecks,
   saveFairnessCheck,
 } from "@/lib/actions/fairness-checks";
 
-type Check = Awaited<ReturnType<typeof listFairnessChecks>>[number];
+type Check = Awaited<ReturnType<typeof listFairnessChecks>>[number] & { riskName?: string };
+type RiskOption = { id: string; riskName: string };
 type Rows = Record<string, unknown>[];
 
 const NONE = "__none__";
@@ -145,11 +147,14 @@ function ColumnSelect({
   options,
   onChange,
   optional,
+  labels,
 }: {
   id: string;
   label: string;
   value: string;
   options: string[];
+  /** Display text per option value (defaults to the value). */
+  labels?: Record<string, string>;
   onChange: (v: string) => void;
   optional?: boolean;
 }) {
@@ -167,7 +172,7 @@ function ColumnSelect({
           {optional && <SelectItem value={NONE}>None</SelectItem>}
           {options.map((o) => (
             <SelectItem key={o} value={o}>
-              {o}
+              {labels?.[o] ?? o}
             </SelectItem>
           ))}
         </SelectContent>
@@ -178,16 +183,20 @@ function ColumnSelect({
 
 function NewCheckDialog({
   riskId,
+  risks,
   open,
   onClose,
   onSaved,
 }: {
-  riskId: string;
+  /** Fixed risk (risk detail page); otherwise the user picks one of `risks`. */
+  riskId?: string;
+  risks: RiskOption[];
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
+  const [targetRisk, setTargetRisk] = useState(riskId ?? "");
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<Rows>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -201,6 +210,7 @@ function NewCheckDialog({
   useEffect(() => {
     if (open) return;
     setName("");
+    setTargetRisk(riskId ?? "");
     setFileName("");
     setRows([]);
     setColumns([]);
@@ -208,7 +218,7 @@ function NewCheckDialog({
     setDecisionColumn("");
     setPositiveValue("");
     setLabelColumn("");
-  }, [open]);
+  }, [open, riskId]);
 
   const readFile = async (file: File) => {
     setParsing(true);
@@ -260,7 +270,7 @@ function NewCheckDialog({
     setSaving(true);
     try {
       await saveFairnessCheck({
-        riskId,
+        riskId: targetRisk,
         name,
         fileName,
         groupColumn,
@@ -316,6 +326,24 @@ function NewCheckDialog({
                 onChange={(e) => e.target.files?.[0] && readFile(e.target.files[0])}
               />
             </div>
+            {!riskId && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <ColumnSelect
+                  id="fc-risk"
+                  label="Risk this check is evidence for"
+                  value={targetRisk}
+                  options={risks.map((r) => r.id)}
+                  labels={Object.fromEntries(risks.map((r) => [r.id, r.riskName]))}
+                  onChange={setTargetRisk}
+                />
+                {!risks.length && (
+                  <p className="text-xs text-muted-foreground">
+                    This application has no risks yet. You can still run the test; add a risk under
+                    Risks to save it.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {parsing && <Loader2 className="mx-auto h-5 w-5 animate-spin" />}
@@ -359,7 +387,7 @@ function NewCheckDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={!computed?.result || !name.trim() || saving}>
+          <Button onClick={save} disabled={!computed?.result || !name.trim() || !targetRisk || saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save check
           </Button>
@@ -369,9 +397,19 @@ function NewCheckDialog({
   );
 }
 
-/** Real fairness checks on a risk (replaces the old placeholder list). */
-export default function FairnessChecks({ riskId }: { riskId: string }) {
+/**
+ * Fairness (bias) checks: upload decisions, run the four-fifths test, save the summary.
+ * Pass `riskId` for one risk, or `applicationId` for every risk in an application.
+ */
+export default function FairnessChecks({
+  riskId,
+  applicationId,
+}: {
+  riskId?: string;
+  applicationId?: string;
+}) {
   const [checks, setChecks] = useState<Check[]>([]);
+  const [risks, setRisks] = useState<RiskOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<Check | null>(null);
@@ -380,13 +418,19 @@ export default function FairnessChecks({ riskId }: { riskId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setChecks(await listFairnessChecks(riskId));
+      if (applicationId) {
+        const data = await listApplicationFairnessChecks(applicationId);
+        setChecks(data.checks);
+        setRisks(data.risks);
+      } else if (riskId) {
+        setChecks(await listFairnessChecks(riskId));
+      }
     } catch {
       errorToast("Could not load fairness checks");
     } finally {
       setLoading(false);
     }
-  }, [riskId]);
+  }, [riskId, applicationId]);
 
   useEffect(() => {
     void load();
@@ -403,25 +447,26 @@ export default function FairnessChecks({ riskId }: { riskId: string }) {
     }
   };
 
+  const cols = applicationId ? 9 : 8;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <PageTitle className="my-2">Bias &amp; Fairness</PageTitle>
-          <p className="text-sm text-muted-foreground">
-            Test whether the model gives a positive outcome to every group at a similar rate.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New fairness check
-        </Button>
-      </div>
+      <PageHeader
+        title={applicationId ? "Bias Monitoring" : "Bias & Fairness"}
+        description="Upload a model's decisions to test whether every group gets a positive outcome at a similar rate."
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New fairness check
+          </Button>
+        }
+      />
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {applicationId && <TableHead>Risk</TableHead>}
             <TableHead>File</TableHead>
             <TableHead>Group column</TableHead>
             <TableHead className="text-right">Rows</TableHead>
@@ -434,13 +479,13 @@ export default function FairnessChecks({ riskId }: { riskId: string }) {
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-10 text-center">
+              <TableCell colSpan={cols} className="py-10 text-center">
                 <Loader2 className="mx-auto h-5 w-5 animate-spin" />
               </TableCell>
             </TableRow>
           ) : !checks.length ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
+              <TableCell colSpan={cols} className="py-12 text-center text-sm text-muted-foreground">
                 <Scale className="mx-auto mb-2 h-6 w-6" />
                 No fairness checks yet. Upload your model&apos;s decisions to run one.
               </TableCell>
@@ -449,6 +494,7 @@ export default function FairnessChecks({ riskId }: { riskId: string }) {
             checks.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
+                {applicationId && <TableCell>{c.riskName}</TableCell>}
                 <TableCell className="text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <FileUp className="h-3.5 w-3.5" />
@@ -487,7 +533,7 @@ export default function FairnessChecks({ riskId }: { riskId: string }) {
         </TableBody>
       </Table>
 
-      <NewCheckDialog riskId={riskId} open={creating} onClose={() => setCreating(false)} onSaved={load} />
+      <NewCheckDialog riskId={riskId} risks={risks} open={creating} onClose={() => setCreating(false)} onSaved={load} />
 
       <Dialog open={Boolean(viewing)} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
