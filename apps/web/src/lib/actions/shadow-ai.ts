@@ -36,12 +36,14 @@ export async function deleteMachineScan(machineId: string) {
  * A scan-only API key for servers without a browser. It shows up (and can be
  * revoked) on the API Keys page like any other key.
  */
-export async function createScanKey() {
+export async function createScanKey(purpose: "server" | "jamf" = "server") {
   const { tenantId } = await requireActiveTenant();
-  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  // A Jamf fleet key lives in a configuration profile, so it gets a year instead of 90 days.
+  const days = purpose === "jamf" ? 365 : 90;
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   const key = await createApiKey({
     tenantId,
-    name: "Shadow AI server scan",
+    name: purpose === "jamf" ? "Shadow AI Jamf fleet" : "Shadow AI server scan",
     permissions: [SHADOW_AI_SCAN_PERMISSION],
     expiresAt,
   });

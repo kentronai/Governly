@@ -546,6 +546,19 @@ def install(origins):
     return None
 
 
+MANAGED_PREFS = "/Library/Managed Preferences/ai.kentron.shadow-ai.plist"
+
+
+def managed_settings():
+    """url/token pushed by an MDM (Jamf) configuration profile, if any."""
+    import plistlib
+    try:
+        with open(MANAGED_PREFS, "rb") as f:
+            return plistlib.load(f)
+    except (OSError, plistlib.InvalidFileException):
+        return {}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--url", default=os.environ.get("GOVERNLY_URL"),
@@ -588,6 +601,10 @@ def main(argv=None):
     if args.dry_run:
         print(json.dumps(payload, indent=2))
         return 0
+    if not args.url or not args.token:
+        managed = managed_settings()
+        args.url = args.url or managed.get("url")
+        args.token = args.token or managed.get("token")
     if not args.url or not args.token:
         parser.error("--url and --token are required (or use --dry-run)")
     try:

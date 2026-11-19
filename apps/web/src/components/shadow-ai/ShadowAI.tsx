@@ -162,7 +162,7 @@ function ScanServer({ origin }: { origin: string }) {
             variant="outline"
             size="sm"
             onClick={() =>
-              createScanKey()
+              createScanKey("server")
                 .then(setKey)
                 .catch((e) => errorToast(e instanceof Error ? e.message : "Could not create a key."))
             }
@@ -171,6 +171,73 @@ function ScanServer({ origin }: { origin: string }) {
             Get server command
           </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Fleet rollout: Jamf pushes the .pkg plus a configuration profile carrying the Governly URL and key. */
+function DeployWithJamf({ origin }: { origin: string }) {
+  const [key, setKey] = useState<{ token: string; expiresAt: string } | null>(null);
+  const profile = key
+    ? `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>url</key><string>${origin}</string>
+  <key>token</key><string>${key.token}</string>
+</dict>
+</plist>`
+    : "";
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Deploy to all Macs with Jamf</CardTitle>
+        <CardDescription>
+          Every Mac scans itself at login and daily, with nothing for employees to click. No Python
+          needed on the Macs.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <ol className="list-decimal space-y-2 pl-5">
+          <li>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/downloads/Governly-ShadowAI.pkg" download>
+                Download Governly-ShadowAI.pkg
+              </a>
+            </Button>{" "}
+            and upload it in Jamf Pro under Settings &gt; Computer management &gt; Packages.
+          </li>
+          <li>
+            Create a configuration profile with Application &amp; Custom Settings &gt; Upload,
+            preference domain <code className="font-mono text-xs">ai.kentron.shadow-ai</code>, and
+            paste this property list:
+            {key ? (
+              <>
+                <CommandBlock command={profile} />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  The key can only upload scans, expires <LocalTime value={key.expiresAt} mode="date" />,
+                  and can be revoked on the API Keys page.
+                </p>
+              </>
+            ) : (
+              <div className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    createScanKey("jamf")
+                      .then(setKey)
+                      .catch((e) => errorToast(e instanceof Error ? e.message : "Could not create a key."))
+                  }
+                >
+                  Create key and property list
+                </Button>
+              </div>
+            )}
+          </li>
+          <li>Scope the profile and a policy installing the package to your Macs. They appear below after their first scan.</li>
+        </ol>
       </CardContent>
     </Card>
   );
@@ -234,6 +301,7 @@ export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
         }
       />
       <ScanThisComputer origin={origin} onScanned={load} />
+      <DeployWithJamf origin={origin} />
       <ScanServer origin={origin} />
 
       {machines.length === 0 ? (

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Start the scan now for whoever is logged in; everyone else gets it at their next login.
+AGENT=/Library/LaunchAgents/ai.kentron.shadow-ai.plist
+chown root:wheel "$AGENT"; chmod 644 "$AGENT"
+USER_ID=$(stat -f %u /dev/console)
+if [ "$USER_ID" -gt 0 ] 2>/dev/null; then
+  launchctl bootout "gui/$USER_ID" "$AGENT" 2>/dev/null
+  launchctl bootstrap "gui/$USER_ID" "$AGENT"
+fi
+exit 0
