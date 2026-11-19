@@ -546,17 +546,22 @@ def install(origins):
     return None
 
 
-MANAGED_PREFS = "/Library/Managed Preferences/ai.kentron.shadow-ai.plist"
+SETTINGS_FILES = (
+    "/Library/Managed Preferences/ai.kentron.shadow-ai.plist",   # Jamf configuration profile
+    "/Library/Application Support/Governly/config.plist",        # baked into the downloaded .pkg
+)
 
 
 def managed_settings():
-    """url/token pushed by an MDM (Jamf) configuration profile, if any."""
+    """url/token from a Jamf profile or the downloaded installer, if any."""
     import plistlib
-    try:
-        with open(MANAGED_PREFS, "rb") as f:
-            return plistlib.load(f)
-    except (OSError, plistlib.InvalidFileException):
-        return {}
+    for path in SETTINGS_FILES:
+        try:
+            with open(path, "rb") as f:
+                return plistlib.load(f)
+        except (OSError, plistlib.InvalidFileException):
+            pass
+    return {}
 
 
 def main(argv=None):

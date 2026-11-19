@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppWindow, Eye, Radar, RefreshCcw, Server, Terminal, Trash2 } from "lucide-react";
+import { Apple, AppWindow, Download, Eye, Monitor, Radar, RefreshCcw, Server, Terminal, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { LocalTime } from "@/components/common/LocalTime";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,19 @@ function copy(text: string) {
     .writeText(text)
     .then(() => infoToast("Copied. Paste it into Terminal."))
     .catch(() => errorToast("Copy failed; select the text instead."));
+}
+
+/** One-time helper setup for a single computer (then the page's Scan button works on it). */
+function setupCommands(origin: string) {
+  return {
+    unix:
+      `mkdir -p ~/.governly && curl -fsSL ${origin}/shadow-ai-scan.py -o ~/.governly/shadow-ai-scan.py && ` +
+      `python3 ~/.governly/shadow-ai-scan.py --install --allow-origin ${origin}`,
+    windows:
+      `New-Item -ItemType Directory -Force "$HOME\\.governly" | Out-Null; ` +
+      `Invoke-WebRequest ${origin}/shadow-ai-scan.py -OutFile "$HOME\\.governly\\shadow-ai-scan.py"; ` +
+      `py -3 "$HOME\\.governly\\shadow-ai-scan.py" --install --allow-origin ${origin}`,
+  };
 }
 
 function CommandBlock({ command }: { command: string }) {
@@ -96,10 +110,10 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
     return () => clearInterval(timer);
   }, [helperMissing, scanning, scan]);
 
-  // ponytail: macOS/Linux only; a Windows .bat installer can come over from Receipt if customers need it.
-  const command =
-    `mkdir -p ~/.governly && curl -fsSL ${origin}/shadow-ai-scan.py -o ~/.governly/shadow-ai-scan.py && ` +
-    `python3 ~/.governly/shadow-ai-scan.py --install --allow-origin ${origin}`;
+  const [showSetup, setShowSetup] = useState(false);
+  const [isWindows, setIsWindows] = useState(false);
+  useEffect(() => setIsWindows(/Win/i.test(navigator.userAgent)), []);
+  const { unix: unixCommand, windows: windowsCommand } = setupCommands(origin);
 
   return (
     <Card>
@@ -116,18 +130,38 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
           {scanning ? "Scanning…" : "Scan this computer"}
         </Button>
       </CardHeader>
-      {helperMissing && (
-        <CardContent>
-          <p className="text-sm font-medium">One-time setup for this computer</p>
-          <p className="text-sm text-muted-foreground">
-            A website cannot read your files, so Governly uses a small read-only helper. Paste this
-            into Terminal once; if your browser asks to access devices on your local network, click
-            Allow. The scan then starts by itself.
-          </p>
-          <CommandBlock command={command} />
-          <p className="mt-3 text-xs text-muted-foreground">Waiting for the helper…</p>
-        </CardContent>
-      )}
+      <CardContent>
+        {helperMissing || showSetup ? (
+          <>
+            <p className="text-sm font-medium">One-time setup for this computer</p>
+            <p className="text-sm text-muted-foreground">
+              A website cannot read your files, so Governly uses a small read-only helper. Run the
+              command for your system once; if your browser asks to access devices on your local
+              network, click Allow. The scan then starts by itself.
+            </p>
+            <Tabs defaultValue={isWindows ? "windows" : "unix"} className="mt-3">
+              <TabsList>
+                <TabsTrigger value="unix">macOS / Linux (Terminal)</TabsTrigger>
+                <TabsTrigger value="windows">Windows (PowerShell)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="unix">
+                <CommandBlock command={unixCommand} />
+              </TabsContent>
+              <TabsContent value="windows">
+                <CommandBlock command={windowsCommand} />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Needs Python 3 from python.org (it provides the <code>py</code> command).
+                </p>
+              </TabsContent>
+            </Tabs>
+            {helperMissing && <p className="mt-3 text-xs text-muted-foreground">Waiting for the helper…</p>}
+          </>
+        ) : (
+          <Button variant="link" className="h-auto p-0" onClick={() => setShowSetup(true)}>
+            Set up manually (macOS, Linux or Windows)
+          </Button>
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -138,6 +172,10 @@ function ScanServer({ origin }: { origin: string }) {
   const command = key
     ? `curl -fsSL ${origin}/shadow-ai-scan.py -o shadow-ai-scan.py\n` +
       `python3 shadow-ai-scan.py --url ${origin} --token ${key.token}`
+    : "";
+  const windowsCommand = key
+    ? `Invoke-WebRequest ${origin}/shadow-ai-scan.py -OutFile shadow-ai-scan.py\n` +
+      `py -3 shadow-ai-scan.py --url ${origin} --token ${key.token}`
     : "";
   return (
     <Card>
@@ -151,7 +189,18 @@ function ScanServer({ origin }: { origin: string }) {
       <CardContent>
         {key ? (
           <>
-            <CommandBlock command={command} />
+            <Tabs defaultValue="unix">
+              <TabsList>
+                <TabsTrigger value="unix">Linux / macOS</TabsTrigger>
+                <TabsTrigger value="windows">Windows (PowerShell)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="unix">
+                <CommandBlock command={command} />
+              </TabsContent>
+              <TabsContent value="windows">
+                <CommandBlock command={windowsCommand} />
+              </TabsContent>
+            </Tabs>
             <p className="mt-2 text-xs text-muted-foreground">
               The key can only upload scans, expires <LocalTime value={key.expiresAt} mode="date" />, and
               can be revoked on the API Keys page.
@@ -176,68 +225,108 @@ function ScanServer({ origin }: { origin: string }) {
   );
 }
 
-/** Fleet rollout: Jamf pushes the .pkg plus a configuration profile carrying the Governly URL and key. */
-function DeployWithJamf({ origin }: { origin: string }) {
-  const [key, setKey] = useState<{ token: string; expiresAt: string } | null>(null);
-  const profile = key
-    ? `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>url</key><string>${origin}</string>
-  <key>token</key><string>${key.token}</string>
-</dict>
-</plist>`
-    : "";
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1 pt-0.5">{children}</div>
+    </li>
+  );
+}
+
+/** Organization-wide rollout, per operating system. */
+function DeployToComputers({ origin }: { origin: string }) {
+  const [os, setOs] = useState("macos");
+  useEffect(() => {
+    if (/Win/i.test(navigator.userAgent)) setOs("windows");
+  }, []);
+  const { unix, windows } = setupCommands(origin);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Deploy to all Macs with Jamf</CardTitle>
+        <CardTitle className="text-base">Deploy to your organization&apos;s computers</CardTitle>
         <CardDescription>
-          Every Mac scans itself at login and daily, with nothing for employees to click. No Python
-          needed on the Macs.
+          Install the scanner on employee computers. Each one reports its AI apps, AI CLI tools and
+          MCP servers here, with secret values masked on the device.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <ol className="list-decimal space-y-2 pl-5">
-          <li>
-            <Button variant="outline" size="sm" asChild>
-              <a href="/downloads/Governly-ShadowAI.pkg" download>
-                Download Governly-ShadowAI.pkg
-              </a>
-            </Button>{" "}
-            and upload it in Jamf Pro under Settings &gt; Computer management &gt; Packages.
-          </li>
-          <li>
-            Create a configuration profile with Application &amp; Custom Settings &gt; Upload,
-            preference domain <code className="font-mono text-xs">ai.kentron.shadow-ai</code>, and
-            paste this property list:
-            {key ? (
-              <>
-                <CommandBlock command={profile} />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  The key can only upload scans, expires <LocalTime value={key.expiresAt} mode="date" />,
-                  and can be revoked on the API Keys page.
-                </p>
-              </>
-            ) : (
-              <div className="mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    createScanKey("jamf")
-                      .then(setKey)
-                      .catch((e) => errorToast(e instanceof Error ? e.message : "Could not create a key."))
-                  }
-                >
-                  Create key and property list
-                </Button>
+      <CardContent>
+        <Tabs value={os} onValueChange={setOs}>
+          <TabsList>
+            <TabsTrigger value="macos">
+              <Apple className="mr-2 h-4 w-4" />
+              macOS
+            </TabsTrigger>
+            <TabsTrigger value="windows">
+              <Monitor className="mr-2 h-4 w-4" />
+              Windows
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="macos" className="mt-4 space-y-6">
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">All Macs with Jamf</p>
+                <Badge variant="secondary">Recommended</Badge>
               </div>
-            )}
-          </li>
-          <li>Scope the profile and a policy installing the package to your Macs. They appear below after their first scan.</li>
-        </ol>
+              <ol className="space-y-3 text-sm">
+                <Step n={1}>
+                  <p>Download the installer. It already contains your organization&apos;s key.</p>
+                  <Button className="mt-2" asChild>
+                    <a href="/api/shadow-ai/installer" download>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Mac installer (.pkg)
+                    </a>
+                  </Button>
+                </Step>
+                <Step n={2}>
+                  In Jamf Pro, upload it under Settings &gt; Computer management &gt; Packages.
+                </Step>
+                <Step n={3}>
+                  Add it to a policy scoped to your Macs. Each Mac scans itself at login and daily, and
+                  appears below. Employees don&apos;t need to do anything.
+                </Step>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                Each download creates a scan-only key, valid for a year, listed on the API Keys page as
+                &quot;Shadow AI Jamf fleet&quot;. Revoke it there to stop those Macs reporting.
+              </p>
+            </section>
+
+            <section className="space-y-2 border-t pt-4">
+              <p className="text-sm font-medium">A single Mac, manually</p>
+              <p className="text-sm text-muted-foreground">
+                Run this once in Terminal on the Mac, then click Scan this computer on that Mac.
+                Requires Python 3.
+              </p>
+              <CommandBlock command={unix} />
+            </section>
+          </TabsContent>
+
+          <TabsContent value="windows" className="mt-4 space-y-3">
+            <p className="text-sm font-medium">A Windows computer, manually</p>
+            <ol className="space-y-3 text-sm">
+              <Step n={1}>
+                Install Python 3 from{" "}
+                <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noreferrer" className="underline">
+                  python.org
+                </a>{" "}
+                if it isn&apos;t installed.
+              </Step>
+              <Step n={2}>
+                Open PowerShell (Start menu, type PowerShell) and run this once:
+                <CommandBlock command={windows} />
+              </Step>
+              <Step n={3}>
+                Open this page on that computer and click Scan this computer. If the browser asks to
+                access devices on your local network, click Allow.
+              </Step>
+            </ol>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -301,7 +390,7 @@ export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
         }
       />
       <ScanThisComputer origin={origin} onScanned={load} />
-      <DeployWithJamf origin={origin} />
+      <DeployToComputers origin={origin} />
       <ScanServer origin={origin} />
 
       {machines.length === 0 ? (
