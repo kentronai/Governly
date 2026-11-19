@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://governly.si"><img alt="Website: governly.si" src="https://img.shields.io/badge/website-governly.si-5b3df5?style=flat-square"></a>
   <a href="CHANGELOG.md"><img alt="Version 1.7.4" src="https://img.shields.io/badge/version-1.7.4-blue?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
   <a href="https://github.com/kentronai/Norix/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kentronai/Norix/ci.yml?branch=main&style=flat-square&label=checks"></a>
@@ -13,6 +14,7 @@
 </p>
 
 <p align="center">
+  <a href="https://governly.si">Website</a> ·
   <a href="#quick-install">Quick install</a> ·
   <a href="#what-you-get">Features</a> ·
   <a href="#deploy-it">Deploy</a> ·
