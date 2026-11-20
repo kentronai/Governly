@@ -3825,3 +3825,37 @@ export const machineScans = pgTable(
   },
   (table) => [primaryKey({ columns: [table.tenantId, table.machineId] })],
 );
+
+export const evalDatasets = pgTable(
+  "eval_datasets",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    applicationId: uuid("application_id").notNull(),
+    name: text().notNull(),
+    description: text(),
+    items: jsonb().notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [index("eval_datasets_app_idx").on(table.tenantId, table.applicationId)],
+);
+
+export const testRuns = pgTable(
+  "test_runs",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    applicationId: uuid("application_id").notNull(),
+    name: text().notNull(),
+    datasetName: text("dataset_name").notNull(),
+    items: jsonb().notNull(),
+    config: jsonb().notNull(),
+    status: text().default("running").notNull(),
+    results: jsonb().default([]).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [index("test_runs_app_idx").on(table.tenantId, table.applicationId)],
+);

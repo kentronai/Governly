@@ -41,6 +41,7 @@ Provider OAuth apps for integrations (GitHub, Google, Slack…) go in an optiona
 | `AGENT_DISCOVERY_INTERVAL_HOURS` | How often agent discovery runs |
 | `HF_TOKEN` | Downloading gated Hugging Face models for the ONNX guards |
 | `ENABLE_ONNX_MODELS`, `PRELOAD_ALL_MODELS` | Turn the ML guard models off on small machines, or preload them at start |
+| `ALLOW_PRIVATE_MODEL_ENDPOINTS` | Set to `true` to let Test Runs call Ollama or a custom model on a private or `http` address (self-hosted installs). Off by default: only public `https` endpoints are allowed. |
 | `NEXT_PUBLIC_CONTROLNET_GATEWAY_URL` | Serve the gateway from a different host than the dashboard |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Product analytics. Off unless set. |
 | `LOG_LEVEL` | `INFO` by default |

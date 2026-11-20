@@ -12,6 +12,7 @@ import {
   Cog,
   Shield,
   Database,
+  FlaskConical,
   DollarSign,
   History,
   Lock,
@@ -193,6 +194,8 @@ const ApplicationSidebar = ({
           return "policies";
         case "datasets":
           return "datasets";
+        case "test-runs":
+          return "test-runs";
         case "red-teaming":
           return "red-teaming";
         case "playground":
@@ -510,6 +513,15 @@ const ApplicationSidebar = ({
                 >
                   <SubNavItem active={component === "datasets"}>
                     Datasets
+                  </SubNavItem>
+                </NavItem>
+                <NavItem
+                  onClick={() => navigateToRoute("control-net/test-runs")}
+                  icon={<FlaskConical size={16} strokeWidth={1.5} />}
+                  active={component === "test-runs"}
+                >
+                  <SubNavItem active={component === "test-runs"}>
+                    Test Runs
                   </SubNavItem>
                 </NavItem>
                 <NavItem
