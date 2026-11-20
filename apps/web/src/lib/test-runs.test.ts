@@ -24,6 +24,14 @@ describe("test-runs scoring", () => {
     expect(s.errors).toBe(1);
   });
 
+  it("leaves skipped guardrail checks out of guardrail scores", () => {
+    const r = gradeItem({ prompt: "a", expected: "block", blocked: false, guardrailSkipped: true, answer: "x", quality: { accuracy: { score: 100, reason: "" } } }, 75);
+    expect(r.passed).toBe(true);
+    const s = summarize([r]);
+    expect(s.catchRate).toBeNull();
+    expect(s.trustScore).toBe(100);
+  });
+
   it("normalizes uploaded rows", () => {
     expect(
       normalizeItems([{ input: "hi", expected: "BLOCK" }, { prompt: " " }, { Prompt: "q", expected_output: "a" }]),

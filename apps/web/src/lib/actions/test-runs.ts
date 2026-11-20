@@ -276,13 +276,18 @@ export async function createTestRun(input: {
   metrics: string[];
   customRules: string[];
   threshold?: number;
+  /** Default true. */
+  guardrailChecks?: boolean;
 }): Promise<Outcome> {
   return outcome(async () => {
     const { tenantId, userId } = await session();
     const items = cleanItems(input.items);
     const target = await resolveModel(tenantId, input.target, "Model to test");
-    const policy = await activePolicy(tenantId, input.applicationId);
-    if (!policy)
+    const guardrailChecks = input.guardrailChecks !== false;
+    const policy = guardrailChecks
+      ? await activePolicy(tenantId, input.applicationId)
+      : undefined;
+    if (guardrailChecks && !policy)
       throw new Error(
         "This application has no active guardrail policy. Attach one under Policies first.",
       );
@@ -301,9 +306,12 @@ export async function createTestRun(input: {
         throw new Error("Pick a Reviewer model for AI Quality Checks");
       reviewer = await resolveModel(tenantId, input.reviewer, "Reviewer");
     }
+    if (!guardrailChecks && !metrics.length)
+      throw new Error("Select Guardrail Checks or AI Quality Checks");
 
     const config: StoredConfig = {
-      policyName: policy.name,
+      policyName: policy?.name,
+      guardrailChecks,
       target,
       reviewer,
       metrics,
@@ -364,19 +372,23 @@ export async function runTestRunItem(
     throw new Error("Out-of-order test run step");
   const item = items[index];
 
-  const base = {
+  const base: Omit<ItemResult, "guardrailPass" | "passed" | "blocked"> = {
     prompt: item.prompt,
     expected: item.expected,
-    quality: {} as Record<string, QualityGrade>,
+    quality: {},
   };
   let result: Omit<ItemResult, "guardrailPass" | "passed">;
 
-  const check = await guardCheck(
-    tenantId,
-    run.applicationId,
-    item.prompt,
-    await getToken(),
-  );
+  const guardrailSkipped = config.guardrailChecks === false;
+  const check: CheckResult = guardrailSkipped
+    ? { allowed: true }
+    : await guardCheck(
+        tenantId,
+        run.applicationId,
+        item.prompt,
+        await getToken(),
+      );
+  if (guardrailSkipped) base.guardrailSkipped = true;
   if ("error" in check) {
     result = { ...base, blocked: false, error: check.error };
   } else if (!check.allowed) {

@@ -74,7 +74,7 @@ export function ModelPicker({
 
       <div className="space-y-2">
         <Label>{saved ? "Or choose a provider" : "Provider"}</Label>
-        <div role="radiogroup" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div role="radiogroup" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {MODEL_SOURCES.map((p) => {
             const Icon = iconOf(p);
             const active = provider === p && !usingSaved;
@@ -91,10 +91,10 @@ export function ModelPicker({
                   active && "border-primary ring-1 ring-primary",
                 )}
               >
-                <CardContent className="flex flex-col items-center gap-2 p-3 text-center">
-                  {active && <Check className="absolute right-2 top-2 h-4 w-4 text-primary" />}
-                  <Icon className="h-5 w-5 text-muted-foreground" />
+                <CardContent className="flex items-center gap-2 px-3 py-2">
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-sm font-medium leading-tight">{labelOf(p)}</span>
+                  {active && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
                 </CardContent>
               </Card>
             );
