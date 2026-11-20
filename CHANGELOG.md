@@ -6,7 +6,8 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 
 | Version | Date | Highlights |
 | --- | --- | --- |
-| [**1.7.4**](#174---2026-11-17) | 2026-11-17 | Compliance grid fixes: bias testing for EU AI Act and more, controls for 10 regulations that had none, fairness checks count as evidence |
+| [**1.8.0**](#180---2026-11-20) | 2026-11-20 | Datasets and Test Runs, Shadow AI scans, bias monitoring |
+| [1.7.4](#174---2026-11-17) | 2026-11-17 | Compliance grid fixes: bias testing for EU AI Act and more, controls for 10 regulations that had none, fairness checks count as evidence |
 | [1.7.3](#173---2026-11-16) | 2026-11-16 | Security fixes: tenant isolation across the app, guardrail bypasses closed, safer agent discovery |
 | [1.7.2](#172---2026-11-16) | 2026-11-16 | Control Owner removed from risks, underline tabs on the risk page |
 | [1.7.1](#171---2026-11-16) | 2026-11-16 | Risk catalog picker shows all IBM and MIT risks when scrolling |
@@ -20,6 +21,23 @@ How to upgrade or cut a release: [docs/releasing.md](docs/releasing.md).
 | [1.2.0](#120---2026-08-10) | 2026-08-10 | LangSmith observability, red teaming, guardrail marketplace, `/v1/guard/check`, security fixes |
 | [1.1.0](#110---2026-07-31) | 2026-07-31 | Self-hosted Nango integrations, multicloud agent discovery (EKS, Databricks, CrewAI), tenant-wide policy, HTTPS |
 | [1.0.0](#100---2026-05-29) | 2026-05-29 | First production launch: dashboard, ControlNet guardrail gateway, model registry, AWS deployment |
+
+## [1.8.0] - 2026-11-20
+
+### Added
+
+- Datasets and Test Runs: run prompt datasets through an application's guardrails and grade answers with a Reviewer model (Guardrail Checks + AI Quality Checks), any provider, HuggingFace, Ollama or custom endpoint
+- Shadow AI one-click Mac installer with the tenant key built in, macOS/Windows deploy tabs with manual commands
+- Shadow AI Jamf rollout: standalone macOS installer (.pkg) that scans at login and daily, Jamf card with config profile and 1-year fleet key
+- Shadow AI page (machine scan for AI apps, AI CLIs and MCP servers, ported from Receipt Scan) and bias monitoring page
+
+### Fixed
+
+- Test Runs: Guardrail and AI Quality checks are selectable, scrollable wizard with fixed header and buttons, template labels, reference answers for every template prompt
+
+### Changed
+
+- Link governly.si from the README
 
 ## [1.7.4] - 2026-11-17
 
