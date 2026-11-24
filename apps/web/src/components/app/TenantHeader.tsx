@@ -125,7 +125,6 @@ export function TenantHeader() {
         {/* Admin pages are reached via the sidebar's "Admin Center" section. */}
         {isMounted ? (
           <UserButton
-            afterSignOutUrl="/sign-in"
             appearance={{
               elements: {
                 avatarBox: "w-8 h-8",

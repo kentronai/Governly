@@ -3,7 +3,7 @@
 
 import { ClerkProvider as ClerkProviderWrapper } from "@clerk/nextjs";
 import { ReactNode } from "react";
-import { shadcn } from "@clerk/themes";
+import { shadcn } from "@clerk/ui/themes";
 import { PageTitle } from "@/components/common/PageHeader";
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -60,9 +60,10 @@ export function ClerkProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProviderWrapper
       publishableKey={clerkPublishableKey}
-      {...(clerkJsUrl ? { clerkJSUrl: clerkJsUrl } : {})}
+      {...(clerkJsUrl ? { __internal_clerkJSUrl: clerkJsUrl } : {})}
+      afterSignOutUrl="/sign-in"
       appearance={{
-        baseTheme: shadcn,
+        theme: shadcn,
       }}
     >
       {children}
