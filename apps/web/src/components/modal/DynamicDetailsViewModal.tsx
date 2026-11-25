@@ -13,6 +13,7 @@ import {
 } from "react-icons/ai";
 import { BsCheckCircleFill } from "react-icons/bs";
 import { formatDateTime } from "@/lib/utils/dateTime";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 
 // Generic field configuration interface
 interface FieldConfig {
@@ -819,6 +820,22 @@ const DynamicDetailsViewModal = <T extends Record<string, any>>({
         <div className=" font-medium text-sm leading-5 flex flex-col gap-2 pb-4 px-2 w-full overflow-y-auto">
           {fields.map(renderField).filter(Boolean)}
         </div>
+        {/* Every View shows who/when; raw Clerk ids are resolved inside RecordMetadata. */}
+        {(() => {
+          const d = data as any;
+          const createdAt = d.createdAt ?? d.created_at;
+          const updatedAt = d.updatedAt ?? d.updated_at;
+          if (!createdAt && !updatedAt) return null;
+          const who = (v: any) => (typeof v === "string" ? v : v?.name || v?.email || null);
+          return (
+            <RecordMetadata
+              createdBy={who(d.createdByName ?? d.user_createdBy ?? d.createdBy ?? d.created_by)}
+              createdAt={createdAt}
+              updatedBy={who(d.updatedByName ?? d.user_updatedBy ?? d.updatedBy ?? d.updated_by)}
+              updatedAt={updatedAt}
+            />
+          );
+        })()}
       </DialogContent>
     </Dialog>
   );

@@ -26,6 +26,8 @@ import { ApiKeyDisplayModal } from "./ApiKeyDisplayModal";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
 
 import { PageTitle } from "@/components/common/PageHeader";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
+import Pagination from "@/components/common/pagination";
 interface ApiKey {
   id: string;
   name: string;
@@ -37,6 +39,7 @@ interface ApiKey {
   expiresAt?: string | null;
   revokedAt?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
   user_createdBy?: {
     name?: string | null;
     email?: string | null;
@@ -65,6 +68,8 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
   const [viewingKey, setViewingKey] = useState<ApiKey | null>(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string>("");
   const [copiedKeyId, setCopiedKeyId] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const filteredKeys = keys.filter(
     (k) =>
@@ -163,7 +168,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
           type="search"
           placeholder="Search API keys..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="pl-10"
         />
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -193,7 +198,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
               </TableCell>
             </TableRow>
           ) : (
-            filteredKeys.map((key) => {
+            filteredKeys.slice((page - 1) * pageSize, page * pageSize).map((key) => {
               const expired = isExpired(key.expiresAt);
               const isInactive = !key.isActive || expired || key.revokedAt;
 
@@ -255,6 +260,15 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
           )}
         </TableBody>
       </Table>
+      {filteredKeys.length > pageSize && (
+        <Pagination
+          page={page}
+          setPage={setPage}
+          totalPages={Math.ceil(filteredKeys.length / pageSize)}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+        />
+      )}
 
       {/* Stats */}
       <div className="flex gap-4 text-sm text-muted-foreground">
@@ -297,8 +311,6 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
               <dd>{viewingKey.permissions.join(", ") || "None"}</dd>
               <dt className="text-muted-foreground">Rate limit</dt>
               <dd>{viewingKey.rateLimitPerMinute ? `${viewingKey.rateLimitPerMinute}/min` : "Default"}</dd>
-              <dt className="text-muted-foreground">Created</dt>
-              <dd>{formatDate(viewingKey.createdAt)} by {viewingKey.user_createdBy?.name || viewingKey.user_createdBy?.email || "Unknown"}</dd>
               <dt className="text-muted-foreground">Last used</dt>
               <dd>{formatDate(viewingKey.lastUsedAt) || "Never"}</dd>
               <dt className="text-muted-foreground">Expires</dt>
@@ -310,6 +322,14 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
                 </>
               )}
             </dl>
+          )}
+          {viewingKey && (
+            <RecordMetadata
+              createdBy={viewingKey.user_createdBy?.name || viewingKey.user_createdBy?.email}
+              createdAt={viewingKey.createdAt}
+              updatedBy={viewingKey.revokedAt ? viewingKey.user_revokedBy?.name || viewingKey.user_revokedBy?.email : null}
+              updatedAt={viewingKey.updatedAt ?? viewingKey.revokedAt}
+            />
           )}
         </DialogContent>
       </Dialog>

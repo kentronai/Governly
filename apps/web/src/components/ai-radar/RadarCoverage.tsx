@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, MoreHorizontal, Pencil, Plus, Search, X } from "lucide-react";
+import { Eye, Loader2, Pencil, Plus, Search, X } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import Pagination from "@/components/common/pagination";
 import { Label } from "@/components/ui/label";
@@ -69,6 +65,7 @@ export function RadarCoverage() {
   const { tenant } = useTenant();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [viewing, setViewing] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [region, setRegion] = useState<string>();
@@ -142,6 +139,32 @@ export function RadarCoverage() {
 
   return (
     <>
+      <RecordViewDialog
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.jurisdictionName}
+        fields={
+          viewing
+            ? [
+                ["Region", viewing.region ?? "N/A"],
+                ["Tier", `Tier ${viewing.tier}`],
+                ["Instruments", viewing.instrumentsTracked || "—"],
+                ["Last verified", viewing.lastVerifiedDate ?? "Never"],
+                [
+                  "Sources",
+                  viewing.primarySourceUrls.length
+                    ? viewing.primarySourceUrls.map((u) => (
+                        <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block break-all text-primary hover:underline">
+                          {u}
+                        </a>
+                      ))
+                    : "None",
+                ],
+              ]
+            : []
+        }
+        meta={viewing ? { createdAt: viewing.createdAt } : undefined}
+      />
       <div className="mb-4 flex flex-wrap items-center gap-4">
         <div className="relative min-w-[240px] flex-[2]">
           <Input
@@ -229,22 +252,12 @@ export function RadarCoverage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-transparent">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[152px]">
-                        <DropdownMenuItem
-                          onClick={() => edit(r)}
-                          className="flex cursor-pointer items-center gap-2 text-sm font-normal"
-                        >
-                          <Pencil size={15} />
-                          Edit
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => setViewing(r) },
+                        { label: "Edit", icon: Pencil, onSelect: () => edit(r) },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

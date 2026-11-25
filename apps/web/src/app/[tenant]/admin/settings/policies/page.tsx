@@ -25,7 +25,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, RotateCw } from "lucide-react";
+import { Pencil, RotateCw, Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
 
 // Inline Policy interface
 interface Policy {
@@ -49,6 +51,7 @@ const OrganizationPolicies = () => {
   // Removed userProfile - using static behavior instead
   const [open, setOpen] = useState(false);
   const [currentPolicy, setCurrentPolicy] = useState<Policy | null>(null);
+  const [viewing, setViewing] = useState<Policy | null>(null);
   const [formValues, setFormValues] = useState({
     name: "",
     description: "",
@@ -213,15 +216,12 @@ const OrganizationPolicies = () => {
                 </div>
               </TableCell>
               <TableCell className="text-center">
-                {policy.terms_and_conditions !== null ? (
-                  <button
-                    onClick={() => handleEditClick(policy)}
-                    disabled={false}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#52525B] hover:bg-gray-100 focus:outline-none"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                ) : null}
+                <RowActionsMenu
+                  items={[
+                    { label: "View", icon: Eye, onSelect: () => setViewing(policy) },
+                    { label: "Edit", icon: Pencil, hidden: policy.terms_and_conditions === null, onSelect: () => handleEditClick(policy) },
+                  ]}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -244,7 +244,7 @@ const OrganizationPolicies = () => {
                 Status
               </TableHead>
               <TableHead className="w-[60px] text-center">
-                Edit
+                Actions
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -263,6 +263,14 @@ const OrganizationPolicies = () => {
       <div className="w-full">
         <DataTable data={allPolicies || []} isListLoading={false} />
       </div>
+
+      <RecordViewDialog
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.policy_name}
+        fields={viewing ? [["Description", viewing.policy_description], ["Status", viewing.is_active ? "Active" : "Inactive"]] : []}
+        meta={viewing ? { createdAt: viewing.created_at, updatedAt: viewing.updated_at } : undefined}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[425px] bg-white">

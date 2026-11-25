@@ -24,6 +24,7 @@ import { LocalTime } from "@/components/common/LocalTime";
 import { RecordMetadata } from "@/components/common/RecordMetadata";
 
 import { PageTitle } from "@/components/common/PageHeader";
+import { modelPageUrl } from "@/lib/llm-providers";
 interface SecurityFinding {
   id: string;
   type: string;
@@ -310,6 +311,7 @@ export default function ModelReportPage() {
   }
 
   console.log("Rendering main content");
+  const pageUrl = model ? modelPageUrl(model.provider, model.modelId, model.modelUrl) : null;
   return (
     <div className="p-6">
       <div className="">
@@ -416,17 +418,22 @@ export default function ModelReportPage() {
                       : "-"}
                   </p>
                 </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Model URL
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm  font-mono break-all">
-                      {model.modelUrl}
+                {pageUrl && (
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Model URL
                     </p>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    <a
+                      href={pageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-mono break-all text-primary hover:underline"
+                    >
+                      {pageUrl}
+                      <ExternalLink className="h-4 w-4 shrink-0" />
+                    </a>
                   </div>
-                </div>
+                )}
               </div>
               <RecordMetadata
                 className="mt-4"

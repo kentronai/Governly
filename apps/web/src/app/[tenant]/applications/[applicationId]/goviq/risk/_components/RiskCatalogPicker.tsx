@@ -138,7 +138,7 @@ export function RiskCatalogPicker({
           <DialogTitle>Add a risk from {meta?.title}</DialogTitle>
           <DialogDescription>
             {total} risks from the{" "}
-            <a href={meta?.url} target="_blank" rel="noreferrer" className="underline">
+            <a href={meta?.url} target="_blank" rel="noopener noreferrer" className="underline">
               {meta?.title}
             </a>{" "}
             ({meta?.license}). Pick one, then review and save it.

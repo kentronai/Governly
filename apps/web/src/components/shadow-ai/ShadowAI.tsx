@@ -160,6 +160,8 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
 
   const [isWindows, setIsWindows] = useState(false);
   useEffect(() => setIsWindows(/Win/i.test(navigator.userAgent)), []);
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => setIsMac(/Mac/i.test(navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent)), []);
   const { unix: unixCommand, windows: windowsCommand } = setupCommands(origin);
 
   return (
@@ -192,11 +194,25 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
             <p className="text-sm text-muted-foreground">
               If your IT team rolled out the Governly installer, make sure it finished and that you
               allowed this site to access devices on your local network, then click Scan again.
-              Otherwise, as a fallback, run this command once; the scan then starts by itself.
+              Otherwise install it on this computer yourself; the scan then starts by itself.
             </p>
+            {isMac ? (
+              <div className="mt-3 space-y-2">
+                <Button asChild variant="outline" size="sm">
+                  <a href="/api/shadow-ai/installer" download>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Mac installer (.pkg)
+                  </a>
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Double-click it and follow the steps. It installs the scan helper and the daily 6 PM scan.
+                  Nothing to run in Terminal.
+                </p>
+              </div>
+            ) : (
             <Tabs defaultValue={isWindows ? "windows" : "unix"} className="mt-3">
               <TabsList>
-                <TabsTrigger value="unix">macOS / Linux (Terminal)</TabsTrigger>
+                <TabsTrigger value="unix">Linux (Terminal)</TabsTrigger>
                 <TabsTrigger value="windows">Windows (PowerShell)</TabsTrigger>
               </TabsList>
               <TabsContent value="unix">
@@ -209,6 +225,7 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
                 </p>
               </TabsContent>
             </Tabs>
+            )}
             <p className="mt-3 text-xs text-muted-foreground">Waiting for the helper…</p>
           </>
         )}
@@ -349,11 +366,13 @@ function DeployToComputers({ origin }: { origin: string }) {
             </section>
 
             <section className="space-y-2 border-t pt-4">
-              <p className="text-sm font-medium">A single Mac without Jamf, manually</p>
+              <p className="text-sm font-medium">A single Mac without Jamf</p>
               <p className="text-sm text-muted-foreground">
-                Run this once in Terminal on the Mac, then click Scan this computer on that Mac.
-                Requires Python 3.
+                Download the same installer and double-click it on that Mac. It installs the scan helper and
+                the daily scan; nothing to run in Terminal.
               </p>
+              <p className="text-sm font-medium">Linux</p>
+              <p className="text-sm text-muted-foreground">Run this once in a terminal. Requires Python 3.</p>
               <CommandBlock command={unix} />
             </section>
           </TabsContent>
@@ -363,7 +382,7 @@ function DeployToComputers({ origin }: { origin: string }) {
             <ol className="space-y-3 text-sm">
               <Step n={1}>
                 Install Python 3 from{" "}
-                <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noreferrer" className="underline">
+                <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noopener noreferrer" className="underline">
                   python.org
                 </a>{" "}
                 if it isn&apos;t installed.

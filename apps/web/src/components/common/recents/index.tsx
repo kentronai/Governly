@@ -18,8 +18,9 @@ import {
 import { FilterSection } from "./filter";
 import { Pagination } from "./pagination";
 
-import { Button } from "../../ui/button";
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 
 import { RecentEndpointsPaginatedResponse } from "@/lib/actions/recent";
 import { Loading } from "./loading";
@@ -278,19 +279,9 @@ export default function RecentEndpointsTable({
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant={"outline"}
-                            size="sm"
-                            className="text-sm pre"
-                            onClick={() => toggleRow(idx)}
-                          >
-                            View
-                            {expandedRows.has(idx) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronUp className="h-4 w-4" />
-                            )}
-                          </Button>
+<RowActionsMenu
+                            items={[{ label: expandedRows.has(idx) ? "Hide details" : "View", icon: Eye, onSelect: () => toggleRow(idx) }]}
+                          />
                         </TableCell>
                       </TableRow>
 
@@ -298,6 +289,7 @@ export default function RecentEndpointsTable({
                         <TableRow className="p-8">
                           <TableCell colSpan={8}>
                             <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                              <RecordMetadata createdAt={ele.createdAt} updatedAt={(ele as { updatedAt?: string | Date | null }).updatedAt} />
                               {/* Request Info */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div>

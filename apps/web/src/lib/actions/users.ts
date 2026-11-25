@@ -1180,3 +1180,16 @@ export const getDeactivatedUsers = async (options?: GetUsersOptions) => {
     counts: total,
   };
 };
+
+/** id -> display name (name or email) for members of the caller's org; used by RecordMetadata. */
+export async function getUserDisplayNames(ids: string[]): Promise<Record<string, string>> {
+  const { userId, orgId } = await auth();
+  const wanted = [...new Set(ids.filter(Boolean))].slice(0, 100);
+  if (!userId || !orgId || !wanted.length) return {};
+  const rows = await db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .innerJoin(memberships, and(eq(memberships.userId, users.id), eq(memberships.tenantId, orgId)))
+    .where(inArray(users.id, wanted));
+  return Object.fromEntries(rows.map((u) => [u.id, u.name || u.email]));
+}

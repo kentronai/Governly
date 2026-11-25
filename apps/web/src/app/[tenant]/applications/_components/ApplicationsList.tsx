@@ -4,12 +4,7 @@ import { useState, useTransition, useEffect, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -24,7 +19,6 @@ import { useTenant } from "@/contexts/TenantContext";
 import { formatTimestamp } from "@/utils/formatTime";
 import {
   Search,
-  MoreHorizontal,
   Pencil,
   FolderOpen,
   Plus,
@@ -381,43 +375,13 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
                     </TableCell>
 
                     <TableCell className="">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedApp(app);
-                              setIsViewModalOpen(true);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedApp(app);
-                              setIsEditModalOpen(true);
-                            }}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedApp(app);
-                              setIsArchiveModalOpen(true);
-                            }}
-                            // className="text-gray-600"
-                          >
-                            <Archive className="mr-2 h-4 w-4" />
-                            Archive
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <RowActionsMenu
+                        items={[
+                          { label: "View", icon: Eye, onSelect: () => { setSelectedApp(app); setIsViewModalOpen(true); } },
+                          { label: "Edit", icon: Pencil, onSelect: () => { setSelectedApp(app); setIsEditModalOpen(true); } },
+                          { label: "Archive", icon: Archive, destructive: true, onSelect: () => { setSelectedApp(app); setIsArchiveModalOpen(true); } },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))

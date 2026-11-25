@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Boxes } from "lucide-react";
+import { Boxes, Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import {
   Card,
   CardContent,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Pagination from "@/components/common/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimestamp } from "@/utils/formatTime";
 import { useObservabilityIntegrations } from "@/store/tenantLogs.store";
@@ -53,6 +55,8 @@ export default function LangSmithRuns() {
   const params = useParams();
   const tenant = typeof params?.tenant === "string" ? params.tenant : "";
   const { data, isLoading } = useObservabilityIntegrations();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [selectedRun, setSelectedRun] = useState<{
     id: string;
     name: string | null;
@@ -107,7 +111,7 @@ export default function LangSmithRuns() {
                   </TableCell>
                 </TableRow>
               ) : (
-                runs.map((run) => (
+                runs.slice((page - 1) * pageSize, page * pageSize).map((run) => (
                   <TableRow key={run.id}>
                     <TableCell className="max-w-[220px] truncate font-medium">
                       {run.name ?? run.externalRunId}
@@ -136,21 +140,18 @@ export default function LangSmithRuns() {
                       {run.startTime ? formatTimestamp(run.startTime) : "—"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setSelectedRun({ id: run.id, name: run.name })
-                        }
-                      >
-                        View
-                      </Button>
+                      <RowActionsMenu
+                        items={[{ label: "View", icon: Eye, onSelect: () => setSelectedRun({ id: run.id, name: run.name }) }]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
+                  {runs.length > pageSize && (
+                    <Pagination page={page} setPage={setPage} totalPages={Math.ceil(runs.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+                  )}
         </CardContent>
       </Card>
 

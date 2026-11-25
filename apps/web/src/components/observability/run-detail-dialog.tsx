@@ -1,5 +1,6 @@
 "use client";
 
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { ArrowRight, ExternalLink, Loader2, RotateCcw } from "lucide-react";
@@ -338,7 +339,7 @@ export default function RunDetailDialog({
                   <a
                     href={run.langsmithUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                   >
                     Open in LangSmith <ExternalLink className="h-3.5 w-3.5" />
@@ -354,6 +355,10 @@ export default function RunDetailDialog({
             </Tabs>
           )}
         </ScrollArea>
+
+        {run ? (
+          <RecordMetadata className="mx-6 mt-4" createdBy="LangSmith sync" createdAt={run.createdAt} updatedAt={run.updatedAt} />
+        ) : null}
 
         <DialogFooter className="p-6 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>

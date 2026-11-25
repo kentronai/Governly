@@ -2,21 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { differenceInDays, format } from "date-fns";
-import { ExternalLink, Info, Loader2, MoreHorizontal } from "lucide-react";
+import { ExternalLink, Info, Loader2 } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -151,22 +146,7 @@ export function RadarUpdates({
                     )}
                   </TableCell>
                   <TableCell className="align-top">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-transparent">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[152px]">
-                        <DropdownMenuItem
-                          onClick={() => setSelected(u)}
-                          className="flex cursor-pointer items-center gap-2 text-sm font-normal"
-                        >
-                          <Info size={15} />
-                          View
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu items={[{ label: "View", icon: Info, onSelect: () => setSelected(u) }]} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -255,6 +235,7 @@ export function RadarUpdates({
                   </a>
                 </div>
               </div>
+              <RecordMetadata createdBy="AI Radar" createdAt={selected.detectedAt} />
             </>
           )}
         </DialogContent>

@@ -22,19 +22,9 @@ import Pagination from "@/components/common/pagination";
 import { Input as InputUI } from "@/components/ui/input";
 import { Button as ButtonUI } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  FileSymlink,
-  MoreHorizontalIcon,
-  Search,
-  Power,
-  RotateCw,
-} from "lucide-react";
+import { FileSymlink, Search, Power, Eye, RotateCw } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
 
 const DeactivatedUsers = () => {
   const [filterValue, setFilterValue] = useState("");
@@ -50,6 +40,7 @@ const DeactivatedUsers = () => {
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
+  const [viewingUser, setViewingUser] = useState<any>(null);
 
   // Fetch deactivated users from server action
   const refetchUsers = React.useCallback(async () => {
@@ -269,34 +260,12 @@ const DeactivatedUsers = () => {
 
   const renderUserActions = (user: UserProfile) => {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <ButtonUI
-            variant="ghost"
-            className="h-8 w-8 p-0 hover:bg-transparent"
-            disabled={isActivating} // Removed permission check - using static behavior
-          >
-            <MoreHorizontalIcon className="h-4 w-4 " />
-          </ButtonUI>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[152px] ">
-          <DropdownMenuItem
-            onClick={() => handleActivateUser(user)}
-            className="flex items-center gap-2 text-sm cursor-pointer font-normal px-3 py-2"
-            disabled={isActivating}
-          >
-            {isActivating ? (
-              <RotateCw
-                size={15}
-                className="text-muted-foreground font-normal animate-spin"
-              />
-            ) : (
-              <Power size={15} className="text-muted-foreground font-normal" />
-            )}
-            Activate
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsMenu
+        items={[
+          { label: "View", icon: Eye, onSelect: () => setViewingUser(user) },
+          { label: "Activate", icon: Power, disabled: isActivating, onSelect: () => handleActivateUser(user) },
+        ]}
+      />
     );
   };
 
@@ -384,6 +353,13 @@ const DeactivatedUsers = () => {
 
   return (
     <>
+      <RecordViewDialog
+        open={!!viewingUser}
+        onClose={() => setViewingUser(null)}
+        title={viewingUser?.name || viewingUser?.email}
+        fields={viewingUser ? [["Email", viewingUser.email], ["Role", viewingUser.role || "member"], ["Status", "Deactivated"]] : []}
+        meta={viewingUser ? { createdAt: viewingUser.created_at, updatedAt: viewingUser.updated_at } : undefined}
+      />
       <div className="flex flex-col  p-5">
         <div className="flex w-full justify-between items-center">
           <div className="text-xl font-semibold font-sans leading-[100%] mt-4">

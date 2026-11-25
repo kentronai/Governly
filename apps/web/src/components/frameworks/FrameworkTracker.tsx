@@ -11,18 +11,13 @@ import {
   Eye,
   FileText,
   Loader2,
-  MoreHorizontal,
   Pencil,
   Save,
   Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -152,7 +147,7 @@ export function FrameworkTracker({
             <a
               href={framework.source.url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="underline underline-offset-2 hover:text-foreground"
             >
               Source: {framework.source.title}
@@ -248,37 +243,14 @@ export function FrameworkTracker({
                               : statusOf(controls[req.key])}
                           </TableCell>
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  aria-label={`Actions for ${req.title}`}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => setCompletionFor(req)}
-                                >
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View completion
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => setSelected(req)}
-                                >
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => void uploadFor(req)}
-                                >
-                                  <Upload className="mr-2 h-4 w-4" />
-                                  Upload evidence document
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <RowActionsMenu
+                              label={`Actions for ${req.title}`}
+                              items={[
+                                { label: "View", icon: Eye, onSelect: () => setCompletionFor(req) },
+                                { label: "Edit", icon: Pencil, onSelect: () => setSelected(req) },
+                                { label: "Upload evidence document", icon: Upload, onSelect: () => void uploadFor(req) },
+                              ]}
+                            />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -541,6 +513,11 @@ export function RequirementDialog({
                   ))}
                 </Tabs>
               )}
+              <RecordMetadata
+                className="mt-4"
+                updatedAt={controls[requirement.key]?._updatedAt as string | undefined}
+                updatedBy={controls[requirement.key]?._updatedBy as string | undefined}
+              />
             </div>
 
             <div className="flex shrink-0 justify-end gap-2 border-t p-4">
@@ -732,6 +709,19 @@ function CompletionDialog({
                 );
               })}
             </ul>
+            {(() => {
+              // Most recent save across this requirement's controls.
+              const latest = items
+                .map((s) => controls[s.key])
+                .filter((c) => c?._updatedAt)
+                .sort((a, b) => String(b._updatedAt).localeCompare(String(a._updatedAt)))[0];
+              return (
+                <RecordMetadata
+                  updatedAt={latest?._updatedAt as string | undefined}
+                  updatedBy={latest?._updatedBy as string | undefined}
+                />
+              );
+            })()}
           </>
         )}
       </DialogContent>

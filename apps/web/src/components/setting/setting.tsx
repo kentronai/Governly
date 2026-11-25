@@ -34,6 +34,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Pagination from "@/components/common/pagination";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 
 // Icons
 import { IoShareSocial } from "react-icons/io5";
@@ -642,51 +644,18 @@ const Settings: FC<SettingsProps> = ({
         </TableCell>
         <TableCell className="text-right">
           {/* modal={false}: the menu opens Dialogs; a modal menu leaves pointer-events locked on body */}
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                aria-label={`Actions for ${policy.name}`}
-              >
-                {evaluatingPolicyId === policy.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MoreHorizontal className="h-4 w-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                disabled={!hasWorkspaceDetailsWritePermission}
-                onSelect={() => handleTogglePolicyStatus(policy.id)}
-              >
-                <Power className="h-4 w-4 mr-2" />
-                {policy.isActive ? "Disable" : "Enable"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={
-                  !policy.isActive || !hasWorkspaceDetailsWritePermission
-                }
-                onSelect={() =>
-                  setEvidenceDialog({ mode: "add", policyId: policy.id })
-                }
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add evidence
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!policy.isActive}
-                onSelect={() =>
-                  setEvidenceDialog({ mode: "view", policyId: policy.id })
-                }
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                View evidence
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {evaluatingPolicyId === policy.id ? (
+            <Loader2 className="ml-auto h-4 w-4 animate-spin" />
+          ) : (
+            <RowActionsMenu
+              label={`Actions for ${policy.name}`}
+              items={[
+                { label: "View", icon: Eye, onSelect: () => setEvidenceDialog({ mode: "view", policyId: policy.id }) },
+                { label: "Add evidence", icon: Plus, disabled: !policy.isActive || !hasWorkspaceDetailsWritePermission, onSelect: () => setEvidenceDialog({ mode: "add", policyId: policy.id }) },
+                { label: policy.isActive ? "Disable" : "Enable", icon: Power, disabled: !hasWorkspaceDetailsWritePermission, onSelect: () => handleTogglePolicyStatus(policy.id) },
+              ]}
+            />
+          )}
         </TableCell>
       </TableRow>
     );
@@ -770,6 +739,7 @@ const Settings: FC<SettingsProps> = ({
                     }
                   />
                 )}
+                <RecordMetadata updatedAt={dialogPolicy.evaluatedAt} />
               </div>
             )}
             <DialogFooter>

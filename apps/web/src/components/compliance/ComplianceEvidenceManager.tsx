@@ -368,7 +368,7 @@ export function ComplianceEvidenceManager({
                   <a
                     href={row.externalUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     aria-label="Open evidence link"
                   >
                     <ExternalLink className="h-4 w-4" />

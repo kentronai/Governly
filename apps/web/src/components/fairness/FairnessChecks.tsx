@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, FileUp, Loader2, MoreHorizontal, Plus, Scale, Trash2 } from "lucide-react";
+import { Eye, FileUp, Loader2, Plus, Scale, Trash2 } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -509,23 +505,13 @@ export default function FairnessChecks({
                 </TableCell>
                 <TableCell>{getFormattedDateString(c.createdAt)}</TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={`Actions for ${c.name}`}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setViewing(c)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View results
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setDeleting(c)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <RowActionsMenu
+                    label={`Actions for ${c.name}`}
+                    items={[
+                      { label: "View", icon: Eye, onSelect: () => setViewing(c) },
+                      { label: "Delete", icon: Trash2, destructive: true, onSelect: () => setDeleting(c) },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))
@@ -545,6 +531,7 @@ export default function FairnessChecks({
             </DialogDescription>
           </DialogHeader>
           {viewing && <ResultTable result={viewing.result} />}
+          {viewing && <RecordMetadata createdBy={viewing.createdBy} createdAt={viewing.createdAt} />}
         </DialogContent>
       </Dialog>
 

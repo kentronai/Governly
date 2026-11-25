@@ -18,13 +18,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import Pagination from "@/components/common/pagination";
 import {
   Search,
   Plus,
-  MoreHorizontal,
   Pencil,
   Eye,
   Trash2,
+  Link2,
   AlertTriangle,
   ChevronDown,
   Database,
@@ -165,6 +167,8 @@ export default function RisksModule({
 }: RisksModuleProps) {
   const [risks, setRisks] = useState<Risk[]>([]);
   const [search, setSearch] = useState("");
+  const [rawPage, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [levelFilter, setLevelFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -271,6 +275,7 @@ export default function RisksModule({
       userNames[risk.owner]?.toLowerCase().includes(searchLower)
     );
   });
+  const page = Math.min(rawPage, Math.max(1, Math.ceil(filteredRisks.length / pageSize)));
 
   const handleCreate = async (
     data: Partial<Risk> & {
@@ -604,7 +609,7 @@ export default function RisksModule({
               </TableCell>
             </TableRow>
           ) : (
-            filteredRisks.map((risk) => (
+            filteredRisks.slice((page - 1) * pageSize, page * pageSize).map((risk) => (
               <TableRow key={risk.id} className="">
                 <TableCell className="max-w-[280px] font-medium">
                   <div className="flex items-center gap-2" title={risk.riskName}>
@@ -661,58 +666,27 @@ export default function RisksModule({
                   <LocalTime value={risk.updatedAt} className="text-muted-foreground" />
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0"
-                    onClick={() => setLinkTarget({ risk, type: "control" })}
-                  >
-                    View controls ({linkCounts[risk.id]?.control ?? 0})
-                  </Button>
+                  {linkCounts[risk.id]?.control ?? 0}
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          router.push(`${pathname}/${risk.id}`);
-                        }}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedRisk(risk);
-                          setIsEditModalOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {/* ponytail: "Linked policies" hidden for now; RiskLinksDialog type="policy" still works. */}
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedRisk(risk);
-                          setIsDeleteModalOpen(true);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <RowActionsMenu
+                    items={[
+                      { label: "View", icon: Eye, onSelect: () => router.push(`${pathname}/${risk.id}`) },
+                      { label: "Edit", icon: Pencil, onSelect: () => { setSelectedRisk(risk); setIsEditModalOpen(true); } },
+                      { label: `Linked controls (${linkCounts[risk.id]?.control ?? 0})`, icon: Link2, onSelect: () => setLinkTarget({ risk, type: "control" }) },
+                      // ponytail: "Linked policies" hidden for now; RiskLinksDialog type="policy" still works.
+                      { label: "Delete", icon: Trash2, destructive: true, onSelect: () => { setSelectedRisk(risk); setIsDeleteModalOpen(true); } },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+      {filteredRisks.length > pageSize && (
+        <Pagination page={page} setPage={setPage} totalPages={Math.ceil(filteredRisks.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+      )}
 
       {/* Modals */}
       <RiskModal

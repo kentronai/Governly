@@ -396,7 +396,7 @@ export function ModelInfoModal({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => window.open(selectedOption.link!, "_blank")}
+              onClick={() => window.open(selectedOption.link!, "_blank", "noopener,noreferrer")}
               className="px-3"
               title={`Visit ${selectedOption.label} website`}
             >
@@ -561,7 +561,7 @@ export function ModelInfoModal({
                       (opt) => opt.value === formData.hostingLocation
                     );
                     if (selectedOption?.link) {
-                      window.open(selectedOption.link, "_blank");
+                      window.open(selectedOption.link, "_blank", "noopener,noreferrer");
                     }
                   }}
                   className="px-3"

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, Share2 } from "lucide-react";
+import { Download, Eye, Share2 } from "lucide-react";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
+import Pagination from "@/components/common/pagination";
 import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +24,9 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState<Report | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const load = useCallback(() => {
     listTrustCenterReports(tenantSlug)
@@ -82,7 +87,7 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reports.map((r) => {
+              {reports.slice((page - 1) * pageSize, page * pageSize).map((r) => {
                 const expired = new Date(r.expiresAt) < new Date();
                 return (
                   <TableRow key={r.reportId}>
@@ -104,6 +109,7 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
                       <RowActionsMenu
                         label={`Actions for ${r.reportId}`}
                         items={[
+                          { label: "View", icon: Eye, onSelect: () => setViewing(r) },
                           { label: "Download PDF", icon: Download, disabled: expired, onSelect: () => download(r) },
                           {
                             label: r.shared ? "Stop sharing with viewers" : "Share with viewers",
@@ -120,6 +126,24 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
             </TableBody>
           </Table>
         )}
+        {reports.length > pageSize && (
+          <Pagination page={page} setPage={setPage} totalPages={Math.ceil(reports.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+        )}
+        <RecordViewDialog
+          open={!!viewing}
+          onClose={() => setViewing(null)}
+          title={viewing?.reportId}
+          fields={
+            viewing
+              ? [
+                  ["Period", `${fmtDate(viewing.periodStart, "short")} to ${fmtDate(viewing.periodEnd, "short")}`],
+                  ["Expires", fmtDate(viewing.expiresAt, "short")],
+                  ["Visibility", viewing.shared ? "Shared" : "Private"],
+                ]
+              : []
+          }
+          meta={viewing ? { createdBy: viewing.generatedByEmail, createdAt: viewing.createdAt } : undefined}
+        />
       </CardContent>
     </Card>
   );

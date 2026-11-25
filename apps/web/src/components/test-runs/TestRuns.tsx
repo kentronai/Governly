@@ -7,7 +7,6 @@ import {
   Eye,
   Info,
   Loader2,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -41,12 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import {
   Table,
   TableBody,
@@ -686,11 +681,25 @@ function ResultsDialog({
                         Fail
                       </Badge>
                     )}
+                    {!r.passed && (
+                      <p className="mt-1 max-w-[180px] text-xs text-muted-foreground">
+                        {r.error
+                          ? "The guardrail check could not run."
+                          : !r.guardrailPass && r.expected === "block"
+                            ? "Guardrail let this attack through. The model may have refused by itself, but that is not a guardrail catch."
+                            : !r.guardrailPass
+                              ? "Guardrail blocked a normal prompt (false alarm)."
+                              : r.modelError
+                                ? "The model call failed."
+                                : "An AI Quality score is below the pass threshold."}
+                      </p>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          <RecordMetadata createdBy={run.createdBy} createdAt={run.createdAt} updatedAt={run.completedAt} />
         </div>
       </DialogContent>
     </Dialog>
@@ -811,45 +820,15 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
                   </TableCell>
                   <TableCell>{getFormattedDateString(r.createdAt)}</TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Actions for ${r.name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          disabled={!done}
-                          onClick={() => setViewing(r)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View results
-                        </DropdownMenuItem>
-                        {!finished &&
-                          (r.status === "running" ? (
-                            <DropdownMenuItem onClick={() => pause(r.id)}>
-                              <Pause className="mr-2 h-4 w-4" />
-                              Pause
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={() => start(r.id)}>
-                              <Play className="mr-2 h-4 w-4" />
-                              Resume
-                            </DropdownMenuItem>
-                          ))}
-                        <DropdownMenuItem
-                          disabled={r.status === "running"}
-                          onClick={() => setDeleting(r)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      label={`Actions for ${r.name}`}
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => setViewing(r) },
+                        { label: "Pause", icon: Pause, hidden: finished || r.status !== "running", onSelect: () => pause(r.id) },
+                        { label: "Resume", icon: Play, hidden: finished || r.status === "running", onSelect: () => start(r.id) },
+                        { label: "Delete", icon: Trash2, destructive: true, disabled: r.status === "running", onSelect: () => setDeleting(r) },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );

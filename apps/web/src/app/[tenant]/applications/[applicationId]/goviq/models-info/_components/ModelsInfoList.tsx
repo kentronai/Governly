@@ -13,18 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import Pagination from "@/components/common/pagination";
 import {
   Search,
   Plus,
   Pencil,
   Trash2,
-  MoreHorizontal,
   Info,
 } from "lucide-react";
 import {
@@ -52,6 +47,10 @@ interface ApplicationModel {
   hardwareRequirements: string;
   software: string;
   promptRegistry?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string | null;
 }
 
 interface Props {
@@ -77,6 +76,8 @@ export function ModelsInfoList({
     null
   );
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const filteredModels = models.filter(
     (m) =>
       m.model?.toLowerCase().includes(search.toLowerCase()) ||
@@ -190,40 +191,13 @@ export function ModelsInfoList({
 
   // Render table row actions
   const renderActions = (model: ApplicationModel) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-          <span className="sr-only">Open menu</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-32">
-        <DropdownMenuItem onClick={() => handleViewDetail(model)}>
-          <Info className="mr-2 h-4 w-4" />
-          View
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            setSelectedModel(model);
-            setIsModalOpen(true);
-          }}
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit
-        </DropdownMenuItem>
-       
-        <DropdownMenuItem
-          onClick={() => {
-            setSelectedModel(model);
-            setIsDeleteModalOpen(true);
-          }}
-          className="text-red-500 focus:text-red-600"
-        >
-          <Trash2 className="mr-2 h-4 w-4 text-red-500" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <RowActionsMenu
+      items={[
+        { label: "View", icon: Info, onSelect: () => handleViewDetail(model) },
+        { label: "Edit", icon: Pencil, onSelect: () => { setSelectedModel(model); setIsModalOpen(true); } },
+        { label: "Delete", icon: Trash2, destructive: true, onSelect: () => { setSelectedModel(model); setIsDeleteModalOpen(true); } },
+      ]}
+    />
   );
 
   return (
@@ -243,7 +217,7 @@ export function ModelsInfoList({
                 className="rounded-md w-[343px] h-9 pl-10  text-sm font-normal  focus:ring-0 focus:outline-none"
                 aria-label="models-info-search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
               <Search
                 size={16}
@@ -297,7 +271,7 @@ export function ModelsInfoList({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredModels.map((model) => (
+                  filteredModels.slice((page - 1) * pageSize, page * pageSize).map((model) => (
                     <TableRow
                       key={model.id}
                       className="h-10 border-b  last:border-b-0 "
@@ -329,6 +303,9 @@ export function ModelsInfoList({
                 )}
               </TableBody>
             </Table>
+            {filteredModels.length > pageSize && (
+              <Pagination page={page} setPage={setPage} totalPages={Math.ceil(filteredModels.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+            )}
           </div>
         </div>
       </div>

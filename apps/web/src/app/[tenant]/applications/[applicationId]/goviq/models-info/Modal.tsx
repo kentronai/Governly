@@ -650,7 +650,7 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => window.open(selectedOption.link!, '_blank')}
+              onClick={() => window.open(selectedOption.link!, '_blank', 'noopener,noreferrer')}
               className="px-3"
               title={`Visit ${selectedOption.label} website`}
             >
@@ -1176,7 +1176,7 @@ const TechnicalDetailsModals: React.FC<TechnicalDetailsModalsProps> = ({
                       onClick={() => {
                         const selectedOption = HOSTING_INTEGRATIONS.find(opt => opt.value === addTechnicalDetailData.sHostingLocation);
                         if (selectedOption?.link) {
-                          window.open(selectedOption.link, '_blank');
+                          window.open(selectedOption.link, '_blank', 'noopener,noreferrer');
                         }
                       }}
                       className="px-3"

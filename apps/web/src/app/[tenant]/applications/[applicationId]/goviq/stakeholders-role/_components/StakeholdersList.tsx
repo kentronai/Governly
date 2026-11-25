@@ -12,16 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import Pagination from "@/components/common/pagination";
 import {
   Search,
   Plus,
-  MoreHorizontal,
   Pencil,
   Trash2,
   Eye,
@@ -45,6 +40,10 @@ interface Stakeholder {
   email?: string | null;
   department?: string | null;
   responsibilities?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string | null;
 }
 
 interface ClerkUser {
@@ -75,6 +74,8 @@ export function StakeholdersList({
 }: Props) {
   const [stakeholders, setStakeholders] = useState(initialStakeholders);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [isPending, startTransition] = useTransition();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -172,7 +173,7 @@ export function StakeholdersList({
           type="search"
           placeholder="Search stakeholders..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="pl-10 h-9"
         />
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -204,7 +205,7 @@ export function StakeholdersList({
                 </TableCell>
               </TableRow>
             ) : (
-              filteredStakeholders.map((stakeholder) => (
+              filteredStakeholders.slice((page - 1) * pageSize, page * pageSize).map((stakeholder) => (
                 <TableRow
                   key={stakeholder.id}
                   className=" border-b last:border-b-0"
@@ -223,53 +224,22 @@ export function StakeholdersList({
                     {stakeholder.responsibilities || "-"}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isPending}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedStakeholder(stakeholder);
-                            setIsViewModalOpen(true);
-                          }}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedStakeholder(stakeholder);
-                            setIsModalOpen(true);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedStakeholder(stakeholder);
-                            setIsDeleteModalOpen(true);
-                          }}
-                          className=""
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => { setSelectedStakeholder(stakeholder); setIsViewModalOpen(true); } },
+                        { label: "Edit", icon: Pencil, disabled: isPending, onSelect: () => { setSelectedStakeholder(stakeholder); setIsModalOpen(true); } },
+                        { label: "Delete", icon: Trash2, destructive: true, disabled: isPending, onSelect: () => { setSelectedStakeholder(stakeholder); setIsDeleteModalOpen(true); } },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
+        {filteredStakeholders.length > pageSize && (
+          <Pagination page={page} setPage={setPage} totalPages={Math.ceil(filteredStakeholders.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+        )}
       </div>
 
       {/* Modals */}

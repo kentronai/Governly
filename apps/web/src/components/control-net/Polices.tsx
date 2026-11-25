@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Eye,
   Trash2,
-  MoreHorizontal,
   Calendar,
   FileText,
   Shield,
@@ -46,12 +45,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import Pagination from "@/components/common/pagination";
 import { TenantInfo, useTenant } from "@/contexts/TenantContext";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { errorToast, successToast } from "@/lib/utils/toast";
@@ -1218,7 +1213,8 @@ const PoliciesTab = () => {
   const [selectedPolicy, setSelectedPolicy] = useState<APIPolicy | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showPolicyDetailsModal, setShowPolicyDetailsModal] = useState(false);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<{
     id: string;
@@ -1300,14 +1296,12 @@ const PoliciesTab = () => {
   };
 
   const handleViewPolicy = async (policyId: string) => {
-    setOpenDropdownId(null);
     loadPolicyDetails(policyId);
   };
 
   const handleDeletePolicy = (policyId: string, policyName: string) => {
     setPolicyToDelete({ id: policyId, name: policyName });
     setShowDeleteDialog(true);
-    setOpenDropdownId(null);
   };
 
   const handleMakeDefault = async (policyId: string) => {
@@ -1355,24 +1349,6 @@ const PoliciesTab = () => {
     setPolicyToDelete(null);
   };
 
-  const handleDropdownOpenChange = (open: boolean, policyId: string) => {
-    if (open) {
-      setOpenDropdownId(policyId);
-    } else {
-      setOpenDropdownId(null);
-    }
-  };
-
-  const handleDropdownAction = (action: () => void, policyId: string) => {
-    return (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleDropdownOpenChange(false, policyId);
-      setTimeout(() => {
-        action();
-      }, 50);
-    };
-  };
 
   const getStatusBadge = (status: string, isActive: boolean) => {
     const statusLower = status?.toLowerCase() || "draft";
@@ -1471,7 +1447,7 @@ const PoliciesTab = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              policies.map((policy: Policy) => (
+              policies.slice((page - 1) * pageSize, page * pageSize).map((policy: Policy) => (
                 <TableRow key={policy.id} className="">
                   <TableCell className="font-medium">
                     <button
@@ -1507,59 +1483,14 @@ const PoliciesTab = () => {
                   </TableCell> */}
                   <TableCell>{formatTimestamp(policy.createdAt)}</TableCell>
                   <TableCell>
-                    <DropdownMenu
-                      open={openDropdownId === policy.id}
-                      onOpenChange={(open) =>
-                        handleDropdownOpenChange(open, policy.id)
-                      }
-                    >
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-32">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(
-                              `/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}`,
-                            )
-                          }
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                        {!policy.isDefault && (
-                          <DropdownMenuItem
-                            onClick={() => handleMakeDefault(policy.id)}
-                          >
-                            <Star className="mr-2 h-4 w-4" />
-                            Make default
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(
-                              `/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`,
-                            )
-                          }
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={handleDropdownAction(
-                            () => handleDeletePolicy(policy.id, policy.name),
-                            policy.id,
-                          )}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => router.push(`/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}`) },
+                        { label: "Make default", icon: Star, hidden: policy.isDefault, onSelect: () => handleMakeDefault(policy.id) },
+                        { label: "Edit", icon: Pencil, onSelect: () => router.push(`/${tenantSlug}/applications/${applicationId}/control-net/policies/${policy.id}/edit`) },
+                        { label: "Delete", icon: Trash2, destructive: true, onSelect: () => handleDeletePolicy(policy.id, policy.name) },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -1568,27 +1499,9 @@ const PoliciesTab = () => {
         </Table>
       </div>
 
-      <div className="mt-4 flex justify-between items-center text-sm text-muted-foreground">
-        <span>Page 1 of 1</span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            className="text-muted-foreground bg-transparent"
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            className="text-muted-foreground bg-transparent"
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      {policies.length > pageSize && (
+        <Pagination className="mt-4" page={page} setPage={setPage} totalPages={Math.ceil(policies.length / pageSize)} pageSize={pageSize} setPageSize={setPageSize} />
+      )}
 
       <CreatePolicyModal
         isOpen={showCreateModal}

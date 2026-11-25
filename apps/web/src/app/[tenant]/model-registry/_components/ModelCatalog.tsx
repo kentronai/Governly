@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Eye, FileText, Plus, Wrench, Database, Brain, Trophy, X } from "lucide-react";
+import { Check, ExternalLink, Eye, FileText, Plus, Wrench, Database, Brain, Trophy, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import Pagination from "@/components/common/pagination";
+import { modelPageUrl } from "@/lib/llm-providers";
 import { AddModelDialog } from "./AddModelDialog";
 import { cn } from "@/lib/utils";
 import type { CatalogModel } from "@/lib/server/model-catalog";
 
-const PAGE = 100;
+const TOP = 100;
+const catalogPageUrl = (m: CatalogModel) =>
+  modelPageUrl(m.registryProvider, m.registryProvider ? m.id.replace(`${m.registryProvider}/`, "") : m.id);
 const FEATURES = [
   { key: "vision", label: "Vision", icon: Eye },
   { key: "tools", label: "Tools", icon: Wrench },
@@ -78,7 +83,8 @@ function AllModels({ models }: { models: CatalogModel[] }) {
   const [provider, setProvider] = useState("all");
   const [mode, setMode] = useState("all");
   const [feats, setFeats] = useState<FeatureKey[]>([]);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<CatalogModel | null>(null);
   const providerOptions = useProviderOptions(models);
@@ -101,9 +107,9 @@ function AllModels({ models }: { models: CatalogModel[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Input placeholder="Search models..." value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="w-64" />
-        <SearchableSelect className="w-52" value={provider} onValueChange={(v) => { setProvider(v); setPage(0); }} options={providerOptions} />
-        <SearchableSelect className="w-52" value={mode} onValueChange={(v) => { setMode(v); setPage(0); }} options={modeOptions} />
+        <Input placeholder="Search models..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="w-64" />
+        <SearchableSelect className="w-52" value={provider} onValueChange={(v) => { setProvider(v); setPage(1); }} options={providerOptions} />
+        <SearchableSelect className="w-52" value={mode} onValueChange={(v) => { setMode(v); setPage(1); }} options={modeOptions} />
         {FEATURES.map(({ key, label, icon: Icon }) => (
           <Button
             key={key}
@@ -132,7 +138,7 @@ function AllModels({ models }: { models: CatalogModel[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.slice(page * PAGE, (page + 1) * PAGE).map((m) => (
+            {rows.slice((page - 1) * pageSize, page * pageSize).map((m) => (
               <TableRow key={m.id}>
                 <TableCell className="text-muted-foreground">{m.provider}</TableCell>
                 <TableCell className="font-medium">
@@ -155,37 +161,37 @@ function AllModels({ models }: { models: CatalogModel[] }) {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  {added.has(m.id) ? (
-                    <Badge variant="secondary"><Check className="h-3 w-3 mr-1" />Added</Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!m.registryProvider}
-                      title={m.registryProvider ? "Add to approved models" : "Provider not supported by the Governly gateway"}
-                      onClick={() => setAdding(m)}
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" />Add
-                    </Button>
-                  )}
+                  <RowActionsMenu
+                    label={`Actions for ${m.id}`}
+                    items={[
+                      {
+                        label: "View model page",
+                        icon: ExternalLink,
+                        hidden: !catalogPageUrl(m),
+                        onSelect: () => window.open(catalogPageUrl(m)!, "_blank", "noopener,noreferrer"),
+                      },
+                      {
+                        label: added.has(m.id) ? "Added to approved models" : "Add to approved models",
+                        icon: added.has(m.id) ? Check : Plus,
+                        disabled: added.has(m.id) || !m.registryProvider,
+                        onSelect: () => setAdding(m),
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
-      {rows.length > PAGE && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Page {page + 1} of {Math.ceil(rows.length / PAGE)}</span>
-          <div className="flex gap-1">
-            <Button size="icon" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="outline" disabled={(page + 1) * PAGE >= rows.length} onClick={() => setPage((p) => p + 1)} aria-label="Next page">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {rows.length > 0 && (
+        <Pagination
+          page={page}
+          setPage={setPage}
+          totalPages={Math.max(1, Math.ceil(rows.length / pageSize))}
+          pageSize={pageSize}
+          setPageSize={(n) => { setPageSize(n); setPage(1); }}
+        />
       )}
       <AddModelDialog
         model={adding}
@@ -255,7 +261,7 @@ function CostCalculator({ models }: { models: CatalogModel[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.slice(0, PAGE).map(({ m, c }, i) => (
+            {rows.slice(0, TOP).map(({ m, c }, i) => (
               <TableRow key={m.id} className={cn(i === 0 && "bg-green-500/5")}>
                 <TableCell>{i < 3 ? <Trophy className={cn("h-4 w-4", i === 0 ? "text-yellow-500" : "text-muted-foreground")} /> : i + 1}</TableCell>
                 <TableCell>

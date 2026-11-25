@@ -243,7 +243,7 @@ const FieldSection: React.FC<FieldSectionProps> = ({
                         (opt: any) => opt.value === field.content,
                       );
                       if (selectedOption?.link) {
-                        window.open(selectedOption.link, "_blank");
+                        window.open(selectedOption.link, "_blank", "noopener,noreferrer");
                       }
                     }}
                     className="px-3"

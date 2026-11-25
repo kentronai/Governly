@@ -23,12 +23,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +45,6 @@ import {
   Rocket,
   Copy,
   Eye,
-  MoreHorizontal,
 } from "lucide-react";
 import { errorToast, infoToast, successToast } from "@/lib/utils/toast";
 import { isEverDeployed, llmCompanies, policyViolations, readProfile } from "@/lib/server/agents/agent-profile";
@@ -751,19 +745,10 @@ export function AgentInventory({
                     )}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Agent actions">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setActiveAgentId(r.id)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      label="Agent actions"
+                      items={[{ label: "View", icon: Eye, onSelect: () => setActiveAgentId(r.id) }]}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -981,7 +966,14 @@ function AgentDetailModal({
                     : " Its source code could not be read: it is not in a connected GitHub repository and the platform exposes no deployed source.";
                   return (
                     <>
-                      <Field label="Status" value={statusLabel(profile)} />
+                      <Field label="Status" value={`${statusLabel(profile)} · ${agent.status}`} />
+                      <Field label="Platform" value={platformLabel(agent.platform)} />
+                      <Field label="Owner" value={agent.ownerUserId ?? "Not assigned"} warn={!agent.ownerUserId} />
+                      <Field
+                        label="Risk"
+                        value={agent.riskLevel ? `${agent.riskLevel}${agent.riskScore != null ? ` (score ${agent.riskScore})` : ""}` : "Not scored"}
+                        warn={agent.riskLevel === "high" || agent.riskLevel === "critical"}
+                      />
                       <Field label="Agent ID" value={cloudIdOf(agent) ?? "None: not deployed to a connected cloud"} warn={!cloudIdOf(agent)} />
                       {profile.repository || agent.platform === "github" ? (
                         <Field label="Repository" value={profile.repository ?? agent.rawMetadata?.repository ?? agent.externalAgentId} />
@@ -1013,8 +1005,8 @@ function AgentDetailModal({
                       {llms.length > 0 && llms.join() !== llmCompanies(llms).join() ? (
                         <ChipList label="Models" items={llms} />
                       ) : null}
-                      <ChipList label="Applications Access" items={profile.applicationsAccess} />
-                      <ChipList label="Skills" items={profile.skills} emptyText={`No SKILL.md folders or tool definitions found in the deployed image or code.${linkHint}`} />
+                      <ChipList label="Data / Applications Access" items={profile.applicationsAccess} />
+                      <ChipList label="Tools / Skills" items={profile.skills} emptyText={`No SKILL.md folders or tool definitions found in the deployed image or code.${linkHint}`} />
                       <ChipList label="Observability" items={observabilityOf(agent)} />
                       <ChipList label="Packages" items={profile.packages} emptyText={`None found in the startup script or bundle.${linkHint}`} />
                       <Field label="Evidence from" value={profile.sources.join(" + ") || "—"} />

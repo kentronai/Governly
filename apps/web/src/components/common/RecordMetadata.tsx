@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LocalTime } from "@/components/common/LocalTime";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +22,22 @@ export function RecordMetadata({
   updatedAt,
   className,
 }: RecordMetadataProps) {
+  // Raw Clerk ids ("user_…") are resolved to a name/email here so every View can pass the column as-is.
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ids = [createdBy, updatedBy].filter((v): v is string => !!v && v.startsWith("user_"));
+    // Lazy import keeps the server-action graph out of client bundles/tests that never see raw ids.
+    if (ids.length)
+      import("@/lib/actions/users")
+        .then((m) => m.getUserDisplayNames(ids))
+        .then(setNames)
+        .catch(() => {});
+  }, [createdBy, updatedBy]);
+  const who = (v?: string | null) => (v ? names[v] ?? v : v);
   const items: [string, React.ReactNode][] = [
-    ["Created by", createdBy || "—"],
+    ["Created by", who(createdBy) || "—"],
     ["Created at", <LocalTime key="c" value={createdAt} fallback="—" />],
-    ["Last modified by", updatedBy || "—"],
+    ["Last modified by", who(updatedBy) || "—"],
     ["Modified at", <LocalTime key="u" value={updatedAt} fallback="—" />],
   ];
   return (

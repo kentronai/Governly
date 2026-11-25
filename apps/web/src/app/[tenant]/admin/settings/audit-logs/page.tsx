@@ -49,6 +49,8 @@ interface IActivityLog {
   };
 }
 import Pagination from "@/components/common/pagination";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { Button } from "@/components/ui/button";
 import {
   MoreHorizontalIcon,
@@ -254,24 +256,7 @@ const AuditLogs = () => {
   };
 
   const renderLogActions = (item: IActivityLog) => {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-transparent">
-            <MoreHorizontalIcon className="h-4 w-4 " />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[152px] ">
-          <DropdownMenuItem
-            onClick={() => openLogDetails(item)}
-            className="flex items-center gap-2 text-sm font-normal cursor-pointer "
-          >
-            <Info size={15} className=" font-normal" />
-            View
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
+    return <RowActionsMenu items={[{ label: "View", icon: Info, onSelect: () => openLogDetails(item) }]} />;
   };
 
   const LogsTable = () => {
@@ -603,6 +588,11 @@ const AuditLogs = () => {
                     />
                   </div>
                 </div>
+                <RecordMetadata
+                  className="mt-6"
+                  createdBy={(selectedLog as any)?.actor?.user?.name || (selectedLog as any)?.actor?.user?.email}
+                  createdAt={(selectedLog as any)?.created_at}
+                />
               </div>
             </div>
           </DialogContent>

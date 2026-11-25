@@ -1,5 +1,6 @@
 "use client";
 
+import { RecordMetadata, type RecordMetadataProps } from "@/components/common/RecordMetadata";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -50,7 +51,7 @@ const counts = (items: DatasetItem[]) => {
   return `${items.length} prompts · ${block} block · ${items.length - block} allow`;
 };
 
-function ItemsDialog({ title, items, onClose }: { title: string; items: DatasetItem[] | null; onClose: () => void }) {
+function ItemsDialog({ title, items, meta, onClose }: { title: string; items: DatasetItem[] | null; meta?: RecordMetadataProps; onClose: () => void }) {
   return (
     <Dialog open={!!items} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -78,6 +79,7 @@ function ItemsDialog({ title, items, onClose }: { title: string; items: DatasetI
             ))}
           </TableBody>
         </Table>
+        {meta && <RecordMetadata {...meta} />}
       </DialogContent>
     </Dialog>
   );
@@ -196,7 +198,7 @@ export default function Datasets({ applicationId }: { applicationId: string }) {
   const [datasets, setDatasets] = useState<Dataset[] | null>(null);
   const [tab, setTab] = useState("mine");
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [viewing, setViewing] = useState<{ title: string; items: DatasetItem[] } | null>(null);
+  const [viewing, setViewing] = useState<{ title: string; items: DatasetItem[]; meta?: RecordMetadataProps } | null>(null);
   const [deleting, setDeleting] = useState<Dataset | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -288,7 +290,7 @@ export default function Datasets({ applicationId }: { applicationId: string }) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setViewing({ title: d.name, items: d.items })}>
+                          <DropdownMenuItem onClick={() => setViewing({ title: d.name, items: d.items, meta: { createdBy: d.createdBy, createdAt: d.createdAt } })}>
                             <Eye className="mr-2 h-4 w-4" />
                             View prompts
                           </DropdownMenuItem>
@@ -362,7 +364,7 @@ export default function Datasets({ applicationId }: { applicationId: string }) {
       </Tabs>
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} applicationId={applicationId} onCreated={load} />
-      <ItemsDialog title={viewing?.title ?? ""} items={viewing?.items ?? null} onClose={() => setViewing(null)} />
+      <ItemsDialog title={viewing?.title ?? ""} items={viewing?.items ?? null} meta={viewing?.meta} onClose={() => setViewing(null)} />
       <DeleteConfirmationModal
         isOpen={!!deleting}
         onClose={() => setDeleting(null)}

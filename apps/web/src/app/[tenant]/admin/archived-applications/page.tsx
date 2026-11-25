@@ -8,12 +8,6 @@ import {
   useMemo,
 } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -24,7 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { Search, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
+import { Search, RotateCcw, Trash2, Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
 import { successToast, errorToast } from "@/lib/utils/toast";
 import { useTenant } from "@/contexts/TenantContext";
 import Pagination from "@/components/common/pagination";
@@ -58,6 +54,7 @@ function ArchivedApplications() {
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [viewing, setViewing] = useState<ArchivedApplication | null>(null);
   const [applicationToDelete, setApplicationToDelete] = useState<{
     id: string;
     name: string;
@@ -213,34 +210,13 @@ function ArchivedApplications() {
                     {app.archivedBy || "Unknown"}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isPending}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleRestore(app.id)}
-                          disabled={isPending}
-                        >
-                          <RotateCcw className="mr-2 h-4 w-4" />
-                          Restore
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => openDeleteModal(app)}
-                          disabled={isPending}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Permanently
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActionsMenu
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => setViewing(app) },
+                        { label: "Restore", icon: RotateCcw, disabled: isPending, onSelect: () => handleRestore(app.id) },
+                        { label: "Delete Permanently", icon: Trash2, destructive: true, disabled: isPending, onSelect: () => openDeleteModal(app) },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -266,6 +242,14 @@ function ArchivedApplications() {
         totalPages={totalPages}
         isLoading={isLoading}
         variant="fixed"
+      />
+
+      <RecordViewDialog
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.name}
+        fields={viewing ? [["Description", viewing.description || "—"], ["Status", viewing.status], ["Archived by", viewing.archivedBy || "Unknown"]] : []}
+        meta={viewing ? { createdAt: viewing.createdAt, updatedAt: viewing.archivedAt || viewing.updatedAt, updatedBy: viewing.archivedBy } : undefined}
       />
 
       <DeleteConfirmationModal

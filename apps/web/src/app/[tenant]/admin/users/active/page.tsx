@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileSymlink, Loader2, MoreHorizontalIcon, Pencil, Search } from "lucide-react";
+import { FileSymlink, Loader2, Pencil, Search } from "lucide-react";
 // Removed unused imports - using static data instead
 import ListSkeleton from "@/components/common/ListSkeleton";
 import Pagination from "@/components/common/pagination";
@@ -39,13 +39,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button as ButtonUI } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { RotateCw, Trash2 } from "lucide-react";
+import { RotateCw, Trash2, Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { RecordViewDialog } from "@/components/common/RecordViewDialog";
 import { useUser } from "@clerk/nextjs";
 
 const ActiveUsers = () => {
@@ -62,6 +58,7 @@ const ActiveUsers = () => {
   }>({ users: [], counts: 0 });
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [viewingUser, setViewingUser] = useState<any>(null);
 
   // Fetch users from server action
   const refetchUsers = React.useCallback(async () => {
@@ -629,45 +626,16 @@ const ActiveUsers = () => {
   };
 
   const renderUserActions = (user: any) => {
+    const isGlobal = (user as any).role === "globaladmin";
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <ButtonUI
-            variant="ghost"
-            className="h-8 w-8 p-0 hover:bg-transparent"
-            disabled={isUpdatingUser} // Removed permission check - using static behavior
-          >
-            <MoreHorizontalIcon className="h-4 w-4 text-muted-foreground" />
-          </ButtonUI>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40 p-2">
-          {(user as any).role !== "globaladmin" && (
-            <DropdownMenuItem
-              onClick={() => handleEditUserClick(user)}
-              className="flex items-center gap-2 text-sm  cursor-pointer "
-            >
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              Edit
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            onClick={() => handleResetPasswordClick(user)}
-            className="flex items-center gap-2 text-sm cursor-pointer "
-          >
-            <RotateCw className="h-4 w-4" />
-            Reset password
-          </DropdownMenuItem>
-          {(user as any).role !== "globaladmin" && (
-            <DropdownMenuItem
-              onClick={() => handleDeactivateUser(user)}
-              className="flex flex-row items-center border-t gap-2  border-t-[#E4E4E7] text-red-500 text-sm"
-            >
-              <Trash2 className="h-4 w-4" />
-              Deactivate
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsMenu
+        items={[
+          { label: "View", icon: Eye, onSelect: () => setViewingUser(user) },
+          { label: "Edit", icon: Pencil, hidden: isGlobal, disabled: isUpdatingUser, onSelect: () => handleEditUserClick(user) },
+          { label: "Reset password", icon: RotateCw, disabled: isUpdatingUser, onSelect: () => handleResetPasswordClick(user) },
+          { label: "Deactivate", icon: Trash2, destructive: true, hidden: isGlobal, disabled: isUpdatingUser, onSelect: () => handleDeactivateUser(user) },
+        ]}
+      />
     );
   };
 
@@ -754,6 +722,13 @@ const ActiveUsers = () => {
 
   return (
     <>
+      <RecordViewDialog
+        open={!!viewingUser}
+        onClose={() => setViewingUser(null)}
+        title={viewingUser?.name || viewingUser?.email}
+        fields={viewingUser ? [["Email", viewingUser.email], ["Role", viewingUser.role || "member"], ["Status", viewingUser.status === false ? "Inactive" : "Active"]] : []}
+        meta={viewingUser ? { createdAt: viewingUser.created_at, updatedAt: viewingUser.updated_at } : undefined}
+      />
       <div className="flex flex-col  p-5">
         <div className="flex w-full justify-between items-center  ">
           <div className="text-xl font-semibold leading-[100%] mt-4 ">

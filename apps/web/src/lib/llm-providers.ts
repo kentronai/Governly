@@ -70,3 +70,41 @@ export const getLlmProvider = (slug: string) =>
 
 export const getModelProvider = (slug: string) =>
   ALL_MODEL_PROVIDERS.find((p) => p.slug === slug);
+
+const MODEL_DOCS: Record<string, (id: string) => string> = {
+  openai: (id) => `https://platform.openai.com/docs/models/${encodeURIComponent(id)}`,
+  azure_openai: (id) => `https://platform.openai.com/docs/models/${encodeURIComponent(id)}`,
+  anthropic: () => "https://docs.anthropic.com/en/docs/about-claude/models",
+  gemini: () => "https://ai.google.dev/gemini-api/docs/models",
+  vertex: () => "https://cloud.google.com/vertex-ai/generative-ai/docs/models",
+  bedrock: () => "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html",
+  openrouter: (id) => `https://openrouter.ai/${id}`,
+  groq: () => "https://console.groq.com/docs/models",
+  mistral: () => "https://docs.mistral.ai/getting-started/models/",
+  xai: () => "https://docs.x.ai/docs/models",
+  deepseek: () => "https://api-docs.deepseek.com/quick_start/pricing",
+  ollama: (id) => `https://ollama.com/library/${encodeURIComponent(id.split(":")[0])}`,
+  huggingface: (id) => `https://huggingface.co/${id}`,
+};
+
+const httpUrl = (u?: string | null) => {
+  try {
+    const url = new URL(u ?? "");
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Public page for a model, for "Model URL" links. Stored `model_url` is usually the API base
+ * (https://api.openai.com/v1), which 404s in a browser, so known providers get their docs page.
+ * Returns null when no http(s) URL can be derived: hide the link then.
+ */
+export function modelPageUrl(provider?: string | null, modelId?: string | null, modelUrl?: string | null): string | null {
+  const id = modelId?.trim();
+  if (provider === "huggingface" && httpUrl(modelUrl)) return httpUrl(modelUrl);
+  const docs = provider ? MODEL_DOCS[provider] : undefined;
+  if (docs && id) return docs(id);
+  return httpUrl(modelUrl);
+}

@@ -5,10 +5,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import { Application } from "./ApplicationsList";
-import { formatTimestamp } from "@/utils/formatTime";
 export default function ApplicationView({
   data,
   onOpenChange,
@@ -23,7 +22,7 @@ export default function ApplicationView({
   const { name, description, createdAt, createdBy } = data;
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>
             <span>{name}</span>
@@ -33,29 +32,12 @@ export default function ApplicationView({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="my-4"></div>
-        <DialogFooter className="justify-start! ">
-          <div className="text-xs flex gap-2 flex-col">
-            <div className="flex gap-2 items-center ">
-              <span
-                className="
-                text-muted-foreground"
-              >
-                Created By
-              </span>
-              <span className="">{createdBy?.name || "Unknown"}</span>
-            </div>
-            <div className="flex gap-2 items-center ">
-              <span
-                className="
-                text-muted-foreground"
-              >
-                Created
-              </span>
-              <span className="">{formatTimestamp(createdAt)}</span>
-            </div>
-          </div>
-        </DialogFooter>
+        <RecordMetadata
+          createdBy={createdBy?.name || createdBy?.email}
+          createdAt={createdAt}
+          updatedBy={data.updatedBy?.name || data.updatedBy?.email}
+          updatedAt={data.updatedAt}
+        />
       </DialogContent>
     </Dialog>
   );

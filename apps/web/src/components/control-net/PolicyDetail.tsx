@@ -1,5 +1,6 @@
 "use client";
 
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
@@ -17,15 +18,11 @@ import {
   Check,
   Settings,
   Shield,
-  Calendar,
-  User,
-  SquareUser,
   Loader2,
   ArrowLeft,
 } from "lucide-react";
 import { PolicyDetails } from "./Polices";
 import { getPhaseColor } from "../playground/Playground";
-import { getFormattedDateString } from "@/lib/utils/helpers";
 import PolicyIntegration from "./PolicyIntegration";
 import { useTenant } from "@/contexts/TenantContext";
 
@@ -300,24 +297,13 @@ export const PolicyDetail = () => {
               {policy.description || "No description"}
             </p>
           </div>
-          <div className="flex flex-row gap-2 flex-wrap my-2 text-sm">
-            <div className="flex flex-row items-center gap-1 pr-2 ">
-              <User className="h-4 w-4" />
-              <span>Created by: {policy.createdByUser?.name || "Unknown"}</span>
-            </div>
-            <div className="flex flex-row items-center gap-1 pr-2 ">
-              <Calendar className="h-4 w-4" />
-              <span>Created: {getFormattedDateString(policy.createdAt)}</span>
-            </div>
-            <div className="flex flex-row items-center gap-1 pr-2 ">
-              <SquareUser className="h-4 w-4" />
-              <span>Updated by: {policy.updatedByUser?.name || "Unknown"}</span>
-            </div>
-            <div className="flex flex-row items-center gap-1 pr-2">
-              <Calendar className="h-4 w-4" />
-              <span>Updated: {getFormattedDateString(policy.updatedAt)}</span>
-            </div>
-          </div>
+          <RecordMetadata
+            className="my-2"
+            createdBy={policy.createdByUser?.name}
+            createdAt={policy.createdAt}
+            updatedBy={policy.updatedByUser?.name}
+            updatedAt={policy.updatedAt}
+          />
         </div>
 
         <Separator />

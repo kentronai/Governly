@@ -54,10 +54,16 @@ export async function getFrameworkControls(
         eq(frameworkControls.framework, framework),
       ),
     );
-  return Object.fromEntries(
-    rows.map((row) => [row.controlKey, row.data as FrameworkControlData]),
-  );
+  return Object.fromEntries(rows.map((row) => [row.controlKey, withMeta(row)]));
 }
+
+// Row audit columns ride along under "_"-prefixed keys for the View dialog; stripped again on save.
+const withMeta = (row: typeof frameworkControls.$inferSelect): FrameworkControlData => ({
+  ...(row.data as FrameworkControlData),
+  _updatedAt: row.updatedAt,
+  _updatedBy: row.updatedBy,
+});
+const stripMeta = ({ _updatedAt, _updatedBy, ...data }: FrameworkControlData) => data;
 
 /** Saved answers of every framework, { slug: { key: data } } (one query). */
 export async function getAllFrameworkControls(
@@ -70,8 +76,7 @@ export async function getAllFrameworkControls(
     .where(eq(frameworkControls.tenantId, tenantId));
   const all: Record<string, Record<string, FrameworkControlData>> = {};
   for (const row of rows)
-    (all[row.framework] ??= {})[row.controlKey] =
-      row.data as FrameworkControlData;
+    (all[row.framework] ??= {})[row.controlKey] = withMeta(row);
   return all;
 }
 
@@ -89,7 +94,7 @@ async function upsertEntries(
         tenantId,
         framework,
         controlKey,
-        data: entries[controlKey],
+        data: stripMeta(entries[controlKey]),
         updatedBy: userId,
       })),
     )

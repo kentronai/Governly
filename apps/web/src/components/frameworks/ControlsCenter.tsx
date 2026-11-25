@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import {
   ListChecks,
   Loader2,
-  MoreHorizontal,
+  Eye,
   Pencil,
   Upload,
 } from "lucide-react";
@@ -18,12 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import {
   Table,
   TableBody,
@@ -358,31 +353,14 @@ export function ControlsCenter() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Actions for ${control.code}`}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => setSelected(control)}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Add / edit details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => void uploadFor(control)}
-                            >
-                              <Upload className="mr-2 h-4 w-4" />
-                              Upload evidence document
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <RowActionsMenu
+                          label={`Actions for ${control.code}`}
+                          items={[
+                            { label: "View", icon: Eye, onSelect: () => setSelected(control) },
+                            { label: "Add / edit details", icon: Pencil, onSelect: () => setSelected(control) },
+                            { label: "Upload evidence document", icon: Upload, onSelect: () => void uploadFor(control) },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

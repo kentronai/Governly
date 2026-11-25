@@ -15,19 +15,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import {
   Search,
   Plus,
   Pencil,
   Trash2,
   CheckCircle2,
-  MoreHorizontal,
   Eye,
   Box,
   BookOpen,
@@ -343,45 +337,31 @@ export function ModelRegistryList({
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Actions for ${model.displayName || model.modelId}`}
-                        disabled={isPending}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => router.push(reportPath(model))}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View report
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
+                  <RowActionsMenu
+                    label={`Actions for ${model.displayName || model.modelId}`}
+                    items={[
+                      { label: "View report", icon: Eye, disabled: isPending, onSelect: () => router.push(reportPath(model)) },
+                      {
+                        label: "Edit",
+                        icon: Pencil,
+                        disabled: isPending,
+                        onSelect: () => {
                           setSelectedModel(model);
                           setIsModalOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => {
+                        },
+                      },
+                      {
+                        label: "Delete",
+                        icon: Trash2,
+                        destructive: true,
+                        disabled: isPending,
+                        onSelect: () => {
                           setSelectedModel(model);
                           setIsDeleteModalOpen(true);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        },
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))
