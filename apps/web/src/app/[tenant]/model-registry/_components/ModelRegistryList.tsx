@@ -30,6 +30,7 @@ import {
   MoreHorizontal,
   Eye,
   Box,
+  BookOpen,
 } from "lucide-react";
 import {
   createProviderModel,
@@ -212,16 +213,24 @@ export function ModelRegistryList({
         title="Organization Approved Models"
         description="Browse and manage approved AI models for your organization"
         actions={
-          <Button
-            onClick={() => {
-              setSelectedModel(null);
-              setIsModalOpen(true);
-            }}
-            disabled={isPending}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Model
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/${tenant}/model-registry/catalog`}>
+                <BookOpen className="h-4 w-4 mr-2" />
+                Browse catalog
+              </Link>
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedModel(null);
+                setIsModalOpen(true);
+              }}
+              disabled={isPending}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Model
+            </Button>
+          </div>
         }
       />
 
