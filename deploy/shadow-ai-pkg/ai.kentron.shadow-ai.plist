@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Runs the Shadow AI scan as each logged-in user (their AI apps and MCP configs live in their home),
-     at login and then daily. Governly URL + key come from the Jamf configuration profile. -->
+     at login and every day at 6 PM (end of day; a missed run happens on wake). Governly URL + key come from the Jamf configuration profile. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>ai.kentron.shadow-ai</string>
   <key>ProgramArguments</key>
   <array><string>/Library/Application Support/Governly/shadow-ai-scan</string></array>
   <key>RunAtLoad</key><true/>
-  <key>StartInterval</key><integer>86400</integer>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
   <key>StandardErrorPath</key><string>/tmp/governly-shadow-ai.log</string>
   <key>StandardOutPath</key><string>/tmp/governly-shadow-ai.log</string>
 </dict>

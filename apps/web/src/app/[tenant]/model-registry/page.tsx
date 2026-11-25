@@ -8,6 +8,7 @@ import { getModelRegistryRuntime } from "@/lib/server/model-registry/runtime";
 import { ModelRegistryList } from "./_components/ModelRegistryList";
 import { RepoModelsSection } from "./_components/RepoModelsSection";
 import { listRepoModels } from "@/lib/actions/repo-models";
+import { tenantHasConnectedGithub } from "@/lib/server/github/model-scan";
 
 interface ModelRegistryPageProps {
   params: Promise<{ tenant: string }>;
@@ -25,7 +26,11 @@ export default async function ModelRegistryPage({
 
   // Initialize the tenant's executable test model idempotently, then return
   // tenant-scoped models together with persistent selection/connection state.
-  const [models, repoModels] = await Promise.all([getModelRegistryRuntime(orgId), listRepoModels()]);
+  const [models, repoModels, githubConnected] = await Promise.all([
+    getModelRegistryRuntime(orgId),
+    listRepoModels(),
+    tenantHasConnectedGithub(orgId),
+  ]);
 
   return (
     <div className="p-6">
@@ -35,7 +40,7 @@ export default async function ModelRegistryPage({
         tenantId={orgId}
         userId={userId}
       />
-      <RepoModelsSection tenant={tenant} rows={repoModels} />
+      <RepoModelsSection tenant={tenant} rows={githubConnected ? repoModels : []} githubConnected={githubConnected} />
     </div>
   );
 }

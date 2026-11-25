@@ -56,6 +56,7 @@ import {
 } from "@/lib/actions/integrations";
 import { disconnectNango } from "@/lib/actions/nango-connect";
 import { pruneOrphanAgents } from "@/lib/server/agents/prune-orphans";
+import { purgeRepoModelsIfGithubGone } from "@/lib/server/github/model-scan";
 
 const DATABRICKS_UNITY_CATALOG = "Databricks Unity Catalog";
 const CREWAI = "CrewAI";
@@ -618,7 +619,10 @@ export async function POST(request: NextRequest) {
         await clearIntegrationCredentials(tenant, integrationId);
       }
       // Whatever the provider, its discovered agents go with it.
-      await pruneOrphanAgents(await resolveTenantId(tenant));
+      const revokedTenantId = await resolveTenantId(tenant);
+      await pruneOrphanAgents(revokedTenantId);
+      // GitHub gone: its repo model detections go too (no-op while GitHub stays connected).
+      await purgeRepoModelsIfGithubGone(revokedTenantId);
       return NextResponse.json({ ok: true });
     }
 

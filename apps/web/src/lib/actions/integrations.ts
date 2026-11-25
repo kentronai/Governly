@@ -6,6 +6,7 @@
 
 import { requireTenantMember } from "@/lib/server/tenant-access";
 import { db, integrations, tenants } from "@db";
+import { purgeRepoModelsIfGithubGone } from "@/lib/server/github/model-scan";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { createAuditEvent } from "@/lib/server/audit";
@@ -396,6 +397,7 @@ export const deleteIntegration = async (tenantSlugOrId: string, id: string) => {
   if (deletedIntegration.length === 0) {
     throw new Error("Integration not found");
   }
+  await purgeRepoModelsIfGithubGone(tenantId);
 
   try {
     await createAuditEvent({

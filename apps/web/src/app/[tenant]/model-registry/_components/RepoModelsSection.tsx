@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
+import Pagination from "@/components/common/pagination";
 import { Check, Eye, GitBranch, RefreshCw, X } from "lucide-react";
 import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { providerLabel } from "./labels";
@@ -20,11 +22,24 @@ import {
 } from "@/lib/actions/repo-models";
 
 /** Models found in connected GitHub repos: unapproved ones need Approve / Dismiss. */
-export function RepoModelsSection({ tenant, rows }: { tenant: string; rows: RepoModelRow[] }) {
+export function RepoModelsSection({
+  tenant,
+  rows,
+  githubConnected = true,
+}: {
+  tenant: string;
+  rows: RepoModelRow[];
+  githubConnected?: boolean;
+}) {
   const [pending, start] = useTransition();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [view, setView] = useState<RepoModelRow | null>(null);
   const unapproved = rows.filter((r) => !r.approved && !r.dismissed);
   const approved = rows.filter((r) => r.approved);
+  const ordered = [...unapproved, ...approved];
+  const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize));
+  const current = Math.min(page, totalPages);
 
   const run = (fn: () => Promise<{ status?: boolean; message?: string } | undefined>, label: string) =>
     start(async () => {
@@ -49,16 +64,24 @@ export function RepoModelsSection({ tenant, rows }: { tenant: string; rows: Repo
             {approved.length} approved in use.
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => scanRepoModels(tenant), "scanned")}>
+        <Button variant="outline" size="sm" disabled={pending || !githubConnected} onClick={() => run(() => scanRepoModels(tenant), "scanned")}>
           <RefreshCw className="mr-2 h-4 w-4" /> Scan repos
         </Button>
       </CardHeader>
       <CardContent>
-        {rows.length === 0 ? (
+        {!githubConnected ? (
+          <p className="text-sm text-muted-foreground">
+            Connect GitHub to scan repositories for models.{" "}
+            <Link href={`/${tenant}/admin/integrations`} className="underline">
+              Admin Center &gt; Integrations
+            </Link>
+          </p>
+        ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No scans yet. Connect GitHub under Integrations, then run Scan repos (agent discovery also scans).
           </p>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -71,7 +94,7 @@ export function RepoModelsSection({ tenant, rows }: { tenant: string; rows: Repo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[...unapproved, ...approved].map((r) => {
+              {ordered.slice((current - 1) * pageSize, current * pageSize).map((r) => {
                 const files = new Set(r.locations.map((l) => `${l.repo}/${l.filePath}`)).size;
                 return (
                   <TableRow key={r.modelId}>
@@ -114,6 +137,14 @@ export function RepoModelsSection({ tenant, rows }: { tenant: string; rows: Repo
               })}
             </TableBody>
           </Table>
+          <Pagination
+            page={current}
+            setPage={setPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+          />
+          </>
         )}
       </CardContent>
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>

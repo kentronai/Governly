@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, or } from "drizzle-orm";
 import {
   awsDiscoveryConnections,
   azureDiscoveryConnections,
@@ -66,7 +66,11 @@ async function run(request: NextRequest) {
       .where(
         and(
           eq(integrations.isEnabled, true),
-          eq(integrations.isCredentialsAdded, true),
+          // Nango-connected rows (e.g. GitHub) may not flip isCredentialsAdded.
+          or(
+            eq(integrations.isCredentialsAdded, true),
+            isNotNull(integrations.nangoConnectionId),
+          ),
         ),
       );
     const results: Array<Record<string, unknown>> = [];

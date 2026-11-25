@@ -5,9 +5,31 @@
  */
 
 import { and, eq, lt, sql } from "drizzle-orm";
-import { db, repoModelDetections } from "@db";
+import { db, integrations, repoModelDetections } from "@db";
+import { isGithubProviderKey } from "@/lib/integrations/categories";
 import { getBlobText, getTree, listRepos, type GithubConnection, type GithubRepo } from "./api-client";
 import { detectModelFile, detectModelsInText, MAX_MODELS_PER_FILE, NON_USAGE_PATH, SCANNABLE_FILE, type ModelHit } from "./model-detector";
+
+type IntegrationLike = {
+  nangoProviderConfigKey: string | null;
+  nangoConnectionId: string | null;
+  isCredentialsAdded: boolean | null;
+};
+
+/** Same "connected" rule as the Admin Center integrations page. */
+export const hasConnectedGithub = (rows: IntegrationLike[]) =>
+  rows.some((r) => isGithubProviderKey(r.nangoProviderConfigKey) && (r.isCredentialsAdded || Boolean(r.nangoConnectionId)));
+
+export async function tenantHasConnectedGithub(tenantId: string) {
+  return hasConnectedGithub(await db.select().from(integrations).where(eq(integrations.tenantId, tenantId)));
+}
+
+/** After a GitHub disconnect/delete: drop the tenant's repo model detections unless GitHub is still connected. */
+export async function purgeRepoModelsIfGithubGone(tenantId: string) {
+  if (await tenantHasConnectedGithub(tenantId)) return false;
+  await db.delete(repoModelDetections).where(eq(repoModelDetections.tenantId, tenantId));
+  return true;
+}
 
 // ponytail: per-repo file cap keeps Nango proxy calls bounded; raise or page if repos are large.
 const MAX_FILES_PER_REPO = 150;

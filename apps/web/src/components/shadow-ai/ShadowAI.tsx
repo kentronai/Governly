@@ -337,7 +337,7 @@ function DeployToComputers({ origin }: { origin: string }) {
                   In Jamf Pro, upload it under Settings &gt; Computer management &gt; Packages.
                 </Step>
                 <Step n={3}>
-                  Add it to a policy scoped to your Macs. Each Mac scans itself at login and daily, and
+                  Add it to a policy scoped to your Macs. Each Mac scans itself at login and every day at 6 PM, and
                   appears below. It also runs the scan helper, so Scan this computer works on those
                   Macs with no extra setup. Employees don&apos;t need to do anything.
                 </Step>
