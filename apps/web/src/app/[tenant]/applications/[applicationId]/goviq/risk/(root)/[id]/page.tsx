@@ -19,16 +19,16 @@ export default async function Page({ params }: { params: { id: string } }) {
       ownerUser: {
         columns: { name: true, email: true },
       },
+      user_createdBy: { columns: { name: true, email: true } },
+      user_updatedBy: { columns: { name: true, email: true } },
     },
   })) as Risk;
 
   if (!risk) return notFound();
 
   return (
-    <div className="p-8 space-y-10">
-      <div className="flex gap-2 items-center">
-        <View risk={risk}></View >
-      </div>
+    <div className="p-6 space-y-6">
+      <View risk={risk} />
       <Tab risk={risk}></Tab>
     </div>
   );

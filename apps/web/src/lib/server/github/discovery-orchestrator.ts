@@ -51,6 +51,7 @@ import { detectOwnership } from "@/lib/server/agents/ownership-engine";
 import { generateRecommendations } from "@/lib/server/agents/recommendations-engine";
 import { syncAgentPolicyEvaluations } from "@/lib/server/policy-enforcement/agent-policy-sync";
 import type { CorrelatedAgent } from "@/lib/server/aws/correlation";
+import { scanReposForModels } from "./model-scan";
 import { hostedDeploysByRepo, type HostedDeploy } from "./hosting";
 import {
   commitAuthor,
@@ -608,6 +609,11 @@ export async function runGithubDiscoveryScan(
         .set({ status: "inactive", updatedAt: now })
         .where(inArray(agents.id, retire));
     }
+
+    // Model Registry: flag models used in these repos (best effort, never fails discovery).
+    await scanReposForModels(tenantId, conn, triggeredBy, repos).catch((e) =>
+      console.error("[github-discovery] model scan failed:", e),
+    );
 
     const resourcesScanned = { github_repository: repos.length };
     const agentsDiscovered = ownRepoNames.length + linked;

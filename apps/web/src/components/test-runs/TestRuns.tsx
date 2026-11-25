@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   Check,
@@ -64,7 +64,7 @@ import {
   type SavedKey,
 } from "@/components/test-runs/ModelPicker";
 import { cn } from "@/lib/utils";
-import { errorToast, successToast } from "@/lib/utils/toast";
+import { errorToast } from "@/lib/utils/toast";
 import { getFormattedDateString } from "@/lib/utils/helpers";
 import {
   DATASET_TEMPLATES,
@@ -81,7 +81,8 @@ import {
   getActiveGuardrails,
   listDatasets,
   listTestRuns,
-  runTestRunItem,
+  pauseTestRun,
+  startTestRun,
 } from "@/lib/actions/test-runs";
 import { listLlmKeys } from "@/lib/actions/llm-keys";
 
@@ -703,8 +704,6 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [viewing, setViewing] = useState<Run | null>(null);
   const [deleting, setDeleting] = useState<Run | null>(null);
-  const [active, setActive] = useState<string | null>(null);
-  const stopRef = useRef(false);
 
   const load = useCallback(
     () =>
@@ -721,52 +720,26 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
   );
   useEffect(() => {
     load();
-    return () => {
-      stopRef.current = true;
-    };
   }, [load]);
 
-  // ponytail: the browser drives the run one prompt per request (fresh gateway token, live progress).
-  // Closing the page pauses it; "Resume" continues. Move to a server job queue if runs get large.
-  const drive = async (runId: string) => {
-    const run = (await load()).find((r) => r.id === runId);
-    if (!run) return;
-    setActive(runId);
-    stopRef.current = false;
-    try {
-      let errors = 0;
-      for (
-        let i = run.results.length;
-        i < run.items.length && !stopRef.current;
-        i++
-      ) {
-        const result = await runTestRunItem(runId, i);
-        if (result.error || result.modelError) errors++;
-        setRuns(
-          (prev) =>
-            prev?.map((r) =>
-              r.id === runId
-                ? {
-                    ...r,
-                    results: [...r.results, result],
-                    status: i === r.items.length - 1 ? "completed" : r.status,
-                  }
-                : r,
-            ) ?? prev,
-        );
-      }
-      if (stopRef.current) return;
-      if (errors)
-        errorToast(
-          `Test run finished, but ${errors} prompt(s) failed. Open the results to see why.`,
-        );
-      else successToast("", "", "", "Test run finished");
-    } catch (e: any) {
-      errorToast(e?.message || "Test run stopped");
-    } finally {
-      setActive(null);
-      load();
-    }
+  // Runs execute on the server (they keep going if this page is closed); poll while any is running.
+  const anyRunning = !!runs?.some((r) => r.status === "running");
+  useEffect(() => {
+    if (!anyRunning) return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [anyRunning, load]);
+
+  const start = async (runId: string) => {
+    const res = await startTestRun(runId);
+    if (!res.ok) errorToast(res.error);
+    load();
+  };
+  const pause = async (runId: string) => {
+    await pauseTestRun(runId).catch((e) =>
+      errorToast(e?.message || "Could not pause"),
+    );
+    load();
   };
 
   return (
@@ -775,7 +748,7 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
         title="Test Runs"
         description="Run a dataset through this application's guardrails and grade every answer with Guardrail Checks and AI Quality Checks."
         actions={
-          <Button onClick={() => setWizardOpen(true)} disabled={!!active}>
+          <Button onClick={() => setWizardOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New test run
           </Button>
@@ -824,7 +797,7 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
                         <Progress value={(done / r.items.length) * 100} />
                         <div className="text-xs text-muted-foreground">
                           {done}/{r.items.length}{" "}
-                          {active === r.id ? "running…" : "paused"}
+                          {r.status === "running" ? "running…" : "paused"}
                         </div>
                       </div>
                     )}
@@ -857,24 +830,19 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
                           View results
                         </DropdownMenuItem>
                         {!finished &&
-                          (active === r.id ? (
-                            <DropdownMenuItem
-                              onClick={() => (stopRef.current = true)}
-                            >
+                          (r.status === "running" ? (
+                            <DropdownMenuItem onClick={() => pause(r.id)}>
                               <Pause className="mr-2 h-4 w-4" />
                               Pause
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem
-                              disabled={!!active}
-                              onClick={() => drive(r.id)}
-                            >
+                            <DropdownMenuItem onClick={() => start(r.id)}>
                               <Play className="mr-2 h-4 w-4" />
                               Resume
                             </DropdownMenuItem>
                           ))}
                         <DropdownMenuItem
-                          disabled={active === r.id}
+                          disabled={r.status === "running"}
                           onClick={() => setDeleting(r)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -894,7 +862,7 @@ export default function TestRuns({ applicationId }: { applicationId: string }) {
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         applicationId={applicationId}
-        onStarted={drive}
+        onStarted={start}
       />
       <ResultsDialog
         run={viewing && (runs?.find((r) => r.id === viewing.id) ?? viewing)}

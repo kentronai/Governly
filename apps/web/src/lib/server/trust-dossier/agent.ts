@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db, trustDossierRuns, trustDossierSubprocessors, trustDossierTracked } from "@db";
 import { fetchSource } from "@/lib/server/radar/agent";
@@ -242,7 +242,7 @@ async function planJobs(tenantId: string | undefined, setup: string[]): Promise<
       }
   };
 
-  const tracked = await db.select().from(trustDossierTracked);
+  const tracked = await db.select().from(trustDossierTracked).where(isNull(trustDossierTracked.removedAt));
   const tenants = tenantId ? [tenantId] : [...new Set(tracked.map((t) => t.tenantId))];
   for (const t of tenants) {
     const model = await pickRadarModel(t, setup);

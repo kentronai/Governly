@@ -3772,6 +3772,8 @@ export const trustDossierTracked = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     vendorSlug: text("vendor_slug").notNull(),
     createdBy: text("created_by"),
+    /** Set when untracked: the vendor stays listed as a "previously used" sub-processor. */
+    removedAt: timestamp("removed_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -3822,6 +3824,10 @@ export const machineScans = pgTable(
     uploadedBy: text("uploaded_by").notNull(),
     result: jsonb().notNull(),
     scannedAt: timestamp("scanned_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    createdBy: text("created_by"),
+    /** "browser" (Scan this computer) or the scan key's name (org installer / server). */
+    reportedVia: text("reported_via"),
   },
   (table) => [primaryKey({ columns: [table.tenantId, table.machineId] })],
 );
@@ -3858,4 +3864,86 @@ export const testRuns = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [index("test_runs_app_idx").on(table.tenantId, table.applicationId)],
+);
+
+// Models found in connected GitHub repos; approval is computed against provider_models.
+export const repoModelDetections = pgTable(
+  "repo_model_detections",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id").notNull(),
+    modelId: text("model_id").notNull(),
+    kind: text().notNull(), // "model_id" | "hf" | "file"
+    repo: text().notNull(),
+    filePath: text("file_path").notNull(),
+    line: integer(),
+    status: text().default("open").notNull(), // "open" | "dismissed"
+    firstDetectedAt: timestamp("first_detected_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    lastDetectedAt: timestamp("last_detected_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("uq_repo_model_detection").on(table.tenantId, table.modelId, table.repo, table.filePath),
+    index("idx_repo_model_detections_tenant").on(table.tenantId),
+  ],
+);
+
+// AI Trust Center report (migration 0072).
+export const trustCenterSettings = pgTable("trust_center_settings", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  data: jsonb().default({}).notNull(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+});
+
+/** One row per published version of the customer data training policy. */
+export const trustCenterTrainingPolicies = pgTable(
+  "trust_center_training_policies",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    policyId: text("policy_id").notNull(),
+    version: text().notNull(),
+    effectiveDate: date("effective_date", { mode: "string" }).notNull(),
+    owner: text().notNull(),
+    statement: text().default("").notNull(),
+    categories: jsonb()
+      .$type<{ category: string; usedForTraining: string; conditions: string }[]>()
+      .default([])
+      .notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [index("idx_trust_center_training_policies_tenant").on(table.tenantId, table.createdAt)],
+);
+
+/** Generated AI Trust Center reports; the PDF is stored encrypted (lib/server/crypto). */
+export const trustCenterReports = pgTable(
+  "trust_center_reports",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    reportId: text("report_id").notNull().unique(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    generatedBy: text("generated_by").notNull(),
+    periodStart: date("period_start", { mode: "string" }).notNull(),
+    periodEnd: date("period_end", { mode: "string" }).notNull(),
+    sections: text().array().notNull(),
+    options: jsonb().default({}).notNull(),
+    fileEncrypted: text("file_encrypted").notNull(),
+    fileSize: integer("file_size").notNull(),
+    shared: boolean().default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  },
+  (table) => [index("idx_trust_center_reports_tenant").on(table.tenantId, table.createdAt)],
 );

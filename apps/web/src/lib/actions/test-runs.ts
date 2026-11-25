@@ -6,10 +6,11 @@
  * One prompt = (1) Guardrail Checks: ControlNet `/v1/guard/check` (policy only, no model called);
  * (2) if allowed, the model under test is called directly (any provider, saved key or custom endpoint);
  * (3) AI Quality Checks: the Reviewer model grades the answer.
- * The browser drives a run one prompt per request (`runTestRunItem`): fresh Clerk token each time, live progress.
+ * A run executes server-side (`startTestRun` → `driveRun`), so it keeps going when the page is closed.
+ * Each prompt mints a fresh Clerk token for the starting user's session; rate limits are retried with backoff.
  */
 
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, evalDatasets, testRuns } from "@db";
 import { getApplicationPolicies } from "@/lib/actions/policies";
@@ -60,9 +61,9 @@ const outcome = async (fn: () => Promise<string>): Promise<Outcome> => {
 };
 
 async function session() {
-  const { userId, orgId, getToken } = await auth();
+  const { userId, orgId, sessionId } = await auth();
   if (!userId || !orgId) throw new Error("Authentication required");
-  return { userId, tenantId: orgId, getToken };
+  return { userId, tenantId: orgId, sessionId };
 }
 
 function cleanItems(items: DatasetItem[]) {
@@ -141,6 +142,13 @@ async function resolveModel(
 const publicModel = (m?: StoredModel): RunModel | undefined =>
   m && { provider: m.provider, modelId: m.modelId, label: m.label };
 
+const RETRIES = 4;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const isRetryable = (status: number) => status === 429 || status >= 500;
+/** Retry-After (seconds) if given, else 2s, 4s, 8s, 16s; capped at 60s. */
+const backoffMs = (attempt: number, retryAfter?: string | null) =>
+  Math.min(60_000, (Number(retryAfter) || 2 ** (attempt + 1)) * 1000);
+
 /** OpenAI-compatible chat call to a stored model. Key: the run's own key, else the tenant's saved key, else env. */
 async function callModel(
   tenantId: string,
@@ -152,28 +160,43 @@ async function callModel(
     (m.keyEncrypted && decryptSecret(m.keyEncrypted)) ||
     (await getTenantLlmKey(tenantId, m.provider)) ||
     process.env[`${m.provider.toUpperCase()}_API_KEY`]?.trim();
-  const res = await fetch(`${m.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify({
-      model: m.modelId,
-      messages: [{ role: "user", content: prompt }],
-      ...(temperature === undefined ? {} : { temperature }),
-    }),
-    redirect: "error",
-    cache: "no-store",
-    signal: AbortSignal.timeout(90_000),
-  });
+  // Free tiers (e.g. OpenRouter `:free`) answer 429/5xx often: retry with backoff, honouring Retry-After.
+  let res: Response | undefined;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(`${m.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model: m.modelId,
+          messages: [{ role: "user", content: prompt }],
+          ...(temperature === undefined ? {} : { temperature }),
+        }),
+        redirect: "error",
+        cache: "no-store",
+        signal: AbortSignal.timeout(120_000),
+      });
+    } catch (e) {
+      if (attempt >= RETRIES) throw e;
+      await sleep(backoffMs(attempt));
+      continue;
+    }
+    if (!isRetryable(res.status) || attempt >= RETRIES) break;
+    await sleep(backoffMs(attempt, res.headers.get("retry-after")));
+  }
+  if (!res) throw new Error("Model call failed");
   if (!res.ok) {
     throw new Error(
       res.status === 401 || res.status === 403
         ? "The provider rejected the API key"
         : res.status === 404
           ? "Model not found at this endpoint"
-          : `Model returned HTTP ${res.status}`,
+          : res.status === 429
+            ? `Rate limited by the provider (HTTP 429) after ${RETRIES + 1} attempts`
+            : `Model returned HTTP ${res.status}`,
     );
   }
   return String((await res.json())?.choices?.[0]?.message?.content ?? "");
@@ -259,6 +282,8 @@ export async function listTestRuns(applicationId: string) {
     };
     return {
       ...r,
+      status:
+        r.status === "running" && !runningRuns.has(r.id) ? "paused" : r.status,
       items: r.items as DatasetItem[],
       config,
       results: r.results as ItemResult[],
@@ -355,22 +380,93 @@ export async function deleteTestRun(id: string) {
     .where(and(eq(testRuns.id, id), eq(testRuns.tenantId, tenantId)));
 }
 
-/** Runs prompt `index` of a run and appends its result. Called by the browser for index 0..n-1 in order. */
-export async function runTestRunItem(
-  runId: string,
-  index: number,
-): Promise<ItemResult> {
-  const { tenantId, getToken } = await session();
-  const run = await db.query.testRuns.findFirst({
-    where: and(eq(testRuns.id, runId), eq(testRuns.tenantId, tenantId)),
+// ponytail: in-process runner (one long-lived Next server). A restart leaves runs "paused" until Resume;
+// move to a job queue if the web tier is ever scaled out.
+const runningRuns = new Set<string>();
+
+/** Starts (or resumes) a run in the background. Returns at once; the page polls `listTestRuns`. */
+export async function startTestRun(runId: string): Promise<Outcome> {
+  return outcome(async () => {
+    const { tenantId, sessionId } = await session();
+    if (!sessionId) throw new Error("Authentication required");
+    const [row] = await db
+      .update(testRuns)
+      .set({ status: "running" })
+      .where(and(eq(testRuns.id, runId), eq(testRuns.tenantId, tenantId)))
+      .returning({ id: testRuns.id });
+    if (!row) throw new Error("Test run not found");
+    if (!runningRuns.has(runId)) {
+      runningRuns.add(runId);
+      const getToken = async () =>
+        (await (await clerkClient()).sessions.getToken(sessionId)).jwt;
+      void driveRun(tenantId, runId, getToken)
+        .catch((e) => console.error("[test-runs] run failed", runId, e))
+        .finally(() => runningRuns.delete(runId));
+    }
+    return runId;
   });
-  if (!run) throw new Error("Test run not found");
-  const items = run.items as DatasetItem[];
+}
+
+/** Stops a run after the prompt in flight. */
+export async function pauseTestRun(runId: string) {
+  const { tenantId } = await session();
+  await db
+    .update(testRuns)
+    .set({ status: "paused" })
+    .where(and(eq(testRuns.id, runId), eq(testRuns.tenantId, tenantId)));
+}
+
+async function driveRun(
+  tenantId: string,
+  runId: string,
+  getToken: () => Promise<string | null>,
+) {
+  for (;;) {
+    const run = await db.query.testRuns.findFirst({
+      where: and(eq(testRuns.id, runId), eq(testRuns.tenantId, tenantId)),
+    });
+    if (!run || run.status !== "running") return;
+    const items = run.items as DatasetItem[];
+    const index = (run.results as ItemResult[]).length;
+    if (index >= items.length) {
+      await db
+        .update(testRuns)
+        .set({ status: "completed", completedAt: new Date().toISOString() })
+        .where(eq(testRuns.id, runId));
+      return;
+    }
+    let graded: ItemResult;
+    try {
+      graded = await runItem(tenantId, run, items[index], getToken);
+    } catch (e) {
+      // Never stall the run: record why this prompt failed and move on.
+      graded = gradeItem(
+        {
+          prompt: items[index].prompt,
+          expected: items[index].expected,
+          quality: {},
+          blocked: false,
+          error: e instanceof Error ? e.message : "Prompt failed",
+        },
+        (run.config as StoredConfig).threshold,
+      );
+    }
+    await db
+      .update(testRuns)
+      .set({
+        results: sql`${testRuns.results} || ${JSON.stringify([graded])}::jsonb`,
+      })
+      .where(eq(testRuns.id, runId));
+  }
+}
+
+async function runItem(
+  tenantId: string,
+  run: typeof testRuns.$inferSelect,
+  item: DatasetItem,
+  getToken: () => Promise<string | null>,
+): Promise<ItemResult> {
   const config = run.config as StoredConfig;
-  const done = run.results as ItemResult[];
-  if (index !== done.length || index >= items.length)
-    throw new Error("Out-of-order test run step");
-  const item = items[index];
 
   const base: Omit<ItemResult, "guardrailPass" | "passed" | "blocked"> = {
     prompt: item.prompt,
@@ -409,18 +505,7 @@ export async function runTestRunItem(
     }
   }
 
-  const graded = gradeItem(result, config.threshold);
-  const last = index === items.length - 1;
-  await db
-    .update(testRuns)
-    .set({
-      results: sql`${testRuns.results} || ${JSON.stringify([graded])}::jsonb`,
-      ...(last
-        ? { status: "completed", completedAt: new Date().toISOString() }
-        : {}),
-    })
-    .where(eq(testRuns.id, runId));
-  return graded;
+  return gradeItem(result, config.threshold);
 }
 
 // ---------- Guardrail Checks ----------

@@ -14,6 +14,8 @@ import axios from "axios";
 import { headers } from "next/headers";
 import { createAuditEvent } from "@/db/tenant";
 import { validateModelId } from "@/lib/model-id";
+import { backfillFromCatalog } from "@/lib/server/model-registry/runtime";
+import { getUserNamesFromIds } from "@/lib/utils/userUtils";
 
 interface CreateProviderModelInput {
   tenantId?: string; // Optional for global models
@@ -114,7 +116,7 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
       }
     }
 
-    const [model] = await db
+    const [inserted] = await db
       .insert(providerModels)
       .values({
         ...input,
@@ -123,6 +125,9 @@ const createProviderModelInternal = async (input: CreateProviderModelInput) => {
         updatedBy: userId,
       } as any)
       .returning();
+
+    // Fill context window / cost the user left blank from the Model Catalog.
+    const [model] = inserted ? await backfillFromCatalog([inserted]) : [];
 
     if (!model) {
       return {
@@ -292,6 +297,14 @@ export const getProviderModelById = async (id: string) => {
     .from(providerModels)
     .where(and(eq(providerModels.id, id), eq(providerModels.tenantId, orgId)))
     .limit(1);
+  if (!model) return null;
 
-  return model || null;
+  const [filled] = await backfillFromCatalog([model]);
+  const ids = [model.createdBy, model.updatedBy].filter(Boolean) as string[];
+  const names = ids.length ? await getUserNamesFromIds(ids, orgId) : {};
+  return {
+    ...filled,
+    createdByName: model.createdBy ? names[model.createdBy] ?? model.createdBy : null,
+    updatedByName: model.updatedBy ? names[model.updatedBy] ?? model.updatedBy : null,
+  };
 };

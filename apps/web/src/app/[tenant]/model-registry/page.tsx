@@ -6,6 +6,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { getModelRegistryRuntime } from "@/lib/server/model-registry/runtime";
 import { ModelRegistryList } from "./_components/ModelRegistryList";
+import { RepoModelsSection } from "./_components/RepoModelsSection";
+import { listRepoModels } from "@/lib/actions/repo-models";
 
 interface ModelRegistryPageProps {
   params: Promise<{ tenant: string }>;
@@ -23,7 +25,7 @@ export default async function ModelRegistryPage({
 
   // Initialize the tenant's executable test model idempotently, then return
   // tenant-scoped models together with persistent selection/connection state.
-  const models = await getModelRegistryRuntime(orgId);
+  const [models, repoModels] = await Promise.all([getModelRegistryRuntime(orgId), listRepoModels()]);
 
   return (
     <div className="p-6">
@@ -33,6 +35,7 @@ export default async function ModelRegistryPage({
         tenantId={orgId}
         userId={userId}
       />
+      <RepoModelsSection tenant={tenant} rows={repoModels} />
     </div>
   );
 }

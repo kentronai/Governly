@@ -97,3 +97,36 @@ export async function getModelCatalog(): Promise<CatalogModel[]> {
     return cache?.models ?? []; // serve stale on failure
   }
 }
+
+/** Best catalog match for a registry model: same provider + id, else same id from any provider. */
+export function findCatalogModel(
+  catalog: CatalogModel[],
+  provider: string,
+  modelId: string,
+): CatalogModel | undefined {
+  const id = modelId.toLowerCase();
+  const same = (m: CatalogModel) => m.modelId.toLowerCase() === id || m.id.toLowerCase() === id;
+  return (
+    catalog.find((m) => m.registryProvider === provider && same(m)) ?? catalog.find(same)
+  );
+}
+
+/** Context window + per-1K costs (as numeric strings) to fill gaps in a registry row. */
+export function catalogBackfill(
+  row: {
+    contextWindowTokens: number | null;
+    maxOutputTokens?: number | null;
+    inputCostPer1K: string | null;
+    outputCostPer1K: string | null;
+  },
+  m: CatalogModel | undefined,
+) {
+  if (!m) return null;
+  const per1K = (v: number | null) => (v == null ? null : (v / 1000).toFixed(6));
+  const patch: Record<string, number | string> = {};
+  if (row.contextWindowTokens == null && m.maxInput) patch.contextWindowTokens = m.maxInput;
+  if (row.maxOutputTokens == null && m.maxOutput) patch.maxOutputTokens = m.maxOutput;
+  if (row.inputCostPer1K == null && m.inPerM != null) patch.inputCostPer1K = per1K(m.inPerM)!;
+  if (row.outputCostPer1K == null && m.outPerM != null) patch.outputCostPer1K = per1K(m.outPerM)!;
+  return Object.keys(patch).length ? patch : null;
+}

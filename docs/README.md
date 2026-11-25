@@ -14,6 +14,7 @@
 - [Policy enforcement and evidence](REAL_POLICY_ENFORCEMENT.md)
 - [Governance engine](governance-engine.md)
 - [Datasets and Test Runs](test-runs.md): test an application's guardrails and answer quality
+- [AI Trust Center report](ai-trust-center-report.md): a PDF of your AI models, training policy, frameworks and sub-processors
 
 ## Architecture
 

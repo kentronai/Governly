@@ -63,6 +63,10 @@ if (process.env.NORIX_NATIVE === "1") {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // pdfkit reads its font metrics (js/data/*.afm) from disk at runtime: keep it out of the
+  // bundle and make sure standalone tracing copies the data files (AI Trust Center report).
+  serverExternalPackages: ["pdfkit"],
+  outputFileTracingIncludes: { "/**": ["./node_modules/pdfkit/js/data/**"] },
   // App version shown in the sidebar; scripts/release.sh keeps package.json in sync with VERSION.
   env: { NEXT_PUBLIC_APP_VERSION: require("./package.json").version },
   experimental: {

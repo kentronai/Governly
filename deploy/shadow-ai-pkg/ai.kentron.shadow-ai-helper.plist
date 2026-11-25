@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The local scan helper for the Shadow AI page's "Scan this computer" button: 127.0.0.1:8766,
+     read-only, answers only Governly origins (the defaults plus the URL in config.plist).
+     Same label as the one-liner's --install, so a Mac never runs two helpers. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.kentron.shadow-ai-helper</string>
+  <key>ProgramArguments</key>
+  <array><string>/Library/Application Support/Governly/shadow-ai-scan</string><string>--serve</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/tmp/governly-shadow-ai-helper.log</string>
+  <key>StandardOutPath</key><string>/tmp/governly-shadow-ai-helper.log</string>
+</dict>
+</plist>

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_scan" }, { status: 400 });
   }
 
-  await saveMachineScan(key.tenantId, key.createdBy, parsed.data);
+  await saveMachineScan(key.tenantId, key.createdBy, parsed.data, key.name);
   await db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.id, key.id));
   return NextResponse.json({ ok: true });
 }

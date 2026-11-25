@@ -9,6 +9,13 @@ const neo = TRUST_DOSSIER_VENDORS.filter((v) => v.collection === "neo-cloud");
 const apps = TRUST_DOSSIER_VENDORS.filter((v) => v.collection === "ai-apps");
 
 describe("Trust Dossier catalog", () => {
+  it("uses sentence case for section item labels in both collections", () => {
+    const lower = TRUST_DOSSIER_VENDORS.flatMap((v) =>
+      v.sections.flatMap((s) => s.items.map((i) => i.label)),
+    ).filter((l) => /^[a-z]/.test(l));
+    expect(lower).toEqual([]);
+  });
+
   it("has the 46 Neo Cloud providers numbered 1-46 in 4 groups", () => {
     expect(neo.map((v) => v.number)).toEqual(
       Array.from({ length: 46 }, (_, i) => i + 1),

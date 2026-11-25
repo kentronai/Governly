@@ -1,103 +1,131 @@
 import React from "react";
 import { Risk } from "../type";
-import { Clock, AlertCircle } from "lucide-react";
-const statusColorMap: Record<string, string> = {
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
+import { LocalTime } from "@/components/common/LocalTime";
+import { cn } from "@/lib/utils";
+
+// Full class strings so Tailwind can see them (dynamic `bg-${color}` never compiled).
+const TONE: Record<string, string> = {
+  green: "bg-green-500/10 text-green-600",
+  yellow: "bg-yellow-500/10 text-yellow-600",
+  orange: "bg-orange-500/10 text-orange-600",
+  red: "bg-red-500/10 text-red-600",
+  blue: "bg-blue-500/10 text-blue-600",
+  gray: "bg-muted text-muted-foreground",
+};
+const statusColorMap: Record<string, keyof typeof TONE> = {
   Low: "green",
   Rare: "green",
   Minor: "green",
   Possible: "yellow",
   Unlikely: "yellow",
+  "Requires Review": "yellow",
   Medium: "orange",
   Moderate: "orange",
   Likely: "orange",
   High: "red",
   Major: "red",
   Critical: "red",
-  "Not Started": "gray",
+  Catastrophic: "red",
   "In Progress": "blue",
-  "Requires Review": "yellow",
   Completed: "green",
 };
 
-function StatusChip({ value }: { value: string }) {
-  const color = statusColorMap[value] || "gray";
+const userLabel = (u?: { name: string | null; email: string } | null, id?: string | null) =>
+  u?.name || u?.email || id || null;
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <span
-      className={`p-1 rounded-full text-sm font-medium bg-${color}-500/10 text-${color}-500`}
-    >
-      {value === "In Progress" ? <Clock /> : <AlertCircle />}
-    </span>
+    <div className="min-w-0 space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="text-sm">{children || "—"}</div>
+    </div>
   );
 }
 
 export default function View({ risk }: { risk: Risk }) {
+  const chips: [string, string][] = [
+    ["Risk Level", risk.riskLevel],
+    ["Severity", risk.severity],
+    ["Likelihood", risk.likelihood],
+    ["Mitigation Status", risk.mitigationStatus],
+  ];
   return (
-    <>
-      <div className="p-6 rounded-xl border bg-card shadow-sm space-y-3">
-        <h2 className="text-lg font-semibold">Use Case</h2>
-
-        <div className="text-sm text-muted-foreground">
-          <p>
-            <strong>Name:</strong> {risk.useCase?.useCase}
-          </p>
-          <p>
-            <strong>Description:</strong> {risk.useCase?.whatItDoes}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {chips.map(([label, value]) => (
+          <Card key={label}>
+            <CardContent className="space-y-2 p-4">
+              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <Badge
+                variant="secondary"
+                className={cn("text-sm", TONE[statusColorMap[value] ?? "gray"])}
+              >
+                {value || "—"}
+              </Badge>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Owner */}
-        <div className="p-6 h-48 rounded-xl border bg-card shadow relative flex flex-col justify-between">
-          <div className="flex justify-between">
-            <h3 className="text-lg font-semibold">Owner</h3>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Owner">
+            {risk.ownerUser ? (
+              <>
+                <p className="font-medium">{risk.ownerUser.name}</p>
+                <p className="text-muted-foreground">{risk.ownerUser.email}</p>
+              </>
+            ) : (
+              risk.owner
+            )}
+          </Field>
+          <Field label="Use case">
+            {risk.useCase && (
+              <>
+                <p className="font-medium">{risk.useCase.useCase}</p>
+                <p className="text-muted-foreground">{risk.useCase.whatItDoes}</p>
+              </>
+            )}
+          </Field>
+          <Field label="Target date">
+            {risk.targetDate && <LocalTime value={risk.targetDate} mode="date" />}
+          </Field>
+          <Field label="Last review">
+            {risk.lastReviewDate && <LocalTime value={risk.lastReviewDate} mode="date" />}
+          </Field>
+          {risk.categories?.filter(Boolean).length > 0 && (
+            <Field label="Categories">
+              <div className="flex flex-wrap gap-1">
+                {risk.categories.filter(Boolean).map((c) => (
+                  <Badge key={c} variant="outline">
+                    {c}
+                  </Badge>
+                ))}
+              </div>
+            </Field>
+          )}
+          <div className="md:col-span-2">
+            <Field label="Mitigation plan">
+              {risk.mitigationPlan && (
+                <p className="whitespace-pre-wrap">{risk.mitigationPlan}</p>
+              )}
+            </Field>
           </div>
-          <div>
-            <p className="font-medium">{risk.ownerUser.name}</p>
-            <p className="text-muted-foreground text-sm">
-              {risk.ownerUser.email}
-            </p>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-4 gap-6">
-        
-        <div className="p-6 h-48 rounded-xl border bg-card shadow flex flex-col justify-between relative">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">Risk Level</h3>
-            <StatusChip value={risk.riskLevel} />
-          </div>
-          <p className="text-xl font-bold">{risk.riskLevel}</p>
-        </div>
-
-    
-        <div className="p-6 h-48 rounded-xl border bg-card shadow flex flex-col justify-between relative">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">Severity</h3>
-            <StatusChip value={risk.severity} />
-          </div>
-          <p className="text-xl font-bold">{risk.severity}</p>
-        </div>
-
-        <div className="p-6 h-48 rounded-xl border bg-card shadow flex flex-col justify-between relative">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">Likelihood</h3>
-            <StatusChip value={risk.likelihood} />
-          </div>
-          <p className="text-xl font-bold">{risk.likelihood}</p>
-        </div>
-
-       
-        <div className="p-6 h-48 rounded-xl border bg-card shadow flex flex-col justify-between relative">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">Mitigation Status</h3>
-            <StatusChip value={risk.mitigationStatus} />
-          </div>
-          <p className="text-xl font-bold">{risk.mitigationStatus}</p>
-        </div>
-      </div>
-    </>
+      <RecordMetadata
+        createdBy={userLabel(risk.user_createdBy, risk.createdBy)}
+        createdAt={risk.createdAt}
+        updatedBy={userLabel(risk.user_updatedBy, risk.updatedBy)}
+        updatedAt={risk.updatedAt}
+      />
+    </div>
   );
 }

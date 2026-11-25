@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { TbCloudNetwork } from "react-icons/tb";
-import { Users } from "lucide-react";
+import { ShieldCheck, Users } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { GenerateTrustCenterReport } from "@/components/trust-center/GenerateTrustCenterReport";
 import { PiFolderOpenLight } from "react-icons/pi";
 import { useTenant } from "@/contexts/TenantContext";
 import { useParams } from "next/navigation";
@@ -169,6 +173,29 @@ const HomeMain = () => {
                   </div>
                 </div> */}
             </div>
+
+            <Card className="max-w-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+                  AI Trust Center
+                </CardTitle>
+                <CardDescription>
+                  A PDF for customers and auditors: AI models, customer data training policy, framework alignment
+                  and sub-processors, built from your live data.
+                </CardDescription>
+                <CardAction>
+                  <Button asChild variant="link" className="px-0">
+                    <Link href={`/${tenantSlug}/admin/settings/ai-trust-center`}>Open</Link>
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              {tenantSlug && (
+                <CardFooter>
+                  <GenerateTrustCenterReport tenantSlug={tenantSlug} />
+                </CardFooter>
+              )}
+            </Card>
 
             {/* Data Usage Card */}
             {/* <div className="bg-white border border-[#DDDCDB] max-w-[600px] rounded-lg p-6">

@@ -32,6 +32,7 @@ import shutil
 import socket
 import sys
 import urllib.error
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.request
 import uuid
@@ -484,7 +485,10 @@ def make_server(origins, port=SERVE_PORT):
             self._send(204 if self.headers.get("Origin") in allowed else 403)
 
         def do_GET(self):
-            if self.path != "/scan":
+            if self.path == "/health":
+                # Presence check only; reveals nothing about the machine.
+                self._send(200, {"ok": True})
+            elif self.path != "/scan":
                 self._send(404, {"error": "not found"})
             # Only a trusted Governly page may read this machine's inventory.
             # The custom header forces a CORS preflight, so no other site can
@@ -581,6 +585,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     origins = list(DEFAULT_ORIGINS) + args.allow_origin
+    # The org installer (.pkg / Jamf profile) names this org's Governly URL; trust its origin too,
+    # so the installed helper answers that site's Scan button with no extra setup.
+    managed_url = managed_settings().get("url") if (args.serve or args.install) else None
+    if managed_url:
+        parsed = urllib.parse.urlsplit(managed_url)
+        if parsed.scheme and parsed.netloc:
+            origins.append("%s://%s" % (parsed.scheme, parsed.netloc))
     if args.install:
         status = install(origins)
         if status == 0:

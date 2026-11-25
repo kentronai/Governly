@@ -1,7 +1,7 @@
 import catalog from "./catalog.json";
 import type { CollectionId } from "./grades";
 
-export type CheckStatus = "Disclosed" | "Partial" | "Silent" | "Not applicable";
+export type CheckStatus = "Disclosed" | "Partial" | "Not disclosed" | "Not applicable";
 
 export interface TrustDossierVendor {
   collection: CollectionId;

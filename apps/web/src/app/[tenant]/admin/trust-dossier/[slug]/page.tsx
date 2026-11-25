@@ -22,7 +22,7 @@ import { format } from "date-fns";
 const STATUS_DOT: Record<CheckStatus, string> = {
   Disclosed: "bg-emerald-600",
   Partial: "bg-amber-500",
-  Silent: "bg-muted-foreground/30",
+  "Not disclosed": "bg-muted-foreground/30",
   "Not applicable": "bg-muted-foreground/60",
 };
 

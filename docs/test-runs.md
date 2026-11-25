@@ -32,7 +32,7 @@ reference answer.
      The step lists the policy and the guardrails it enables.
    - **AI Quality Checks**: a **Reviewer** model (pick one in the same way) grades each allowed answer from 1 to 5
      on On-Topic, Accuracy, Coverage, Grounded, Safe Language and Fairness, plus up to five rules of your own.
-4. **Start**: name the run and start it. Keep the page open; closing it pauses the run and **⋯ → Resume** continues.
+4. **Start**: name the run and start it. The run executes on the server, so you can close the page; rate limits (HTTP 429) and provider errors are retried with backoff, and a prompt that still fails is recorded with its error instead of stopping the run. **⋯ → Pause** stops it after the current prompt and **⋯ → Resume** continues (also after a server restart).
 
 For each prompt: the guardrails check it. If blocked, that is the result. If allowed, the model answers and the
 Reviewer grades the answer.

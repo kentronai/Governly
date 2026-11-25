@@ -1,15 +1,18 @@
 #!/bin/sh
-# Start the scan now for whoever is logged in; everyone else gets it at their next login.
-AGENT=/Library/LaunchAgents/ai.kentron.shadow-ai.plist
+# Start the daily scan and the local scan helper for whoever is logged in; everyone else gets them
+# at their next login.
+AGENTS="/Library/LaunchAgents/ai.kentron.shadow-ai.plist /Library/LaunchAgents/ai.kentron.shadow-ai-helper.plist"
 # Governly adds governly.plist (URL + key) next to this script when the installer is downloaded.
 if [ -f "$(dirname "$0")/governly.plist" ]; then
   cp "$(dirname "$0")/governly.plist" "/Library/Application Support/Governly/config.plist"
   chmod 644 "/Library/Application Support/Governly/config.plist"
 fi
-chown root:wheel "$AGENT"; chmod 644 "$AGENT"
 USER_ID=$(stat -f %u /dev/console)
-if [ "$USER_ID" -gt 0 ] 2>/dev/null; then
-  launchctl bootout "gui/$USER_ID" "$AGENT" 2>/dev/null
-  launchctl bootstrap "gui/$USER_ID" "$AGENT"
-fi
+for AGENT in $AGENTS; do
+  chown root:wheel "$AGENT"; chmod 644 "$AGENT"
+  if [ "$USER_ID" -gt 0 ] 2>/dev/null; then
+    launchctl bootout "gui/$USER_ID" "$AGENT" 2>/dev/null
+    launchctl bootstrap "gui/$USER_ID" "$AGENT"
+  fi
+done
 exit 0

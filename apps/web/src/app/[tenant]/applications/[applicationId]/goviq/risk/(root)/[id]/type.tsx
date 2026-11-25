@@ -36,5 +36,7 @@ export interface Risk {
   ownerUser: {
     name: string;
     email: string;
-  };
+  } | null;
+  user_createdBy?: { name: string | null; email: string } | null;
+  user_updatedBy?: { name: string | null; email: string } | null;
 }

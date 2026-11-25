@@ -1,10 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Apple, AppWindow, Download, Eye, Monitor, Radar, RefreshCcw, Server, Terminal, Trash2 } from "lucide-react";
+import {
+  Apple,
+  AppWindow,
+  CheckCircle2,
+  Download,
+  Eye,
+  Monitor,
+  MoreHorizontal,
+  Radar,
+  RefreshCcw,
+  Search,
+  Server,
+  Terminal,
+  Trash2,
+} from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { LocalTime } from "@/components/common/LocalTime";
 import { DeleteConfirmationModal } from "@/components/common/DeleteConfirmationModal";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+import Pagination from "@/components/common/pagination";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,15 +47,31 @@ import { errorToast, infoToast } from "@/lib/utils/toast";
 import {
   createScanKey,
   deleteMachineScan,
-  listMachineScans,
+  getMachineScan,
+  queryShadowAi,
   saveBrowserScan,
+  type MachineRow,
+  type McpRow,
+  type ShadowAiKind,
 } from "@/lib/actions/shadow-ai";
 import type { MachineScanResult } from "@/lib/shadow-ai";
 
-type Machine = Awaited<ReturnType<typeof listMachineScans>>[number];
+/**
+ * The local scan helper (shadow-ai-scan.py --serve): started by the org installer (.pkg) or by
+ * the one-liner's --install. Loopback only; answers only trusted Governly origins.
+ */
+const HELPER_URL = "http://127.0.0.1:8766";
+const HELPER_SCAN_URL = `${HELPER_URL}/scan`;
 
-/** The local helper installed by shadow-ai-scan.py --install (loopback only, answers only trusted origins). */
-const HELPER_SCAN_URL = "http://127.0.0.1:8766/scan";
+/** Cheap presence check. Older helpers 404 /health, which still proves one is listening. */
+async function helperRunning(): Promise<boolean> {
+  try {
+    await fetch(`${HELPER_URL}/health`, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function fetchHelperScan(): Promise<MachineScanResult> {
   const res = await fetch(HELPER_SCAN_URL, { headers: { "X-Shadow-AI-Scan": "1" } });
@@ -70,10 +112,17 @@ function CommandBlock({ command }: { command: string }) {
   );
 }
 
-/** The page cannot read the disk, so it asks the local helper; until it answers, show the one-time install. */
+/**
+ * The page cannot read the disk, so it asks the local helper. Computers that got the org
+ * installer already run it; the one-liner is only offered when no helper answers.
+ */
 function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: () => void }) {
   const [scanning, setScanning] = useState(false);
-  const [helperMissing, setHelperMissing] = useState(false);
+  const [helper, setHelper] = useState<"checking" | "found" | "missing">("checking");
+
+  useEffect(() => {
+    helperRunning().then((ok) => setHelper(ok ? "found" : "missing"));
+  }, []);
 
   const scan = useCallback(async () => {
     setScanning(true);
@@ -82,10 +131,10 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
       try {
         result = await fetchHelperScan();
       } catch {
-        setHelperMissing(true); // not installed, not running, or browser prompt declined
+        setHelper("missing"); // not installed, not running, or browser prompt declined
         return;
       }
-      setHelperMissing(false);
+      setHelper("found");
       await saveBrowserScan(result);
       infoToast("This computer was scanned.");
       onScanned();
@@ -96,21 +145,19 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
     }
   }, [onScanned]);
 
-  // While setup is on screen, scan the moment the helper starts answering.
+  // While the fallback setup is on screen, scan the moment a helper starts answering.
   useEffect(() => {
-    if (!helperMissing || scanning) return;
+    if (helper !== "missing" || scanning) return;
     const timer = setInterval(() => {
-      fetchHelperScan()
-        .then(() => {
-          clearInterval(timer);
-          void scan();
-        })
-        .catch(() => undefined);
+      helperRunning().then((ok) => {
+        if (!ok) return;
+        clearInterval(timer);
+        void scan();
+      });
     }, 3000);
     return () => clearInterval(timer);
-  }, [helperMissing, scanning, scan]);
+  }, [helper, scanning, scan]);
 
-  const [showSetup, setShowSetup] = useState(false);
   const [isWindows, setIsWindows] = useState(false);
   useEffect(() => setIsWindows(/Win/i.test(navigator.userAgent)), []);
   const { unix: unixCommand, windows: windowsCommand } = setupCommands(origin);
@@ -125,19 +172,27 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
             masked before anything leaves it.
           </CardDescription>
         </div>
-        <Button onClick={scan} disabled={scanning}>
+        <Button onClick={scan} disabled={scanning || helper === "checking"}>
           <Radar className="mr-2 h-4 w-4" />
           {scanning ? "Scanning…" : "Scan this computer"}
         </Button>
       </CardHeader>
       <CardContent>
-        {helperMissing || showSetup ? (
+        {helper === "checking" && <p className="text-sm text-muted-foreground">Looking for the Governly scan helper…</p>}
+        {helper === "found" && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            Scan helper detected on this computer (installed by your organization or an earlier setup).
+            Nothing else to install.
+          </p>
+        )}
+        {helper === "missing" && (
           <>
-            <p className="text-sm font-medium">One-time setup for this computer</p>
+            <p className="text-sm font-medium">No scan helper found on this computer</p>
             <p className="text-sm text-muted-foreground">
-              A website cannot read your files, so Governly uses a small read-only helper. Run the
-              command for your system once; if your browser asks to access devices on your local
-              network, click Allow. The scan then starts by itself.
+              If your IT team rolled out the Governly installer, make sure it finished and that you
+              allowed this site to access devices on your local network, then click Scan again.
+              Otherwise, as a fallback, run this command once; the scan then starts by itself.
             </p>
             <Tabs defaultValue={isWindows ? "windows" : "unix"} className="mt-3">
               <TabsList>
@@ -154,12 +209,8 @@ function ScanThisComputer({ origin, onScanned }: { origin: string; onScanned: ()
                 </p>
               </TabsContent>
             </Tabs>
-            {helperMissing && <p className="mt-3 text-xs text-muted-foreground">Waiting for the helper…</p>}
+            <p className="mt-3 text-xs text-muted-foreground">Waiting for the helper…</p>
           </>
-        ) : (
-          <Button variant="link" className="h-auto p-0" onClick={() => setShowSetup(true)}>
-            Set up manually (macOS, Linux or Windows)
-          </Button>
         )}
       </CardContent>
     </Card>
@@ -287,7 +338,8 @@ function DeployToComputers({ origin }: { origin: string }) {
                 </Step>
                 <Step n={3}>
                   Add it to a policy scoped to your Macs. Each Mac scans itself at login and daily, and
-                  appears below. Employees don&apos;t need to do anything.
+                  appears below. It also runs the scan helper, so Scan this computer works on those
+                  Macs with no extra setup. Employees don&apos;t need to do anything.
                 </Step>
               </ol>
               <p className="text-xs text-muted-foreground">
@@ -297,7 +349,7 @@ function DeployToComputers({ origin }: { origin: string }) {
             </section>
 
             <section className="space-y-2 border-t pt-4">
-              <p className="text-sm font-medium">A single Mac, manually</p>
+              <p className="text-sm font-medium">A single Mac without Jamf, manually</p>
               <p className="text-sm text-muted-foreground">
                 Run this once in Terminal on the Mac, then click Scan this computer on that Mac.
                 Requires Python 3.
@@ -350,32 +402,268 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
   return (
     <div className="py-2">
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className={mono ? "break-all font-mono text-xs" : "text-sm"}>{value || "—"}</p>
+      <p className={mono ? "whitespace-pre-wrap break-all font-mono text-xs" : "text-sm"}>{value || "—"}</p>
     </div>
   );
 }
 
-const installedApps = (m: Machine) => m.result.applications.filter((a) => a.status === "installed");
-const installedClis = (m: Machine) => m.result.cli_tools.filter((t) => t.installed);
+type Result<K extends ShadowAiKind> = Awaited<ReturnType<typeof queryShadowAi<K>>>;
+type Stats = Result<"machines">["stats"];
+const ALL = "__all__";
 
-export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
-  const [machines, setMachines] = useState(initialMachines);
+function FilterSelect({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  label: string;
+}) {
+  return (
+    <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : v)}>
+      <SelectTrigger className="h-9 w-[180px]" aria-label={label}>
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL}>All {label.toLowerCase()}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** A server-filtered, server-paged table of one Shadow AI inventory. */
+function InventoryTable<K extends ShadowAiKind>({
+  kind,
+  reloadKey,
+  onStats,
+  filters,
+  columns,
+  row,
+  empty,
+}: {
+  kind: K;
+  reloadKey: number;
+  onStats: (s: Stats) => void;
+  filters: ("machine" | "platform" | "source" | "transport")[];
+  columns: string[];
+  row: (r: Result<K>["rows"][number]) => React.ReactNode;
+  empty: string;
+}) {
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [machine, setMachine] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [source, setSource] = useState("");
+  const [transport, setTransport] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [data, setData] = useState<Result<K> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+  useEffect(() => setPage(1), [debouncedQ, machine, platform, source, transport]);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    queryShadowAi(kind, { q: debouncedQ, machine, platform, source, transport, page, pageSize })
+      .then((d) => {
+        if (!live) return;
+        setData(d);
+        onStats(d.stats);
+      })
+      .catch((e) => errorToast(e instanceof Error ? e.message : "Could not load scans."))
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
+  }, [kind, debouncedQ, machine, platform, source, transport, page, pageSize, reloadKey, onStats]);
+
+  const facets = data?.facets;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="h-9 pl-8" />
+        </div>
+        {filters.includes("machine") && (
+          <SearchableSelect
+            className="h-9 w-[200px]"
+            value={machine}
+            onValueChange={setMachine}
+            options={[{ value: "", label: "All machines" }, ...(facets?.machines ?? [])]}
+            placeholder="All machines"
+            searchPlaceholder="Search machines…"
+          />
+        )}
+        {filters.includes("platform") && (
+          <FilterSelect label="Platforms" value={platform} onChange={setPlatform} options={facets?.platforms ?? []} />
+        )}
+        {filters.includes("source") && (
+          <FilterSelect
+            label={kind === "apps" ? "Categories" : "Configured in"}
+            value={source}
+            onChange={setSource}
+            options={facets?.sources ?? []}
+          />
+        )}
+        {filters.includes("transport") && (
+          <FilterSelect label="Transports" value={transport} onChange={setTransport} options={facets?.transports ?? []} />
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{data ? `${data.total} results` : ""}</span>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {columns.map((c, i) => (
+              <TableHead key={c} className={i === columns.length - 1 && c === "Actions" ? "text-right" : undefined}>
+                {c}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {!data || data.rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
+                {loading ? "Loading…" : empty}
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.rows.map(row)
+          )}
+        </TableBody>
+      </Table>
+      {data && data.total > 0 && (
+        <Pagination
+          page={data.page}
+          setPage={setPage}
+          totalPages={data.totalPages}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          isLoading={loading}
+        />
+      )}
+    </div>
+  );
+}
+
+function RowMenu({ label, onView, onDelete }: { label: string; onView: () => void; onDelete?: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Actions for ${label}`}>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onView}>
+          <Eye className="mr-2 h-4 w-4" />
+          View
+        </DropdownMenuItem>
+        {onDelete && (
+          <DropdownMenuItem onClick={onDelete} className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+type Viewing = { machineId: string; server?: McpRow };
+
+function ViewDialog({ viewing, onClose }: { viewing: Viewing | null; onClose: () => void }) {
+  const [machine, setMachine] = useState<Awaited<ReturnType<typeof getMachineScan>> | null>(null);
+  useEffect(() => {
+    setMachine(null);
+    if (!viewing) return;
+    getMachineScan(viewing.machineId)
+      .then(setMachine)
+      .catch((e) => errorToast(e instanceof Error ? e.message : "Could not load the machine."));
+  }, [viewing]);
+
+  const s = viewing?.server;
+  const apps = machine?.result.applications.filter((a) => a.status === "installed") ?? [];
+  const clis = machine?.result.cli_tools.filter((t) => t.installed) ?? [];
+  return (
+    <Dialog open={viewing !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{s ? s.name : (machine?.hostname ?? "Machine")}</DialogTitle>
+          <DialogDescription>
+            {s
+              ? `MCP server on ${s.hostname}, configured in ${s.source_application}`
+              : machine
+                ? `${machine.platform} · signed-in user ${machine.result.username}`
+                : "Loading…"}
+          </DialogDescription>
+        </DialogHeader>
+        {s ? (
+          <>
+            <Detail label="Transport" value={s.transport} />
+            <Detail label="Status" value={s.status} />
+            <Detail label={s.url ? "URL" : "Command"} value={s.url ?? [s.command, ...s.args].filter(Boolean).join(" ")} mono />
+            <Detail label="Environment variables (names only)" value={s.env_var_names.join(", ")} mono />
+            <Detail label="Config file" value={s.config_path} mono />
+            <Detail label="Machine" value={`${s.hostname} (${s.platform})`} />
+          </>
+        ) : (
+          machine && (
+            <>
+              <Detail label={`AI applications (${apps.length})`} value={apps.map((a) => `${a.name} (${a.detection ?? a.category})`).join(", ")} />
+              <Detail label={`AI CLI tools (${clis.length})`} value={clis.map((t) => t.name).join(", ")} />
+              <Detail
+                label={`MCP servers (${machine.result.mcp_servers.length})`}
+                value={machine.result.mcp_servers.map((x) => `${x.name} (${x.source_application})`).join(", ")}
+              />
+              {machine.result.errors.length > 0 && <Detail label="Scan warnings" value={machine.result.errors.join("\n")} mono />}
+              <Detail label="Machine ID" value={machine.machineId} mono />
+            </>
+          )
+        )}
+        {machine && (
+          <div className="space-y-2 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Created = first seen (first reporter). Last modified = latest scan and who reported it.
+            </p>
+            <RecordMetadata
+              createdBy={machine.createdByName}
+              createdAt={machine.createdAt}
+              updatedBy={machine.reportedByName}
+              updatedAt={machine.scannedAt}
+            />
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const cmd = (s: McpRow) => s.url ?? [s.command, ...s.args].filter(Boolean).join(" ");
+
+export function ShadowAI() {
   const [origin, setOrigin] = useState("");
-  const [selected, setSelected] = useState<Machine | null>(null);
-  const [removing, setRemoving] = useState<Machine | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [viewing, setViewing] = useState<Viewing | null>(null);
+  const [removing, setRemoving] = useState<MachineRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   useEffect(() => setOrigin(window.location.origin), []);
-
-  const load = useCallback(() => {
-    listMachineScans()
-      .then(setMachines)
-      .catch((e) => errorToast(e instanceof Error ? e.message : "Could not load scans."));
-  }, []);
-
-  const servers = useMemo(
-    () => machines.flatMap((m) => m.result.mcp_servers.map((s, i) => ({ ...s, hostname: m.hostname, key: `${m.machineId}:${i}` }))),
-    [machines],
-  );
+  const load = useCallback(() => setReloadKey((k) => k + 1), []);
 
   return (
     <div className="space-y-4">
@@ -393,7 +681,7 @@ export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
       <DeployToComputers origin={origin} />
       <ScanServer origin={origin} />
 
-      {machines.length === 0 ? (
+      {stats && stats.machines === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
             <Radar className="h-8 w-8 text-muted-foreground" />
@@ -403,133 +691,134 @@ export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
             </p>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat icon={Server} label="Machines scanned" value={machines.length} />
-            <Stat icon={Radar} label="MCP servers" value={servers.length} />
-            <Stat icon={AppWindow} label="AI apps installed" value={machines.reduce((n, m) => n + installedApps(m).length, 0)} />
-            <Stat icon={Terminal} label="AI CLI tools" value={machines.reduce((n, m) => n + installedClis(m).length, 0)} />
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">MCP servers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Server</TableHead>
-                    <TableHead>Machine</TableHead>
-                    <TableHead>Configured in</TableHead>
-                    <TableHead>Transport</TableHead>
-                    <TableHead>Command / URL</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {servers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        No MCP servers found on the scanned machines.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    servers.map((s) => (
-                      <TableRow key={s.key}>
-                        <TableCell className="font-medium">{s.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.hostname}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.source_application}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{s.transport}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[320px] truncate font-mono text-xs" title={s.url ?? [s.command, ...s.args].join(" ")}>
-                          {s.url ?? [s.command, ...s.args].filter(Boolean).join(" ")}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Machines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Machine</TableHead>
-                    <TableHead>Platform</TableHead>
-                    <TableHead>MCP servers</TableHead>
-                    <TableHead>AI apps</TableHead>
-                    <TableHead>AI CLIs</TableHead>
-                    <TableHead>Last scan</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {machines.map((m) => (
-                    <TableRow key={m.machineId}>
-                      <TableCell className="font-medium">{m.hostname}</TableCell>
-                      <TableCell>{m.platform}</TableCell>
-                      <TableCell className="tabular-nums">{m.result.mcp_servers.length}</TableCell>
-                      <TableCell className="tabular-nums">{installedApps(m).length}</TableCell>
-                      <TableCell className="tabular-nums">{installedClis(m).length}</TableCell>
-                      <TableCell>
-                        <LocalTime value={m.scannedAt} />
-                      </TableCell>
-                      <TableCell className="space-x-1 text-right">
-                        <Button variant="ghost" size="icon" aria-label={`View ${m.hostname}`} onClick={() => setSelected(m)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" aria-label={`Remove ${m.hostname}`} onClick={() => setRemoving(m)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </>
+      )}
+      {stats && stats.machines > 0 && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Stat icon={Server} label="Machines scanned" value={stats.machines} />
+          <Stat icon={Radar} label="MCP servers" value={stats.mcp} />
+          <Stat icon={AppWindow} label="AI apps installed" value={stats.apps} />
+          <Stat icon={Terminal} label="AI CLI tools" value={stats.clis} />
+        </div>
       )}
 
-      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          {selected && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selected.hostname}</DialogTitle>
-                <DialogDescription>
-                  {selected.platform} · scanned as {selected.result.username}
-                </DialogDescription>
-              </DialogHeader>
-              <Detail
-                label={`AI applications (${installedApps(selected).length})`}
-                value={installedApps(selected).map((a) => `${a.name} (${a.detection ?? a.category})`).join(", ")}
+      <Card className={cn(stats?.machines === 0 && "hidden")}>
+        <CardContent className="pt-6">
+          <Tabs defaultValue="mcp">
+            <TabsList>
+              <TabsTrigger value="mcp">MCP servers</TabsTrigger>
+              <TabsTrigger value="machines">Machines</TabsTrigger>
+              <TabsTrigger value="apps">AI apps</TabsTrigger>
+              <TabsTrigger value="clis">AI CLI tools</TabsTrigger>
+            </TabsList>
+            <TabsContent value="mcp" className="mt-4">
+              <InventoryTable
+                kind="mcp"
+                reloadKey={reloadKey}
+                onStats={setStats}
+                filters={["machine", "source", "transport", "platform"]}
+                columns={["Server", "Machine", "Configured in", "Transport", "Command / URL", "Actions"]}
+                empty="No MCP servers match."
+                row={(s) => (
+                  <TableRow key={s.key}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{s.hostname}</TableCell>
+                    <TableCell className="text-muted-foreground">{s.source_application}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{s.transport}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[320px] truncate font-mono text-xs" title={cmd(s)}>
+                      {cmd(s)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowMenu label={s.name} onView={() => setViewing({ machineId: s.machineId, server: s })} />
+                    </TableCell>
+                  </TableRow>
+                )}
               />
-              <Detail label={`AI CLI tools (${installedClis(selected).length})`} value={installedClis(selected).map((t) => t.name).join(", ")} />
-              <Detail
-                label={`MCP servers (${selected.result.mcp_servers.length})`}
-                value={selected.result.mcp_servers.map((s) => `${s.name} (${s.source_application})`).join(", ")}
+            </TabsContent>
+            <TabsContent value="machines" className="mt-4">
+              <InventoryTable
+                kind="machines"
+                reloadKey={reloadKey}
+                onStats={setStats}
+                filters={["platform"]}
+                columns={["Machine", "Platform", "MCP servers", "AI apps", "AI CLIs", "Last scan", "Actions"]}
+                empty="No machines match."
+                row={(m) => (
+                  <TableRow key={m.key}>
+                    <TableCell className="font-medium">{m.hostname}</TableCell>
+                    <TableCell>{m.platform}</TableCell>
+                    <TableCell className="tabular-nums">{m.mcp}</TableCell>
+                    <TableCell className="tabular-nums">{m.apps}</TableCell>
+                    <TableCell className="tabular-nums">{m.clis}</TableCell>
+                    <TableCell>
+                      <LocalTime value={m.scannedAt} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowMenu
+                        label={m.hostname}
+                        onView={() => setViewing({ machineId: m.machineId })}
+                        onDelete={() => setRemoving(m)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
               />
-              {selected.result.errors.length > 0 && <Detail label="Scan warnings" value={selected.result.errors.join("\n")} mono />}
-              <Detail label="Machine ID" value={selected.machineId} mono />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </TabsContent>
+            <TabsContent value="apps" className="mt-4">
+              <InventoryTable
+                kind="apps"
+                reloadKey={reloadKey}
+                onStats={setStats}
+                filters={["machine", "source", "platform"]}
+                columns={["App", "Category", "Machine", "Detected by", "Actions"]}
+                empty="No AI apps match."
+                row={(a) => (
+                  <TableRow key={a.key}>
+                    <TableCell className="font-medium">{a.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{a.category}</TableCell>
+                    <TableCell className="text-muted-foreground">{a.hostname}</TableCell>
+                    <TableCell className="max-w-[320px] truncate font-mono text-xs" title={a.path ?? ""}>
+                      {a.path ?? a.detection ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowMenu label={a.name} onView={() => setViewing({ machineId: a.machineId })} />
+                    </TableCell>
+                  </TableRow>
+                )}
+              />
+            </TabsContent>
+            <TabsContent value="clis" className="mt-4">
+              <InventoryTable
+                kind="clis"
+                reloadKey={reloadKey}
+                onStats={setStats}
+                filters={["machine", "platform"]}
+                columns={["Tool", "Machine", "Path", "Actions"]}
+                empty="No AI CLI tools match."
+                row={(t) => (
+                  <TableRow key={t.key}>
+                    <TableCell className="font-medium">{t.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.hostname}</TableCell>
+                    <TableCell className="max-w-[320px] truncate font-mono text-xs">{t.path ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <RowMenu label={t.name} onView={() => setViewing({ machineId: t.machineId })} />
+                    </TableCell>
+                  </TableRow>
+                )}
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <ViewDialog viewing={viewing} onClose={() => setViewing(null)} />
 
       <DeleteConfirmationModal
         isOpen={removing !== null}
         onClose={() => setRemoving(null)}
         isLoading={deleting}
-        title="Remove machine"
+        title="Delete machine"
         itemName={removing?.hostname ?? ""}
         itemType="machine"
         onConfirm={async () => {
@@ -540,7 +829,7 @@ export function ShadowAI({ initialMachines }: { initialMachines: Machine[] }) {
             setRemoving(null);
             load();
           } catch (e) {
-            errorToast(e instanceof Error ? e.message : "Could not remove the machine.");
+            errorToast(e instanceof Error ? e.message : "Could not delete the machine.");
           } finally {
             setDeleting(false);
           }

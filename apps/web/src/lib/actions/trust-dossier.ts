@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { db, tenants, trustDossierTracked } from "@db";
 import { getTrustDossierVendor } from "@/lib/trust-dossier/vendors";
 
@@ -24,7 +24,12 @@ export async function getTrackedVendorSlugs(tenantSlugOrId: string) {
   const rows = await db
     .select({ slug: trustDossierTracked.vendorSlug })
     .from(trustDossierTracked)
-    .where(eq(trustDossierTracked.tenantId, tenantId));
+    .where(
+      and(
+        eq(trustDossierTracked.tenantId, tenantId),
+        isNull(trustDossierTracked.removedAt),
+      ),
+    );
   return rows.map((row) => row.slug);
 }
 
@@ -39,10 +44,15 @@ export async function setVendorTracked(
     await db
       .insert(trustDossierTracked)
       .values({ tenantId, vendorSlug, createdBy: userId })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [trustDossierTracked.tenantId, trustDossierTracked.vendorSlug],
+        set: { removedAt: null },
+      });
   } else {
+    // Soft-remove: the AI Trust Center report lists it as "previously used".
     await db
-      .delete(trustDossierTracked)
+      .update(trustDossierTracked)
+      .set({ removedAt: new Date().toISOString() })
       .where(
         and(
           eq(trustDossierTracked.tenantId, tenantId),
@@ -67,6 +77,9 @@ export async function trackVendors(
     .values(
       slugs.map((vendorSlug) => ({ tenantId, vendorSlug, createdBy: userId })),
     )
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [trustDossierTracked.tenantId, trustDossierTracked.vendorSlug],
+      set: { removedAt: null },
+    });
   return { tracked: slugs.length };
 }

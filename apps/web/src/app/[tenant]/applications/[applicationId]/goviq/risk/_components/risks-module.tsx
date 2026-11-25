@@ -66,6 +66,7 @@ import { isKentronEmail } from "@/lib/utils/validateEmail";
 
 
 import { PageTitle } from "@/components/common/PageHeader";
+import { LocalTime } from "@/components/common/LocalTime";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
   v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ") : "";
@@ -573,6 +574,7 @@ export default function RisksModule({
             <TableHead>Likelihood</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Owner</TableHead>
+            <TableHead>Last modified</TableHead>
             <TableHead>Controls</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -582,7 +584,7 @@ export default function RisksModule({
             <>
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Loading Risk...
@@ -593,7 +595,7 @@ export default function RisksModule({
           {!isLoadingRisk && filteredRisks.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={9}
+                colSpan={10}
                 className="text-center py-12 text-muted-foreground"
               >
                 {search || filtersActive
@@ -653,6 +655,10 @@ export default function RisksModule({
                 </TableCell>
                 <TableCell>
                   {userNames[risk.owner] || risk.owner}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs">
+                  <div>{userNames[risk.updatedBy ?? risk.createdBy ?? ""] || risk.updatedBy || risk.createdBy || "—"}</div>
+                  <LocalTime value={risk.updatedAt} className="text-muted-foreground" />
                 </TableCell>
                 <TableCell>
                   <Button

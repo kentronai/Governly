@@ -1,25 +1,16 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
+import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, FileText } from "lucide-react";
-// Removed Navbar import - using static layout instead
+import { CheckCircle2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 
-import { PageTitle } from "@/components/common/PageHeader";
+import { PageHeader } from "@/components/common/PageHeader";
+import { TrustCenterReports } from "@/components/trust-center/TrustCenterReports";
+import { TrustCenterReportSettings } from "@/components/trust-center/TrustCenterReportSettings";
+
 const AIComplianceDashboard = () => {
-  const [previewMode, setPreviewMode] = useState(false);
-
-  const handleDownloadReport = () => {
-    const link = document.createElement("a");
-    link.href = "/aireport.docx"; // Path to the file in public folder
-    link.download = "Report.docx"; // Name of the downloaded file
-    link.style.display = "none";
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const { tenant } = useParams<{ tenant: string }>();
 
   // Compliance badges
   const complianceBadges = [
@@ -37,28 +28,14 @@ const AIComplianceDashboard = () => {
     <div className="flex flex-col p-5">
       {/* Content */}
       <div className="w-full">
-        {/* Header with Preview Mode Toggle */}
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="flex items-center space-x-2">
-              <PageTitle>AI trust center</PageTitle>
-            </div>
-            <p className="text-gray-600 mt-1">
-              AI Trust Center centralizes your AI policies, certifications, and
-              subprocessors to demonstrate responsible, transparent, and
-              compliant AI practices.
-            </p>
-          </div>
-          <div>
-            <Button
-              variant="outline"
-              className="border-black text-black hover:bg-gray-100"
-              onClick={handleDownloadReport}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Generate report
-            </Button>
-          </div>
+        <PageHeader
+          title="AI trust center"
+          description="AI Trust Center centralizes your AI policies, certifications, and subprocessors to demonstrate responsible, transparent, and compliant AI practices."
+        />
+
+        <div className="mt-6 space-y-6">
+          <TrustCenterReports tenantSlug={tenant} />
+          <TrustCenterReportSettings tenantSlug={tenant} />
         </div>
 
         {/* Navigation Tabs */}

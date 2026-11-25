@@ -21,6 +21,7 @@ import {
 import { getModelScanResultsByUrl } from "@/lib/actions/model-scans";
 import { getProviderModelById } from "@/lib/actions/provider-models";
 import { LocalTime } from "@/components/common/LocalTime";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
 
 import { PageTitle } from "@/components/common/PageHeader";
 interface SecurityFinding {
@@ -92,6 +93,8 @@ interface ProviderModel {
   updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  createdByName?: string | null;
+  updatedByName?: string | null;
 }
 
 export default function ModelReportPage() {
@@ -382,9 +385,9 @@ export default function ModelReportPage() {
                   </p>
                   <Badge
                     variant="outline"
-                    className="text-xs bg-yellow-500/10 text-yello5-800"
+                    className="text-xs bg-yellow-500/10 text-yellow-600"
                   >
-                    {model.riskLevel}
+                    {model.riskLevel || "N/A"}
                   </Badge>
                 </div>
                 <div>
@@ -392,6 +395,26 @@ export default function ModelReportPage() {
                     Purpose
                   </p>
                   <p className="text-sm ">{model.purposeUseCase}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Context Window
+                  </p>
+                  <p className="text-sm">
+                    {model.contextWindowTokens
+                      ? `${model.contextWindowTokens.toLocaleString("en-US")} tokens`
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Cost / 1K (in / out)
+                  </p>
+                  <p className="text-sm">
+                    {model.inputCostPer1K || model.outputCostPer1K
+                      ? `$${model.inputCostPer1K ?? "-"} / $${model.outputCostPer1K ?? "-"}`
+                      : "-"}
+                  </p>
                 </div>
                 <div className="md:col-span-2 lg:col-span-3">
                   <p className="text-sm font-medium text-muted-foreground">
@@ -405,6 +428,13 @@ export default function ModelReportPage() {
                   </div>
                 </div>
               </div>
+              <RecordMetadata
+                className="mt-4"
+                createdBy={model.createdByName}
+                createdAt={model.createdAt}
+                updatedBy={model.updatedByName}
+                updatedAt={model.updatedAt}
+              />
             </CardContent>
           </Card>
         )}

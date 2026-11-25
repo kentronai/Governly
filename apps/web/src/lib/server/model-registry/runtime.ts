@@ -2,6 +2,7 @@ import "server-only";
 
 import { db, providerModels, tenantModelSettings, tenantLlmKeys } from "@db";
 import { decryptSecret } from "@/lib/server/crypto";
+import { getModelCatalog, findCatalogModel, catalogBackfill } from "@/lib/server/model-catalog";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import {
   getModelProviderAdapter,
@@ -42,7 +43,7 @@ export async function ensureDefaultGeminiModel(tenantId: string) {
         availabilityStatus: "available",
         modelUrl: GEMINI_OPENAI_API_BASE_URL,
         purposeUseCase: "NORIX policy and guardrail testing",
-        riskLevel: "Medium",
+        riskLevel: "N/A",
         category: "llm",
       })
       .onConflictDoNothing()
@@ -170,10 +171,39 @@ export async function getTenantLlmKey(tenantId: string, provider: string) {
   return row ? decryptSecret(row.keyEncrypted) : undefined;
 }
 
+/** Fill missing context window / cost on registry rows from the public Model Catalog and persist it. */
+export async function backfillFromCatalog<
+  T extends {
+    id: string;
+    provider: string;
+    modelId: string;
+    contextWindowTokens: number | null;
+    maxOutputTokens: number | null;
+    inputCostPer1K: string | null;
+    outputCostPer1K: string | null;
+  },
+>(rows: T[]): Promise<T[]> {
+  const missing = rows.filter(
+    (r) => r.contextWindowTokens == null || r.inputCostPer1K == null || r.outputCostPer1K == null,
+  );
+  if (!missing.length) return rows;
+  const catalog = await getModelCatalog(); // cached 24h; [] when offline
+  if (!catalog.length) return rows;
+  const patched = new Map<string, Partial<T>>();
+  for (const r of missing) {
+    const patch = catalogBackfill(r, findCatalogModel(catalog, r.provider, r.modelId));
+    if (!patch) continue;
+    patched.set(r.id, patch as Partial<T>);
+    // ponytail: system backfill, so updatedBy/updatedAt stay untouched.
+    await db.update(providerModels).set(patch).where(eq(providerModels.id, r.id));
+  }
+  return rows.map((r) => (patched.has(r.id) ? { ...r, ...patched.get(r.id) } : r));
+}
+
 export async function getModelRegistryRuntime(tenantId: string) {
   await ensureDefaultGeminiModel(tenantId);
 
-  return db
+  const rows = await db
     .select({
       id: providerModels.id,
       provider: providerModels.provider,
@@ -212,6 +242,7 @@ export async function getModelRegistryRuntime(tenantId: string) {
       ),
     )
     .orderBy(desc(providerModels.createdAt));
+  return backfillFromCatalog(rows);
 }
 
 async function getAvailableTenantModel(tenantId: string, modelId: string) {
