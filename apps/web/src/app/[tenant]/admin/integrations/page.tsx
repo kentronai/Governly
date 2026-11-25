@@ -424,7 +424,7 @@ export default function IntegrationsPage() {
     integrations.forEach((i) => add(i.category));
     providerCatalog
       .filter((p) => !live.has(normalizeName(p.name)))
-      .forEach((p) => add(tabOf(p.category)));
+      .forEach((p) => add(tabOf(p.category, p.key)));
     return counts;
   }, [integrations]);
 
@@ -465,7 +465,7 @@ export default function IntegrationsPage() {
     const query = search.trim().toLowerCase();
     if (status === "enabled") return [];
     return providerCatalog
-      .filter((p) => category === "all" || tabOf(p.category) === category)
+      .filter((p) => category === "all" || tabOf(p.category, p.key) === category)
       .filter((p) => !live.has(normalizeName(p.name)))
       .filter((p) => !query || p.name.toLowerCase().includes(query));
   }, [integrations, category, status, search]);
@@ -1223,7 +1223,7 @@ export default function IntegrationsPage() {
                     {provider.name}
                   </CardTitle>
                   <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
-                    {categoryLabel(tabOf(provider.category))}
+                    {categoryLabel(tabOf(provider.category, provider.key))}
                   </p>
                 </div>
                 <Badge variant="secondary" className="shrink-0">

@@ -12,6 +12,10 @@ import catalog from "@/lib/integrations/provider-catalog.json";
 import { tabOf } from "@/lib/integrations/categories";
 import { createIntegration, listIntegrationKeys } from "./client";
 
+// GitHub OAuth discovery reads private repos + org repos; without scopes the
+// OAuth token only sees public data.
+const DEFAULT_SCOPES: Record<string, string> = { github: "repo,read:org" };
+
 const envName = (key: string) => key.toUpperCase().replace(/[^A-Z0-9]/g, "_");
 
 function envCredentials(key: string, auth: string) {
@@ -19,7 +23,8 @@ function envCredentials(key: string, auth: string) {
   const id = process.env[`${prefix}_CLIENT_ID`]?.trim();
   const secret = process.env[`${prefix}_CLIENT_SECRET`]?.trim();
   // Comma/space separated, e.g. HUBSPOT_SCOPES="crm.objects.contacts.read,oauth"
-  const scopes = process.env[`${prefix}_SCOPES`]?.trim().replace(/[\s,]+/g, ",");
+  const scopes =
+    process.env[`${prefix}_SCOPES`]?.trim().replace(/[\s,]+/g, ",") || DEFAULT_SCOPES[key];
   if (auth === "OAUTH2" && id && secret) {
     return { enabled: true, credentials: { type: "OAUTH2", client_id: id, client_secret: secret, ...(scopes ? { scopes } : {}) } };
   }
@@ -64,7 +69,7 @@ export async function ensureEnvIntegrations(tenantId: string, userId: string) {
         await db.insert(integrations).values({
           tenantId,
           name: p.name,
-          category: tabOf(p.category),
+          category: tabOf(p.category, p.key),
           description: `Connect ${p.name} through Nango.`,
           configuration: { nangoProviderKey: p.key },
           isEnabled: false,

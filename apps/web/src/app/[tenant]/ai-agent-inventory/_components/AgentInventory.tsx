@@ -72,6 +72,8 @@ import type {
 
 
 import { PageTitle } from "@/components/common/PageHeader";
+import { RecordMetadata } from "@/components/common/RecordMetadata";
+import type { GoverningPolicy } from "@/lib/queries/agents";
 import { ConnectIntegrationDialog } from "@/components/integrations/ConnectIntegrationDialog";
 // Display-only: "non_compliant" -> "Non compliant". Never use for stored values.
 const toLabel = (v?: string | null) =>
@@ -1047,6 +1049,47 @@ function AgentDetailModal({
                 </Section>
               )}
 
+              <Section title="Policies">
+                {agent.governingPolicies?.length ? (
+                  agent.governingPolicies.map((p: GoverningPolicy) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <Link href={`/${tenant}/policies`} className="min-w-0 truncate font-medium hover:underline">
+                        {p.name} <span className="text-muted-foreground">{p.version}</span>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {p.guards} guardrail{p.guards === 1 ? "" : "s"}
+                        </span>
+                        <Badge variant="outline">
+                          {p.source === "application"
+                            ? `Application: ${agent.application?.name ?? "linked"}`
+                            : "Tenant default"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <Field
+                    label="Governing policy"
+                    value={
+                      agent.application
+                        ? `None: ${agent.application.name} has no active policy and there is no tenant default policy.`
+                        : "None: assign the agent to an application with a policy, or set a tenant default policy."
+                    }
+                    warn
+                  />
+                )}
+                <Field
+                  label="Policy violations"
+                  value={
+                    violationsOf(agent).length
+                      ? violationsOf(agent).map((v) => v.policy).join(", ")
+                      : "None"
+                  }
+                  warn={violationsOf(agent).length > 0}
+                />
+              </Section>
+
               <Section title="Discovery">
                 <Field
                   label="First Seen"
@@ -1064,6 +1107,12 @@ function AgentDetailModal({
                 />
               </Section>
 
+              <RecordMetadata
+                createdBy="Agent discovery"
+                createdAt={agent.createdAt}
+                updatedBy="Agent discovery"
+                updatedAt={agent.updatedAt}
+              />
               </TabsContent>
               <TabsContent
                 value="observability"

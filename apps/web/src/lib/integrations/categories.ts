@@ -29,7 +29,19 @@ export const NANGO_TO_TAB: Record<string, string> = {
   "e-commerce": "ecommerce",
   legal: "legal",
 };
-export const tabOf = (nangoCategory: string) => NANGO_TO_TAB[nangoCategory] ?? "other";
+// Nango files warehouses under dev-tools/productivity/analytics, which left the
+// Data Platforms tab holding only Databricks Unity Catalog. Override by key.
+const DATA_PLATFORM_KEYS = new Set([
+  "snowflake",
+  "snowflake-jwt",
+  "google-bigquery",
+  "clickhouse",
+  "supabase",
+]);
+export const tabOf = (nangoCategory: string, key?: string) =>
+  key && DATA_PLATFORM_KEYS.has(key)
+    ? "data_platforms"
+    : (NANGO_TO_TAB[nangoCategory] ?? "other");
 
 /** GitHub providers in Nango (PAT, user OAuth, App, App OAuth) all feed GitHub agent discovery. */
 export const isGithubProviderKey = (key?: string | null): boolean =>

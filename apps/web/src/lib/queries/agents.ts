@@ -5,7 +5,16 @@
  * discovered by the Agent Registry, optionally linked to an Application.
  */
 
-import { db, agents, users, applications, providerModels, withDbRetry } from "@db";
+import {
+  db,
+  agents,
+  users,
+  applications,
+  applicationPolicies,
+  policies,
+  providerModels,
+  withDbRetry,
+} from "@db";
 import { and, eq, desc, ilike, inArray, isNull, notInArray, or, sql, count } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { cache } from "react";
@@ -251,9 +260,67 @@ export const getAgentDetail = cache(
         .from(providerModels)
         .where(eq(providerModels.tenantId, tenantId)),
     );
-    return { ...agent, approvedModels: approved.map((m) => m.modelId) };
+    return {
+      ...agent,
+      approvedModels: approved.map((m) => m.modelId),
+      governingPolicies: await getGoverningPolicies(tenantId, agent.applicationId),
+    };
   },
 );
+
+export type GoverningPolicy = {
+  id: string;
+  name: string;
+  version: string;
+  source: "application" | "tenant_default";
+  guards: number;
+  updatedAt: string;
+};
+
+/**
+ * ControlNet policies that govern an agent: the active policies linked to its
+ * application, else the tenant-wide default the gateway falls back to.
+ */
+async function getGoverningPolicies(
+  tenantId: string,
+  applicationId: string | null,
+): Promise<GoverningPolicy[]> {
+  const live = and(eq(policies.tenantId, tenantId), eq(policies.isActive, true), isNull(policies.deletedAt));
+  const cols = {
+    id: policies.id,
+    name: policies.name,
+    version: policies.version,
+    yaml: policies.yaml,
+    updatedAt: policies.updatedAt,
+  };
+  const linked = applicationId
+    ? await withDbRetry(() =>
+        db
+          .selectDistinct(cols)
+          .from(applicationPolicies)
+          .innerJoin(policies, eq(applicationPolicies.policyId, policies.id))
+          .where(
+            and(
+              live,
+              eq(applicationPolicies.applicationId, applicationId),
+              eq(applicationPolicies.isActive, true),
+            ),
+          ),
+      )
+    : [];
+  const rows = linked.length
+    ? linked
+    : await withDbRetry(() =>
+        db.select(cols).from(policies).where(and(live, eq(policies.isTenantDefault, true))).limit(1),
+      );
+  const source = linked.length ? "application" : "tenant_default";
+  return rows.map(({ yaml, ...p }) => ({
+    ...p,
+    source,
+    // Same guard-id count the agent policy sync uses.
+    guards: yaml ? [...yaml.matchAll(/^\s*-\s+id:\s*([^\s#]+)\s*$/gm)].length : 0,
+  }));
+}
 
 export const getAgentFilterOptions = cache(async (tenantId: string) => {
   const rows = await withDbRetry(() =>
