@@ -7,14 +7,13 @@ import {
   trustCenterReports,
   trustCenterSettings,
   trustCenterTrainingPolicies,
-  trustDossierTracked,
   users,
 } from "@db";
 import { getCurrentUserServer } from "@/lib/utils/clerk.server";
 import { createAuditEvent } from "@/lib/server/audit";
 import { decryptSecret, encryptSecret } from "@/lib/server/crypto";
+import { loadReportData } from "@/lib/server/trust-center/data";
 import { buildTrustCenterReport } from "@/lib/server/trust-center/pdf";
-import { getTrustDossierVendor } from "@/lib/trust-dossier/vendors";
 import {
   REPORT_LINK_DAYS,
   REPORT_SECTION_KEYS,
@@ -38,10 +37,10 @@ async function resolveTenant(tenantSlugOrId: string, requireAdmin = false) {
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const cap = (v: unknown, n = 2000) => (typeof v === "string" ? v.slice(0, n) : "");
 
-/** Settings, the latest training policy and the tracked vendors (for the settings form). */
+/** Settings, the latest training policy and the report's sub-processors (for the settings form). */
 export async function getTrustCenterSettings(tenantSlugOrId: string) {
   const { tenantId, isAdmin } = await resolveTenant(tenantSlugOrId);
-  const [[row], [policy], tracked] = await Promise.all([
+  const [[row], [policy], report] = await Promise.all([
     db.select().from(trustCenterSettings).where(eq(trustCenterSettings.tenantId, tenantId)).limit(1),
     db
       .select()
@@ -49,15 +48,13 @@ export async function getTrustCenterSettings(tenantSlugOrId: string) {
       .where(eq(trustCenterTrainingPolicies.tenantId, tenantId))
       .orderBy(desc(trustCenterTrainingPolicies.createdAt))
       .limit(1),
-    db.select().from(trustDossierTracked).where(eq(trustDossierTracked.tenantId, tenantId)),
+    loadReportData(tenantId, { includePreviousSubprocessors: false }),
   ]);
   return {
     isAdmin,
     settings: (row?.data ?? {}) as TrustCenterSettings,
     trainingPolicy: policy ?? null,
-    vendors: tracked
-      .filter((t) => !t.removedAt)
-      .map((t) => ({ slug: t.vendorSlug, name: getTrustDossierVendor(t.vendorSlug)?.name ?? t.vendorSlug })),
+    vendors: report.subprocessors.map((p) => ({ slug: p.key, name: p.name, source: p.source })),
   };
 }
 

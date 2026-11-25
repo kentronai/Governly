@@ -612,6 +612,9 @@ export async function POST(request: NextRequest) {
       } else if (providerName === LANGSMITH) {
         await deleteLangSmithConnection(tenant, integrationId);
       } else {
+        // Nango-backed rows (e.g. GitHub PAT): drop the Nango connection and its
+        // reference too, or the card keeps showing "Connected".
+        await disconnectNango({ tenantSlugOrId: tenant, integrationId });
         await clearIntegrationCredentials(tenant, integrationId);
       }
       // Whatever the provider, its discovered agents go with it.

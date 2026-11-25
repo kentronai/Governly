@@ -4,12 +4,11 @@
  * GitHub client used by agent discovery.
  */
 
-import { sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { db, repoModelDetections } from "@db";
 import { getBlobText, getTree, listRepos, type GithubConnection, type GithubRepo } from "./api-client";
-import { detectModelFile, detectModelsInText, SCANNABLE_FILE, type ModelHit } from "./model-detector";
+import { detectModelFile, detectModelsInText, MAX_MODELS_PER_FILE, NON_USAGE_PATH, SCANNABLE_FILE, type ModelHit } from "./model-detector";
 
-const SKIP = /(^|\/)(node_modules|vendor|dist|build|\.venv|venv|\.next|__pycache__)\/|\.min\.|lock/i;
 // ponytail: per-repo file cap keeps Nango proxy calls bounded; raise or page if repos are large.
 const MAX_FILES_PER_REPO = 150;
 
@@ -24,7 +23,7 @@ export async function scanReposForModels(
   for (const repo of list) {
     const tree = await getTree(conn, repo).catch(() => null);
     if (!tree) continue;
-    const blobs = tree.filter((e) => e.type === "blob" && !SKIP.test(e.path));
+    const blobs = tree.filter((e) => e.type === "blob" && !NON_USAGE_PATH.test(e.path));
     const hits: Array<ModelHit & { path: string }> = [];
     for (const e of blobs) {
       const f = detectModelFile(e.path);
@@ -33,10 +32,20 @@ export async function scanReposForModels(
     const files = blobs.filter((e) => SCANNABLE_FILE.test(e.path)).slice(0, MAX_FILES_PER_REPO);
     for (const e of files) {
       const text = await getBlobText(conn, repo, e).catch(() => null);
-      if (text) for (const h of detectModelsInText(text)) hits.push({ ...h, path: e.path });
+      const found = text ? detectModelsInText(text) : [];
+      if (found.length <= MAX_MODELS_PER_FILE) for (const h of found) hits.push({ ...h, path: e.path });
     }
-    if (!hits.length) continue;
     const now = new Date().toISOString();
+    // Drop this repo's rows the scan no longer sees (old test/example hits, removed code).
+    // ponytail: files past MAX_FILES_PER_REPO count as "not seen"; page the tree if repos are large.
+    const prune = () =>
+      db.delete(repoModelDetections).where(
+        and(eq(repoModelDetections.tenantId, tenantId), eq(repoModelDetections.repo, repo.full_name), lt(repoModelDetections.lastDetectedAt, now)),
+      );
+    if (!hits.length) {
+      await prune();
+      continue;
+    }
     await db
       .insert(repoModelDetections)
       .values(
@@ -47,6 +56,7 @@ export async function scanReposForModels(
           repo: repo.full_name,
           filePath: h.path,
           line: h.line,
+          lastDetectedAt: now,
           createdBy: userId,
           updatedBy: userId,
         })),
@@ -55,6 +65,7 @@ export async function scanReposForModels(
         target: [repoModelDetections.tenantId, repoModelDetections.modelId, repoModelDetections.repo, repoModelDetections.filePath],
         set: { line: sql`excluded.line`, lastDetectedAt: now, updatedAt: now, updatedBy: userId },
       });
+    await prune();
     detections += hits.length;
   }
   return { repos: list.length, detections };

@@ -75,7 +75,11 @@ export function GenerateTrustCenterReport({
     if (!tenantSlug) return;
     getTrustCenterAccess(tenantSlug)
       .then((r) => setIsAdmin(r.isAdmin))
-      .catch(() => setIsAdmin(false));
+      .catch((e) => {
+        // Hidden on failure (e.g. no active organization), but leave a trace for debugging.
+        console.error("[trust-center] access check failed", e);
+        setIsAdmin(false);
+      });
   }, [tenantSlug]);
 
   if (!isAdmin) return null;

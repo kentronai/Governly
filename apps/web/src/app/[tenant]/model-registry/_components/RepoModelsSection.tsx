@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Check, Eye, GitBranch, RefreshCw, X } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { providerLabel } from "./labels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,46 +63,55 @@ export function RepoModelsSection({ tenant, rows }: { tenant: string; rows: Repo
             <TableHeader>
               <TableRow>
                 <TableHead>Model</TableHead>
+                <TableHead>Provider</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Found in</TableHead>
-                <TableHead>First detected</TableHead>
                 <TableHead>Last detected</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[...unapproved, ...approved].map((r) => (
-                <TableRow key={r.modelId}>
-                  <TableCell className="font-mono text-xs">{r.modelId}</TableCell>
-                  <TableCell>
-                    {r.approved ? <Badge variant="secondary">Approved</Badge> : <Badge variant="destructive">Unapproved</Badge>}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {r.approved
-                      ? `Used in ${r.repos.length} repo${r.repos.length === 1 ? "" : "s"}`
-                      : `${r.locations[0].repo}/${r.locations[0].filePath}${r.locations[0].line ? `:${r.locations[0].line}` : ""}${r.locations.length > 1 ? ` +${r.locations.length - 1}` : ""}`}
-                  </TableCell>
-                  <TableCell><LocalTime value={r.firstDetectedAt} /></TableCell>
-                  <TableCell><LocalTime value={r.lastDetectedAt} /></TableCell>
-                  <TableCell className="space-x-1 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setView(r)} aria-label="View">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    {!r.approved && (
-                      <>
-                        <Button variant="ghost" size="sm" disabled={pending} aria-label="Approve"
-                          onClick={() => run(() => approveRepoModel(tenant, r.modelId, r.provider), "approved")}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" disabled={pending} aria-label="Dismiss"
-                          onClick={() => run(() => dismissRepoModel(tenant, r.modelId), "dismissed")}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {[...unapproved, ...approved].map((r) => {
+                const files = new Set(r.locations.map((l) => `${l.repo}/${l.filePath}`)).size;
+                return (
+                  <TableRow key={r.modelId}>
+                    <TableCell className="font-mono text-xs">{r.modelId}</TableCell>
+                    <TableCell>{providerLabel(r.provider)}</TableCell>
+                    <TableCell>
+                      {r.approved ? <Badge variant="secondary">Approved</Badge> : <Badge variant="destructive">Unapproved</Badge>}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {r.repos.length === 1 ? r.repos[0] : `${r.repos.length} repos`}
+                      <span className="text-muted-foreground"> · {files} file{files === 1 ? "" : "s"}</span>
+                    </TableCell>
+                    <TableCell><LocalTime value={r.lastDetectedAt} /></TableCell>
+                    <TableCell className="text-right">
+                      <RowActionsMenu
+                        label={`Actions for ${r.modelId}`}
+                        items={[
+                          { label: "View", icon: Eye, onSelect: () => setView(r) },
+                          {
+                            label: "Approve",
+                            icon: Check,
+                            hidden: r.approved,
+                            disabled: pending,
+                            onSelect: () => run(() => approveRepoModel(tenant, r.modelId, r.provider), "approved"),
+                          },
+                          {
+                            label: "Dismiss",
+                            icon: X,
+                            hidden: r.approved,
+                            disabled: pending,
+                            destructive: true,
+                            confirm: `Hide ${r.modelId} from this list? It reappears only if it shows up in a new file.`,
+                            onSelect: () => run(() => dismissRepoModel(tenant, r.modelId), "dismissed"),
+                          },
+                        ]}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

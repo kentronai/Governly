@@ -4,11 +4,11 @@
  */
 
 export const REPORT_SECTIONS = [
-  { key: "models", title: "AI models deployed" },
-  { key: "training", title: "Customer data training policy" },
-  { key: "frameworks", title: "Framework and standards alignment" },
+  { key: "models", title: "AI models in use" },
+  { key: "training", title: "Customer data and model training" },
+  { key: "frameworks", title: "Regulatory and standards alignment" },
   { key: "subprocessors", title: "Sub-processors" },
-  { key: "governance", title: "Governance, contacts and methodology" },
+  { key: "governance", title: "Governance and contacts" },
 ] as const;
 export type ReportSectionKey = (typeof REPORT_SECTIONS)[number]["key"];
 export const REPORT_SECTION_KEYS = REPORT_SECTIONS.map((s) => s.key) as ReportSectionKey[];
@@ -60,16 +60,16 @@ export interface TrainingCategory {
 
 /** The ten frameworks the report always lists; `tracker` is the Governly framework slug. */
 export const REPORT_FRAMEWORKS = [
-  { key: "nist-ai-rmf", name: "NIST AI RMF 1.0", tracker: "nist-ai-rmf", scope: "AI risk management (Govern, Map, Measure, Manage)" },
-  { key: "iso-42001", name: "ISO/IEC 42001:2023", tracker: "iso-42001", scope: "AI management system" },
-  { key: "eu-ai-act", name: "EU AI Act (Reg. 2024/1689)", tracker: "eu-ai-act", scope: "AI governance and risk tiers" },
-  { key: "iso-27001", name: "ISO/IEC 27001:2022", tracker: "iso-27001", scope: "Information security management" },
-  { key: "soc-2-type-ii", name: "SOC 2 Type II", tracker: "soc-2-type-ii", scope: "Security, availability, confidentiality" },
-  { key: "nist-800-53", name: "NIST SP 800-53 Rev. 5", tracker: null, scope: "Security and privacy controls" },
-  { key: "gdpr", name: "GDPR", tracker: "gdpr", scope: "EU data protection" },
-  { key: "ccpa", name: "CCPA / CPRA", tracker: "ccpa", scope: "California consumer privacy" },
-  { key: "pci-dss", name: "PCI DSS v4.0", tracker: "pci-dss-lite", scope: "Payment card data" },
-  { key: "hipaa", name: "HIPAA", tracker: "hipaa-security", scope: "Protected health information" },
+  { key: "nist-ai-rmf", name: "NIST AI RMF 1.0", tracker: "nist-ai-rmf", policy: "NIST AI Risk Management Framework", scope: "AI risk management (Govern, Map, Measure, Manage)" },
+  { key: "iso-42001", name: "ISO/IEC 42001:2023", tracker: "iso-42001", policy: "ISO/IEC 42001", scope: "AI management system" },
+  { key: "eu-ai-act", name: "EU AI Act (Reg. 2024/1689)", tracker: "eu-ai-act", policy: "EU AI Act", scope: "AI governance and risk tiers" },
+  { key: "iso-27001", name: "ISO/IEC 27001:2022", tracker: "iso-27001", policy: "ISO/IEC 27001", scope: "Information security management" },
+  { key: "soc-2-type-ii", name: "SOC 2 Type II", tracker: "soc-2-type-ii", policy: null, scope: "Security, availability, confidentiality" },
+  { key: "nist-800-53", name: "NIST SP 800-53 Rev. 5", tracker: null, policy: null, scope: "Security and privacy controls" },
+  { key: "gdpr", name: "GDPR", tracker: "gdpr", policy: "GDPR", scope: "EU data protection" },
+  { key: "ccpa", name: "CCPA / CPRA", tracker: "ccpa", policy: "CCPA", scope: "California consumer privacy" },
+  { key: "pci-dss", name: "PCI DSS v4.0", tracker: "pci-dss-lite", policy: "PCI DSS Lite", scope: "Payment card data" },
+  { key: "hipaa", name: "HIPAA", tracker: "hipaa-security", policy: "HIPAA Security Rule", scope: "Protected health information" },
 ] as const;
 
 export interface FrameworkProgress {
@@ -78,6 +78,10 @@ export interface FrameworkProgress {
   done: number;
   withEvidence: number;
   lastUpdated: string | null;
+  /** Applications assessed against this framework (Policy Center evaluations). */
+  assessedApps?: number;
+  /** Mean latest coverage score (0-100) across those applications. */
+  avgCoverage?: number | null;
 }
 
 export interface FrameworkRow {
@@ -114,29 +118,34 @@ export function frameworkRow(
 ): FrameworkRow {
   const scope = blank(override.scope) ? fw.scope : override.scope!.trim();
   const reason = blank(override.notApplicableReason)
-    ? "Not in scope: not enabled in Governly Regulations & Frameworks"
+    ? "Not in scope: no assessment or enabled tracker in Governly"
     : override.notApplicableReason!.trim();
+  const apps = progress?.assessedApps ?? 0;
+  const tracked = !!progress && (progress.done > 0 || progress.withEvidence > 0);
+  const inScope = !!progress && (progress.enabled || apps > 0 || tracked);
   let status = override.status?.trim() || "";
   if (!status) {
-    if (!progress?.enabled) status = NOT_APPLICABLE;
+    if (!inScope) status = NOT_APPLICABLE;
     else if (progress.total && progress.done >= progress.total) status = "Aligned";
-    else if (progress.done > 0)
-      status = `In progress (${Math.round((progress.done / progress.total) * 100)}%)`;
-    else status = "Not started";
+    else if (apps && progress.avgCoverage != null) status = progress.avgCoverage >= 100 ? "Aligned" : progress.avgCoverage < 1 ? "Not yet aligned (0% coverage)" : `Partially aligned (${Math.round(progress.avgCoverage)}% coverage)`;
+    else if (progress.done > 0 && progress.total) status = `In progress (${Math.round((progress.done / progress.total) * 100)}%)`;
+    else status = "In progress";
   }
   const na = status === NOT_APPLICABLE;
+  const parts: string[] = [];
+  if (apps) parts.push(`Assessed across ${apps} application${apps === 1 ? "" : "s"}`);
+  if (progress?.total && (progress.enabled || tracked))
+    parts.push(`${progress.withEvidence} of ${progress.total} controls evidenced`);
   const evidence = !blank(override.evidence)
     ? override.evidence!.trim()
     : na
       ? reason
-      : progress?.enabled
-        ? `${progress.withEvidence} of ${progress.total} controls have evidence in Governly`
-        : NOT_SPECIFIED;
+      : parts.join("; ") || "Assessment recorded in Governly";
   const lastAssessed = !blank(override.lastAssessed)
     ? fmtDate(override.lastAssessed, "short")
     : progress?.lastUpdated
       ? fmtDate(progress.lastUpdated, "short")
-      : "Not assessed";
+      : na ? "—" : "Not assessed";
   return { name: fw.name, scope, status, evidence, lastAssessed };
 }
 

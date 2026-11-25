@@ -14,9 +14,17 @@ export interface ModelHit {
   line: number | null;
 }
 
+/** Paths that mention models without using them: tests, examples, demos, docs, fixtures, lockfiles. */
+export const NON_USAGE_PATH =
+  /(^|\/)(tests?|__tests__|examples?|demos?|docs?|fixtures?|samples?|node_modules|vendor|dist|build|\.venv|venv|\.next|__pycache__)\/|(^|\/)(test_[^/]*|[^/]*[_.-](test|spec)\.[^/]+|[^/]*demo[^/]*)$|\.md$|\.example$|\.min\.|(^|\/)[^/]*lock[^/]*$/i;
+
+/** A file naming more distinct models than this is a catalog/default list, not usage. */
+// ponytail: count heuristic; a real app wiring >5 models in one file gets skipped, raise if that bites.
+export const MAX_MODELS_PER_FILE = 5;
+
 export const MODEL_FILE = /\.(onnx|safetensors|gguf|pt|pth|ckpt)$/i;
 export const SCANNABLE_FILE =
-  /(\.(py|ipynb|ts|tsx|js|mjs|cjs|go|java|rb|yaml|yml|json|toml|ini|cfg)|(^|\/)\.env(\.[\w-]+)?|(^|\/)Modelfile)$/i;
+  /(\.(py|ipynb|ts|tsx|js|mjs|cjs|go|java|rb|yaml|yml|toml|ini|cfg)|(^|\/)\.env(\.[\w-]+)?|(^|\/)Modelfile)$/i;
 
 // "org/name" handed to a model loader or a `model=` / `model:` setting.
 const SLASH_ID =

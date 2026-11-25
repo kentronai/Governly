@@ -57,6 +57,8 @@ async function get<T>(
       return res.data;
     } catch (e) {
       const status = (e as { status?: number }).status;
+      // Expired/revoked token: fail the scan loudly so the card shows "Reconnect needed".
+      if (status === 401) throw new Error("GitHub rejected the token (401 Bad credentials). Reconnect GitHub with a new token.");
       if (status && status >= 400 && status < 500 && status !== 429) return null;
       if (status !== 429 || attempt >= 5) throw e;
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));

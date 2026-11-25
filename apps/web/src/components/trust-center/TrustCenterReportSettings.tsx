@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,9 +126,12 @@ export function TrustCenterReportSettings({ tenantSlug }: { tenantSlug: string }
                     <Input aria-label="Conditions" value={c.conditions} onChange={(e) => setCat(i, { conditions: e.target.value })} />
                   </TableCell>
                   <TableCell>
-                    <Button size="icon" variant="ghost" aria-label="Remove category" onClick={() => setPolicy({ ...policy, categories: policy.categories.filter((_, j) => j !== i) })}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <RowActionsMenu
+                      label={`Actions for ${c.category || "category"}`}
+                      items={[
+                        { label: "Remove", icon: Trash2, destructive: true, onSelect: () => setPolicy((p) => ({ ...p, categories: p.categories.filter((_, j) => j !== i) })) },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -207,12 +212,13 @@ export function TrustCenterReportSettings({ tenantSlug }: { tenantSlug: string }
         <CardHeader>
           <CardTitle>Sub-processors</CardTitle>
           <CardDescription>
-            Sub-processors are the vendors you track in Trust Dossier. Untracked vendors are kept as previously used.
+            Found automatically from Model Registry providers, connected integrations and vendors tracked in Trust Dossier.
+            Fill in what Governly cannot know, such as DPA status.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!loaded.vendors.length ? (
-            <p className="text-sm text-muted-foreground">No vendors tracked yet. Track vendors under Admin Center &gt; Trust Dossier.</p>
+            <p className="text-sm text-muted-foreground">No sub-processors found yet. Register models, connect integrations or track vendors in Trust Dossier.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -229,7 +235,14 @@ export function TrustCenterReportSettings({ tenantSlug }: { tenantSlug: string }
                   const o = settings.subprocessors?.[v.slug] ?? {};
                   return (
                     <TableRow key={v.slug}>
-                      <TableCell className="font-medium">{v.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {v.name}
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {v.source.split(", ").map((src) => (
+                            <Badge key={src} variant="secondary" className="font-normal">{src}</Badge>
+                          ))}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input aria-label={`${v.name} service`} value={o.service ?? ""} placeholder="From Trust Dossier" onChange={(e) => setSp(v.slug, "service", e.target.value)} />
                       </TableCell>

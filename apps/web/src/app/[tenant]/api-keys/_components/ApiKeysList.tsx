@@ -13,7 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Copy, Check, Ban, Trash2, Key } from "lucide-react";
+import { Search, Plus, Copy, Check, Ban, Trash2, Key, Eye } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   createApiKey,
   revokeApiKey,
@@ -60,6 +62,7 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
   const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedKey, setSelectedKey] = useState<ApiKey | null>(null);
+  const [viewingKey, setViewingKey] = useState<ApiKey | null>(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string>("");
   const [copiedKeyId, setCopiedKeyId] = useState<string>("");
 
@@ -220,31 +223,31 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
                   </TableCell>
 
                   <TableCell>
-                    <div className="flex gap-2 ">
-                      {key.isActive && !key.revokedAt && !expired && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRevoke(key.id)}
-                          disabled={isPending}
-                          title="Revoke key"
-                        >
-                          <Ban className="h-4 w-4 text-orange-500" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedKey(key);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        disabled={isPending}
-                        title="Delete key"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
+                    <RowActionsMenu
+                      label={`Actions for ${key.name}`}
+                      items={[
+                        { label: "View", icon: Eye, onSelect: () => setViewingKey(key) },
+                        {
+                          label: "Revoke",
+                          icon: Ban,
+                          destructive: true,
+                          hidden: !(key.isActive && !key.revokedAt && !expired),
+                          disabled: isPending,
+                          confirm: `Revoke "${key.name}"? Requests using it will be rejected.`,
+                          onSelect: () => handleRevoke(key.id),
+                        },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          destructive: true,
+                          disabled: isPending,
+                          onSelect: () => {
+                            setSelectedKey(key);
+                            setIsDeleteModalOpen(true);
+                          },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -280,6 +283,36 @@ export function ApiKeysList({ initialKeys, tenant, tenantId, userId }: Props) {
           setNewlyCreatedKey("");
         }}
       />
+
+      <Dialog open={!!viewingKey} onOpenChange={(o) => !o && setViewingKey(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{viewingKey?.name}</DialogTitle>
+          </DialogHeader>
+          {viewingKey && (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Key</dt>
+              <dd><code>{viewingKey.keyPrefix}...</code></dd>
+              <dt className="text-muted-foreground">Permissions</dt>
+              <dd>{viewingKey.permissions.join(", ") || "None"}</dd>
+              <dt className="text-muted-foreground">Rate limit</dt>
+              <dd>{viewingKey.rateLimitPerMinute ? `${viewingKey.rateLimitPerMinute}/min` : "Default"}</dd>
+              <dt className="text-muted-foreground">Created</dt>
+              <dd>{formatDate(viewingKey.createdAt)} by {viewingKey.user_createdBy?.name || viewingKey.user_createdBy?.email || "Unknown"}</dd>
+              <dt className="text-muted-foreground">Last used</dt>
+              <dd>{formatDate(viewingKey.lastUsedAt) || "Never"}</dd>
+              <dt className="text-muted-foreground">Expires</dt>
+              <dd>{formatDate(viewingKey.expiresAt) || "Never"}</dd>
+              {viewingKey.revokedAt && (
+                <>
+                  <dt className="text-muted-foreground">Revoked</dt>
+                  <dd>{formatDate(viewingKey.revokedAt)}</dd>
+                </>
+              )}
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}

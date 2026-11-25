@@ -41,6 +41,7 @@ import { successToast, errorToast } from "@/lib/utils/toast";
 import ApplicationLoader from "./ApplicationLoader";
 import Pagination from "@/components/common/pagination";
 import { PageHeader } from "@/components/common/PageHeader";
+import { GenerateTrustCenterReport } from "@/components/trust-center/GenerateTrustCenterReport";
 
 // These dialogs are not needed until the user opens them. Keeping them out of
 // the initial applications bundle materially reduces cold dev compilation.
@@ -264,13 +265,17 @@ export function ApplicationsList({ tenant, tenantId, userId }: Props) {
         title="Applications"
         description="Centrally manage and govern every AI application with confidence."
         actions={
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            disabled={isPending}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Application
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Admins only: the component renders nothing for other users. */}
+            <GenerateTrustCenterReport tenantSlug={tenant} variant="outline" />
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              disabled={isPending}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Application
+            </Button>
+          </div>
         }
       />
 

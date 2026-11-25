@@ -1,4 +1,4 @@
-import { detectModelFile, detectModelsInText, guessProvider, isApproved } from "./model-detector";
+import { detectModelFile, detectModelsInText, guessProvider, isApproved, NON_USAGE_PATH } from "./model-detector";
 
 describe("model detector", () => {
   it("finds SDK model ids, HF/OpenRouter ids and lines", () => {
@@ -29,5 +29,25 @@ describe("model detector", () => {
     expect(guessProvider("bert-base/uncased", "hf")).toBe("huggingface");
     expect(isApproved("openai/gpt-4o", ["gpt-4o"])).toBe(true);
     expect(isApproved("gpt-4o", ["gpt-4o-mini"])).toBe(false);
+  });
+});
+
+describe("NON_USAGE_PATH", () => {
+  it("skips tests, examples, demos, docs, fixtures, markdown and lockfiles", () => {
+    for (const p of [
+      "tests/test_llm_client_errors.py",
+      "apps/controlnet/test_x.py",
+      "src/foo.test.ts",
+      "src/foo_test.go",
+      "examples/enhanced_sdk_demo.py",
+      "demo/app.py",
+      "docs/guide.py",
+      "fixtures/a.yaml",
+      "README.md",
+      "pnpm-lock.yaml",
+      ".env.example",
+    ]) expect([p, NON_USAGE_PATH.test(p)]).toEqual([p, true]);
+    for (const p of ["apps/controlnet/gateway/llm_client.py", "src/agents/run.ts", "config/latest.yaml"])
+      expect([p, NON_USAGE_PATH.test(p)]).toEqual([p, false]);
   });
 });

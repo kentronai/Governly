@@ -6,9 +6,12 @@ describe("AI Trust Center report data", () => {
   it("never leaves a not-enabled framework blank: Not applicable with a reason", () => {
     const row = frameworkRow(fw, { enabled: false, total: 10, done: 0, withEvidence: 0, lastUpdated: null });
     expect(row.status).toBe(NOT_APPLICABLE);
-    expect(row.evidence).toMatch(/not enabled/);
+    expect(row.evidence).toMatch(/Not in scope/);
     expect(frameworkRow(fw, null, { notApplicableReason: "We do not process PHI" }).evidence).toBe("We do not process PHI");
     expect(frameworkRow(fw, { enabled: true, total: 4, done: 2, withEvidence: 1, lastUpdated: null }).status).toBe("In progress (50%)");
+    const assessed = frameworkRow(fw, { enabled: false, total: 0, done: 0, withEvidence: 0, lastUpdated: "2026-11-03", assessedApps: 2, avgCoverage: 41.6 });
+    expect(assessed.status).toBe("Partially aligned (42% coverage)");
+    expect(assessed.evidence).toMatch(/2 applications/);
   });
 
   it("lists removed sub-processors only when asked, and defaults to the last full quarter", () => {

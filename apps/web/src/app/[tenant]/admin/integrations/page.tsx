@@ -1048,10 +1048,19 @@ export default function IntegrationsPage() {
               const connectionPending =
                 !hasProviderConnection && integration.syncStatus === "pending";
               const connected = hasProviderConnection && !connectionFailed;
+              // A stored connection whose last sync was rejected (expired/revoked token).
+              const needsReconnect =
+                connected &&
+                integration.syncStatus === "failed" &&
+                /\b40[13]\b|bad credentials|unauthori[sz]ed|forbidden|expired|revoked|invalid (token|credential)/i.test(
+                  integration.errorMessage ?? "",
+                );
 
               const hasWarnings = connected && Boolean(integration.errorMessage);
               const statusText = connectionFailed
                 ? "Connection failed"
+                : needsReconnect
+                  ? "Reconnect needed"
                 : connectionPending
                   ? "Checking connection…"
                   : connected
@@ -1074,13 +1083,13 @@ export default function IntegrationsPage() {
                     <p
                       className={cn(
                         "mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground",
-                        connectionFailed && "text-destructive",
+                        (connectionFailed || needsReconnect) && "text-destructive",
                       )}
                     >
                       <span
                         className={cn(
                           "h-1.5 w-1.5 shrink-0 rounded-full",
-                          connectionFailed
+                          connectionFailed || needsReconnect
                             ? "bg-destructive"
                             : hasWarnings
                               ? "bg-amber-500"
@@ -1090,7 +1099,7 @@ export default function IntegrationsPage() {
                         )}
                       />
                       <span>{statusText}</span>
-                      {connected && integration.lastSyncAt ? (
+                      {connected && !needsReconnect && integration.lastSyncAt ? (
                         <>
                           <span aria-hidden>·</span>
                           <span>Last sync</span>

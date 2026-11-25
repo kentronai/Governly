@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Share2 } from "lucide-react";
+import { RowActionsMenu } from "@/components/common/RowActionsMenu";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { errorToast } from "@/lib/utils/toast";
 import {
@@ -79,7 +78,7 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
                 <TableHead>Generated</TableHead>
                 <TableHead>Link expires</TableHead>
                 {isAdmin && <TableHead>Shared</TableHead>}
-                <TableHead className="text-right">Download</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -98,17 +97,22 @@ export function TrustCenterReports({ tenantSlug }: { tenantSlug: string }) {
                     <TableCell>{expired ? <Badge variant="secondary">Expired</Badge> : fmtDate(r.expiresAt, "short")}</TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <Switch
-                          aria-label={`Share ${r.reportId} with viewers`}
-                          checked={r.shared}
-                          onCheckedChange={(c) => toggleShared(r, c)}
-                        />
+                        <Badge variant={r.shared ? "default" : "secondary"}>{r.shared ? "Shared" : "Private"}</Badge>
                       </TableCell>
                     )}
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" disabled={expired} onClick={() => download(r)} aria-label={`Download ${r.reportId}`}>
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      <RowActionsMenu
+                        label={`Actions for ${r.reportId}`}
+                        items={[
+                          { label: "Download PDF", icon: Download, disabled: expired, onSelect: () => download(r) },
+                          {
+                            label: r.shared ? "Stop sharing with viewers" : "Share with viewers",
+                            icon: Share2,
+                            hidden: !isAdmin,
+                            onSelect: () => toggleShared(r, !r.shared),
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 );

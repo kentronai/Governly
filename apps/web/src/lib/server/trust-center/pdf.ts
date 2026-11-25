@@ -25,6 +25,16 @@ const M = { top: 64, bottom: 60, left: 54, right: 54 };
 const CONTENT_W = PAGE.w - M.left - M.right;
 
 type Doc = PDFKit.PDFDocument;
+const DASH = "\u2014";
+const cell = (v: string) => (v === NOT_SPECIFIED ? DASH : v);
+
+/** Governly mark (src/assets/images/governly-logo.svg): a shield with a "G" cut out. */
+function governlyMark(doc: Doc, x: number, y: number, size: number, fg: string, bg: string) {
+  doc.save().translate(x, y).scale(size / 64);
+  doc.path("M32 3 56 11v19c0 15-10 26-24 31C18 56 8 45 8 30V11Z").fill(fg);
+  doc.path("M43 22.5A14 14 0 1 0 46 32H33").lineWidth(5.5).stroke(bg);
+  doc.restore();
+}
 
 export interface RenderInput {
   data: ReportData;
@@ -52,7 +62,7 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
       Author: data.orgName,
       Subject: `AI models, customer data policy, framework alignment and sub-processors. ${period}.`,
       Keywords: `AI Trust Center, ${reportId}`,
-      Creator: "Governly",
+      Creator: "Governly", Producer: "Governly",
     },
   });
   const chunks: Buffer[] = [];
@@ -89,6 +99,24 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
     doc.moveDown(0.5);
   };
 
+  /** One muted line listing items with a missing field, instead of a column full of blanks. */
+  const unknowns = (label: string, names: string[]) => {
+    if (names.length) para(`${label}: ${names.join(", ")}.`, { color: MUTED, size: 8.5 });
+  };
+  const callout = (title: string, body: string) => {
+    doc.font("Helvetica").fontSize(9.5);
+    const h = doc.heightOfString(body, { width: CONTENT_W - 28 }) + 38;
+    ensure(h + 8);
+    const y = doc.y;
+    artifact(() => {
+      doc.rect(M.left, y, CONTENT_W, h).fill("#FEF7E6");
+      doc.rect(M.left, y, 3, h).fill("#B45309");
+    });
+    tagged("P", () => doc.font("Helvetica-Bold").fontSize(10.5).fillColor("#7C2D12").text(title, M.left + 14, y + 10, { width: CONTENT_W - 28 }));
+    tagged("P", () => doc.font("Helvetica").fontSize(9.5).fillColor(TEXT).text(body, M.left + 14, doc.y + 3, { width: CONTENT_W - 28, lineGap: 2 }));
+    doc.x = M.left;
+    doc.y = y + h + 10;
+  };
   const table = (cols: { header: string; width: number }[], rows: string[][]) => {
     const pad = 5;
     const widths = cols.map((c) => (c.width * CONTENT_W) / cols.reduce((s, x) => s + x.width, 0));
@@ -151,6 +179,10 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
   // ---- Cover -------------------------------------------------------------
   const bandH = 236;
   artifact(() => doc.rect(0, 0, PAGE.w, bandH).fill(NAVY));
+  artifact(() => {
+    governlyMark(doc, PAGE.w - M.right - 104, 50, 16, "#FFFFFF", NAVY);
+    doc.font("Helvetica").fontSize(9).fillColor("#BFD7F2").text("Prepared with Governly", PAGE.w - M.right - 84, 54, { width: 84, lineBreak: false });
+  });
   doc.y = 52;
   tagged("P", () => doc.font("Helvetica-Bold").fontSize(10).fillColor("#BFD7F2").text("AI TRUST CENTER", M.left, doc.y));
   doc.moveDown(0.6);
@@ -159,7 +191,7 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
   tagged("P", () => doc.font("Helvetica-Bold").fontSize(15).fillColor("#FFFFFF").text(data.orgName, M.left, doc.y));
   doc.moveDown(0.3);
   tagged("P", () =>
-    doc.font("Helvetica").fontSize(10.5).fillColor("#E5EEF8").text("AI models, customer data policy, framework alignment and sub-processors", M.left, doc.y),
+    doc.font("Helvetica").fontSize(10.5).fillColor("#E5EEF8").text("AI models, customer data practices, regulatory alignment and sub-processors", M.left, doc.y),
   );
   doc.moveDown(0.9);
   tagged("P", () =>
@@ -178,11 +210,12 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
       : "Off"
     : "N/A";
   const assessed = data.frameworks.filter((f) => f.status !== "Not applicable").length;
+  const aligned = data.frameworks.filter((f) => f.status === "Aligned").length;
   const tiles: [string, string][] = [
     [String(activeModels), "AI models in production or pilot"],
     [String(data.subprocessors.length), "Active sub-processors"],
-    [String(assessed), "Compliance frameworks assessed"],
-    [training, "Customer data used for model training by default"],
+    [String(assessed), "Frameworks and regulations assessed"],
+    [training === "N/A" ? "None" : training, training === "N/A" ? "Training policy published" : "Customer data used for model training by default"],
   ];
   const tileY = bandH + 18;
   const gap = 10;
@@ -214,16 +247,25 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
   const sections = REPORT_SECTIONS.filter((s) => options.sections.includes(s.key));
   heading("Executive summary");
   const tierCount = (t: string) => data.models.filter((m) => m.stage !== "Retired" && m.euTier.startsWith(t)).length;
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const providers = [...new Set(data.models.filter((m) => m.stage !== "Retired").map((m) => m.hosting.match(/\(([^)]+)\)/)?.[1]).filter(Boolean))];
   para(
-    `This report summarizes how ${data.orgName} develops, deploys and governs artificial intelligence. ` +
-      `It covers ${sections.map((s) => (s.title.startsWith("AI") ? s.title : s.title.toLowerCase())).join(", ")}, using live data from the Governly platform at the time of generation.`,
+    `This report describes how ${data.orgName} uses and governs artificial intelligence. It is generated from live records in Governly ` +
+      `(model registry, policy assessments, control evidence and vendor data) and covers the reporting period ${period}.`,
   );
-  para(
-    `Key points for this period: ${activeModels} AI model${activeModels === 1 ? "" : "s"} in production or pilot` +
-      (tierCount("High") ? `, ${tierCount("High")} classified high risk under the EU AI Act` : "") +
-      `; ${assessed} of ${data.frameworks.length} frameworks in scope; ${data.subprocessors.length} active sub-processor${data.subprocessors.length === 1 ? "" : "s"}; ` +
-      `customer data used for model training by default: ${training === "N/A" ? "no policy published" : training}.`,
-  );
+  const points = [
+    `${data.orgName} has ${plural(activeModels, "AI model")} in production or pilot` +
+      (providers.length ? `, supplied by ${providers.join(", ")}` : "") +
+      (tierCount("High") ? `, of which ${tierCount("High")} support high-risk use cases under the EU AI Act` : "") + ".",
+    assessed
+      ? `${assessed} ${assessed === 1 ? "framework or regulation has" : "frameworks and regulations have"} been assessed, ${aligned ? `${aligned} of them fully aligned` : "with remediation in progress for all of them"}.`
+      : "No framework assessments have been recorded yet.",
+    `${plural(data.subprocessors.length, "sub-processor")} ${data.subprocessors.length === 1 ? "is" : "are"} involved in delivering AI capabilities.`,
+    data.training
+      ? `Customer data ${training === "On" ? "is" : "is not"} used for model training by default (policy ${data.training.policyId}, version ${data.training.version}).`
+      : "A customer data training policy has not yet been published.",
+  ];
+  para(`Highlights for this period: ${points.join(" ")}`);
 
   // Contents: kept together so it never spills onto an otherwise empty page.
   ensure(30 + sections.length * 16);
@@ -244,8 +286,8 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
   sections.forEach((s, i) => {
     heading(`${i + 1}. ${s.title}`, "H2");
     if (s.key === "models") {
-      para(`Inventory of AI models registered in the Governly Model Registry as of ${fmtDate(options.periodEnd)}. EU AI Act tier is the strictest classification of the applications that use the model.`, { color: MUTED, size: 9.5 });
-      if (!data.models.length) para("No AI models are registered.");
+      para(`The AI models ${data.orgName} uses, as recorded in its model registry on ${fmtDate(options.periodEnd)}. The EU AI Act tier reflects the strictest classification of any application that uses the model.`, { color: MUTED, size: 9.5 });
+      if (!data.models.length) para("No AI models have been registered.");
       else
         table(
           [
@@ -256,11 +298,12 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
             { header: "Business purpose", width: 1.6 },
             { header: "EU AI Act tier", width: 1.1 },
           ],
-          data.models.map((m) => [m.name, m.type, m.hosting, m.stage, m.purpose, m.euTier]),
+          data.models.map((m) => [m.name, m.type, m.hosting, m.stage, m.purpose, m.euTier].map(cell)),
         );
+      unknowns("Business purpose not yet documented", data.models.filter((m) => m.purpose === NOT_SPECIFIED).map((m) => m.name));
     }
     if (s.key === "training") {
-      if (!data.training) para("No customer data training policy has been published in Governly. An administrator can publish one under Admin Center > AI Trust Center.");
+      if (!data.training) callout("No customer data training policy has been published", `${data.orgName} has not yet published a policy stating whether customer data may be used to train AI models. Until one is published, no statement is made in this report.`);
       else {
         const t = data.training;
         para(`Policy ID: ${t.policyId} | Version ${t.version} | Effective ${fmtDate(t.effectiveDate)} | Owner: ${t.owner}`, { bold: true, color: NAVY });
@@ -277,7 +320,7 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
       }
     }
     if (s.key === "frameworks") {
-      para('Status reflects the Governly requirements tracker or the latest assessment recorded by an administrator. "Not applicable" rows state the reason.', { color: MUTED, size: 9.5 });
+      para("Alignment with AI, security and privacy frameworks, based on application assessments, control evidence and administrator attestations. Coverage is the average share of requirements met across assessed applications.", { color: MUTED, size: 9.5 });
       table(
         [
           { header: "Framework", width: 1.3 },
@@ -286,12 +329,12 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
           { header: "Evidence", width: 1.7 },
           { header: "Last assessed", width: 0.8 },
         ],
-        data.frameworks.map((f) => [f.name, f.scope, f.status, f.evidence, f.lastAssessed]),
+        data.frameworks.map((f) => [f.name, f.scope, f.status, f.evidence, f.lastAssessed].map(cell)),
       );
     }
     if (s.key === "subprocessors") {
-      para(`Third parties that process customer data on behalf of ${data.orgName}, from the vendors tracked in Governly Trust Dossier.`, { color: MUTED, size: 9.5 });
-      if (!data.subprocessors.length) para("No active sub-processors are recorded.");
+      para(`Third parties involved in delivering ${data.orgName}'s AI capabilities: model providers, connected platforms and vendors under review. Service and location details come from Governly vendor research where available.`, { color: MUTED, size: 9.5 });
+      if (!data.subprocessors.length) para("No sub-processors have been identified.");
       else
         table(
           [
@@ -301,8 +344,10 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
             { header: "Processing locations", width: 1.1 },
             { header: "DPA signed", width: 0.7 },
           ],
-          data.subprocessors.map((p) => [p.name, p.service, p.dataProcessed, p.locations, p.dpa]),
+          data.subprocessors.map((p) => [p.name, p.service, p.dataProcessed, p.locations, p.dpa].map(cell)),
         );
+      unknowns("Processing locations not yet recorded", data.subprocessors.filter((p) => p.locations === NOT_SPECIFIED).map((p) => p.name));
+      unknowns("DPA status not yet recorded", data.subprocessors.filter((p) => p.dpa === NOT_SPECIFIED).map((p) => p.name));
       if (options.includePreviousSubprocessors)
         para(
           data.previousSubprocessors.length
@@ -315,14 +360,20 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
     }
     if (s.key === "governance") {
       const g = data.settings;
-      para(
-        `Privacy questions: ${g.privacyContact || NOT_SPECIFIED}. Security questions and incident reports: ${g.securityContact || NOT_SPECIFIED}. AI governance review: ${g.aiGovernanceContact || NOT_SPECIFIED}.`,
-      );
-      para(`AI governance review cadence: ${g.reviewCadence || NOT_SPECIFIED}. Next scheduled review: ${g.nextReview || NOT_SPECIFIED}.`);
+      const contacts: [string, string | undefined][] = [
+        ["Privacy enquiries", g.privacyContact],
+        ["Security and incident reports", g.securityContact],
+        ["AI governance", g.aiGovernanceContact],
+        ["Review cadence", g.reviewCadence],
+        ["Next scheduled review", g.nextReview],
+      ];
+      const known = contacts.filter(([, v]) => v?.trim());
+      if (known.length) table([{ header: "Topic", width: 1 }, { header: "Detail", width: 2 }], known.map(([k, v]) => [k, v!]));
+      unknowns("Not yet published", contacts.filter(([, v]) => !v?.trim()).map(([k]) => k));
       para(
         `Methodology: ${
           g.methodology ||
-          "model inventory is generated from the Governly Model Registry, sub-processor data from Trust Dossier, and framework status from Governly Regulations & Frameworks as of the report generation date."
+          "the model inventory is drawn from the Governly model registry, framework status from application assessments and control evidence, and sub-processors from model providers, connected integrations and tracked vendors, as of the report generation date."
         }`,
       );
       para("Disclaimer: this report is provided for information only and does not constitute legal advice or a warranty.", { color: MUTED, size: 8.5 });
@@ -344,8 +395,10 @@ export async function renderTrustCenterPdf({ data, options, reportId, generatedA
         doc.moveTo(M.left, 44).lineTo(PAGE.w - M.right, 44).lineWidth(0.5).stroke(BORDER);
       }
       doc.font("Helvetica").fontSize(8.5).fillColor(MUTED);
-      doc.text(`Confidential. Report ID ${reportId}`, M.left, PAGE.h - 38, { width: CONTENT_W / 2, lineBreak: false });
-      doc.text(`Page ${i + 1} of ${range.count}`, M.left + CONTENT_W / 2, PAGE.h - 38, { width: CONTENT_W / 2, align: "right", lineBreak: false });
+      governlyMark(doc, M.left, PAGE.h - 41, 11, NAVY, "#FFFFFF");
+      doc.font("Helvetica").fontSize(8.5).fillColor(MUTED);
+      doc.text(`Prepared with Governly  |  Confidential  |  ${reportId}`, M.left + 15, PAGE.h - 38, { width: CONTENT_W * 0.7, lineBreak: false });
+      doc.text(`Page ${i + 1} of ${range.count}`, M.left + CONTENT_W * 0.7, PAGE.h - 38, { width: CONTENT_W * 0.3, align: "right", lineBreak: false });
       if (options.watermark) {
         doc.save();
         doc.rotate(-35, { origin: [PAGE.w / 2, PAGE.h / 2] });

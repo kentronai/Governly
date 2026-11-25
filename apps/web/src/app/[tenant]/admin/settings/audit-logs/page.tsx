@@ -267,7 +267,7 @@ const AuditLogs = () => {
             className="flex items-center gap-2 text-sm font-normal cursor-pointer "
           >
             <Info size={15} className=" font-normal" />
-            Details
+            View
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
