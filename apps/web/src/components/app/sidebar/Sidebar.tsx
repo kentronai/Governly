@@ -15,6 +15,7 @@ import {
   ChevronDown,
   CircleHelp,
   Radar,
+  Satellite,
 } from "lucide-react";
 import { usePathname, useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -148,6 +149,15 @@ export default function Sidebar({ isAdminUser }: { isAdminUser: boolean }) {
               </div>
             </div>
           </div>
+          {tenantInfo?.govIQEnabled && (
+            <NavItem
+              href={`/${tenant}/admin/settings/ai-policies-updates`}
+              icon={<Satellite className="h-4 w-4" />}
+              isActive={isActive(`/${tenant}/admin/settings/ai-policies-updates`)}
+            >
+              AI Radar
+            </NavItem>
+          )}
           <NavItem
             href={`/${tenant}/model-registry`}
             icon={<Database className="h-4 w-4" />}

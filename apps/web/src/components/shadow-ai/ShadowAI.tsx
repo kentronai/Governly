@@ -799,6 +799,11 @@ export function ShadowAI() {
                     <TableCell className="text-muted-foreground">{a.hostname}</TableCell>
                     <TableCell className="max-w-[320px] truncate font-mono text-xs" title={a.path ?? ""}>
                       {a.path ?? a.detection ?? "—"}
+                      {a.path && a.detection?.includes("·") && (
+                        <div className="truncate font-sans text-muted-foreground" title={a.detection}>
+                          {a.detection.split(" · ").slice(1).join(" · ")}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <RowMenu label={a.name} onView={() => setViewing({ machineId: a.machineId })} />

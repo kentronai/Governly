@@ -59,7 +59,6 @@ const ADMIN_LINKS: [string, string][] = [
   ["Controls", "/acme/admin/controls"],
   ["Integrations", "/acme/admin/integrations"],
   ["BYOK", "/acme/admin/settings/byok"],
-  ["AI Radar", "/acme/admin/settings/ai-policies-updates"],
   ["Support", "/acme/admin/support"],
 ];
 
@@ -140,7 +139,6 @@ describe("Sidebar — Admin Center section", () => {
         "ISO 42001",
         "Integrations",
         "BYOK",
-        "AI Radar",
       ]) {
         expect(
           screen.queryByRole("link", { name: label }),
@@ -223,6 +221,7 @@ describe("Sidebar — existing navigation (regression)", () => {
     ["Agent Risk Dashboard", "/acme/ai-agent-discovery/dashboard"],
     ["Agent Inventory", "/acme/ai-agent-inventory"],
     ["Model Registry", "/acme/model-registry"],
+    ["AI Radar", "/acme/admin/settings/ai-policies-updates"],
     ["Trust Dossier", "/acme/admin/trust-dossier"],
     ["Dashboard", "/acme/reports"],
     ["AI Usage Console", "/acme/ai-console"],

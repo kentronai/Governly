@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Governly AI environment scan.
 
-Finds AI applications, AI CLI tools and MCP server configs on this machine and
+Finds AI applications, IDE extensions, local model runtimes, AI CLI tools and MCP
+server configs on this machine and
 uploads the result to the organization's Shadow AI page in Governly.
 
     python3 shadow-ai-scan.py --url https://app.example.com --token <scan token>
@@ -286,7 +287,7 @@ def discover_mcp_servers():
 # --- AI applications --------------------------------------------------------
 
 DETECTION_LABEL = {"app_bundle": "Application", "config_path": "Config",
-                   "binary": "PATH", "vscode_extension": "Extension"}
+                   "binary": "PATH"}
 
 
 def mac_linux(mac, linux):
@@ -314,9 +315,6 @@ APPLICATION_REGISTRY = [
                   ("config_path", "~/Library/Application Support/Code")),
         "Linux": (("binary", "code"), ("config_path", "~/.config/Code")),
         "Windows": (("config_path", "~/AppData/Roaming/Code"),)}),
-    ("GitHub Copilot", "Extension", mac_linux(
-        (("vscode_extension", "github.copilot"),),
-        (("vscode_extension", "github.copilot"),))),
     ("ChatGPT", "Desktop", {
         "macOS": (("app_bundle", "ChatGPT.app"),
                   ("config_path", "~/Library/Application Support/com.openai.chat")),
@@ -342,7 +340,137 @@ APPLICATION_REGISTRY = [
         "Windows": ()}),
     ("Continue", "Extension", mac_linux(
         (("config_path", "~/.continue"),), (("config_path", "~/.continue"),))),
+    ("Jan", "Local AI", {
+        "macOS": (("app_bundle", "Jan.app"), ("config_path", "~/Library/Application Support/Jan")),
+        "Linux": (("config_path", "~/.config/Jan"), ("config_path", "~/jan")),
+        "Windows": (("config_path", "~/AppData/Roaming/Jan"),)}),
+    ("GPT4All", "Local AI", {
+        "macOS": (("app_bundle", "GPT4All.app"),
+                  ("config_path", "~/Library/Application Support/nomic.ai/GPT4All")),
+        "Linux": (("config_path", "~/.local/share/nomic.ai/GPT4All"),),
+        "Windows": (("config_path", "~/AppData/Local/nomic.ai/GPT4All"),)}),
+    ("Msty", "Local AI", {
+        "macOS": (("app_bundle", "Msty.app"),), "Linux": (), "Windows": ()}),
+    ("AnythingLLM", "Local AI", {
+        "macOS": (("app_bundle", "AnythingLLM.app"),),
+        "Linux": (("config_path", "~/.config/anythingllm-desktop"),),
+        "Windows": (("config_path", "~/AppData/Roaming/anythingllm-desktop"),)}),
+    ("llama.cpp", "Local AI", same(("binary", "llama-server"), ("binary", "llama-cli"))),
+    ("LocalAI", "Local AI", same(("binary", "local-ai"),)),
+    ("vLLM", "Local AI", same(("binary", "vllm"),)),
 ]
+
+# Local runtimes that serve an HTTP API: (name, port, models path, json key, name key).
+# Answering means the runtime is running right now; the reply lists downloaded models.
+RUNTIME_ENDPOINTS = {
+    "Ollama": (11434, "/api/tags", "models", "name"),
+    "LM Studio": (1234, "/v1/models", "data", "id"),
+    "Jan": (1337, "/v1/models", "data", "id"),
+    "GPT4All": (4891, "/v1/models", "data", "id"),
+    "llama.cpp": (8080, "/v1/models", "data", "id"),
+    "LocalAI": (8080, "/v1/models", "data", "id"),
+    "vLLM": (8000, "/v1/models", "data", "id"),
+}
+
+
+def runtime_status(name):
+    """'running · N models: a, b' when the runtime answers on localhost, else None."""
+    port, path, key, field = RUNTIME_ENDPOINTS[name]
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d%s" % (port, path), timeout=0.5) as r:
+            models = [m.get(field) for m in json.load(r).get(key) or [] if isinstance(m, dict)]
+    except Exception:  # ponytail: not running / not that runtime on the port, both mean "no"
+        return None
+    models = [m for m in models if m]
+    if not models:
+        return "running"
+    return "running · %d model%s: %s" % (
+        len(models), "" if len(models) == 1 else "s", ", ".join(models[:10]))
+
+
+def ollama_models_on_disk():
+    """Downloaded Ollama models even when the server is stopped (manifest folders)."""
+    root = expand("~/.ollama/models/manifests")
+    found = sorted({"%s:%s" % (Path(p).parent.name, Path(p).name)
+                    for p in globmod.glob(str(root / "*" / "*" / "*" / "*"))})
+    return found
+
+# --- IDE extensions ---------------------------------------------------------
+
+# Extension folders per editor: VS Code and its forks share one layout
+# (<publisher>.<name>-<version>[-platform]); JetBrains keeps plugins per product.
+IDE_EXTENSION_DIRS = [
+    ("VS Code", "~/.vscode/extensions"),
+    ("VS Code Insiders", "~/.vscode-insiders/extensions"),
+    ("VSCodium", "~/.vscode-oss/extensions"),
+    ("Cursor", "~/.cursor/extensions"),
+    ("Windsurf", "~/.windsurf/extensions"),
+    ("Kiro", "~/.kiro/extensions"),
+    ("Trae", "~/.trae/extensions"),
+]
+JETBRAINS_PLUGIN_GLOBS = {
+    "macOS": "~/Library/Application Support/JetBrains/*/plugins/*",
+    "Linux": "~/.local/share/JetBrains/*/*",
+    "Windows": "~/AppData/Roaming/JetBrains/*/plugins/*",
+}
+KNOWN_AI_EXTENSIONS = {
+    "anthropic.claude-code": "Claude Code",
+    "github.copilot": "GitHub Copilot",
+    "github.copilot-chat": "GitHub Copilot Chat",
+    "openai.chatgpt": "OpenAI Codex / ChatGPT",
+    "google.geminicodeassist": "Gemini Code Assist",
+    "saoudrizwan.claude-dev": "Cline",
+    "rooveterinaryinc.roo-cline": "Roo Code",
+    "kilocode.kilo-code": "Kilo Code",
+    "continue.continue": "Continue",
+    "codeium.codeium": "Windsurf Plugin (Codeium)",
+    "tabnine.tabnine-vscode": "Tabnine",
+    "sourcegraph.cody-ai": "Sourcegraph Cody",
+    "amazonwebservices.amazon-q-vscode": "Amazon Q",
+    "supermaven.supermaven": "Supermaven",
+    "codium.codium": "Qodo Gen",
+    "qodo.qodo-gen": "Qodo Gen",
+    "danielsanmedium.dscodegpt": "CodeGPT",
+    "blackboxapp.blackbox": "Blackbox AI",
+    "ms-windows-ai-studio.windows-ai-studio": "AI Toolkit",
+    "augment.vscode-augment": "Augment Code",
+    "tencent-cloud.coding-copilot": "Tencent Coding Copilot",
+}
+# Anything else whose id contains one of these is reported as an unrecognised AI extension.
+AI_EXTENSION_KEYWORDS = ("copilot", "claude", "anthropic", "openai", "chatgpt", "gpt",
+                         "gemini", "codeium", "tabnine", "llm", "cline", "cody",
+                         "codewhisperer", "amazon-q", "supermaven", "ollama", "mistral",
+                         "deepseek", "aider", "qodo", "augment", "genai", "-ai", "ai-")
+EXT_VERSION = re.compile(r"-\d+\.\d+.*$")
+
+
+def ai_extension_name(ext_id):
+    """Friendly name for a known AI extension id, a flagged name for a likely one, else None."""
+    ext_id = ext_id.lower()
+    if ext_id in KNOWN_AI_EXTENSIONS:
+        return KNOWN_AI_EXTENSIONS[ext_id]
+    if any(k in ext_id for k in AI_EXTENSION_KEYWORDS):
+        return ext_id + " (unrecognised AI extension)"
+    return None
+
+
+def discover_ide_extensions():
+    found = {}
+    for ide, folder in IDE_EXTENSION_DIRS:
+        for path in sorted(globmod.glob(str(expand(folder) / "*"))):
+            name = ai_extension_name(EXT_VERSION.sub("", Path(path).name))
+            if name:
+                found.setdefault((name, ide), path)
+    for path in sorted(globmod.glob(str(expand(JETBRAINS_PLUGIN_GLOBS.get(PLATFORM, ""))))):
+        if not os.path.isdir(path):
+            continue
+        product = Path(path).parent.parent.name if PLATFORM != "Linux" else Path(path).parent.name
+        name = ai_extension_name(Path(path).name)
+        if name:
+            found.setdefault((name, "JetBrains " + re.sub(r"\d.*$", "", product)), path)
+    return [{"name": "%s (%s)" % (name, ide), "category": "IDE extension",
+             "status": "installed", "detection": "Extension in " + ide, "path": path}
+            for (name, ide), path in sorted(found.items())]
 
 
 def probe_hit(kind, target):
@@ -359,9 +487,6 @@ def probe_hit(kind, target):
         return str(p) if p.exists() else None
     if kind == "binary":
         return which(target)
-    if kind == "vscode_extension":
-        matches = sorted(globmod.glob(str(expand("~/.vscode/extensions/" + target + "*"))))
-        return matches[0] if matches else None
     return None
 
 
@@ -374,20 +499,31 @@ def discover_applications():
             if path:
                 hit = (kind, path)
                 break
+        detection = DETECTION_LABEL[hit[0]] if hit else None
+        if name in RUNTIME_ENDPOINTS:
+            running = runtime_status(name)
+            if name == "Ollama" and not running:
+                disk = ollama_models_on_disk()
+                running = disk and "stopped · %d models: %s" % (len(disk), ", ".join(disk[:10]))
+            if running:
+                detection = "%s · %s" % (detection, running) if detection else running
         apps.append({
             "name": name,
             "category": category,
-            "status": "installed" if hit else "not_detected",
-            "detection": DETECTION_LABEL[hit[0]] if hit else None,
+            "status": "installed" if hit or detection else "not_detected",
+            "detection": detection,
             "path": hit[1] if hit else None,
         })
+    apps.extend(discover_ide_extensions())
     apps.sort(key=lambda a: (a["status"] != "installed", a["name"].lower()))
-    return apps
+    return apps[:200]  # ponytail: matches the server's 200-app cap
 
 # --- AI CLI tools -----------------------------------------------------------
 
 AI_CLI_TOOLS = ["claude", "cursor", "code", "windsurf", "ollama", "aider", "codex",
-                "gemini", "llm", "sgpt", "mods", "goose", "fabric"]
+                "gemini", "llm", "sgpt", "mods", "goose", "fabric", "lms",
+                "llama-server", "llama-cli", "local-ai", "vllm", "opencode", "amp",
+                "cursor-agent", "qwen", "crush", "kiro"]
 # A cron or systemd PATH is minimal, so also look where installers put these.
 EXTRA_BIN_DIRS = ["~/.local/bin", "~/bin", "~/.npm-global/bin", "~/.cargo/bin",
                   "/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/snap/bin"]

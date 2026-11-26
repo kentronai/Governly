@@ -20,7 +20,6 @@ import {
   ListChecks,
   Scale,
   ScrollText,
-  Settings,
   UserCheck,
   UserX,
 } from "lucide-react";
@@ -132,11 +131,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { label: "Integrations", path: "admin/integrations", icon: Blocks },
       { label: "BYOK", path: "admin/settings/byok", icon: KeyRound },
-      {
-        label: "AI Radar",
-        path: "admin/settings/ai-policies-updates",
-        icon: Settings,
-      },
     ],
   },
   {

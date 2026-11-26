@@ -210,6 +210,70 @@ async function reconcileFromNango(
 }
 
 /**
+ * Drop every trace of a provider connection: the provider's own connection row,
+ * the Nango connection and the integration's credential state, then the agents
+ * it discovered. Used by Revoke and to roll back a connect that failed, so the
+ * card never says "Connected" for credentials NORIX cannot use.
+ */
+async function revokeConnection(
+  tenant: string,
+  integrationId: string,
+  providerName: string,
+  configuration: Record<string, unknown>,
+) {
+  if (providerName === "AWS") {
+    const connectionId = configuration.awsConnectionId;
+    if (typeof connectionId === "string" && connectionId) {
+      await deleteAwsConnection(tenant, connectionId);
+    }
+    await disconnectNango({ tenantSlugOrId: tenant, integrationId });
+  } else if (providerName === "Azure") {
+    const connectionId = configuration.azureConnectionId;
+    if (typeof connectionId === "string" && connectionId) {
+      await deleteAzureConnection(tenant, connectionId);
+    }
+    await disconnectNango({ tenantSlugOrId: tenant, integrationId });
+  } else if (providerName === "Google Cloud") {
+    await deleteGoogleCloudConnection(tenant, integrationId);
+  } else if (providerName === DATABRICKS_UNITY_CATALOG) {
+    await deleteDatabricksConnection(tenant, integrationId);
+  } else if (providerName === CREWAI) {
+    await deleteCrewAIConnection(tenant, integrationId);
+  } else if (providerName === LANGSMITH) {
+    await deleteLangSmithConnection(tenant, integrationId);
+  } else {
+    // Nango-backed rows (e.g. GitHub PAT): drop the Nango connection and its
+    // reference too, or the card keeps showing "Connected".
+    await disconnectNango({ tenantSlugOrId: tenant, integrationId });
+    await clearIntegrationCredentials(tenant, integrationId);
+  }
+  // Whatever the provider, its discovered agents go with it.
+  const revokedTenantId = await resolveTenantId(tenant);
+  await pruneOrphanAgents(revokedTenantId);
+  // GitHub gone: its repo model detections go too (no-op while GitHub stays connected).
+  await purgeRepoModelsIfGithubGone(revokedTenantId);
+}
+
+/** Undo a half-finished connect, using the configuration the connect wrote. */
+async function rollbackConnect(tenant: string, integrationId: string, providerName: string) {
+  try {
+    const tenantId = await resolveTenantId(tenant);
+    const row = await db.query.integrations.findFirst({
+      where: and(eq(integrations.tenantId, tenantId), eq(integrations.id, integrationId)),
+      columns: { configuration: true },
+    });
+    await revokeConnection(
+      tenant,
+      integrationId,
+      providerName,
+      (row?.configuration as Record<string, unknown>) ?? {},
+    );
+  } catch (error) {
+    console.error("Rolling back a failed connect failed:", error);
+  }
+}
+
+/**
  * Guarantee the integration row carries a Nango connection reference before
  * discovery runs. Prefers what the webhook may have already written, otherwise
  * reconciles it directly from Nango (webhook-independent). Polls briefly so a
@@ -433,39 +497,62 @@ export async function POST(request: NextRequest) {
         typeof body.connectionId === "string" && body.connectionId.trim()
           ? body.connectionId.trim()
           : undefined;
-      // Record the connection straight from Nango (webhook-independent) before
-      // any provider-specific discovery runs.
-      await ensureNangoConnection(
-        tenant,
-        integrationId,
-        providerConfigKey,
-        hintConnectionId,
-      );
-      if (isGithubProviderKey(providerConfigKey)) {
-        return NextResponse.json(
-          await triggerGithubDiscovery(tenant, integrationId),
-        );
-      }
-      if (!knownKey) {
-        return NextResponse.json({ status: "completed", agentsDiscovered: 0 });
-      }
-      if (providerName === "AWS") {
-        const { awsConnectionId } = await syncAwsConnectionFromNango(
+      // All or nothing: if NORIX cannot record or use the credentials just
+      // entered, remove them again so the card goes back to "Not connected" with
+      // the real error, instead of saying "Connected" for an account that
+      // doesn't work (and blocking a fresh Connect).
+      const connect = async (): Promise<unknown> => {
+        // Record the connection straight from Nango (webhook-independent) before
+        // any provider-specific discovery runs.
+        await ensureNangoConnection(
           tenant,
           integrationId,
+          providerConfigKey,
+          hintConnectionId,
         );
-        return NextResponse.json(await triggerManualScan(tenant, awsConnectionId));
+        if (isGithubProviderKey(providerConfigKey)) {
+          return triggerGithubDiscovery(tenant, integrationId);
+        }
+        if (!knownKey) return { status: "completed", agentsDiscovered: 0 };
+        if (providerName === "AWS") {
+          const { awsConnectionId } = await syncAwsConnectionFromNango(
+            tenant,
+            integrationId,
+          );
+          const tested = await testAwsIntegrationConnection(tenant, awsConnectionId);
+          if (!tested.ok) throw new Error(tested.error);
+          return triggerManualScan(tenant, awsConnectionId);
+        }
+        if (providerName === "Azure") {
+          const { azureConnectionId } = await syncAzureConnectionFromNango(
+            tenant,
+            integrationId,
+          );
+          const tested = await testAzureIntegrationConnection(tenant, azureConnectionId);
+          if (!tested.ok) throw new Error(tested.error);
+          return triggerAzureDiscovery(tenant, azureConnectionId);
+        }
+        return runDiscovery(body);
+      };
+      // All or nothing: if NORIX cannot record or use the credentials just
+      // entered, remove them again so the card goes back to "Not connected" with
+      // the real error, instead of saying "Connected" for an account that
+      // doesn't work (and blocking a fresh Connect).
+      let result: unknown;
+      try {
+        result = await connect();
+      } catch (error) {
+        await rollbackConnect(tenant, integrationId, providerName);
+        throw error;
       }
-      if (providerName === "Azure") {
-        const { azureConnectionId } = await syncAzureConnectionFromNango(
-          tenant,
-          integrationId,
-        );
-        return NextResponse.json(
-          await triggerAzureDiscovery(tenant, azureConnectionId),
+      const failed = result as { status?: string; errorMessage?: string } | undefined;
+      if (failed?.status === "failed") {
+        await rollbackConnect(tenant, integrationId, providerName);
+        throw new Error(
+          `${providerName} could not be connected: ${failed.errorMessage || "the credentials were rejected"}. Check them and click Connect again.`,
         );
       }
-      return NextResponse.json(await runDiscovery(body));
+      return NextResponse.json(result);
     }
 
     if (action === "connectAws") {
@@ -589,40 +676,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "revoke") {
-      const integrationId = requiredString(body, "integrationId");
-      const providerName = requiredString(body, "providerName");
-      const configuration = body.configuration ?? {};
-      if (providerName === "AWS") {
-        const connectionId = configuration.awsConnectionId;
-        if (typeof connectionId === "string" && connectionId) {
-          await deleteAwsConnection(tenant, connectionId);
-        }
-        await disconnectNango({ tenantSlugOrId: tenant, integrationId });
-      } else if (providerName === "Azure") {
-        const connectionId = configuration.azureConnectionId;
-        if (typeof connectionId === "string" && connectionId) {
-          await deleteAzureConnection(tenant, connectionId);
-        }
-        await disconnectNango({ tenantSlugOrId: tenant, integrationId });
-      } else if (providerName === "Google Cloud") {
-        await deleteGoogleCloudConnection(tenant, integrationId);
-      } else if (providerName === DATABRICKS_UNITY_CATALOG) {
-        await deleteDatabricksConnection(tenant, integrationId);
-      } else if (providerName === CREWAI) {
-        await deleteCrewAIConnection(tenant, integrationId);
-      } else if (providerName === LANGSMITH) {
-        await deleteLangSmithConnection(tenant, integrationId);
-      } else {
-        // Nango-backed rows (e.g. GitHub PAT): drop the Nango connection and its
-        // reference too, or the card keeps showing "Connected".
-        await disconnectNango({ tenantSlugOrId: tenant, integrationId });
-        await clearIntegrationCredentials(tenant, integrationId);
-      }
-      // Whatever the provider, its discovered agents go with it.
-      const revokedTenantId = await resolveTenantId(tenant);
-      await pruneOrphanAgents(revokedTenantId);
-      // GitHub gone: its repo model detections go too (no-op while GitHub stays connected).
-      await purgeRepoModelsIfGithubGone(revokedTenantId);
+      await revokeConnection(
+        tenant,
+        requiredString(body, "integrationId"),
+        requiredString(body, "providerName"),
+        (body.configuration ?? {}) as Record<string, unknown>,
+      );
       return NextResponse.json({ ok: true });
     }
 

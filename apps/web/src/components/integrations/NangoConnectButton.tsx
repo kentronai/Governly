@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { successToast, errorToast } from "@/lib/utils/toast";
+import { errorToast } from "@/lib/utils/toast";
 
 // Self-hosted Nango URLs the browser widget must use. Without these the SDK
 // defaults to Nango Cloud (api.nango.dev / connect.nango.dev) and the popup
@@ -143,7 +143,8 @@ export function NangoConnectButton({
         );
       } else if (data.type === "connect") {
         setSessionToken(null);
-        successToast("", "", "", "Account connected");
+        // No toast here: the account is only usable once NORIX has verified it
+        // (onConnected), and the caller reports that real outcome.
         const connectionId =
           data.payload?.connectionId ?? data.payload?.connection_id;
         onConnected?.(

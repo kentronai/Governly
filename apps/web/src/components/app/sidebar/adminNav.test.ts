@@ -37,7 +37,6 @@ describe("Admin Center navigation config", () => {
       ["Controls", "admin/controls"],
       ["Integrations", "admin/integrations"],
       ["BYOK", "admin/settings/byok"],
-      ["AI Radar", "admin/settings/ai-policies-updates"],
       ["Support", "admin/support"],
     ]);
   });
@@ -111,7 +110,7 @@ describe("getVisibleAdminNav", () => {
         activePolicyNames: allPolicies,
         enabledFrameworkSlugs: allFrameworkSlugs,
       }),
-    ).toHaveLength(11 + FRAMEWORKS.length);
+    ).toHaveLength(10 + FRAMEWORKS.length);
   });
 
   it("shows a framework tab right below Regulations only when its policy is enabled", () => {
@@ -166,7 +165,6 @@ describe("getVisibleAdminNav", () => {
         "Regulations & Frameworks",
         "Integrations",
       "BYOK",
-        "AI Radar",
       ]),
     );
   });
