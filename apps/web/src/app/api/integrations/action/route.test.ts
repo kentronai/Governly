@@ -22,7 +22,7 @@ jest.mock("@db", () => ({
 jest.mock("@/lib/server/tenant-access", () => ({
   requireTenantMember: jest.fn(async () => ({ tenantId: "tenant-1" })),
 }));
-jest.mock("@/lib/server/nango/client", () => ({}));
+jest.mock("@/lib/server/nango/client", () => ({ listConnections: jest.fn(async () => []), deleteConnection: jest.fn() }));
 jest.mock("@/lib/actions/aws-discovery", () => ({ triggerManualScan: jest.fn() }));
 jest.mock("@/lib/actions/aws-integration", () => ({
   syncAwsConnectionFromNango: jest.fn(async () => ({ awsConnectionId: "aws-row-1" })),

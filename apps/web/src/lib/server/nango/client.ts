@@ -219,9 +219,8 @@ export async function listConnections(params?: {
 }): Promise<NangoConnectionListItem[]> {
   assertConfigured();
   const url = new URL(`${NANGO_HOST}/connection`);
-  if (params?.providerConfigKey) {
-    url.searchParams.set("provider_config_key", params.providerConfigKey);
-  }
+  // The self-hosted Nango rejects provider_config_key on GET /connection (400
+  // "Unrecognized key"), which made every lookup fail. Filter by provider below.
   if (params?.endUserId) url.searchParams.set("endUserId", params.endUserId);
   if (params?.connectionId) {
     url.searchParams.set("connectionId", params.connectionId);
@@ -261,7 +260,10 @@ export async function listConnections(params?: {
     }))
     .filter(
       (item) =>
-        typeof item.connectionId === "string" && item.connectionId.length > 0,
+        typeof item.connectionId === "string" &&
+        item.connectionId.length > 0 &&
+        (!params?.providerConfigKey ||
+          item.providerConfigKey === params.providerConfigKey),
     );
 }
 

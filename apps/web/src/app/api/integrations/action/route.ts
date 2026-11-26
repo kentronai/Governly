@@ -4,6 +4,7 @@ import { db, integrations, tenants } from "@db";
 import { requireTenantMember } from "@/lib/server/tenant-access";
 import {
   getConnection,
+  deleteConnection,
   getConnectionCredentials,
   listConnections,
 } from "@/lib/server/nango/client";
@@ -254,8 +255,33 @@ async function revokeConnection(
   await purgeRepoModelsIfGithubGone(revokedTenantId);
 }
 
-/** Undo a half-finished connect, using the configuration the connect wrote. */
-async function rollbackConnect(tenant: string, integrationId: string, providerName: string) {
+/**
+ * Undo a half-finished connect, using the configuration the connect wrote.
+ * The popup's own Nango connection is deleted too, even if NORIX never bound it
+ * to the row, so failed attempts don't pile up as orphans in Nango.
+ */
+async function rollbackConnect(
+  tenant: string,
+  integrationId: string,
+  providerName: string,
+  providerConfigKey: string,
+  hintConnectionId?: string,
+) {
+  if (hintConnectionId) {
+    try {
+      const tenantId = await resolveTenantId(tenant);
+      const owned = await listConnections({
+        connectionId: hintConnectionId,
+        endUserId: tenantId,
+        providerConfigKey,
+      });
+      if (owned.some((c) => c.connectionId === hintConnectionId && c.endUserId === tenantId)) {
+        await deleteConnection(hintConnectionId, providerConfigKey);
+      }
+    } catch (error) {
+      console.error("Deleting the failed Nango connection failed:", error);
+    }
+  }
   try {
     const tenantId = await resolveTenantId(tenant);
     const row = await db.query.integrations.findFirst({
@@ -542,12 +568,12 @@ export async function POST(request: NextRequest) {
       try {
         result = await connect();
       } catch (error) {
-        await rollbackConnect(tenant, integrationId, providerName);
+        await rollbackConnect(tenant, integrationId, providerName, providerConfigKey, hintConnectionId);
         throw error;
       }
       const failed = result as { status?: string; errorMessage?: string } | undefined;
       if (failed?.status === "failed") {
-        await rollbackConnect(tenant, integrationId, providerName);
+        await rollbackConnect(tenant, integrationId, providerName, providerConfigKey, hintConnectionId);
         throw new Error(
           `${providerName} could not be connected: ${failed.errorMessage || "the credentials were rejected"}. Check them and click Connect again.`,
         );
