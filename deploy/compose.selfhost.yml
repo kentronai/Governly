@@ -2,7 +2,9 @@
 #   docker compose -f docker-compose.yml -f deploy/compose.selfhost.yml up -d
 # It changes only what ties the stack to one hosted domain: nginx serves plain
 # HTTP on GOVERNLY_HTTP_PORT (TLS goes in front, see deploy/README.md), and a
-# one-shot `migrate` service applies the Drizzle migrations.
+# one-shot `migrate` service applies the Drizzle migrations. It applies them one
+# at a time (scripts/migrate-staged.mjs) so a fresh database can use enum values
+# added by earlier migrations.
 services:
   nginx:
     ports: !override
@@ -33,7 +35,7 @@ services:
       - >-
         corepack enable && corepack prepare pnpm@9.0.0 --activate &&
         pnpm install --frozen-lockfile --filter @ai-governance/web... &&
-        cd apps/web && pnpm exec drizzle-kit migrate --config=src/drizzle.config.env.ts
+        cd apps/web && node scripts/migrate-staged.mjs
 
 volumes:
   migrate_node_modules:
