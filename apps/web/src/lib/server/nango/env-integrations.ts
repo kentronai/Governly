@@ -10,7 +10,50 @@ import { and, eq } from "drizzle-orm";
 import { db, integrations } from "@db";
 import catalog from "@/lib/integrations/provider-catalog.json";
 import { tabOf } from "@/lib/integrations/categories";
-import { createIntegration, listIntegrationKeys } from "./client";
+import { isGithubProviderKey } from "@/lib/integrations/categories";
+import { decryptSecret } from "@/lib/server/crypto";
+import { createConnectionWithCredentials, createIntegration, listIntegrationKeys } from "./client";
+
+/**
+ * Heal cards broken by older builds: a Revoke that wiped the card's Nango key
+ * (it then showed a JSON box), and a GitHub token saved through that box, which
+ * sat encrypted on the row where nothing reads it. Move such a token into Nango
+ * so discovery and the Model Registry see GitHub as connected.
+ */
+async function repairCard(row: typeof integrations.$inferSelect, key: string) {
+  const config = (row.configuration as Record<string, unknown> | null) ?? {};
+  const patch: Partial<typeof integrations.$inferInsert> = {};
+  if (config.nangoProviderKey !== key) patch.configuration = { ...config, nangoProviderKey: key };
+  if (isGithubProviderKey(key) && row.credentialsEncrypted && !row.nangoConnectionId) {
+    try {
+      const saved = JSON.parse(decryptSecret(row.credentialsEncrypted)) as Record<string, unknown>;
+      const token = Object.values(saved).find((v): v is string => typeof v === "string" && v.trim().length > 0);
+      if (token) {
+        const connectionId = `${row.tenantId}--${key}`;
+        await createConnectionWithCredentials({
+          connectionId,
+          providerConfigKey: key,
+          credentials: { type: "API_KEY", apiKey: token.trim() },
+          metadata: { tenantId: row.tenantId, integrationId: row.id },
+        });
+        Object.assign(patch, {
+          nangoConnectionId: connectionId,
+          nangoProviderConfigKey: key,
+          credentialsEncrypted: null,
+          isCredentialsAdded: true,
+          isEnabled: true,
+          syncStatus: "pending",
+          errorMessage: null,
+        });
+      }
+    } catch (error) {
+      console.error(`Env integrations: could not move ${row.name}'s saved token into Nango:`, error);
+    }
+  }
+  if (Object.keys(patch).length) {
+    await db.update(integrations).set(patch).where(eq(integrations.id, row.id));
+  }
+}
 
 // GitHub OAuth discovery reads private repos + org repos; without scopes the
 // OAuth token only sees public data.
@@ -76,6 +119,8 @@ export async function ensureEnvIntegrations(tenantId: string, userId: string) {
           createdBy: userId,
           updatedBy: userId,
         });
+      } else {
+        await repairCard(existing, p.key);
       }
     } catch (error) {
       console.error(`Env integrations: failed to enable ${p.key}:`, error);

@@ -580,10 +580,12 @@ export default function IntegrationsPage() {
     if (selected.name === "Snowflake") {
       return Boolean(credentials.hostUrl.trim() && credentials.apiKey.trim());
     }
+    // A plain key/token is accepted as-is (stored as {apiKey}); JSON only
+    // needs to parse when it looks like JSON.
+    const raw = credentials.json.trim();
+    if (!raw.startsWith("{")) return Boolean(raw);
     try {
-      return Boolean(
-        credentials.json.trim() && JSON.parse(credentials.json.trim()),
-      );
+      return Boolean(JSON.parse(raw));
     } catch {
       return false;
     }
@@ -729,7 +731,8 @@ export default function IntegrationsPage() {
             apiKey: credentials.apiKey,
           };
         } else {
-          secret = JSON.parse(credentials.json);
+          const raw = credentials.json.trim();
+          secret = raw.startsWith("{") ? JSON.parse(raw) : { apiKey: raw };
         }
         await runIntegrationAction("saveEncryptedCredentials", {
           tenantSlugOrId: tenant.id,
@@ -1611,18 +1614,18 @@ export default function IntegrationsPage() {
                 </>
               ) : (
                 <FormField
-                  label="Credentials JSON"
+                  label="API key or token"
                   required
-                  help="Enter the provider credential object. NORIX encrypts the complete object at rest."
+                  help="Paste the key or token. For providers that need several fields, paste a JSON object instead. NORIX encrypts it at rest."
                 >
                   <Textarea
-                    rows={6}
+                    rows={4}
                     value={credentials.json}
                     onChange={(event) =>
                       setCredential("json", event.target.value)
                     }
-                    placeholder='{"apiKey":"..."}'
-                    className="font-mono text-xs"
+                    placeholder="Paste key or token"
+                    className="break-all font-mono text-xs [field-sizing:fixed]"
                   />
                 </FormField>
               )}

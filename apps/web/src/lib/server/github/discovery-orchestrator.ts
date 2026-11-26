@@ -183,13 +183,16 @@ export function serverNameUrl(texts: string[]): string | null {
  * a manifest names one (e.g. owluc.com -> app.owluc.com).
  */
 async function appUrl(conn: GithubConnection, repo: GithubRepo, all: GithubTreeEntry[]) {
-  if (!repo.homepage) {
-    // No website set on the repo: the domain its own nginx config serves is the app's host.
-    const proxies = all
-      .filter((e) => /(^|\/)nginx[^/]*\.conf$/i.test(e.path) && e.path.split("/").length <= 3 && !RETIRED_PATH.test(e.path))
-      .slice(0, 2);
-    return serverNameUrl((await Promise.all(proxies.map((e) => getBlobText(conn, repo, e)))).filter((t): t is string => Boolean(t)));
-  }
+  // The domain the repo's own nginx config serves is where its code actually
+  // runs, so it wins over the GitHub website (often a marketing domain). It is
+  // also what links the repo to its EC2 host when their names differ.
+  const proxies = all
+    .filter((e) => /(^|\/)nginx[^/]*\.conf$/i.test(e.path) && e.path.split("/").length <= 3 && !RETIRED_PATH.test(e.path))
+    .slice(0, 2);
+  const served = serverNameUrl(
+    (await Promise.all(proxies.map((e) => getBlobText(conn, repo, e)))).filter((t): t is string => Boolean(t)),
+  );
+  if (served || !repo.homepage) return served;
   const files = all
     .filter((e) => /^(README|CHANGELOG)[^/]*$/i.test(e.path) || isEnvExample(e.path) || /(^|\/)manifest\.json$/i.test(e.path))
     .slice(0, 6);

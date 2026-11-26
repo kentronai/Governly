@@ -55,7 +55,7 @@ import {
   saveEncryptedIntegrationCredentials,
   updateIntegration,
 } from "@/lib/actions/integrations";
-import { disconnectNango } from "@/lib/actions/nango-connect";
+import { connectViaNango, disconnectNango } from "@/lib/actions/nango-connect";
 import { pruneOrphanAgents } from "@/lib/server/agents/prune-orphans";
 import { purgeRepoModelsIfGithubGone } from "@/lib/server/github/model-scan";
 
@@ -253,6 +253,18 @@ async function revokeConnection(
   await pruneOrphanAgents(revokedTenantId);
   // GitHub gone: its repo model detections go too (no-op while GitHub stays connected).
   await purgeRepoModelsIfGithubGone(revokedTenantId);
+}
+
+/** The Nango GitHub provider key of a GitHub card ("github-pat" when the card lost it), else null. */
+async function githubProviderKeyOf(tenant: string, integrationId: string) {
+  const tenantId = await resolveTenantId(tenant);
+  const row = await db.query.integrations.findFirst({
+    where: and(eq(integrations.tenantId, tenantId), eq(integrations.id, integrationId)),
+    columns: { name: true, configuration: true },
+  });
+  const key = (row?.configuration as { nangoProviderKey?: unknown } | null)?.nangoProviderKey;
+  if (typeof key === "string" && isGithubProviderKey(key)) return key;
+  return row && /github/i.test(row.name) && /token|pat/i.test(row.name) ? "github-pat" : null;
 }
 
 /**
@@ -691,6 +703,37 @@ export async function POST(request: NextRequest) {
       const integrationId = requiredString(body, "integrationId");
       if (!body.credentials || typeof body.credentials !== "object") {
         throw new Error("credentials are required");
+      }
+      // A GitHub token pasted into the key box must land where GitHub discovery,
+      // the Model Registry and Revoke read it: a Nango connection. Otherwise it
+      // sat encrypted on the row and GitHub looked disconnected everywhere.
+      const githubKey = await githubProviderKeyOf(tenant, integrationId);
+      if (githubKey) {
+        const token = Object.values(body.credentials as Record<string, unknown>).find(
+          (v): v is string => typeof v === "string" && v.trim().length > 0,
+        );
+        if (!token) throw new Error("Paste the GitHub personal access token.");
+        await connectViaNango({
+          tenantSlugOrId: tenant,
+          integrationId,
+          providerConfigKey: githubKey,
+          credentials: { type: "API_KEY", apiKey: token.trim() },
+          extraConfiguration: { nangoProviderKey: githubKey },
+        });
+        let result: { status?: string; errorMessage?: string } | undefined;
+        try {
+          result = await triggerGithubDiscovery(tenant, integrationId);
+        } catch (error) {
+          await rollbackConnect(tenant, integrationId, "GitHub", githubKey);
+          throw error;
+        }
+        if (result?.status === "failed") {
+          await rollbackConnect(tenant, integrationId, "GitHub", githubKey);
+          throw new Error(
+            `GitHub could not be connected: ${result.errorMessage || "the token was rejected"}. Check the token and click Connect again.`,
+          );
+        }
+        return NextResponse.json(result);
       }
       return NextResponse.json(
         await saveEncryptedIntegrationCredentials({

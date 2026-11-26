@@ -364,11 +364,19 @@ export const clearIntegrationCredentials = async (
   const { userId } = await auth();
   if (!userId) throw new Error("Authentication required");
   const tenantRow = [await resolveTenant(tenantSlugOrId)];
+  const current = await db.query.integrations.findFirst({
+    where: and(eq(integrations.id, id), eq(integrations.tenantId, tenantRow[0].id)),
+    columns: { configuration: true },
+  });
+  // Keep how the card connects (its Nango provider key): wiping it turned the
+  // GitHub card into a "Credentials JSON" box after every Revoke.
+  const nangoProviderKey = (current?.configuration as { nangoProviderKey?: unknown } | null)
+    ?.nangoProviderKey;
   const [integration] = await db
     .update(integrations)
     .set({
       credentialsEncrypted: null,
-      configuration: {},
+      configuration: typeof nangoProviderKey === "string" ? { nangoProviderKey } : {},
       isCredentialsAdded: false,
       isEnabled: false,
       updatedBy: userId,

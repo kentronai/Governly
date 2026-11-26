@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatTimestamp } from "@/utils/formatTime";
@@ -168,16 +168,24 @@ function relativeFromNow(iso: string | null): string {
 }
 
 /** One empty-cell label for the whole table (Agent ID, framework, LLMs, observability). */
-const NotFound = ({ title }: { title?: string }) => (
+const NotFound = ({ title, label = "Not found" }: { title?: string; label?: string }) => (
   <span className="text-xs text-amber-600" title={title}>
-    Not found
+    {label}
   </span>
 );
 
+// A cloud host (EC2, VM…) only exposes framework, LLMs and observability
+// through its code. Without a linked repo or readable code those fields are
+// unknown, not absent, so say why and how to fix it instead of "Not found".
+const NO_CODE_HINT =
+  "NORIX has not read this agent's code. Connect GitHub under Integrations (the repo links automatically when its live site resolves to this host), or tag the host repo=owner/name, then Refresh.";
+const codeUnknown = (p: { repository: string | null; packages: string[] }) =>
+  !p.repository && p.packages.length === 0;
+
 // Shows the first few items and a "+N" with the full list on hover.
-function Chips({ items, max = 2 }: { items: string[]; max?: number }) {
+function Chips({ items, max = 2, empty }: { items: string[]; max?: number; empty?: ReactNode }) {
   if (items.length === 0) {
-    return <NotFound />;
+    return <>{empty ?? <NotFound />}</>;
   }
   return (
     <div className="flex max-w-[220px] flex-wrap gap-1" title={items.join(", ")}>
@@ -669,6 +677,11 @@ export function AgentInventory({
           ) : (
             rows.map((r) => {
               const profile = readProfile(r.profile);
+              const noCode = codeUnknown(profile) ? (
+                <NotFound label="No code linked" title={NO_CODE_HINT} />
+              ) : (
+                <NotFound />
+              );
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium max-w-[220px] truncate">
@@ -733,16 +746,12 @@ export function AgentInventory({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>{profile.framework ?? <NotFound />}</TableCell>
+                  <TableCell>{profile.framework ?? noCode}</TableCell>
                   <TableCell>
-                    <Chips items={llmCompanies(llmsOf(r))} />
+                    <Chips items={llmCompanies(llmsOf(r))} empty={noCode} />
                   </TableCell>
                   <TableCell>
-                    {observabilityOf(r).length ? (
-                      <Chips items={observabilityOf(r)} />
-                    ) : (
-                      <NotFound />
-                    )}
+                    <Chips items={observabilityOf(r)} empty={noCode} />
                   </TableCell>
                   <TableCell>
                     <RowActionsMenu
