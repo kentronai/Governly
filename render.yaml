@@ -1,0 +1,123 @@
+# Render Blueprint: the "Deploy to Render" button in README.md reads this file.
+# Mirrors docker-compose.yml: nginx is the only public service; web, controlnet and Nango are private.
+# Setup and redeploys: docs/deploy/render.md
+envVarGroups:
+  - name: governly
+    envVars:
+      # Asked for when you create the Blueprint
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: GOVERNLY_URL # https://<public service>.onrender.com, see docs/deploy/render.md
+        sync: false
+      - key: NANGO_SECRET_KEY # any UUID: run `uuidgen`
+        sync: false
+      # Generated once by Render
+      - key: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+        generateValue: true
+      - key: AWS_CREDENTIALS_ENCRYPTION_KEY
+        generateValue: true
+      - key: AGENT_DISCOVERY_CRON_SECRET
+        generateValue: true
+      - key: NANGO_ENCRYPTION_KEY
+        generateValue: true
+      - key: NANGO_DASHBOARD_PASSWORD
+        generateValue: true
+      - key: NEXT_PUBLIC_APP_ENV
+        value: production
+      - key: ENVIRONMENT
+        value: production
+      - key: ENABLE_ONNX_MODELS
+        value: "false"
+
+databases:
+  - name: governly-db
+    databaseName: ai_governance
+    plan: basic-1gb
+    postgresMajorVersion: "15"
+    ipAllowList: []
+
+services:
+  - type: keyvalue
+    name: governly-redis
+    plan: starter
+    ipAllowList: []
+
+  - type: web
+    name: governly
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./deploy/paas/nginx.Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "80"
+      - key: WEB_HOST
+        fromService: { type: pserv, name: governly-web, property: host }
+      - key: CONTROLNET_HOST
+        fromService: { type: pserv, name: governly-controlnet, property: host }
+      - key: NANGO_HOSTNAME
+        fromService: { type: pserv, name: governly-nango, property: host }
+
+  - type: pserv
+    name: governly-web
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: ./apps/web
+    # Render cannot build a URL out of a hostname, so the scheme and port are added here.
+    dockerCommand: >-
+      sh -c 'CONTROLNET_INTERNAL_URL=http://$CONTROLNET_HOST:8000 NANGO_HOST=http://$NANGO_HOSTNAME:3003 exec node server.js'
+    envVars:
+      - fromGroup: governly
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: PORT
+        value: "8080"
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase: { name: governly-db, property: connectionString }
+      - key: CONTROLNET_HOST
+        fromService: { type: pserv, name: governly-controlnet, property: host }
+      - key: NANGO_HOSTNAME
+        fromService: { type: pserv, name: governly-nango, property: host }
+
+  - type: pserv
+    name: governly-controlnet
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./apps/controlnet/Dockerfile
+    dockerContext: ./apps/controlnet
+    envVars:
+      - fromGroup: governly
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        fromDatabase: { name: governly-db, property: connectionString }
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: governly-redis, property: connectionString }
+
+  - type: pserv
+    name: governly-nango
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./deploy/paas/nango.Dockerfile
+    dockerContext: .
+    envVars:
+      - fromGroup: governly
+      # Shares Governly's database; Nango keeps its tables in its own `nango` schema.
+      - key: NANGO_DB_HOST
+        fromDatabase: { name: governly-db, property: host }
+      - key: NANGO_DB_PORT
+        fromDatabase: { name: governly-db, property: port }
+      - key: NANGO_DB_NAME
+        fromDatabase: { name: governly-db, property: database }
+      - key: NANGO_DB_USER
+        fromDatabase: { name: governly-db, property: user }
+      - key: NANGO_DB_PASSWORD
+        fromDatabase: { name: governly-db, property: password }
+      - key: NANGO_REDIS_URL
+        fromService: { type: keyvalue, name: governly-redis, property: connectionString }

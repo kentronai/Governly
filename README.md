@@ -73,6 +73,15 @@ sign up.
 
 ## Deploy it
 
+One click to your cloud. Each asks for your two Clerk keys and prints the live URL when it is up.
+[Cloud deploy guide](docs/deploy.md) covers status, failures and redeploys.
+
+[![Launch on AWS](https://img.shields.io/badge/Launch_on-AWS-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](docs/deploy.md#aws)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Custom.Deployment/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fkentronai%2FNorix%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
+[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/kentronai/Norix&cloudshell_tutorial=deploy/gcp/tutorial.md&show=terminal)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kentronai/Norix)
+[![Deploy on Railway](https://railway.com/button.svg)](docs/deploy.md#railway)
+
 | Where | How |
 | --- | --- |
 | **Any Linux server or VM** (AWS EC2, GCP, Azure, DigitalOcean, Hetzner…) | Run the same one-liner on the server with `GOVERNLY_URL=https://your.domain`, then put HTTPS in front. [Self-hosting guide](docs/self-hosting.md) |

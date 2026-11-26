@@ -3,6 +3,7 @@
 ## Getting started
 
 - [Self-hosting](self-hosting.md): install with one command, HTTPS, Clerk, upgrades, backups, troubleshooting
+- [Deploy to the cloud](deploy.md): one-click AWS, Azure, Google Cloud, Render and Railway, status and redeploys
 - [Configuration](configuration.md): every `.env` setting
 - [Setup skill for coding agents](SKILL.md): hand this to Claude Code, Codex or Cursor
 

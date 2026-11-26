@@ -90,8 +90,20 @@ ENV NEXT_PUBLIC_NANGO_CONNECT_URL=$NEXT_PUBLIC_NANGO_CONNECT_URL
 ENV NEXT_PUBLIC_NANGO_FRONTEND_URL=$NEXT_PUBLIC_NANGO_FRONTEND_URL
 ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 
+# PaaS deploys (render.yaml, Railway) pass only GOVERNLY_URL; derive the public URLs from it
+# unless they were given explicitly (Docker Compose sets them all through .env).
+ARG GOVERNLY_URL
+
 # Build Next.js application
 RUN \
+  if [ -n "$GOVERNLY_URL" ]; then \
+    export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-$GOVERNLY_URL}" \
+      NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-$GOVERNLY_URL}" \
+      NEXT_PUBLIC_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-$GOVERNLY_URL}" \
+      NEXT_PUBLIC_NANGO_API_URL="${NEXT_PUBLIC_NANGO_API_URL:-$GOVERNLY_URL/nango-api}" \
+      NEXT_PUBLIC_NANGO_CONNECT_URL="${NEXT_PUBLIC_NANGO_CONNECT_URL:-$GOVERNLY_URL/nango-connect}" \
+      NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-production}"; \
+  fi; \
   if [ -f pnpm-lock.yaml ]; then \
     corepack enable pnpm && pnpm run build; \
   else \
@@ -114,6 +126,9 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# SQL migrations, applied at boot when RUN_MIGRATIONS=true (src/instrumentation.ts)
+COPY --from=builder /app/drizzle/meta ./drizzle/meta
+COPY --from=builder /app/drizzle/*.sql ./drizzle/
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app

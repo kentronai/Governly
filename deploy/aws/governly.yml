@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Governly on one EC2 instance (Docker Compose). The stack waits until Governly answers its health
+  check; if the install fails or times out, CloudFormation rolls back and deletes every resource.
+
+Parameters:
+  ClerkPublishableKey:
+    Type: String
+    AllowedPattern: "pk_.+"
+    Description: Clerk publishable key (pk_...) from https://dashboard.clerk.com > API Keys
+  ClerkSecretKey:
+    Type: String
+    NoEcho: true
+    AllowedPattern: "sk_.+"
+    Description: Clerk secret key (sk_...)
+  InstanceType:
+    Type: String
+    Default: t3.xlarge
+    AllowedValues: [t3.large, t3.xlarge, t3.2xlarge, m6i.xlarge, m6i.2xlarge]
+    Description: t3.xlarge (4 vCPU / 16 GB) runs the ML guard models; t3.large works without them
+  AllowedCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who may open Governly on port 80
+  KeyName:
+    Type: String
+    Default: ""
+    Description: Optional EC2 key pair, opens SSH (port 22) from AllowedCidr
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+
+Conditions:
+  HasKey: !Not [!Equals [!Ref KeyName, ""]]
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Governly
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: !Ref AllowedCidr }
+        - !If [HasKey, { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref AllowedCidr }, !Ref AWS::NoValue]
+
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !If [HasKey, !Ref KeyName, !Ref AWS::NoValue]
+      SecurityGroupIds: [!GetAtt SecurityGroup.GroupId]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs: { VolumeSize: 60, VolumeType: gp3 }
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          log=/var/log/governly-install.log
+          signal() {
+            curl -fsS -X PUT -H 'Content-Type:' --data-binary \
+              "{\"Status\":\"$1\",\"Reason\":\"$2\",\"UniqueId\":\"governly\",\"Data\":\"$2\"}" '${WaitHandle}'
+          }
+          if curl -fsSL https://raw.githubusercontent.com/kentronai/Norix/main/deploy/vm-init.sh \
+               | NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY='${ClerkPublishableKey}' CLERK_SECRET_KEY='${ClerkSecretKey}' bash >"$log" 2>&1
+          then signal SUCCESS "Governly is running"
+          else signal FAILURE "Install failed: $(tail -c 400 "$log" | tr -d '"\\' | tr '\n' ' ')"
+          fi
+
+  Ready:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: Instance
+    Properties:
+      Handle: !Ref WaitHandle
+      Timeout: "3000"
+
+Outputs:
+  Url:
+    Description: Open Governly here, then add it to your Clerk app's allowed origins
+    Value: !Sub http://${Instance.PublicIp}
+  Redeploy:
+    Description: Pull the latest version and redeploy in place (SSH or Session Manager)
+    Value: sudo bash /opt/governly/deploy/vm-init.sh
