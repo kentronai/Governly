@@ -129,6 +129,7 @@ COPY --from=builder /app/.next/static ./.next/static
 # SQL migrations, applied at boot when RUN_MIGRATIONS=true (src/instrumentation.ts)
 COPY --from=builder /app/drizzle/meta ./drizzle/meta
 COPY --from=builder /app/drizzle/*.sql ./drizzle/
+COPY --from=builder /app/scripts/migrate-staged.mjs ./scripts/
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app

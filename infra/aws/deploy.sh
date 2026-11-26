@@ -147,7 +147,7 @@ $SSH "cd ${REMOTE_DIR} && sudo docker run --rm --network controlnet-network \
     corepack enable && corepack prepare pnpm@9.0.0 --activate && \
     pnpm install --frozen-lockfile --filter @ai-governance/web... && \
     cd apps/web && \
-    pnpm exec drizzle-kit migrate --config=src/drizzle.config.env.ts'"
+    node scripts/migrate-staged.mjs'"
 success "Drizzle migrations complete"
 
 # ── Health check ─────────────────────────────────────────────────────────────

@@ -83,7 +83,7 @@ services:
     volumes:
       - ./apps/web:/app
       - web_node_modules:/app/node_modules
-    command: sh -c "test -x node_modules/.bin/drizzle-kit || npm install; npx drizzle-kit migrate --config=src/drizzle.config.ts"
+    command: sh -c "test -x node_modules/.bin/drizzle-kit || npm install; node scripts/migrate-staged.mjs"
 
   # ControlNet Gateway (Development Mode)
   controlnet:

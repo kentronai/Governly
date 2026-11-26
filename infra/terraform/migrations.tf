@@ -34,8 +34,8 @@ resource "google_cloud_run_v2_job" "migrations" {
             cd /app
             echo "🔄 Running database migrations..."
             echo "📋 Migration files: $(ls drizzle/*.sql 2>/dev/null | wc -l | tr -d ' ') SQL files found"
-            echo "🚀 Executing drizzle-kit migrate..."
-            npx drizzle-kit migrate --config=src/drizzle.config.ts
+            echo "🚀 Applying migrations one at a time..."
+            node scripts/migrate-staged.mjs
             echo "✅ Migrations completed successfully!"
           EOT
         ]
