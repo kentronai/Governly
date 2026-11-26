@@ -76,11 +76,13 @@ sign up.
 One click to your cloud. Each asks for your two Clerk keys and prints the live URL when it is up.
 [Cloud deploy guide](docs/deploy.md) covers status, failures and redeploys.
 
-[![Launch on AWS](https://img.shields.io/badge/Launch_on-AWS-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)](docs/deploy.md#aws)
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Custom.Deployment/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fkentronai%2FNorix%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json)
-[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/kentronai/Norix&cloudshell_tutorial=deploy/gcp/tutorial.md&show=terminal)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kentronai/Norix)
-[![Deploy on Railway](https://railway.com/button.svg)](docs/deploy.md#railway)
+<p>
+  <a href="docs/deploy.md#aws"><img alt="Launch on AWS" height="32" src="https://img.shields.io/badge/Launch_on-AWS-FF9900?style=for-the-badge"></a>
+  <a href="https://portal.azure.com/#create/Custom.Deployment/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fkentronai%2FNorix%2Fmain%2Fdeploy%2Fazure%2Fazuredeploy.json"><img alt="Deploy to Azure" height="32" src="https://img.shields.io/badge/Deploy_to-Azure-0078D4?style=for-the-badge"></a>
+  <a href="https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/kentronai/Norix&cloudshell_tutorial=deploy/gcp/tutorial.md&show=terminal"><img alt="Deploy to Google Cloud" height="32" src="https://img.shields.io/badge/Deploy_to-Google_Cloud-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white"></a>
+  <a href="https://render.com/deploy?repo=https://github.com/kentronai/Norix"><img alt="Deploy to Render" height="32" src="https://img.shields.io/badge/Deploy_to-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white"></a>
+  <a href="docs/deploy.md#railway"><img alt="Deploy on Railway" height="32" src="https://img.shields.io/badge/Deploy_on-Railway-0B0D0E?style=for-the-badge&logo=railway&logoColor=white"></a>
+</p>
 
 | Where | How |
 | --- | --- |
