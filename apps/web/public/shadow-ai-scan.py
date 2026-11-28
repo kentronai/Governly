@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Governly AI environment scan.
 
-Finds AI applications, IDE extensions, local model runtimes, AI CLI tools and MCP
-server configs on this machine and
+Finds AI applications (and which are running), IDE and browser extensions, AI
+websites visited, local model runtimes, AI CLI tools and MCP server configs on
+this machine and
 uploads the result to the organization's Shadow AI page in Governly.
 
     python3 shadow-ai-scan.py --url https://app.example.com --token <scan token>
@@ -15,7 +16,9 @@ origins it trusts, so the browser's Scan button can scan this machine. The
 browser asks the user to allow local network access the first time.
 
 Standard library only (Python >= 3.9). Read-only: it stats, reads and globs a
-fixed list of config paths and looks up binaries on PATH. Secret values never
+fixed list of config paths, looks up binaries on PATH, lists process names, and
+reads browser history only to count visits to known AI domains (URLs, titles and
+page content never leave the machine). Secret values never
 leave the machine: env values are dropped (only their names are kept) and
 token-shaped strings in commands, args and URLs are redacted before upload.
 """
@@ -473,6 +476,214 @@ def discover_ide_extensions():
             for (name, ide), path in sorted(found.items())]
 
 
+# --- AI websites, browser extensions, running apps ----------------------------
+
+# domain -> service. A host matches the domain itself or any subdomain of it.
+AI_DOMAINS = {
+    "chatgpt.com": "ChatGPT", "chat.openai.com": "ChatGPT", "sora.com": "Sora",
+    "platform.openai.com": "OpenAI Platform", "claude.ai": "Claude",
+    "console.anthropic.com": "Anthropic Console", "gemini.google.com": "Gemini",
+    "bard.google.com": "Gemini", "aistudio.google.com": "Google AI Studio",
+    "notebooklm.google.com": "NotebookLM", "copilot.microsoft.com": "Microsoft Copilot",
+    "perplexity.ai": "Perplexity", "poe.com": "Poe", "chat.mistral.ai": "Mistral Le Chat",
+    "chat.deepseek.com": "DeepSeek", "grok.com": "Grok", "meta.ai": "Meta AI",
+    "chat.qwen.ai": "Qwen", "kimi.com": "Kimi", "chat.z.ai": "Z.ai", "pi.ai": "Pi",
+    "character.ai": "Character.AI", "you.com": "You.com", "phind.com": "Phind",
+    "huggingface.co": "Hugging Face", "openrouter.ai": "OpenRouter", "groq.com": "Groq",
+    "v0.dev": "v0", "v0.app": "v0", "bolt.new": "Bolt", "lovable.dev": "Lovable",
+    "replit.com": "Replit", "manus.im": "Manus", "genspark.ai": "Genspark",
+    "midjourney.com": "Midjourney", "leonardo.ai": "Leonardo AI", "ideogram.ai": "Ideogram",
+    "runwayml.com": "Runway", "suno.com": "Suno", "elevenlabs.io": "ElevenLabs",
+    "otter.ai": "Otter.ai", "fireflies.ai": "Fireflies", "jasper.ai": "Jasper",
+    "copy.ai": "Copy.ai", "writesonic.com": "Writesonic", "quillbot.com": "QuillBot",
+    "gamma.app": "Gamma", "deepl.com": "DeepL",
+}
+
+# Chromium browsers: (name, {platform: "User Data" folder}). Profiles are Default and "Profile N".
+CHROMIUM_BROWSERS = [
+    ("Chrome", {"macOS": "~/Library/Application Support/Google/Chrome",
+                "Linux": "~/.config/google-chrome",
+                "Windows": "~/AppData/Local/Google/Chrome/User Data"}),
+    ("Edge", {"macOS": "~/Library/Application Support/Microsoft Edge",
+              "Linux": "~/.config/microsoft-edge",
+              "Windows": "~/AppData/Local/Microsoft/Edge/User Data"}),
+    ("Brave", {"macOS": "~/Library/Application Support/BraveSoftware/Brave-Browser",
+               "Linux": "~/.config/BraveSoftware/Brave-Browser",
+               "Windows": "~/AppData/Local/BraveSoftware/Brave-Browser/User Data"}),
+    ("Arc", {"macOS": "~/Library/Application Support/Arc/User Data"}),
+    ("Chromium", {"macOS": "~/Library/Application Support/Chromium",
+                  "Linux": "~/.config/chromium",
+                  "Windows": "~/AppData/Local/Chromium/User Data"}),
+]
+FIREFOX_PROFILES = {"macOS": "~/Library/Application Support/Firefox/Profiles/*",
+                    "Linux": "~/.mozilla/firefox/*",
+                    "Windows": "~/AppData/Roaming/Mozilla/Firefox/Profiles/*"}
+SAFARI_HISTORY = "~/Library/Safari/History.db"  # needs Full Disk Access; skipped without it
+
+# (browser, sql, epoch offset in seconds, divisor) -> rows of (url, visits, last visit).
+CHROME_SQL = "SELECT url, visit_count, last_visit_time FROM urls"
+FIREFOX_SQL = "SELECT url, visit_count, last_visit_date FROM moz_places WHERE visit_count > 0"
+SAFARI_SQL = ("SELECT i.url, i.visit_count, MAX(v.visit_time) FROM history_items i "
+              "JOIN history_visits v ON v.history_item = i.id GROUP BY i.id")
+CHROME_EPOCH, SAFARI_EPOCH = -11644473600, 978307200  # 1601-01-01, 2001-01-01
+
+
+def chromium_profiles():
+    for browser, bases in CHROMIUM_BROWSERS:
+        base = bases.get(PLATFORM)
+        if not base:
+            continue
+        for profile in sorted(globmod.glob(str(expand(base) / "Default")) +
+                              globmod.glob(str(expand(base) / "Profile *"))):
+            yield browser, Path(profile)
+
+
+def query_locked_db(path, sql):
+    """Browsers keep history open, so query a temp copy (with its WAL) instead."""
+    import sqlite3
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / path.name
+        shutil.copy2(path, copy)
+        wal = Path(str(path) + "-wal")
+        if wal.exists():
+            shutil.copy2(wal, Path(str(copy) + "-wal"))
+        con = sqlite3.connect("file:%s?mode=ro" % copy, uri=True)
+        try:
+            return con.execute(sql).fetchall()
+        finally:
+            con.close()
+
+
+def ai_service(url):
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    for domain, service in AI_DOMAINS.items():
+        if host == domain or host.endswith("." + domain):
+            return service, domain
+    return None
+
+
+def discover_ai_websites():
+    """AI services visited in this machine's browsers. Only the service, visit count and
+    last visit leave the machine: never the URL, page title or anything typed."""
+    sources = [(b, p / "History", CHROME_SQL, CHROME_EPOCH, 1e6) for b, p in chromium_profiles()]
+    sources += [("Firefox", Path(p) / "places.sqlite", FIREFOX_SQL, 0, 1e6)
+                for p in globmod.glob(str(expand(FIREFOX_PROFILES.get(PLATFORM, ""))))]
+    if PLATFORM == "macOS":
+        sources.append(("Safari", expand(SAFARI_HISTORY), SAFARI_SQL, SAFARI_EPOCH, 1))
+    found = {}  # service -> {domain, browsers, visits, last}
+    for browser, path, sql, epoch, divisor in sources:
+        if not path.is_file():
+            continue
+        try:
+            rows = query_locked_db(path, sql)
+        except Exception:  # ponytail: locked/protected/odd schema → skip that browser
+            continue
+        for url, visits, last in rows:
+            hit = ai_service(url or "")
+            if not hit:
+                continue
+            entry = found.setdefault(hit[0], {"domain": hit[1], "browsers": set(),
+                                              "visits": 0, "last": 0})
+            entry["browsers"].add(browser)
+            entry["visits"] += visits or 0
+            entry["last"] = max(entry["last"], (last or 0) / divisor + epoch)
+    out = []
+    for service, e in sorted(found.items()):
+        when = (datetime.fromtimestamp(e["last"], timezone.utc).strftime("%Y-%m-%d")
+                if e["last"] > 0 else "unknown")
+        out.append({"name": "%s (%s)" % (service, e["domain"]), "category": "AI website",
+                    "status": "installed", "path": None,
+                    "detection": "%s · %d visits · last %s"
+                                 % (", ".join(sorted(e["browsers"])), e["visits"], when)})
+    return out
+
+
+AI_EXTENSION_WORDS = re.compile(
+    r"\b(ai|gpt\w*|chatgpt|claude|gemini|copilot|openai|anthropic|perplexity|llm|"
+    r"deepseek|mistral|monica|merlin|sider|maxai|harpa|grok)\b", re.I)
+
+
+def chromium_extension_name(version_dir):
+    manifest = json.loads((version_dir / "manifest.json").read_text(encoding="utf-8-sig"))
+    name = manifest.get("name", "")
+    if name.startswith("__MSG_"):  # localized: look the key up in the default locale
+        key = name[6:].rstrip("_").lower()
+        locale = manifest.get("default_locale", "en")
+        messages = json.loads((version_dir / "_locales" / locale / "messages.json")
+                              .read_text(encoding="utf-8-sig"))
+        name = next((v.get("message", "") for k, v in messages.items() if k.lower() == key), "")
+    return name
+
+
+def discover_browser_extensions():
+    found = {}
+    for browser, profile in chromium_profiles():
+        for version_dir in globmod.glob(str(profile / "Extensions" / "*" / "*")):
+            try:
+                name = chromium_extension_name(Path(version_dir))
+            except (OSError, ValueError, AttributeError):
+                continue
+            if name and AI_EXTENSION_WORDS.search(name):
+                found.setdefault((name, browser), version_dir)
+    for profile in globmod.glob(str(expand(FIREFOX_PROFILES.get(PLATFORM, "")))):
+        try:
+            addons = json.loads((Path(profile) / "extensions.json").read_text("utf-8"))["addons"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        for a in addons:
+            name = ((a.get("defaultLocale") or {}).get("name") or "")
+            if a.get("type") == "extension" and AI_EXTENSION_WORDS.search(name):
+                found.setdefault((name, "Firefox"), a.get("path"))
+    return [{"name": "%s (%s)" % (name, browser), "category": "Browser extension",
+             "status": "installed", "detection": "Extension in " + browser, "path": path}
+            for (name, browser), path in sorted(found.items())]
+
+
+def process_table():
+    """[(pid, {lower-case names})] for running processes; on macOS the .app bundle name too."""
+    try:
+        if PLATFORM == "Windows":
+            out = subprocess.run(["tasklist", "/fo", "csv", "/nh"], capture_output=True,
+                                 text=True, timeout=10).stdout
+            rows = []
+            for line in out.splitlines():
+                cols = line.strip('"').split('","')
+                if len(cols) > 1 and cols[1].isdigit():
+                    rows.append((int(cols[1]), {cols[0].lower().removesuffix(".exe")}))
+            return rows
+        out = subprocess.run(["ps", "-axo", "pid=,comm="], capture_output=True, text=True,
+                             timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    rows = []
+    for line in out.splitlines():
+        pid, _, comm = line.strip().partition(" ")
+        if not pid.isdigit():
+            continue
+        names = {Path(comm.strip()).name.lower()}
+        bundle = re.search(r"/([^/]+)\.app/", comm)
+        if bundle:
+            names.add(bundle.group(1).lower())
+        rows.append((int(pid), names))
+    return rows
+
+
+def running_processes():
+    return set().union(*(names for _, names in process_table()))
+
+
+def process_names(name, probes):
+    names = {name.lower()}
+    for platform_probes in probes.values():
+        for kind, target in platform_probes:
+            if kind == "app_bundle":
+                names.add(target[:-4].lower())
+            elif kind == "binary":
+                names.add(target.lower())
+    return names
+
+
 def probe_hit(kind, target):
     if kind == "app_bundle":
         if PLATFORM != "macOS":
@@ -492,6 +703,7 @@ def probe_hit(kind, target):
 
 def discover_applications():
     apps = []
+    procs = running_processes()
     for name, category, probes in APPLICATION_REGISTRY:
         hit = None
         for kind, target in probes.get(PLATFORM, ()):
@@ -507,6 +719,8 @@ def discover_applications():
                 running = disk and "stopped · %d models: %s" % (len(disk), ", ".join(disk[:10]))
             if running:
                 detection = "%s · %s" % (detection, running) if detection else running
+        if process_names(name, probes) & procs and "running" not in (detection or ""):
+            detection = "%s · running now" % detection if detection else "running now"
         apps.append({
             "name": name,
             "category": category,
@@ -515,6 +729,8 @@ def discover_applications():
             "path": hit[1] if hit else None,
         })
     apps.extend(discover_ide_extensions())
+    apps.extend(discover_browser_extensions())
+    apps.extend(discover_ai_websites())
     apps.sort(key=lambda a: (a["status"] != "installed", a["name"].lower()))
     return apps[:200]  # ponytail: matches the server's 200-app cap
 
@@ -544,6 +760,77 @@ def discover_cli_tools():
              for n, p in ((n, which(n)) for n in AI_CLI_TOOLS)]
     tools.sort(key=lambda t: (not t["installed"], AI_CLI_TOOLS.index(t["name"])))
     return tools
+
+# --- enforcement: close blocked AI apps ---------------------------------------
+
+REGISTRY_PROBES = {name: probes for name, _, probes in APPLICATION_REGISTRY}
+_notified = set()
+
+
+def notify(title, message):
+    """Best-effort desktop notification for the logged-in user."""
+    try:
+        if PLATFORM == "macOS":
+            subprocess.run(["osascript", "-e", "display notification %s with title %s"
+                            % (json.dumps(message), json.dumps(title))], timeout=10)
+        elif PLATFORM == "Windows":
+            subprocess.run(["msg", "*", "/time:30", "%s: %s" % (title, message)], timeout=10)
+        elif shutil.which("notify-send"):
+            subprocess.run(["notify-send", title, message], timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def enforce(blocked):
+    """Close running apps and CLIs the organization blocked in Governly. Websites and browser
+    extensions are blocked by the browser policy Governly generates for the MDM, not here."""
+    me = os.getpid()
+    table = process_table()
+    closed = []
+    for tool in blocked or []:
+        name = tool.get("name", "")
+        if tool.get("category") in ("AI website", "Browser extension", "IDE extension"):
+            continue
+        targets = process_names(name, REGISTRY_PROBES.get(name, {}))
+        pids = [pid for pid, names in table if pid != me and names & targets]
+        for pid in pids:
+            try:
+                if PLATFORM == "Windows":
+                    subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, timeout=10)
+                else:
+                    os.kill(pid, 15)  # SIGTERM: lets the app save and quit
+            except (OSError, subprocess.SubprocessError):
+                pass
+        if pids:
+            closed.append(name)
+            if name not in _notified:  # once per helper run, not every 5 minutes
+                _notified.add(name)
+                alt = tool.get("alternative")
+                notify("Blocked by your organization",
+                       "%s is not approved for use.%s" % (name, " Use %s instead." % alt if alt else ""))
+    return closed
+
+
+def fetch_policy(base_url, token):
+    request = urllib.request.Request(base_url.rstrip("/") + "/api/shadow-ai/policy",
+                                     headers={"Authorization": "Bearer " + token})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.loads(response.read() or b"{}").get("blocked", [])
+
+
+ENFORCE_EVERY = 300  # seconds
+
+
+def enforce_forever(base_url, token):
+    """Helper thread: re-applies the block list every few minutes, so a blocked app that is
+    reopened gets closed again and a new block takes effect without waiting for the daily scan."""
+    import time
+    while True:
+        try:
+            enforce(fetch_policy(base_url, token))
+        except Exception:  # ponytail: offline or key revoked; try again next round
+            pass
+        time.sleep(ENFORCE_EVERY)
 
 # --- scan + upload ----------------------------------------------------------
 
@@ -689,6 +976,8 @@ def install(origins):
 SETTINGS_FILES = (
     "/Library/Managed Preferences/ai.kentron.shadow-ai.plist",   # Jamf configuration profile
     "/Library/Application Support/Governly/config.plist",        # baked into the downloaded .pkg
+    os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"),
+                 "Governly", "config.plist"),                       # written by the Windows installer
 )
 
 
@@ -740,6 +1029,11 @@ def main(argv=None):
         args.serve = True
     if args.serve:
         server = make_server(origins)
+        settings = managed_settings()
+        url, token = args.url or settings.get("url"), args.token or settings.get("token")
+        if url and token:
+            import threading
+            threading.Thread(target=enforce_forever, args=(url, token), daemon=True).start()
         print("Governly scan helper on http://127.0.0.1:%d (read-only)" % SERVE_PORT)
         print("Allowed: " + ", ".join(origins))
         print("Open Governly > Shadow AI and click Scan this computer.")
@@ -760,7 +1054,7 @@ def main(argv=None):
     if not args.url or not args.token:
         parser.error("--url and --token are required (or use --dry-run)")
     try:
-        upload(args.url, args.token, payload)
+        closed = enforce(upload(args.url, args.token, payload).get("blocked"))
     except urllib.error.HTTPError as exc:
         print("Upload failed: HTTP %d %s" % (exc.code, exc.read().decode("utf-8", "replace")),
               file=sys.stderr)
@@ -772,6 +1066,8 @@ def main(argv=None):
           % (payload["hostname"], len(payload["mcp_servers"]),
              sum(a["status"] == "installed" for a in payload["applications"]),
              sum(t["installed"] for t in payload["cli_tools"])))
+    if closed:
+        print("Closed blocked AI apps: " + ", ".join(closed))
     return 0
 
 

@@ -3832,6 +3832,38 @@ export const machineScans = pgTable(
   (table) => [primaryKey({ columns: [table.tenantId, table.machineId] })],
 );
 
+/** Shadow AI: label, risk override and block state per AI tool seen in a tenant (migration 0073). */
+export const shadowAiTools = pgTable(
+  "shadow_ai_tools",
+  {
+    tenantId: text("tenant_id").notNull(),
+    name: text().notNull(),
+    category: text().notNull(),
+    status: text().default("unknown").notNull(),
+    statusReason: text("status_reason"),
+    riskOverride: integer("risk_override"),
+    riskReason: text("risk_reason"),
+    alternative: text(),
+    blockedAt: timestamp("blocked_at", { withTimezone: true, mode: "string" }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.name] })],
+);
+
+/** Shadow AI trends: machines using each tool, per day (migration 0073). */
+export const shadowAiDaily = pgTable(
+  "shadow_ai_daily",
+  {
+    tenantId: text("tenant_id").notNull(),
+    day: date().notNull(),
+    name: text().notNull(),
+    machines: integer().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.day, table.name] })],
+);
+
 export const evalDatasets = pgTable(
   "eval_datasets",
   {

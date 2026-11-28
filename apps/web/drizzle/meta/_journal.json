@@ -512,6 +512,13 @@
       "when": 1789400003000,
       "tag": "0072_trust_center_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1789400004000,
+      "tag": "0073_shadow_ai_governance",
+      "breakpoints": true
     }
   ]
 }

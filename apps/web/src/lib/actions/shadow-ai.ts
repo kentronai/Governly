@@ -2,12 +2,24 @@
 
 /** Shadow AI: AI apps, AI CLI tools and MCP servers found on the tenant's machines. */
 
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { db, machineScans, users } from "@db";
+import { z } from "zod";
+import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
+import { auditEvents, db, machineScans, shadowAiDaily, shadowAiTools, users } from "@db";
+import { createAuditEvent } from "@/lib/server/audit";
+import { defaultRisk, toolsInScan } from "@/lib/server/shadow-ai-governance";
 import { requireActiveTenant } from "@/lib/server/tenant-access";
 import { saveMachineScan } from "@/lib/server/machine-scans";
 import { createApiKey } from "@/lib/actions/api-keys";
-import { MachineScanSchema, SHADOW_AI_SCAN_PERMISSION, type MachineScanResult, type ScanMcpServer } from "@/lib/shadow-ai";
+import {
+  MachineScanSchema,
+  SHADOW_AI_SCAN_PERMISSION,
+  SHADOW_AI_STATUSES,
+  STATUS_LABEL,
+  type LogUsage,
+  type MachineScanResult,
+  type ScanMcpServer,
+  type ShadowAiStatus,
+} from "@/lib/shadow-ai";
 
 // ponytail: loads every machine row (1 row per machine, ~1k max) and filters/pages in Node, so the
 // browser only ever receives one page. Move to SQL jsonb_array_elements if fleets grow past ~10k machines.
@@ -145,16 +157,210 @@ export async function deleteMachineScan(machineId: string) {
  * A scan-only API key for servers without a browser. It shows up (and can be
  * revoked) on the API Keys page like any other key.
  */
-export async function createScanKey(purpose: "server" | "jamf" = "server") {
+export async function createScanKey(purpose: "server" | "jamf" | "windows" = "server") {
   const { tenantId } = await requireActiveTenant();
-  // A Jamf fleet key lives in a configuration profile, so it gets a year instead of 90 days.
-  const days = purpose === "jamf" ? 365 : 90;
+  // A fleet key lives on every managed computer, so it gets a year instead of 90 days.
+  const days = purpose === "server" ? 90 : 365;
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
   const key = await createApiKey({
     tenantId,
-    name: purpose === "jamf" ? "Shadow AI Jamf fleet" : "Shadow AI server scan",
+    name: { server: "Shadow AI server scan", jamf: "Shadow AI Jamf fleet", windows: "Shadow AI Windows fleet" }[purpose],
     permissions: [SHADOW_AI_SCAN_PERMISSION],
     expiresAt,
   });
   return { token: key.plainKey, expiresAt };
+}
+
+// --- Governance: labels, risk, blocking, trends, audit trail, log import -----------------
+
+export type ShadowAiToolRow = {
+  name: string;
+  category: string;
+  status: ShadowAiStatus;
+  statusReason: string | null;
+  risk: number;
+  riskBasis: string;
+  riskOverridden: boolean;
+  alternative: string | null;
+  blockedAt: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  machines: number;
+  users: number;
+};
+
+/** Every AI tool the tenant has seen, with its label, risk and current reach. */
+export async function listShadowAiTools(): Promise<ShadowAiToolRow[]> {
+  const { tenantId } = await requireActiveTenant();
+  const [tools, machines] = await Promise.all([
+    db.select().from(shadowAiTools).where(eq(shadowAiTools.tenantId, tenantId)),
+    loadMachines(tenantId),
+  ]);
+  const reach = new Map<string, { machines: number; users: Set<string> }>();
+  for (const m of machines)
+    for (const name of toolsInScan(m.result).keys()) {
+      const r = reach.get(name) ?? { machines: 0, users: new Set<string>() };
+      r.machines += 1;
+      r.users.add(m.result.username || m.hostname);
+      reach.set(name, r);
+    }
+  return tools
+    .map((t) => {
+      const base = defaultRisk(t.name, t.category);
+      const overridden = t.riskOverride !== null;
+      return {
+        name: t.name,
+        category: t.category,
+        status: t.status as ShadowAiStatus,
+        statusReason: t.statusReason,
+        risk: overridden ? t.riskOverride! : base.score,
+        riskBasis: overridden ? `Set by admin: ${t.riskReason}` : base.basis,
+        riskOverridden: overridden,
+        alternative: t.alternative,
+        blockedAt: t.blockedAt,
+        firstSeenAt: t.firstSeenAt,
+        lastSeenAt: t.lastSeenAt,
+        machines: reach.get(t.name)?.machines ?? 0,
+        users: reach.get(t.name)?.users.size ?? 0,
+      };
+    })
+    .sort((a, b) => b.risk - a.risk || b.machines - a.machines || a.name.localeCompare(b.name));
+}
+
+const ToolChangeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("status"), status: z.enum(SHADOW_AI_STATUSES), reason: z.string().trim().max(1000).optional() }),
+  z.object({ kind: z.literal("risk"), score: z.number().int().min(0).max(100).nullable(), reason: z.string().trim().max(1000) }),
+  z.object({ kind: z.literal("block"), alternative: z.string().trim().max(200).optional(), reason: z.string().trim().max(1000).optional() }),
+  z.object({ kind: z.literal("unblock"), reason: z.string().trim().max(1000).optional() }),
+]);
+export type ShadowAiToolChange = z.infer<typeof ToolChangeSchema>;
+
+/** Label, re-score, block or unblock one tool. Every change is written to the audit trail. */
+export async function updateShadowAiTool(name: string, input: ShadowAiToolChange) {
+  const { tenantId, userId } = await requireActiveTenant();
+  const change = ToolChangeSchema.parse(input);
+  const where = and(eq(shadowAiTools.tenantId, tenantId), eq(shadowAiTools.name, name));
+  const [tool] = await db.select().from(shadowAiTools).where(where).limit(1);
+  if (!tool) throw new Error("Tool not found.");
+  const now = new Date().toISOString();
+  let set: Partial<typeof shadowAiTools.$inferInsert>;
+  let message: string;
+  if (change.kind === "status") {
+    // Sanctioning or tolerating a tool lifts its block; marking it unsanctioned doesn't block by itself.
+    const lift = change.status === "sanctioned" || change.status === "tolerated";
+    set = { status: change.status, statusReason: change.reason || null, ...(lift && { blockedAt: null }) };
+    message = `${name}: ${STATUS_LABEL[tool.status as ShadowAiStatus]} → ${STATUS_LABEL[change.status]}`;
+  } else if (change.kind === "risk") {
+    if (change.score !== null && !change.reason) throw new Error("A reason is required to override the risk score.");
+    set = { riskOverride: change.score, riskReason: change.score === null ? null : change.reason };
+    message = change.score === null ? `${name}: risk reset to default` : `${name}: risk set to ${change.score}`;
+  } else if (change.kind === "block") {
+    set = { status: "unsanctioned", blockedAt: now, alternative: change.alternative || null, statusReason: change.reason || null };
+    message = `${name}: blocked${change.alternative ? `, use ${change.alternative} instead` : ""}`;
+  } else {
+    set = { blockedAt: null, statusReason: change.reason || null };
+    message = `${name}: unblocked`;
+  }
+  await db.update(shadowAiTools).set({ ...set, updatedAt: now }).where(where);
+  await createAuditEvent({
+    tenantId,
+    actorUserId: userId,
+    action: `shadow_ai.${change.kind === "status" ? "status_changed" : change.kind === "risk" ? "risk_overridden" : change.kind === "block" ? "blocked" : "unblocked"}`,
+    targetType: "shadow_ai_tool",
+    targetId: name,
+    metadata: { ...change, previous_status: tool.status },
+    message,
+  });
+}
+
+/** Machines per tool per day for the last `days` days, for the trends chart. */
+export async function getShadowAiTrends(days = 30) {
+  const { tenantId } = await requireActiveTenant();
+  const since = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  const rows = await db
+    .select()
+    .from(shadowAiDaily)
+    .where(and(eq(shadowAiDaily.tenantId, tenantId), gte(shadowAiDaily.day, since)))
+    .orderBy(asc(shadowAiDaily.day));
+  const byTool = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    const series = byTool.get(r.name) ?? new Map<string, number>();
+    series.set(r.day, r.machines);
+    byTool.set(r.name, series);
+  }
+  const dayList = [...new Set(rows.map((r) => r.day))];
+  const tools = [...byTool].map(([name, series]) => {
+    const first = series.get(dayList[0]) ?? 0;
+    const last = series.get(dayList[dayList.length - 1]) ?? 0;
+    return { name, first, last, change: last - first };
+  });
+  return { days: dayList, series: Object.fromEntries([...byTool].map(([n, s]) => [n, Object.fromEntries(s)])), tools };
+}
+
+/** The Shadow AI audit trail (detections, label changes, blocks), newest first. */
+export async function getShadowAiActivity(limit = 200) {
+  const { tenantId } = await requireActiveTenant();
+  const rows = await db
+    .select({
+      id: auditEvents.id,
+      action: auditEvents.action,
+      tool: auditEvents.targetId,
+      metadata: auditEvents.metadata,
+      createdAt: auditEvents.createdAt,
+      actor: users.email,
+    })
+    .from(auditEvents)
+    .leftJoin(users, eq(users.id, auditEvents.actorUserId))
+    .where(and(eq(auditEvents.tenantId, tenantId), like(auditEvents.action, "shadow_ai.%")))
+    .orderBy(desc(auditEvents.createdAt))
+    .limit(Math.min(limit, 1000));
+  return rows.map((r) => ({ ...r, message: String((r.metadata as { message?: string })?.message ?? "") }));
+}
+
+const LogImportSchema = z.object({
+  source: z.string().trim().min(1).max(80),
+  usage: z
+    .array(
+      z.object({
+        user: z.string().trim().min(1).max(256),
+        tools: z.array(z.object({ name: z.string().max(256), hits: z.number().int().min(0) })).max(200),
+      }),
+    )
+    .max(20_000),
+});
+
+/**
+ * Proxy/DNS log import (Zscaler, Netskope, Umbrella, ...), parsed in the browser by parseAiUsageLog.
+ * Each user becomes a "machine" reported by that source, so labels, trends and alerts apply as for scans.
+ */
+export async function importAiUsageLog(input: { source: string; usage: LogUsage[] }) {
+  const { tenantId, userId } = await requireActiveTenant();
+  const { source, usage } = LogImportSchema.parse(input);
+  const now = new Date().toISOString();
+  // ponytail: one save (and trend refresh) per user; batch it if imports grow past a few thousand users.
+  for (const u of usage)
+    await saveMachineScan(
+      tenantId,
+      userId,
+      {
+        scan_id: crypto.randomUUID(),
+        scanned_at: now,
+        machine_id: `log:${source}:${u.user}`.slice(0, 256),
+        hostname: u.user,
+        username: u.user,
+        platform: `${source} log`,
+        applications: u.tools.map((t) => ({
+          name: t.name,
+          category: "AI website",
+          status: "installed" as const,
+          detection: `${source} log · ${t.hits} requests`,
+          path: null,
+        })),
+        mcp_servers: [],
+        cli_tools: [],
+        errors: [],
+      },
+      `${source} log import`,
+    );
+  return { users: usage.length, tools: new Set(usage.flatMap((u) => u.tools.map((t) => t.name))).size };
 }
