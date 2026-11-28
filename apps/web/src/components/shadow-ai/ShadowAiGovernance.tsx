@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   FileUp,
+  Info,
   Search,
   ShieldAlert,
   Unlock,
@@ -46,6 +47,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -69,6 +75,7 @@ import {
   getShadowAiActivity,
   getShadowAiTrends,
   importAiUsageLog,
+  listCompanyDevices,
   listShadowAiTools,
   updateShadowAiTool,
   type ShadowAiToolChange,
@@ -76,7 +83,9 @@ import {
 } from "@/lib/actions/shadow-ai";
 import {
   parseAiUsageLog,
+  RISK_HELP,
   SHADOW_AI_STATUSES,
+  STATUS_HELP,
   STATUS_LABEL,
   type ShadowAiStatus,
 } from "@/lib/shadow-ai";
@@ -107,6 +116,71 @@ function RiskBadge({ risk }: { risk: number }) {
     </Badge>
   );
 }
+
+/** Clickable (i) that explains a column in plain language. */
+function InfoTip({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-1 h-5 w-5"
+          aria-label={`What is ${title}?`}
+        >
+          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 text-sm" align="start">
+        <p className="mb-2 font-medium">{title}</p>
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const LabelHelp = () => (
+  <InfoTip title="Labels">
+    <dl className="space-y-2">
+      {(["unknown", "sanctioned", "tolerated", "unsanctioned"] as const).map(
+        (s) => (
+          <div key={s}>
+            <dt>
+              <StatusBadge status={s} />
+            </dt>
+            <dd className="mt-1 text-muted-foreground">{STATUS_HELP[s]}</dd>
+          </div>
+        ),
+      )}
+    </dl>
+  </InfoTip>
+);
+
+const RiskHelp = () => (
+  <InfoTip title="Risk score (0 safe – 100 risky)">
+    <p className="mb-2 text-muted-foreground">
+      Known vendors (OpenAI, Anthropic, Perplexity…) use 100 minus their AI
+      Catalog trust score. Others get a default by type. 60+ is High, 35–59
+      Medium, below 35 Low. Admins can override it with a reason.
+    </p>
+    <dl className="space-y-1">
+      {RISK_HELP.map(([type, score, why]) => (
+        <div key={type}>
+          <dt className="font-medium">
+            {type} · {score}
+          </dt>
+          <dd className="text-muted-foreground">{why}</dd>
+        </div>
+      ))}
+    </dl>
+  </InfoTip>
+);
 
 type Editing = {
   tool: ShadowAiToolRow;
@@ -231,8 +305,14 @@ export function AiToolsTable({ reloadKey }: { reloadKey: number }) {
           <TableRow>
             <TableHead>AI tool</TableHead>
             <TableHead>Category</TableHead>
-            <TableHead>Label</TableHead>
-            <TableHead>Risk</TableHead>
+            <TableHead>
+              Label
+              <LabelHelp />
+            </TableHead>
+            <TableHead>
+              Risk
+              <RiskHelp />
+            </TableHead>
             <TableHead className="text-right">Users</TableHead>
             <TableHead className="text-right">Machines</TableHead>
             <TableHead>First detected</TableHead>
@@ -439,7 +519,7 @@ function ChangeDialog({
           <DialogTitle>{title}</DialogTitle>
           {mode === "block" && (
             <DialogDescription>
-              Marks it unsanctioned. Computers running the Governly scanner
+              Marks it Not approved. Computers running the Governly scanner
               close the app within 5 minutes and tell the user. Websites and
               browser extensions are blocked through the browser policy (Block
               policy button).
@@ -802,9 +882,16 @@ export function ImportLogsCard({ onImported }: { onImported: () => void }) {
     if (!file) return;
     setBusy(true);
     try {
-      const usage = parseAiUsageLog(await file.text());
+      const devices = await listCompanyDevices();
+      if (!devices.length) {
+        errorToast(
+          "Scan company laptops first: only their traffic is imported.",
+        );
+        return;
+      }
+      const usage = parseAiUsageLog(await file.text(), devices);
       if (!usage.length) {
-        errorToast("No AI services found in that file.");
+        errorToast("No AI use from company laptops found in that file.");
         return;
       }
       const r = await importAiUsageLog({ source, usage });
@@ -812,7 +899,7 @@ export function ImportLogsCard({ onImported }: { onImported: () => void }) {
         null,
         "Logs",
         "imported",
-        `Imported ${r.tools} AI services used by ${r.users} users.`,
+        `Found ${r.tools} AI services on ${r.users} company laptops.`,
       );
       onImported();
     } catch (e) {
@@ -827,10 +914,11 @@ export function ImportLogsCard({ onImported }: { onImported: () => void }) {
       <CardHeader>
         <CardTitle className="text-base">Import proxy or DNS logs</CardTitle>
         <CardDescription>
-          Covers web use the scanner can&apos;t see (phones, unmanaged devices).
-          Export web or DNS logs from Zscaler, Netskope, Umbrella and others as
-          CSV or text. The file is read in your browser; only which user used
-          which AI service is uploaded.
+          Adds AI website use from your proxy or DNS tool (Zscaler, Netskope,
+          Umbrella and others), for company laptops only: lines are matched to
+          laptops Governly already scans, and phones, guests and other devices
+          on the network are ignored. The file is read in your browser; only
+          which laptop used which AI service is uploaded.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-3">

@@ -8,6 +8,17 @@ if [ -f "$(dirname "$0")/governly.plist" ]; then
   chmod 644 "/Library/Application Support/Governly/config.plist"
 fi
 USER_ID=$(stat -f %u /dev/console)
+# Remove a helper set up earlier with the one-line command (~/.governly, same launchd label):
+# it would keep port 8766 and run the old scanner instead of this one.
+for HOME_DIR in /Users/*; do
+  OLD="$HOME_DIR/Library/LaunchAgents/ai.kentron.shadow-ai-helper.plist"
+  if [ -f "$OLD" ]; then
+    OWNER=$(stat -f %u "$HOME_DIR")
+    launchctl bootout "gui/$OWNER" "$OLD" 2>/dev/null
+    rm -f "$OLD"
+  fi
+done
+pkill -f '\.governly/shadow-ai-scan.py' 2>/dev/null
 for AGENT in $AGENTS; do
   chown root:wheel "$AGENT"; chmod 644 "$AGENT"
   if [ "$USER_ID" -gt 0 ] 2>/dev/null; then

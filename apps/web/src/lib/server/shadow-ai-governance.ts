@@ -6,11 +6,21 @@ import { emailConfigured, sendEmail } from "@/lib/server/email";
 import { toolsData } from "@/app/[tenant]/ai-catalog/tools";
 import type { MachineScanResult } from "@/lib/shadow-ai";
 
+// CLI binary -> the app the scanner already reports, so "claude" and "Claude Code" are one tool.
+const CLI_APP: Record<string, string> = {
+  claude: "Claude Code", code: "VS Code", cursor: "Cursor", "cursor-agent": "Cursor",
+  codex: "Codex CLI", gemini: "Gemini CLI", ollama: "Ollama", windsurf: "Windsurf",
+  lms: "LM Studio", kiro: "Kiro", zed: "Zed",
+};
+
 /** The AI tools (apps, websites, extensions, CLIs) one scan found, keyed the way shadow_ai_tools is. */
 export function toolsInScan(result: MachineScanResult) {
   const tools = new Map<string, string>();
   for (const a of result.applications) if (a.status === "installed") tools.set(a.name, a.category);
-  for (const t of result.cli_tools) if (t.installed && !tools.has(t.name)) tools.set(t.name, "CLI");
+  for (const t of result.cli_tools) {
+    const name = CLI_APP[t.name] ?? t.name;
+    if (t.installed && !tools.has(name)) tools.set(name, "CLI");
+  }
   return tools;
 }
 
